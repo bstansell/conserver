@@ -1,6 +1,12 @@
 /*
- * $Id: consent.h,v 5.11 1998-12-14 11:20:15-08 bryan Exp $
+ *  $Id: consent.h,v 5.12 1998-12-17 17:21:24-08 bryan Exp $
  *
+ *  GNAC, Inc., 1998
+ *
+ *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
+ */
+
+/*
  * Copyright 1992 Purdue Research Foundation, West Lafayette, Indiana
  * 47907.  All rights reserved.
  *

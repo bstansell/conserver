@@ -1,6 +1,12 @@
 /*
- * $Id: access.c,v 5.9 1993-05-17 07:36:01-07 ksb Exp $
+ *  $Id: access.c,v 5.11 1999-01-13 11:48:11-08 bryan Exp $
  *
+ *  GNAC, Inc., 1998
+ *
+ *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
+ */
+
+/*
  * Copyright 1992 Purdue Research Foundation, West Lafayette, Indiana
  * 47907.  All rights reserved.
  *
@@ -48,6 +54,7 @@ static char copyright[] =
 #include <pwd.h>
 
 #include "cons.h"
+#include "port.h"
 #include "access.h"
 #include "consent.h"
 #include "client.h"

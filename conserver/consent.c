@@ -1,6 +1,12 @@
 /*
- * $Id: consent.c,v 5.30 1998-11-20 17:30:45-08 bryan Exp $
+ *  $Id: consent.c,v 5.33 1999-01-13 11:52:21-08 bryan Exp $
  *
+ *  GNAC, Inc., 1998
+ *
+ *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
+ */
+
+/*
  * Copyright 1992 Purdue Research Foundation, West Lafayette, Indiana
  * 47907.  All rights reserved.
  *
@@ -52,6 +58,7 @@ static char copyright[] =
 #include <pwd.h>
 
 #include "cons.h"
+#include "port.h"
 #include "consent.h"
 #include "client.h"
 #include "main.h"
@@ -628,7 +635,7 @@ fd_set *pfdSet;
 	    struct hostent *hp;
 	    int one = 1;
 	    
-#ifdef USLEEP_FOR_SLOW_PORTS
+#if USLEEP_FOR_SLOW_PORTS
 	    usleep( USLEEP_FOR_SLOW_PORTS );  /* Sleep for slow network ports */
 #endif
 

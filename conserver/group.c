@@ -1,6 +1,12 @@
 /*
- * $Id: group.c,v 5.48 1998-12-14 11:20:15-08 bryan Exp $
+ *  $Id: group.c,v 5.51 1999-01-13 11:48:11-08 bryan Exp $
  *
+ *  GNAC, Inc., 1998
+ *
+ *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
+ */
+
+/*
  * Copyright (c) 1990 The Ohio State University.
  * All rights reserved.
  *
@@ -65,6 +71,7 @@ All rights reserved.\n";
 #include <pwd.h>
 
 #include "cons.h"
+#include "port.h"
 #include "consent.h"
 #include "client.h"
 #include "access.h"
@@ -176,7 +183,28 @@ ReOpen(arg)
 	}
 }
 
-void
+static fd_set *rinitUsr1;
+static SIGRETS
+ReUp(arg)
+	int arg;
+{
+	register int i;
+	register CONSENT *pCE;
+
+	if ((GRPENT *)0 == pGEHup) {
+		return;
+	}
+
+	for (i = 0, pCE = pGEHup->pCElist; i < pGEHup->imembers; ++i, ++pCE) {
+		if (pCE->fup) {
+			continue;
+		}
+		ConsInit(pCE, rinitUsr1);
+	}
+	(void)signal(SIGUSR1, ReUp);
+}
+
+static SIGRETS
 Mark(arg)
     int arg;
 {
@@ -562,10 +590,14 @@ int sfd;
 	/* on a SIGHUP we should close and reopen our log files
 	 */ 
 	pGEHup = pGE;
-	signal(SIGHUP, ReOpen);
+	(void)signal(SIGHUP, ReOpen);
+
+	/* on a SIGUSR1 we try to bring up all downed consoles */ 
+	rinitUsr1 = &rinit;
+	(void)signal(SIGUSR1, ReUp);
 
 	/* on a SIGALRM we should mark log files */
-	signal(SIGALRM, Mark);
+	(void)signal(SIGALRM, Mark);
 	alarm(ALARMTIME);
 
 	/* the MAIN loop a group server

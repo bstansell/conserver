@@ -1,6 +1,12 @@
 /*
- * $Id: client.h,v 5.10 1998-11-18 00:17:12-08 bryan Exp $
+ *  $Id: client.h,v 5.11 1998-12-17 17:20:37-08 bryan Exp $
  *
+ *  GNAC, Inc., 1998
+ *
+ *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
+ */
+
+/*
  * Copyright 1992 Purdue Research Foundation, West Lafayette, Indiana
  * 47907.  All rights reserved.
  *

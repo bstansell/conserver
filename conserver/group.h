@@ -1,6 +1,12 @@
 /*
- * $Id: group.h,v 5.8 1994-07-19 09:40:23-07 ksb Exp $
+ *  $Id: group.h,v 5.9 1998-12-17 17:21:24-08 bryan Exp $
  *
+ *  GNAC, Inc., 1998
+ *
+ *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
+ */
+
+/*
  * Copyright 1992 Purdue Research Foundation, West Lafayette, Indiana
  * 47907.  All rights reserved.
  *

@@ -1,6 +1,12 @@
 /*
- * $Id: client.c,v 5.18 1998-11-19 14:32:20-08 bryan Exp $
+ *  $Id: client.c,v 5.20 1999-01-13 11:48:11-08 bryan Exp $
  *
+ *  GNAC, Inc., 1998
+ *
+ *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
+ */
+
+/*
  * Copyright 1992 Purdue Research Foundation, West Lafayette, Indiana
  * 47907.  All rights reserved.
  *
@@ -47,6 +53,7 @@ static char copyright[] =
 #include <pwd.h>
 
 #include "cons.h"
+#include "port.h"
 #include "consent.h"
 #include "client.h"
 

@@ -1,6 +1,12 @@
 /*
- * $Id: readcfg.c,v 5.21 1998-12-14 11:20:15-08 bryan Exp $
+ *  $Id: readcfg.c,v 5.23 1999-01-13 11:48:11-08 bryan Exp $
  *
+ *  GNAC, Inc., 1998
+ *
+ *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
+ */
+
+/*
  * Copyright (c) 1990 The Ohio State University.
  * All rights reserved.
  *
@@ -39,6 +45,7 @@
 #include <pwd.h>
 
 #include "cons.h"
+#include "port.h"
 #include "consent.h"
 #include "client.h"
 #include "group.h"

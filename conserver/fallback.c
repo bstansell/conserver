@@ -1,6 +1,12 @@
 /*
- * $Id: fallback.c,v 5.18 1994-07-19 08:25:54-07 ksb Exp $
+ *  $Id: fallback.c,v 5.20 1999-01-13 11:48:11-08 bryan Exp $
  *
+ *  GNAC, Inc., 1998
+ *
+ *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
+ */
+
+/*
  * This is a fake library interface to ptyd			    (mtr&ksb)
  *
  * Mike Rowan (mtr@mace.cc.purdue.edu)
@@ -22,6 +28,7 @@
 #include <ctype.h>
 
 #include "cons.h"
+#include "port.h"
 
 #if HAVE_PTSNAME
 /* for grantpt() and unlockpt()						(gregf)

@@ -1,4 +1,12 @@
 /*
+ *  $Id: console.c,v 5.22 1999-01-13 11:48:38-08 bryan Exp $
+ *
+ *  GNAC, Inc., 1998
+ *
+ *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
+ */
+
+/*
  * Copyright (c) 1990 The Ohio State University.
  * All rights reserved.
  *
@@ -31,6 +39,7 @@
 #include <ctype.h>
 
 #include "cons.h"
+#include "port.h"
 #include "version.h"
 
 #if USE_STRINGS
@@ -68,7 +77,7 @@ extern char *sys_errlist[];
 #endif
 
 static char rcsid[] =
-	"$Id: console.c,v 5.20 1998-11-20 16:53:02-08 bryan Exp $";
+	"$Id: console.c,v 5.22 1999-01-13 11:48:38-08 bryan Exp $";
 static char *progname =
 	rcsid;
 int fVerbose = 0, fReplay = 0, fRaw = 0;

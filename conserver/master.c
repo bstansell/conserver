@@ -1,6 +1,12 @@
 /*
- * $Id: master.c,v 5.19 1998-11-17 23:14:51-08 bryan Exp $
+ *  $Id: master.c,v 5.22 1999-01-13 11:48:11-08 bryan Exp $
  *
+ *  GNAC, Inc., 1998
+ *
+ *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
+ */
+
+/*
  * Copyright (c) 1990 The Ohio State University.
  * All rights reserved.
  *
@@ -35,6 +41,7 @@
 #include <pwd.h>
 
 #include "cons.h"
+#include "port.h"
 #include "consent.h"
 #include "client.h"
 #include "group.h"
@@ -113,6 +120,23 @@ QuitIt(arg)
 	++fSawQuit;
 }
 
+/* Signal all the kids...
+ */
+static SIGRETS
+SignalKids(arg)
+	int arg;
+{
+	int i;
+	for (i = 0; i < MAXGRP; ++i) {
+		if (0 == aGroups[i].imembers)
+			continue;
+		if (-1 == kill(aGroups[i].pid, arg)) {
+		    fprintf(stderr, "%s: kill: %s\n", progname, strerror(errno));
+		}
+	}
+	(void)signal(SIGUSR1, SignalKids);
+}
+
 
 /* this routine is used by the master console server process		(ksb)
  */
@@ -136,6 +160,8 @@ REMOTE
 	/* set up signal handler */
 	(void)signal(SIGCHLD, FixKids);
 	(void)signal(SIGTERM, QuitIt);
+	(void)signal(SIGUSR1, SignalKids);
+	(void)signal(SIGHUP, SignalKids);
 
 	/* set up port for master to listen on
 	 */
@@ -187,7 +213,9 @@ REMOTE
 		rmask = rmaster;
 
 		if (-1 == select(msfd+1, &rmask, (fd_set *)0, (fd_set *)0, (struct timeval *)0)) {
-			fprintf(stderr, "%s: select: %s\n", progname, strerror(errno));
+			if ( errno != EINTR ) {
+			    fprintf(stderr, "%s: select: %s\n", progname, strerror(errno));
+			}
 			continue;
 		}
 		if (!FD_ISSET(msfd, &rmask)) {

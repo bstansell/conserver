@@ -1,6 +1,12 @@
 /*
- * $Id: access.h,v 5.6 1993-02-09 03:53:43-08 ldv Exp $
+ *  $Id: access.h,v 5.7 1998-12-17 17:20:37-08 bryan Exp $
  *
+ *  GNAC, Inc., 1998
+ *
+ *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
+ */
+
+/*
  * Copyright 1992 Purdue Research Foundation, West Lafayette, Indiana
  * 47907.  All rights reserved.
  *

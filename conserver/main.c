@@ -1,4 +1,12 @@
 /*
+ *  $Id: main.c,v 5.29 1999-01-13 11:48:11-08 bryan Exp $
+ *
+ *  GNAC, Inc., 1998
+ *
+ *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
+ */
+
+/*
  * Copyright (c) 1990 The Ohio State University.
  * All rights reserved.
  *
@@ -35,6 +43,7 @@
 #include <pwd.h>
 
 #include "cons.h"
+#include "port.h"
 #include "consent.h"
 #include "client.h"
 #include "group.h"
@@ -49,7 +58,7 @@
 #endif
 
 char rcsid[] =
-	"$Id: main.c,v 5.27 1998-11-19 14:32:45-08 bryan Exp $";
+	"$Id: main.c,v 5.29 1999-01-13 11:48:11-08 bryan Exp $";
 char *progname =
 	rcsid;
 int fAll = 1, fVerbose = 0, fSoftcar = 0;
