@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.55 2003/12/21 16:23:02 bryan Exp $
+ *  $Id: consent.h,v 5.56 2004/02/20 14:58:14 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -92,8 +92,9 @@ typedef struct consent {	/* console information                  */
 #endif
     /* type == HOST */
     char *host;			/* hostname                             */
-    unsigned short port;	/* port number      socket = portbase + */
-    unsigned short portbase;	/* port base             portinc * port */
+    unsigned short netport;	/* final port    | netport = portbase + */
+    unsigned short port;	/* port number   |      portinc * port  */
+    unsigned short portbase;	/* port base                            */
     unsigned short portinc;	/* port increment                       */
     unsigned short raw;		/* raw or telnet protocol?              */
     /* type == EXEC */
@@ -105,6 +106,7 @@ typedef struct consent {	/* console information                  */
     char *logfile;		/* logfile                              */
     off_t logfilemax;		/* size limit for rolling logfile       */
     char *initcmd;		/* initcmd command                      */
+    char *initsubst;		/* initcmd substitution pattern         */
     char *motd;			/* motd                                 */
     time_t idletimeout;		/* idle timeout                         */
     char *idlestring;		/* string to print when idle            */

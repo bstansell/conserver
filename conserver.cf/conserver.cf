@@ -91,9 +91,10 @@ default * {
 
 default cyclades {
 	# sets up /dev/ttyC0 through /dev/ttyC31, for a 32 port card
+	# referenced as ports 1 through 32
 	type device;
 	device /dev/ttyC.;
-	devicesubst ,.d;
+	devicesubst .=Pd;
 	portbase -1;
 	portinc 1;
 	host none; # not really used, since devicesubst doesn't use it

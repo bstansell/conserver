@@ -1,5 +1,5 @@
-.\" $Id: console.man,v 1.42 2003/12/25 19:22:02 bryan Exp $
-.TH CONSOLE 1 "2003/12/25" "conserver-8.1.1" "conserver"
+.\" $Id: console.man,v 1.44 2004/03/11 16:23:29 bryan Exp $
+.TH CONSOLE 1 "2004/03/11" "conserver-8.1.2" "conserver"
 .SH NAME
 console \- console server client program
 .SH SYNOPSIS
@@ -318,8 +318,8 @@ a command, or `!' for a remote port.
 .TP
 .I console-details
 The details regarding the console.
-The values here (all comma separated) depend on the type of the console.
-Local devices will have values of the device file, baud rate, and
+The values here (all comma-separated) depend on the type of the console.
+Local devices will have values of the device file, baud rate/parity, and
 file descriptor for the device.
 Commands will have values of the command, the command's pid, the
 pseudo-tty, and file descriptor for the pseudo-tty.
@@ -347,7 +347,7 @@ that the server can open the file for read, but not write.
 .TP
 .I logfile-details
 The details regarding the logging for the console.
-The comma separated
+The comma-separated
 values will be the logfile, ``log'' or ``nolog'' (if logging is on
 or not - toggled via ^EcL), ``act'' or ``noact'' (if activity logging is
 enabled or not - the `a' timestamp option), the timestamp interval, and
@@ -362,10 +362,10 @@ is at work, it will have the value of ``autoup'', otherwise it
 will be ``noautoup''.
 .TP
 .I aliases
-The console aliases are presented in a comma separated list.
+The console aliases are presented in a comma-separated list.
 .TP
 .I options
-The active options for the console are presented in a comma separated list.
+The active options for the console are presented in a comma-separated list.
 .TP
 .I initcmd
 The initcmd configuration option for the console.
@@ -387,6 +387,12 @@ Commands are:
 .sp
 .PD 0
 .TP 13
+.B \.
+disconnect
+.TP
+.B ;
+disconnect and login to another console
+.TP
 .B a
 attach read-write if nobody already is
 .TP
@@ -470,8 +476,6 @@ replay the last line only
 send character having octal code
 .IR ooo " (must"
 specify three octal digits)
-.IP \.
-disconnect
 .PD
 .PP
 If any other character is hit after the escape sequence, all three characters

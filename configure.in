@@ -16,6 +16,7 @@ AH_TEMPLATE([HAVE_OPENSSL], [have openssl support])
 AH_TEMPLATE([HAVE_DMALLOC], [have dmalloc support])
 AH_TEMPLATE([HAVE_SA_LEN],[Defined if sa_len member exists in struct sockaddr])
 AH_TEMPLATE([TRUST_REVERSE_DNS],[Defined if we trust reverse DNS])
+AH_TEMPLATE([USE_EXTENDED_MESSAGES],[Defined if we produce extended messages])
 
 dnl ### Normal initialization. ######################################
 AC_INIT
@@ -208,6 +209,19 @@ AC_ARG_WITH(trustrevdns,
 	[case "$withval" in
 	    yes)
 		AC_DEFINE(TRUST_REVERSE_DNS)
+		AC_MSG_RESULT(yes)
+		;;
+	    *)
+		AC_MSG_RESULT(no)
+		;;
+	esac],[AC_MSG_RESULT(no)])
+
+AC_MSG_CHECKING(whether to display extended messages)
+AC_ARG_WITH(extmsgs,
+	AC_HELP_STRING([--with-extmsgs],[Produce extended messages]),
+	[case "$withval" in
+	    yes)
+		AC_DEFINE(USE_EXTENDED_MESSAGES)
 		AC_MSG_RESULT(yes)
 		;;
 	    *)

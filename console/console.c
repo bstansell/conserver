@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.155 2004/01/08 16:12:46 bryan Exp $
+ *  $Id: console.c,v 5.157 2004/03/10 02:55:47 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -57,6 +57,7 @@ int disconnectCount = 0;
 STRING *execCmd = (STRING *)0;
 CONSFILE *execCmdFile = (CONSFILE *)0;
 pid_t execCmdPid = 0;
+int gotoConsole = 0;
 
 #if HAVE_OPENSSL
 SSL_CTX *ctx = (SSL_CTX *)0;
@@ -784,6 +785,57 @@ ExecCmd()
 
 void
 #if PROTOTYPES
+GetUserInput(STRING *str)
+#else
+GetUserInput(str)
+    STRING *str;
+#endif
+{
+    char c;
+
+    if (str == (STRING *)0)
+	return;
+
+    BuildString((char *)0, str);
+
+    for (;;) {
+	if (read(0, &c, 1) == 0)
+	    break;
+	if (c == '\n' || c == '\r') {
+	    break;
+	}
+	if (c >= ' ' && c <= '~') {
+	    BuildStringChar(c, str);
+	    FileWrite(cfstdout, FLAGFALSE, &c, 1);
+	} else if ((c == '\b' || c == 0x7f) && str->used > 1) {
+	    FileWrite(cfstdout, FLAGFALSE, "\b \b", 3);
+	    str->string[str->used - 2] = '\000';
+	    str->used--;
+	} else if ((c == 0x15) && str->used > 1) {
+	    while (str->used > 1) {
+		FileWrite(cfstdout, FLAGFALSE, "\b \b", 3);
+		str->string[str->used - 2] = '\000';
+		str->used--;
+	    }
+	} else if ((c == 0x17) && str->used > 1) {
+	    while (str->used > 1 &&
+		   isspace((int)(str->string[str->used - 2]))) {
+		FileWrite(cfstdout, FLAGFALSE, "\b \b", 3);
+		str->string[str->used - 2] = '\000';
+		str->used--;
+	    }
+	    while (str->used > 1 &&
+		   !isspace((int)(str->string[str->used - 2]))) {
+		FileWrite(cfstdout, FLAGFALSE, "\b \b", 3);
+		str->string[str->used - 2] = '\000';
+		str->used--;
+	    }
+	}
+    }
+}
+
+void
+#if PROTOTYPES
 DoExec(CONSFILE *pcf)
 #else
 DoExec(pcf)
@@ -791,34 +843,10 @@ DoExec(pcf)
 #endif
 {
     FileWrite(cfstdout, FLAGFALSE, "exec: ", 6);
-    BuildString((char *)0, execCmd);
-    for (;;) {
-	char c;
-	if (read(0, &c, 1) == 0)
-	    break;
-	if (c == '\n' || c == '\r') {
-	    FileWrite(cfstdout, FLAGFALSE, "]\r\n", 3);
-	    break;
-	}
-	if (c == '\a' || (c >= ' ' && c <= '~')) {
-	    BuildStringChar(c, execCmd);
-	    FileWrite(cfstdout, FLAGFALSE, &c, 1);
-	} else if ((c == '\b' || c == 0x7f) && execCmd->used > 1) {
-	    if (execCmd->string[execCmd->used - 2] != '\a') {
-		FileWrite(cfstdout, FLAGFALSE, "\b \b", 3);
-	    }
-	    execCmd->string[execCmd->used - 2] = '\000';
-	    execCmd->used--;
-	} else if ((c == 0x15) && execCmd->used > 1) {
-	    while (execCmd->used > 1) {
-		if (execCmd->string[execCmd->used - 2] != '\a') {
-		    FileWrite(cfstdout, FLAGFALSE, "\b \b", 3);
-		}
-		execCmd->string[execCmd->used - 2] = '\000';
-		execCmd->used--;
-	    }
-	}
-    }
+
+    GetUserInput(execCmd);
+    FileWrite(cfstdout, FLAGFALSE, "]\r\n", 3);
+
     if (execCmd != (STRING *)0 && execCmd->used > 1) {
 	ExecCmd();
 	BuildString((char *)0, execCmd);
@@ -880,6 +908,7 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
     char *r = (char *)0;
     static char acMesg[8192];
 
+    gotoConsole = 0;
     if (fVerbose) {
 	Msg("%s to %s (on %s)", pcHow, pcMach, pcMaster);
     }
@@ -1076,22 +1105,35 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 	    }
 	    while ((l = ParseIACBuf(pcf, acMesg, &nc)) >= 0) {
 		if (l == 0) {
-		    if (FileSawQuoteExec(pcf) == FLAGTRUE)
-			DoExec(pcf);
-		    if (FileSawQuoteSusp(pcf) == FLAGTRUE) {
-			justSuspended = 1;
+		    if (execCmdFile == (CONSFILE *)0) {
+			if (FileSawQuoteExec(pcf) == FLAGTRUE)
+			    DoExec(pcf);
+			else if (FileSawQuoteSusp(pcf) == FLAGTRUE) {
+			    justSuspended = 1;
 #if defined(SIGSTOP)
-			FileWrite(cfstdout, FLAGFALSE, "stop]", 5);
-			C2Cooked();
-			kill(thepid, SIGSTOP);
-			C2Raw();
-			FileWrite(cfstdout, FLAGFALSE,
-				  "[press any character to continue", 32);
+			    FileWrite(cfstdout, FLAGFALSE, "stop]", 5);
+			    C2Cooked();
+			    kill(thepid, SIGSTOP);
+			    C2Raw();
+			    FileWrite(cfstdout, FLAGFALSE,
+				      "[press any character to continue",
+				      32);
 #else
-			FileWrite(cfstdout, FLAGFALSE,
-				  "stop not supported -- press any character to continue",
-				  53);
+			    FileWrite(cfstdout, FLAGFALSE,
+				      "stop not supported -- press any character to continue",
+				      53);
 #endif
+			} else if (FileSawQuoteGoto(pcf) == FLAGTRUE) {
+			    gotoConsole = 1;
+			    break;
+			}
+		    } else {
+			if (FileSawQuoteAbrt(pcf) == FLAGTRUE) {
+			    FD_CLR(FileFDNum(execCmdFile), &rinit);
+			    FD_CLR(FileFDOutNum(execCmdFile), &winit);
+			    FileClose(&execCmdFile);
+			    kill(execCmdPid, SIGHUP);
+			}
 		    }
 		    continue;
 		}
@@ -1328,11 +1370,6 @@ DoCmds(master, ports, cmdi)
 		FileClose(&pcf);
 		continue;
 	    } else {
-		/* right now, we can only connect to one console, so it's ok
-		 * to clear the password.  if we were allowed to connect to
-		 * multiple consoles (somehow), either in parallel or serial,
-		 * we wouldn't want to do this here */
-		ClearPassword();
 		CallUp(pcf, server, cmdarg, cmds[0], result);
 		return 0;
 	    }
@@ -1423,9 +1460,10 @@ main(argc, argv)
     extern int optopt;
     extern char *optarg;
     int i;
-    STRING *textMsg = (STRING *)0;
+    static STRING *textMsg = (STRING *)0;
     int cmdi;
     int retval;
+    static STRING *consoleName = (STRING *)0;
 
     isMultiProc = 0;		/* make sure stuff DOESN'T have the pid */
 
@@ -1698,7 +1736,31 @@ main(argc, argv)
 	    cmds[++cmdi] = "master";
     }
 
-    retval = DoCmds(pcInMaster, acPorts->string, cmdi);
+    for (;;) {
+	char *ports;
+	if ((ports = StrDup(acPorts->string)) == (char *)0)
+	    OutOfMem();
+	retval = DoCmds(pcInMaster, ports, cmdi);
+	free(ports);
+	/* if we didn't "call" or we didn't ask for another console, abort */
+	if (cmds[cmdi][0] != 'c' || gotoConsole == 0)
+	    break;
+
+	if (consoleName == (STRING *)0)
+	    consoleName = AllocString();
+	C2Raw();
+	if (gotoConsole == -1)
+	    FileWrite(cfstdout, FLAGFALSE, "[console: ", 10);
+	else
+	    FileWrite(cfstdout, FLAGFALSE, "console: ", 9);
+	GetUserInput(consoleName);
+	FileWrite(cfstdout, FLAGFALSE, "]\r\n", 3);
+	C2Cooked();
+	if (consoleName->used <= 1)
+	    break;
+	cmdarg = consoleName->string;
+	gotoConsole = -1;
+    }
 
     if (*pcCmd == 'd')
 	FilePrint(cfstdout, FLAGFALSE, "Disconnected %d users\n",

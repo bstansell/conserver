@@ -48,16 +48,17 @@ default cisco { type host; portbase 2000; portinc 1; }
 default xyplex  { type host; portbase 2000; portinc 100; }
 
 # this is a cyclades card referenced with /dev/ttyC0 through /dev/ttyC31
+# (referenced as ports 1 through 32 in conserver.cf)
 # we set the various port calculation bits and pattern substitution to
 # come up with a generic definition
 default cyclades { type device; device /dev/ttyC&; baud 9600; parity none;
-		   devicesubst .&d; portbase -1; portinc 1; host unused; }
+		   devicesubst &=Pd; portbase -1; portinc 1; host unused; }
 
 ## this is a term server accessed with an ssh command
 # it too uses pattern substitution and such to get the job done
 default ciscossh { type exec; portbase 2000; portinc 1;
 		   exec /usr/local/bin/ssh -p P -l tsuser H;
-		   execsubst HPd; }
+		   execsubst H=hs,P=Pd; }
 
 
 # ------- set the global default for the first conserver host -------

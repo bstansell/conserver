@@ -324,6 +324,9 @@
 /* Defined if we trust reverse DNS */
 #undef TRUST_REVERSE_DNS
 
+/* Defined if we produce extended messages */
+#undef USE_EXTENDED_MESSAGES
+
 /* use tcp_wrappers libwrap */
 #undef USE_LIBWRAP
 

@@ -10,6 +10,13 @@ Upgrading?
     new features added to the client if you're considering *not*
     upgrading.
 
+    Version 8.1.2
+	- The 'devicesubst' and 'execsubst' formats have changed from
+	  8.1.1.  It's fairly simple to update your config file to the
+	  new format...just check the conserver.cf manpage.  Sorry for
+	  having to change things, but it's for a good reason (I should
+	  have though ahead when designing the original format).
+
     Version 8.1.0
 
 	- The client/server protocol has changed to better protect 8-bit
@@ -263,5 +270,5 @@ Other Information And Gotchas
 
 
 #
-#  $Id: INSTALL,v 1.35 2003/12/25 19:21:59 bryan Exp $
+#  $Id: INSTALL,v 1.36 2004/02/22 21:04:06 bryan Exp $
 #

@@ -1,6 +1,6 @@
 .\" @(#)conserver.8 01/06/91 OSU CIS; Thomas A. Fine
-.\" $Id: conserver.man,v 1.40 2003/11/10 15:37:24 bryan Exp $
-.TH CONSERVER 8 "2003/11/10" "conserver-8.1.1" "conserver"
+.\" $Id: conserver.man,v 1.42 2004/03/11 17:52:08 bryan Exp $
+.TH CONSERVER 8 "2004/03/11" "conserver-8.1.2" "conserver"
 .SH NAME
 conserver \- console server daemon
 .SH SYNOPSIS
@@ -324,6 +324,37 @@ connect to remote consoles will result in an informative message to the user.
 .B \-S
 Do not run the server, just perform a syntax check of configuration file and
 exit with a non-zero value if there is an error.
+Using more than one
+.B \-S
+will cause conserver to output various information about each console in 5
+colon-separated fields, enclosed in curly-braces.
+The philosophy behind the output is to provide information to allow external
+detection of multiple consoles access the same physical port.
+Since this is
+.I highly
+environment-specific, conserver cannot do the check internally.
+.RS
+.TP 8
+.I name
+The name of the console.
+.TP
+.I master
+The hostname of the master conserver host for the console.
+.TP
+.I aliases
+The console aliases in a comma-separated list.
+.TP
+.I type
+The type of console.
+Values will be a `/' for a local device, `|' for
+a command, or `!' for a remote port.
+.TP
+.I details
+Multiple values are comma-separated and depend on the type of the console.
+Local devices will have the values of the device file and baud rate/parity.
+Commands will have string to invoke.
+Remote ports will have the values of the remote hostname and port number.
+.RE
 .TP
 .B \-u
 Send unloved console output to

@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.174 2003/12/21 16:23:02 bryan Exp $
+ *  $Id: main.c,v 5.178 2004/03/11 16:23:59 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -853,7 +853,7 @@ DumpDataStructures()
 
     for (pGE = pGroups; pGE != (GRPENT *)0; pGE = pGE->pGEnext) {
 	CONDDEBUG((1,
-		   "DumpDataStructures(): group: id=%u pid=%lu, port=%hu, imembers=%d",
+		   "DumpDataStructures(): group: id=%u port=%hu, pid=%lu, imembers=%d",
 		   pGE->id, pGE->port, (unsigned long)pGE->pid,
 		   pGE->imembers));
 
@@ -864,8 +864,9 @@ DumpDataStructures()
 			       "DumpDataStructures():  server=%s, type=DEVICE",
 			       EMPTYSTR(pCE->server)));
 		    CONDDEBUG((1,
-			       "DumpDataStructures():  baud=%s, parity=%s",
-			       pCE->baud->acrate, pCE->parity->key));
+			       "DumpDataStructures():  baud=%s, parity=%s, device=%s",
+			       pCE->baud->acrate, pCE->parity->key,
+			       EMPTYSTR(pCE->device)));
 		    break;
 		case EXEC:
 		    CONDDEBUG((1,
@@ -883,9 +884,9 @@ DumpDataStructures()
 			       "DumpDataStructures():  server=%s, type=HOST",
 			       EMPTYSTR(pCE->server)));
 		    CONDDEBUG((1,
-			       "DumpDataStructures():  host=%s, raw=%hu, port=%hu, telnetState=%d",
-			       EMPTYSTR(pCE->host), pCE->raw, pCE->port,
-			       pCE->telnetState));
+			       "DumpDataStructures():  host=%s, raw=%hu, netport=%hu, port=%hu, telnetState=%d",
+			       EMPTYSTR(pCE->host), pCE->raw, pCE->netport,
+			       pCE->port, pCE->telnetState));
 		    break;
 		case UNKNOWNTYPE:
 		    CONDDEBUG((1,
@@ -1311,7 +1312,7 @@ main(argc, argv)
 		optConf->redirect = FLAGFALSE;
 		break;
 	    case 'S':
-		fSyntaxOnly = 1;
+		fSyntaxOnly++;
 		break;
 	    case 'u':
 		fAll = 1;

@@ -1,6 +1,27 @@
 				CHANGES
 				=======
 
+version 8.1.2 (Mar 11, 2004):
+	- better handling of client command (^Ec|) when user is bumped,
+	  conserver is reconfigured, etc
+	- added 'initsubst' option for 'initcmd' substitutions like
+	  'devicesubst' and 'execsubst' - based on patch by Bill
+	  Sommerfeld <sommerfeld@east.sun.com>
+	- modified and added to *subst (initsubst, etc) syntax to allow
+	  for flexibility and future enhancement
+	- changed 'port' and 'portinc' minimums from 1 to 0 - it allows
+	  more flexibility and helps with 0-based counting
+	- removed unportable sys/cdefs.h from contrib/chat/chat.c -
+	  patch by Bill Sommerfeld <sommerfeld@east.sun.com>
+	- added --with-extmsgs configure switch to enable entertaining
+	  messages
+	- marked various undocumented client commands as depreciated so
+	  that they can be removed in a future version
+	- added ability to "move" to a new console via '^Ec;' -
+	  suggested by Christopher T. Beers <ctbeers@syr.edu>
+	- added a dump of console information when -S is used twice -
+	  suggested by Todd Stansell <todd@stansell.org>
+
 version 8.1.1 (Feb 10, 2004):
 	- fixed mistake in Makefiles where rpmbuild fails - reported by
 	  Martin Evans <m.d.t.evans@qmul.ac.uk>
@@ -669,5 +690,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.150 2004/02/10 15:24:48 bryan Exp $
+#  $Id: CHANGES,v 1.158 2004/03/11 16:31:27 bryan Exp $
 #

@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.163 2004/01/28 14:47:53 bryan Exp $
+ *  $Id: readcfg.c,v 5.168 2004/03/11 16:23:59 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -605,6 +605,8 @@ DestroyParserDefaultOrConsole(c, ph, pt)
 	free(c->devicesubst);
     if (c->execsubst != (char *)0)
 	free(c->execsubst);
+    if (c->initsubst != (char *)0)
+	free(c->initsubst);
     if (c->logfile != (char *)0)
 	free(c->logfile);
     if (c->initcmd != (char *)0)
@@ -667,6 +669,8 @@ ApplyDefault(d, c)
 	c->logfilemax = d->logfilemax;
     if (d->port != 0)
 	c->port = d->port;
+    if (d->netport != 0)
+	c->netport = d->netport;
     if (d->portinc != 0)
 	c->portinc = d->portinc;
     if (d->portbase != 0)
@@ -737,6 +741,12 @@ ApplyDefault(d, c)
 	if (c->execsubst != (char *)0)
 	    free(c->execsubst);
 	if ((c->execsubst = StrDup(d->execsubst)) == (char *)0)
+	    OutOfMem();
+    }
+    if (d->initsubst != (char *)0) {
+	if (c->initsubst != (char *)0)
+	    free(c->initsubst);
+	if ((c->initsubst = StrDup(d->initsubst)) == (char *)0)
 	    OutOfMem();
     }
     if (d->logfile != (char *)0) {
@@ -953,98 +963,235 @@ ProcessDevice(c, id)
 
 void
 #if PROTOTYPES
-ProcessDevicesubst(CONSENT *c, char *id)
+ProcessSubst(CONSENT *pCE, char **repl, char **str, char *name, char *id)
 #else
-ProcessDevicesubst(c, id)
-    CONSENT *c;
+ProcessSubst(pCE, repl, str, name, id)
+    CONSENT *pCE;
+    char **repl;
+    char **str;
+    char *name;
     char *id;
 #endif
 {
+    /*
+     * (CONSENT *pCE) and (char **repl) are used when a replacement is to
+     * actually happen...repl is the string to munch, pCE holds the data.
+     *
+     * (char **str) is used to store a copy of (char *id), if it passes
+     * the format check.
+     *
+     * the idea is that this is first called when the config file is read,
+     * putting the result in (char **str).  then we call it again, near
+     * the end, permuting (char **repl) with values from (CONSENT *pCE) with
+     * the saved string now coming in as (char *id).  got it?
+     *
+     * you could pass all arguments in...then both types of actions occur.
+     */
     char *p;
+    char *repfmt[255];
+    unsigned short repnum;
+    int i;
 
-    if (c->devicesubst != (char *)0) {
-	free(c->devicesubst);
-	c->devicesubst = (char *)0;
+    enum repstate {
+	REP_BEGIN,
+	REP_LTR,
+	REP_EQ,
+	REP_INT,
+	REP_END
+    } state;
+
+    if (str != (char **)0) {
+	if (*str != (char *)0) {
+	    free(*str);
+	    *str = (char *)0;
+	}
     }
 
     if ((id == (char *)0) || (*id == '\000'))
 	return;
 
-    if (strlen(id) < 3) {
-	if (isMaster)
-	    Error("incomplete `devicesubst' option [%s:%d]", file, line);
-	return;
+    repnum = 0;
+    state = REP_BEGIN;
+
+    for (i = 0; i < 256; i++)
+	repfmt[i] = (char *)0;
+
+    for (p = id; *p != '\000'; p++) {
+	switch (state) {
+	    case REP_BEGIN:
+		/* must be printable */
+		if (*p == ',' || !isgraph((int)(*p)))
+		    goto subst_err;
+
+		/* make sure we haven't seen this replacement char yet */
+		repnum = (unsigned short)(*p);
+		if (repfmt[repnum] != (char *)0) {
+		    if (isMaster)
+			Error
+			    ("substitution characters of `%s' option are the same [%s:%d]",
+			     name, file, line);
+		    return;
+		}
+		state = REP_LTR;
+		break;
+	    case REP_LTR:
+		if (*p != '=')
+		    goto subst_err;
+		state = REP_EQ;
+		break;
+	    case REP_EQ:
+		repfmt[repnum] = p;
+		if (*p == 'h' || *p == 'c' || *p == 'p' || *p == 'P')
+		    state = REP_INT;
+		else
+		    goto subst_err;
+		break;
+	    case REP_INT:
+		if (*p == 'd' || *p == 'x' || *p == 'X') {
+		    if (*(repfmt[repnum]) != 'p' &&
+			*(repfmt[repnum]) != 'P')
+			goto subst_err;
+		    state = REP_END;
+		} else if (*p == 's') {
+		    if (*(repfmt[repnum]) != 'h' &&
+			*(repfmt[repnum]) != 'c')
+			goto subst_err;
+		    state = REP_END;
+		} else if (!isdigit((int)(*p)))
+		    goto subst_err;
+		break;
+	    case REP_END:
+		if (*p != ',')
+		    goto subst_err;
+		state = REP_BEGIN;
+		break;
+	}
     }
 
-    if (id[0] == id[1]) {
+    if (state != REP_END) {
+      subst_err:
 	if (isMaster)
 	    Error
-		("first two characters of `devicesubst' option are the same [%s:%d]",
-		 file, line);
+		("invalid `%s' specification `%s' (char #%d: `%c') [%s:%d]",
+		 name, id, (p - id) + 1, *p, file, line);
 	return;
     }
 
-    for (p = id + 2; *p != '\000'; p++)
-	if (!isdigit((int)(*p)))
-	    break;
-    /* if it wasn't a number followed by a d/x/X */
-    if (!((*p == 'd' || *p == 'x' || *p == 'X') && *(p + 1) == '\000')) {
-	if (isMaster)
-	    Error("invalid `execsubst' specification `%s' [%s:%d]", id,
-		  file, line);
-	return;
+    if (str != (char **)0) {
+	if ((*str = StrDup(id)) == (char *)0)
+	    OutOfMem();
     }
 
-    if ((c->devicesubst = StrDup(id)) == (char *)0)
-	OutOfMem();
-}
+    if (pCE != (CONSENT *)0 && repl != (char **)0) {
+	static STRING *result = (STRING *)0;
 
-void
-#if PROTOTYPES
-ProcessExecsubst(CONSENT *c, char *id)
-#else
-ProcessExecsubst(c, id)
-    CONSENT *c;
-    char *id;
-#endif
-{
-    char *p;
+	if (result == (STRING *)0)
+	    result = AllocString();
+	BuildString((char *)0, result);
 
-    if (c->execsubst != (char *)0) {
-	free(c->execsubst);
-	c->execsubst = (char *)0;
+	for (p = *repl; *p != '\000'; p++) {
+	    if (repfmt[(unsigned short)(*p)] != (char *)0) {
+		char *r = repfmt[(unsigned short)(*p)];
+		int plen = 0;
+		char *c = (char *)0;
+		int o = 0;
+
+		if (*r == 'h' || *r == 'c') {
+		    /* check the pattern for a length */
+		    if (isdigit((int)(*(r + 1))))
+			plen = atoi(r + 1);
+
+		    if (*r == 'h')
+			c = pCE->host;
+		    else if (*r == 'c')
+			c = pCE->server;
+		    plen -= strlen(c);
+
+		    /* pad it out, if necessary */
+		    for (i = 0; i < plen; i++)
+			BuildStringChar(' ', result);
+
+		    /* throw in the string */
+		    BuildString(c, result);
+		} else {
+		    unsigned short port = 0;
+		    unsigned short base = 0;
+		    int padzero = 0;
+		    static STRING *num = (STRING *)0;
+
+		    if (num == (STRING *)0)
+			num = AllocString();
+		    BuildString((char *)0, num);
+
+		    if (*r == 'p')
+			port = pCE->port;
+		    if (*r == 'P')
+			port = pCE->netport;
+
+		    /* check the pattern for a length and padding */
+		    for (c = r + 1; *c != '\000'; c++)
+			if (!isdigit((int)(*c)))
+			    break;
+		    if (c != r + 1) {
+			plen = atoi(r + 1);
+			padzero = (r[1] == '0');
+		    }
+
+		    /* check for base */
+		    switch (*c) {
+			case 'd':
+			    base = 10;
+			    break;
+			case 'x':
+			case 'X':
+			    base = 16;
+			    break;
+			default:
+			    return;
+		    }
+		    while (port >= base) {
+			if (port % base >= 10)
+			    BuildStringChar((port % base) - 10 +
+					    (*c == 'x' ? 'a' : 'A'), num);
+			else
+			    BuildStringChar((port % base) + '0', num);
+			port /= base;
+		    }
+		    if (port >= 10)
+			BuildStringChar(port - 10 +
+					(*c == 'x' ? 'a' : 'A'), num);
+		    else
+			BuildStringChar(port + '0', num);
+
+		    /* if we're supposed to be a certain length, pad it */
+		    while (num->used - 1 < plen) {
+			if (padzero == 0)
+			    BuildStringChar(' ', num);
+			else
+			    BuildStringChar('0', num);
+		    }
+
+		    /* reverse the text to put it in forward order */
+		    o = num->used - 1;
+		    for (i = 0; i < o / 2; i++) {
+			char temp;
+
+			temp = num->string[i];
+			num->string[i]
+			    = num->string[o - i - 1];
+			num->string[o - i - 1] = temp;
+		    }
+		    BuildStringN(num->string, o, result);
+		}
+	    } else
+		BuildStringChar(*p, result);
+	}
+	free(*repl);
+	if ((*repl = StrDup(result->string)) == (char *)0)
+	    OutOfMem();
     }
 
-    if ((id == (char *)0) || (*id == '\000'))
-	return;
-
-    if (strlen(id) < 3) {
-	if (isMaster)
-	    Error("incomplete `execsubst' option [%s:%d]", file, line);
-	return;
-    }
-
-    if (id[0] == id[1]) {
-	if (isMaster)
-	    Error
-		("first two characters of `execsubst' option are the same [%s:%d]",
-		 file, line);
-	return;
-    }
-
-    for (p = id + 2; *p != '\000'; p++)
-	if (!isdigit((int)(*p)))
-	    break;
-    /* if it wasn't a number followed by a d/x/X */
-    if (!((*p == 'd' || *p == 'x' || *p == 'X') && *(p + 1) == '\000')) {
-	if (isMaster)
-	    Error("invalid `execsubst' specification `%s' [%s:%d]", id,
-		  file, line);
-	return;
-    }
-
-    if ((c->execsubst = StrDup(id)) == (char *)0)
-	OutOfMem();
+    return;
 }
 
 void
@@ -1068,7 +1215,8 @@ DefaultItemDevicesubst(id)
 #endif
 {
     CONDDEBUG((1, "DefaultItemDevicesubst(%s) [%s:%d]", id, file, line));
-    ProcessDevicesubst(parserDefaultTemp, id);
+    ProcessSubst((CONSENT *)0, (char **)0,
+		 &(parserDefaultTemp->devicesubst), "devicesubst", id);
 }
 
 void
@@ -1080,7 +1228,21 @@ DefaultItemExecsubst(id)
 #endif
 {
     CONDDEBUG((1, "DefaultItemExecsubst(%s) [%s:%d]", id, file, line));
-    ProcessExecsubst(parserDefaultTemp, id);
+    ProcessSubst((CONSENT *)0, (char **)0, &(parserDefaultTemp->execsubst),
+		 "execsubst", id);
+}
+
+void
+#if PROTOTYPES
+DefaultItemInitsubst(char *id)
+#else
+DefaultItemInitsubst(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemInitsubst(%s) [%s:%d]", id, file, line));
+    ProcessSubst((CONSENT *)0, (char **)0, &(parserDefaultTemp->initsubst),
+		 "initsubst", id);
 }
 
 void
@@ -1560,9 +1722,7 @@ ProcessPort(c, id)
 
     /* if it was a number */
     if (*p == '\000') {
-	if (((c->port = (unsigned short)atoi(id)) == 0) && isMaster)
-	    Error("invalid port number `%s' [%s:%d]", id, file, line);
-	return;
+	c->port = (unsigned short)atoi(id) + 1;
     } else {
 	/* non-numeric */
 	struct servent *se;
@@ -1573,9 +1733,7 @@ ProcessPort(c, id)
 		     id, file, line);
 	    return;
 	} else {
-	    if (((c->port = ntohs((unsigned short)se->s_port)) == 0) &&
-		isMaster)
-		Error("invalid port number `%s' [%s:%d]", id, file, line);
+	    c->port = ntohs((unsigned short)se->s_port) + 1;
 	}
     }
 }
@@ -1605,12 +1763,6 @@ ProcessPortinc(c, id)
 	return;
     }
     c->portinc = (unsigned short)atoi(id) + 1;
-    /* make sure the value was >=1 */
-    if (c->portinc <= 1) {
-	if (isMaster)
-	    Error("invalid portinc number `%s' [%s:%d]", id, file, line);
-	c->portinc = 0;
-    }
 }
 
 void
@@ -2161,6 +2313,26 @@ ConsoleEnd()
 	    invalid = 1;
 	    break;
     }
+    if (parserConsoleTemp->initsubst != (char *)0 &&
+	parserConsoleTemp->initcmd != (char *)0) {
+	if (parserConsoleTemp->port == 0 ||
+	    parserConsoleTemp->host == (char *)0) {
+	    if (parserConsoleTemp->port == 0) {
+		if (isMaster)
+		    Error
+			("[%s] console has 'initsubst' attribute without 'port' attribute (ignoring) [%s:%d]",
+			 parserConsoleTemp->server, file, line);
+	    }
+	    if (parserConsoleTemp->host == (char *)0) {
+		if (isMaster)
+		    Error
+			("[%s] console has 'initsubst' attribute without 'host' attribute (ignoring) [%s:%d]",
+			 parserConsoleTemp->server, file, line);
+	    }
+	    free(parserConsoleTemp->initsubst);
+	    parserConsoleTemp->initsubst = (char *)0;
+	}
+    }
 
     if (invalid != 0) {
 	DestroyParserDefaultOrConsole(parserConsoleTemp, (CONSENT **)0,
@@ -2248,109 +2420,6 @@ ExpandLogfile(c, id)
     if ((c->logfile = StrDup(tmp))
 	== (char *)0)
 	OutOfMem();
-}
-
-void
-#if PROTOTYPES
-DoSubstitution(char *sub, int port, char *host, char **string)
-#else
-DoSubstitution(sub, port, host, string)
-    char *sub;
-    int port;
-    char *host;
-    char **string;
-#endif
-{
-    char *p = (char *)0;
-    char *pstr = (char *)0;
-    int o = 0;
-    int i = 0;
-    int plen = 0;
-    int base = 0;
-    short padzero = 0;
-    STRING *result = (STRING *)0;
-
-    if (sub == (char *)0 || sub[0] == '\000' || sub[1] == '\000' ||
-	string == (char **)0 || *string == (char *)0 || host == (char *)0)
-	return;
-    if (result == (STRING *)0)
-	result = AllocString();
-    BuildString((char *)0, result);
-
-    /* check the pattern for a length and padding */
-    for (p = sub + 2; *p != '\000'; p++)
-	if (!isdigit((int)(*p)))
-	    break;
-    if (p != sub + 2) {
-	plen = atoi(sub + 2);
-	padzero = (sub[2] == '0');
-    }
-
-    /* check for base */
-    switch (*p) {
-	case 'd':
-	    base = 10;
-	    break;
-	case 'x':
-	case 'X':
-	    base = 16;
-	    break;
-	default:
-	    return;
-    }
-    while (port >= base) {
-	if (port % base >= 10)
-	    BuildStringChar((port % base) - 10 + (*p == 'x' ? 'a' : 'A'),
-			    result);
-	else
-	    BuildStringChar((port % base) + '0', result);
-	port /= base;
-    }
-    if (port >= 10)
-	BuildStringChar(port - 10 + (*p == 'x' ? 'a' : 'A'), result);
-    else
-	BuildStringChar(port + '0', result);
-
-    /* if we're supposed to be a certain length, pad it */
-    while (result->used - 1 < plen) {
-	if (padzero == 0)
-	    BuildStringChar(' ', result);
-	else
-	    BuildStringChar('0', result);
-    }
-
-    /* reverse the text to put it in forward order */
-    o = result->used - 1;
-    for (i = 0; i < o / 2; i++) {
-	char temp;
-
-	temp = result->string[i];
-	result->string[i]
-	    = result->string[o - i - 1];
-	result->string[o - i - 1] = temp;
-    }
-    if ((pstr = StrDup(result->string)) == (char *)0)
-	OutOfMem();
-
-    BuildString((char *)0, result);
-    for (o = 0, p = *string; *(p + o) != '\000'; o++) {
-	if (*(p + o) == sub[0]) {
-	    BuildStringN(p, o, result);
-	    BuildString(host, result);
-	    p += o + 1;
-	    o = -1;
-	} else if (*(p + o) == sub[1]) {
-	    BuildStringN(p, o, result);
-	    BuildString(pstr, result);
-	    p += o + 1;
-	    o = -1;
-	}
-    }
-    BuildStringN(p, o, result);
-    free(*string);
-    if ((*string = StrDup(result->string)) == (char *)0)
-	OutOfMem();
-    free(pstr);
 }
 
 /* this will adjust parserConsoles/parserConsolesTail if we're adding
@@ -2727,8 +2796,8 @@ ConsoleAdd(c)
 		    SwapStr(&pCEmatch->host, &c->host);
 		    closeMatch = 0;
 		}
-		if (pCEmatch->port != c->port) {
-		    pCEmatch->port = c->port;
+		if (pCEmatch->netport != c->netport) {
+		    pCEmatch->netport = c->netport;
 		    closeMatch = 0;
 		}
 		break;
@@ -2839,7 +2908,7 @@ ConsoleDestroy()
 	if (c->breakNum == 0)
 	    c->breakNum = 1;
 
-	/* portbase and portinc values are +2 and +1, so a zero can
+	/* portbase, portinc, and port values are +2, +1, +1, so a zero can
 	 * show that no value was given.  defaults: portbase=0, portinc=1
 	 */
 	if (c->portbase != 0)
@@ -2849,18 +2918,36 @@ ConsoleDestroy()
 	else
 	    c->portinc = 1;
 
-	/* now calculate the "real" port number */
-	/* this formula should always give >= 0 because
-	 * portbase >= -1, portinc >= 1, and port >= 1
+	/* if this is ever false, we don't actually use the port value, so
+	 * doesn't matter if we "default" to zero...it's all enforced in
+	 * ConsoleEnd()
 	 */
-	c->port = c->portbase + c->portinc * c->port;
+	if (c->port != 0)
+	    c->port--;
+
+	/* now calculate the "real" port number */
+
+	/* this formula could give -1 because
+	 * portbase >= -1, portinc >= 0, and port >= 0
+	 * since it's an unsigned type, it'll wrap back around
+	 * look very, very, bizarre.  but, oh well.  yeah, a
+	 * user can shoot himself in the foot with a bad config
+	 * file, but it won't hurt too much.
+	 */
+	c->netport = c->portbase + c->portinc * c->port;
 
 	/* check for substitutions */
 	if (c->type == DEVICE && c->devicesubst != (char *)0)
-	    DoSubstitution(c->devicesubst, c->port, c->host, &(c->device));
+	    ProcessSubst(c, &(c->device), (char **)0, (char *)0,
+			 c->devicesubst);
 
 	if (c->type == EXEC && c->execsubst != (char *)0)
-	    DoSubstitution(c->execsubst, c->port, c->host, &(c->exec));
+	    ProcessSubst(c, &(c->exec), (char **)0, (char *)0,
+			 c->execsubst);
+
+	if (c->initcmd != (char *)0 && c->initsubst != (char *)0)
+	    ProcessSubst(c, &(c->initcmd), (char **)0, (char *)0,
+			 c->initsubst);
 
 	/* go ahead and do the '&' substitution */
 	if (c->logfile != (char *)0) {
@@ -2925,6 +3012,48 @@ ConsoleDestroy()
 
 	/* now remember where we're headed and do the dirty work */
 	cNext = c->pCEnext;
+	if (fSyntaxOnly > 1) {
+	    static STRING *s = (STRING *)0;
+
+	    if (s == (STRING *)0)
+		s = AllocString();
+
+	    BuildString((char *)0, s);
+	    BuildString(BuildTmpStringPrint
+			("{%s:%s:", c->server, c->master), s);
+	    if (c->aliases != (NAMES *)0) {
+		NAMES *n;
+		for (n = c->aliases; n != (NAMES *)0; n = n->next) {
+		    if (n == c->aliases)
+			BuildStringChar(',', s);
+		    BuildString(n->name, s);
+		}
+	    }
+	    BuildStringChar(':', s);
+	    switch (c->type) {
+		case EXEC:
+		    BuildString(BuildTmpStringPrint
+				("|:%s",
+				 (c->exec !=
+				  (char *)0 ? c->exec : "/bin/sh")), s);
+		    break;
+		case HOST:
+		    BuildString(BuildTmpStringPrint
+				("!:%s,%hu", c->host, c->netport), s);
+		    break;
+		case DEVICE:
+		    BuildString(BuildTmpStringPrint
+				("/:%s,%s%c", c->device,
+				 (c->baud ? c->baud->acrate : ""),
+				 (c->parity ? c->parity->key[0] : ' ')),
+				s);
+		    break;
+		case UNKNOWNTYPE:	/* shut up gcc */
+		    break;
+	    }
+	    BuildStringChar('}', s);
+	    Msg("%s", s->string);
+	}
 	ConsoleAdd(c);
     }
 
@@ -3119,7 +3248,8 @@ ConsoleItemDevicesubst(id)
 #endif
 {
     CONDDEBUG((1, "ConsoleItemDevicesubst(%s) [%s:%d]", id, file, line));
-    ProcessDevicesubst(parserConsoleTemp, id);
+    ProcessSubst((CONSENT *)0, (char **)0,
+		 &(parserConsoleTemp->devicesubst), "devicesubst", id);
 }
 
 void
@@ -3131,7 +3261,21 @@ ConsoleItemExecsubst(id)
 #endif
 {
     CONDDEBUG((1, "ConsoleItemExecsubst(%s) [%s:%d]", id, file, line));
-    ProcessExecsubst(parserConsoleTemp, id);
+    ProcessSubst((CONSENT *)0, (char **)0, &(parserConsoleTemp->execsubst),
+		 "execsubst", id);
+}
+
+void
+#if PROTOTYPES
+ConsoleItemInitsubst(char *id)
+#else
+ConsoleItemInitsubst(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemInitsubst(%s) [%s:%d]", id, file, line));
+    ProcessSubst((CONSENT *)0, (char **)0, &(parserConsoleTemp->initsubst),
+		 "initsubst", id);
 }
 
 void
@@ -4302,6 +4446,7 @@ ITEM keyDefault[] = {
     {"idletime", DefaultItemIdletimeout},
     {"include", DefaultItemInclude},
     {"initcmd", DefaultItemInitcmd},
+    {"initsubst", DefaultItemInitsubst},
     {"logfile", DefaultItemLogfile},
     {"logfilemax", DefaultItemLogfilemax},
     {"master", DefaultItemMaster},
@@ -4333,6 +4478,7 @@ ITEM keyConsole[] = {
     {"idletimeout", ConsoleItemIdletimeout},
     {"include", ConsoleItemInclude},
     {"initcmd", ConsoleItemInitcmd},
+    {"initsubst", ConsoleItemInitsubst},
     {"logfile", ConsoleItemLogfile},
     {"logfilemax", ConsoleItemLogfilemax},
     {"master", ConsoleItemMaster},

@@ -88,15 +88,6 @@
 #define const
 #endif
 
-#include <sys/cdefs.h>
-#ifndef __NetBSD__
-#if 1
-static const char rcsid[] = "Id: chat.c,v 1.26 1999/12/23 01:39:54 paulus Exp ";
-#else
-__RCSID("$NetBSD: chat.c,v 1.25 2001/09/24 13:22:38 wiz Exp $");
-#endif
-#endif
-
 #include <stdio.h>
 #include <ctype.h>
 #include <time.h>

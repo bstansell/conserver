@@ -1,5 +1,5 @@
 /*
- *  $Id: cutil.c,v 1.113 2004/01/18 13:05:43 bryan Exp $
+ *  $Id: cutil.c,v 1.115 2004/03/11 16:23:59 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -1491,6 +1491,8 @@ VWrite(cfp, bufferonly, str, fmt, ap)
 			break;
 		    case 's':
 			p = va_arg(ap, char *);
+			if (p == (char *)0)
+			    p = "(null)";
 			{
 			    int l = strlen(p);
 			    int c;
@@ -1934,6 +1936,19 @@ FileSawQuoteAbrt(cfp)
     return r;
 }
 
+FLAG
+#if PROTOTYPES
+FileSawQuoteGoto(CONSFILE *cfp)
+#else
+FileSawQuoteGoto(cfp)
+    CONSFILE *cfp;
+#endif
+{
+    FLAG r = cfp->sawiacgoto;
+    cfp->sawiacgoto = FLAGFALSE;
+    return r;
+}
+
 #if HAVE_OPENSSL
 /* Get the SSL instance */
 SSL *
@@ -2334,6 +2349,8 @@ ParseIACBuf(cfp, msg, len)
 	    cfp->sawiacexec = FLAGTRUE;
 	else if (b[i] == OB_ABRT)
 	    cfp->sawiacabrt = FLAGTRUE;
+	else if (b[i] == OB_GOTO)
+	    cfp->sawiacgoto = FLAGTRUE;
 	else {
 	    if (b[i] != OB_IAC)
 		Error

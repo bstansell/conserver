@@ -1,5 +1,5 @@
 /*
- *  $Id: cutil.h,v 1.60 2004/01/18 13:05:43 bryan Exp $
+ *  $Id: cutil.h,v 1.61 2004/03/10 02:55:45 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -20,6 +20,7 @@
  */
 #define OB_IAC		0xff	/* quote char                   */
 #define OB_EXEC		'E'	/* exec a command on the client */
+#define OB_GOTO		'G'	/* goto next console            */
 #define OB_SUSP		'Z'	/* suspended by server          */
 #define OB_ABRT		'.'	/* abort                        */
 
@@ -74,6 +75,7 @@ typedef struct consFile {
     FLAG sawiacsusp;
     FLAG sawiacexec;
     FLAG sawiacabrt;
+    FLAG sawiacgoto;
 #if HAVE_OPENSSL
     /* SSL stuff */
     SSL *ssl;
@@ -142,6 +144,7 @@ extern void FileSetQuoteIAC PARAMS((CONSFILE *, FLAG));
 extern FLAG FileSawQuoteSusp PARAMS((CONSFILE *));
 extern FLAG FileSawQuoteExec PARAMS((CONSFILE *));
 extern FLAG FileSawQuoteAbrt PARAMS((CONSFILE *));
+extern FLAG FileSawQuoteGoto PARAMS((CONSFILE *));
 extern void Bye PARAMS((int));
 extern void DestroyDataStructures PARAMS((void));
 extern int IsMe PARAMS((char *));

@@ -1,5 +1,5 @@
-.\" $Id: conserver.cf.man,v 1.55 2003/12/21 16:23:03 bryan Exp $
-.TH CONSERVER.CF 5 "2003/12/21" "conserver-8.1.1" "conserver"
+.\" $Id: conserver.cf.man,v 1.58 2004/02/24 02:59:36 bryan Exp $
+.TH CONSERVER.CF 5 "2004/02/24" "conserver-8.1.2" "conserver"
 .SH NAME
 conserver.cf \- console configuration file for
 .BR conserver (8)
@@ -411,33 +411,73 @@ as the access to the console.
 Only consoles of type ``device'' will use this value.
 .TP
 .B devicesubst
-.RI [ " hp" [ n ] "f "
+.RI [ c = t [ n ] f "[,...]"
 | "" ]
 .br
-Perform string substitutions on the
+Perform character substitutions on the
 .B device
 value.
-.I h
-is the character in
-.B device
-to replace with the
+A series of replacements can be defined by specifying a
+comma-separated list of
+.IR c = t [ n ] f
+sequences where
+.I c
+is any printable character,
+.I t
+specifies the replacement value,
+.I n
+is a field length (optional),
+and
+.I f
+is the format string.
+.I t
+can be one of the characters below, catagorized as a string replacement
+or a numeric replacement, which dictates the use of the
+.I n
+and
+.I f
+fields.
+.RS
+.RS
+.sp
+.PD 0
+.TP
+String Replacement
+.TP
+.B h
 .B host
-value and
-.I p
-is the character to replace with the
+value
+.TP
+.B c
+console name
+.sp
+.PP
+Numeric Replacement
+.TP
+.B p
+config
 .B port
-value.
-The
-.B port
-value will be formatted to at least
+value
+.TP
+.B P
+calculated port value
+.PD
+.RE
+.RE
+.IP
+For string replacements, if the replacement isn't at least
+.I n
+characters, it will be padded with space characters on the left.
+.I f
+must be `s'.
+For numeric replacements, the value will be formatted to at least
 .I n
 characters, padded with 0s if
 .I n
 begins with a 0, and space characters otherwise.
 .I f
-must be either `d' or `x' or `X', specifying a decimal, lower-case
-hexdecimal, or uppercase hexdecimal representation of
-.BR port .
+must be either `d', `x' or `X', specifying a decimal, lower-case
+hexadecimal, or an uppercase hexadecimal conversion.
 If the null string (``""'') is used, no replacements will be done.
 .TP
 .B exec
@@ -455,33 +495,15 @@ keyword is specified, conserver will use the command ``/bin/sh -i''.
 Only consoles of type ``exec'' will use this value.
 .TP
 .B execsubst
-.RI [ " hp" [ n ] "f "
+.RI [ c = t [ n ] f "[,...]"
 | "" ]
 .br
-Perform string substitutions on the
+Perform character substitutions on the
 .B exec
 value.
-.I h
-is the character in
-.B exec
-to replace with the
-.B host
-value and
-.I p
-is the character to replace with the
-.B port
-value.
-The
-.B port
-value will be formatted to at least
-.I n
-characters, padded with 0s if
-.I n
-begins with a 0, and space characters otherwise.
-.I f
-must be either `d' or `x' or `X', specifying a decimal, lower-case
-hexdecimal, or uppercase hexdecimal representation of
-.BR port .
+See the
+.B devicesubst
+option for an explanation of the format string.
 If the null string (``""'') is used, no replacements will be done.
 .TP
 .B host
@@ -493,12 +515,13 @@ as the host to connect to for accessing the console.
 You must also set the
 .B port
 option as well.
-Normally, only consoles of type ``host'' will use this value.
-If the
-.B devicesubst
+Normally, only consoles of type ``host'' will use this value, however
+if the
+.BR devicesubst ,
+.BR execsubst ,
 or
-.B execsubst
-keywords are used in ``device'' and ``exec'' types, this value is used.
+.B initsubst
+keywords are used in any console type, this value is used.
 .TP
 .B idlestring
 .RI [ " string "
@@ -524,7 +547,8 @@ The default string is ``\en''.
 .br
 Set the idle timeout of the console to
 .I number
-seconds.  If an `s', `m', or `h' is used after
+seconds.
+If an `s', `m', or `h' is used after
 .IR number ,
 the specified time is interpreted as seconds, minutes, or hours.
 Set the timeout to zero to disable the idle timeout (the default).
@@ -552,13 +576,26 @@ is passed as an argument to ``/bin/sh -ce''.
 If the null string (``""'') is used, the command is unset and
 nothing is invoked.
 .TP
+.B initsubst
+.RI [ c = t [ n ] f "[,...]"
+| "" ]
+.br
+Perform character substitutions on the
+.B initcmd
+value.
+See the
+.B devicesubst
+option for an explanation of the format string.
+If the null string (``""'') is used, no replacements will be done.
+.TP
 .B logfile
 .RI [ " filename "
 | "" ]
 .br
 Assign the logfile specified by
 .I filename
-to the console.  Any occurrence of ``&'' in
+to the console.
+Any occurrence of ``&'' in
 .I filename
 will be replaced with the name of the console.
 If the null string (``""'') is used, the logfile name is unset and
@@ -764,24 +801,31 @@ The formula used is
 .BR portbase " + "
 .BR portinc " * " port .
 By using proper values in the formula, you can reference ports on a
-terminal server by their physical numbering of 1 through
-.IR n .
+terminal server by their physical numbering of
+.RI 0.. n
+or
+.RI 1.. n
+(depending on if you like zero-based or one-based numbering).
+Warning: you can generate a \-1 value with this formula,
+which will become a very high numbered positive
+value (since things are stored unsigned).
 You must also set the
 .B host
 option as well.
-Normally, only consoles of type ``host'' will use this value.
-If the
-.B devicesubst
+Normally, only consoles of type ``host'' will use this value, however
+if the
+.BR devicesubst ,
+.BR execsubst ,
 or
-.B execsubst
-keywords are used in ``device'' and ``exec'' types, this value is used.
+.B initsubst
+keywords are used in any console type, this value is used.
 .TP
 .B portbase
 .I number
 .br
 Set the base value for the port calculation formula.
 .I number
-must be -1 or greater.
+must be 0 or greater.
 The default is zero.
 See
 .B port
@@ -792,7 +836,7 @@ for the details of the formula.
 .br
 Set the increment value for the port calculation formula.
 .I number
-must be 1 or greater.
+must be 0 or greater.
 The default is one.
 See
 .B port
@@ -880,7 +924,8 @@ can be specified to add logging of break sequences sent to the console.
 .B type
 .RB [ " device " | " exec " | " host " ]
 .br
-Set the type of console.  The type
+Set the type of console.
+The type
 .RB `` device ''
 should be used for local serial ports (also set the
 .B device

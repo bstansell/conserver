@@ -94,6 +94,18 @@ Bryan Stansell
 - allow for very long replays (hundres of lines) : John Stoffel
   <stoffel@lucent.com>
 
+- log rotation by date : Tom Pachla <tom.pachla@nlc-bnc.ca>
+
+- client config file (for -M, etc?) : Erik Sjolund
+  <erik.sjolund@sbc.su.se>
+
+- strict file permission checks on conserver.passwd/conserver.cf : Erik
+  Sjolund <erik.sjolund@sbc.su.se>
+
+- imbedded startup delays per remote host...or "group" of consoles in
+  some way 'cause some ssh connections to console servers need
+  significant throttling : Jay McCanta <mccantaj@amgen.com>
+
 #
-#  $Id: TODO,v 1.45 2004/01/28 14:57:39 bryan Exp $
+#  $Id: TODO,v 1.46 2004/03/11 16:45:57 bryan Exp $
 #

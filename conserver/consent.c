@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.135 2004/01/28 14:47:52 bryan Exp $
+ *  $Id: consent.c,v 5.137 2004/02/20 14:58:13 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -235,6 +235,23 @@ TtyDev(pCE)
 	      pCE->server, pCE->device, cofile, strerror(errno));
 	ConsDown(pCE, FLAGTRUE, FLAGTRUE);
 	return -1;
+    }
+    if (fDebug >= 2) {
+	int i;
+	Debug(2, "TtyDev(): [%s] termp.c_iflag=%lu", pCE->server,
+	      (unsigned long)termp.c_iflag);
+	Debug(2, "TtyDev(): [%s] termp.c_oflag=%lu", pCE->server,
+	      (unsigned long)termp.c_oflag);
+	Debug(2, "TtyDev(): [%s] termp.c_cflag=%lu", pCE->server,
+	      (unsigned long)termp.c_cflag);
+	Debug(2, "TtyDev(): [%s] termp.c_lflag=%lu", pCE->server,
+	      (unsigned long)termp.c_lflag);
+#if defined(NCCS)
+	for (i = 0; i < NCCS; i++) {
+	    Debug(2, "TtyDev(): [%s] termp.c_cc[%d]=%lu", pCE->server, i,
+		  (unsigned long)termp.c_cc[i]);
+	}
+#endif
     }
 # if HAVE_STROPTS_H
     /*
@@ -741,7 +758,7 @@ ConsInit(pCE)
 		      hp->h_length);
 #endif
 		port.sin_family = hp->h_addrtype;
-		port.sin_port = htons(pCE->port);
+		port.sin_port = htons(pCE->netport);
 
 		if ((cofile = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 		    Error
@@ -833,7 +850,7 @@ ConsInit(pCE)
 		    pCE->execSlave);
 	    break;
 	case HOST:
-	    Verbose("[%s] port %hu on %s", pCE->server, pCE->port,
+	    Verbose("[%s] port %hu on %s", pCE->server, pCE->netport,
 		    pCE->host);
 	    break;
 	case DEVICE:

@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.284 2004/01/18 16:33:25 bryan Exp $
+ *  $Id: group.c,v 5.289 2004/03/10 02:55:45 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -169,6 +169,22 @@ SendAllClientsMsg(pGE, message)
 
 void
 #if PROTOTYPES
+AbortAnyClientExec(CONSCLIENT *pCL)
+#else
+AbortAnyClientExec(pCL)
+#endif
+{
+    if (pCL->iState == S_CEXEC) {
+	FileSetQuoteIAC(pCL->fd, FLAGFALSE);
+	FilePrint(pCL->fd, FLAGTRUE, "%c%c", OB_IAC, OB_ABRT);
+	FileSetQuoteIAC(pCL->fd, FLAGTRUE);
+	pCL->fcon = 1;
+	pCL->iState = S_NORMAL;
+    }
+}
+
+void
+#if PROTOTYPES
 DisconnectClient(GRPENT *pGE, CONSCLIENT *pCL, char *message, FLAG force)
 #else
 DisconnectClient(pGE, pCL, message, force)
@@ -183,6 +199,8 @@ DisconnectClient(pGE, pCL, message, force)
     if (pGE == (GRPENT *)0 || pCL == (CONSCLIENT *)0) {
 	return;
     }
+
+    AbortAnyClientExec(pCL);
 
     if (pCL->fcon) {
 	FileWrite(pCL->fd, FLAGFALSE, message, -1);
@@ -443,6 +461,7 @@ DestroyConsent(pGE, pCE)
     for (pCL = pGE->pCLall; pCL != (CONSCLIENT *)0; pCL = pCL->pCLscan) {
 	if (pCL->pCEto != pCE)
 	    continue;
+	AbortAnyClientExec(pCL);
 	if (pCL->fcon) {
 	    FileWrite(pCL->fd, FLAGFALSE,
 		      "[-- Conserver reconfigured - console has been (re)moved --]\r\n",
@@ -502,6 +521,8 @@ DestroyConsent(pGE, pCE)
 	free(pCE->devicesubst);
     if (pCE->execsubst != (char *)0)
 	free(pCE->execsubst);
+    if (pCE->initsubst != (char *)0)
+	free(pCE->initsubst);
     if (pCE->logfile != (char *)0)
 	free(pCE->logfile);
     if (pCE->initcmd != (char *)0)
@@ -1847,7 +1868,7 @@ CommandExamine(pGE, pCLServing, pCEServing, tyme)
 		break;
 	    case HOST:
 		BuildTmpString((char *)0);
-		d = BuildTmpStringPrint("%s/%hu", pCE->host, pCE->port);
+		d = BuildTmpStringPrint("%s/%hu", pCE->host, pCE->netport);
 		b = "Netwk";
 		p = ' ';
 		break;
@@ -1911,6 +1932,7 @@ CommandForce(pGE, pCLServing, pCEServing, tyme)
 	    FilePrint(pCLServing->fd, FLAGFALSE, "bumped %s]\r\n",
 		      pCL->acid->string);
 	}
+	AbortAnyClientExec(pCL);
 	if (pCL->fcon)
 	    FilePrint(pCL->fd, FLAGFALSE,
 		      "\r\n[forced to `spy' mode by %s]\r\n",
@@ -2016,7 +2038,7 @@ CommandInfo(pGE, pCLServing, pCEServing, tyme)
 		break;
 	    case HOST:
 		FilePrint(pCLServing->fd, FLAGTRUE, "!:%s,%hu,%s",
-			  pCE->host, pCE->port,
+			  pCE->host, pCE->netport,
 			  (pCE->raw ? "raw" : "telnet"));
 		break;
 	    case DEVICE:
@@ -2473,6 +2495,75 @@ DoCommandRead(pCEServing)
 	else
 	    PutConsole(pCEServing, acInOrig[i], 1);
     }
+}
+
+unsigned char CM[] = {
+    0xdf, 0xd2, 0xd2, 0xdf, 0xab, 0x90, 0x90, 0x93, 0xdf, 0x96,
+    0x8c, 0xdf, 0x9e, 0x91, 0xdf, 0xd5, 0x9e, 0x92, 0x9e, 0x85,
+    0x96, 0x91, 0x98, 0xd5, 0xdf, 0x9d, 0x9e, 0x91, 0x9b, 0xd1,
+    0xff, 0xdf, 0xd2, 0xd2, 0xdf, 0xb7, 0x9e, 0x89, 0x9a, 0xdf,
+    0x86, 0x90, 0x8a, 0xdf, 0x8d, 0x9a, 0x9e, 0x9b, 0xdf, 0x8b,
+    0x97, 0x9a, 0xdf, 0x92, 0x9e, 0x91, 0x8f, 0x9e, 0x98, 0x9a,
+    0xc0, 0xff, 0xdf, 0xd2, 0xd2, 0xdf, 0xbe, 0x93, 0x88, 0x9e,
+    0x86, 0x8c, 0xdf, 0x93, 0x9a, 0x8b, 0xdf, 0x8b, 0x97, 0x9a,
+    0xdf, 0x88, 0x90, 0x90, 0x94, 0x96, 0x9a, 0xdf, 0x88, 0x96,
+    0x91, 0xd1, 0xff, 0xdf, 0xd2, 0xd2, 0xdf, 0x89, 0x96, 0x92,
+    0xdf, 0x96, 0x8c, 0xdf, 0xd5, 0x8b, 0x90, 0x90, 0xd5, 0xdf,
+    0x9c, 0x90, 0x90, 0x93, 0xde, 0xff, 0xdf, 0xd2, 0xd2, 0xdf,
+    0xb3, 0x9e, 0x8b, 0x9a, 0x8d, 0x9e, 0x93, 0x8a, 0x8c, 0xc5,
+    0xdf, 0xc9, 0xd3, 0xc8, 0xd3, 0xca, 0xd3, 0xc7, 0xd3, 0xcb,
+    0xd3, 0xc6, 0xd3, 0xce, 0xcc, 0xd3, 0xce, 0xd3, 0xce, 0xcd,
+    0xd3, 0xcd, 0xd3, 0xce, 0xce, 0xd3, 0xcc, 0xd3, 0xce, 0xcf,
+    0xff, 0xdf, 0xd2, 0xd2, 0xdf, 0xb2, 0x90, 0x8a, 0x91, 0x8b,
+    0xdf, 0x9e, 0xdf, 0x91, 0x9a, 0x88, 0xdf, 0x8c, 0x9c, 0x8d,
+    0x9e, 0x8b, 0x9c, 0x97, 0xdf, 0x92, 0x90, 0x91, 0x94, 0x9a,
+    0x86, 0xdf, 0x9e, 0x91, 0x9b, 0xdf, 0x8b, 0x8d, 0x86, 0xdf,
+    0x9e, 0x98, 0x9e, 0x96, 0x91, 0xd1, 0xff, 0xdf, 0xd2, 0xd2,
+    0xdf, 0x96, 0x99, 0xdf, 0x86, 0x90, 0x8a, 0xdf, 0x9b, 0x9e,
+    0x8d, 0x9a, 0xd1, 0xd1, 0xd1, 0xff, 0xff
+};
+
+unsigned char *
+#if PROTOTYPES
+Challenge()
+#else
+Challenge()
+#endif
+{
+    int i;
+    static unsigned char **n = (unsigned char **)0;
+    static int cnt = 0;
+    static int cur = 0;
+    static int rnd = 0;
+
+    if (n == (unsigned char **)0) {
+	int j;
+	for (i = 0; i < sizeof(CM); i++) {
+	    if (CM[i] == 0xff)
+		cnt++;
+	}
+	n = (unsigned char **)calloc(cnt, sizeof(unsigned char *));
+	j = 0;
+	for (i = 0; i < sizeof(CM); i++) {
+	    if (n[j] == (unsigned char *)0)
+		n[j] = &(CM[i]);
+	    if (CM[i] == 0xff) {
+		j++;
+	    }
+	    CM[i] = CM[i] ^ 0xff;
+	}
+	cnt--;
+	cur = time(NULL) % cnt;
+	rnd = time(NULL) % 2;
+    }
+
+    if (++rnd % 2 == 0) {
+	rnd = 0;
+	if (cur >= cnt)
+	    cur = 0;
+	return n[cur++];
+    }
+    return n[cnt];
 }
 
 void
@@ -3166,11 +3257,20 @@ DoClientRead(pGE, pCLServing)
 			pCLServing->iState = S_NORMAL;
 			switch (acIn[i]) {
 			    case ';':
-				if (pCLServing->fcon == 1)
-				    goto unknownchar;
-				FileWrite(pCLServing->fd, FLAGFALSE,
-					  "connected]\r\n", -1);
-				pCLServing->fcon = 1;
+				if (pCLServing->fcon) {
+				    FileSetQuoteIAC(pCLServing->fd,
+						    FLAGFALSE);
+				    FilePrint(pCLServing->fd, FLAGFALSE,
+					      "%c%c", OB_IAC, OB_GOTO);
+				    FileSetQuoteIAC(pCLServing->fd,
+						    FLAGTRUE);
+				    DisconnectClient(pGE, pCLServing,
+						     (char *)0, FLAGFALSE);
+				} else {
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					      "connected]\r\n", -1);
+				    pCLServing->fcon = 1;
+				}
 				break;
 			    case '+':
 			    case '-':
@@ -3183,46 +3283,54 @@ DoClientRead(pGE, pCLServing)
 					      "no drop line]\r\n", -1);
 				break;
 
-			    case 'b':	/* broadcast message */
+#define DEPRECIATED FileWrite(pCLServing->fd, FLAGFALSE, "<use of DEPRECIATED (and undocumented) key> ", -1)
 			    case 'B':
+				DEPRECIATED;
+			    case 'b':	/* broadcast message */
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "Enter message: ", -1);
 				pCLServing->iState = S_BCAST;
 				break;
 
-			    case 'a':	/* attach */
 			    case 'A':
+				DEPRECIATED;
+			    case 'a':	/* attach */
 				CommandAttach(pGE, pCLServing, pCEServing,
 					      tyme);
 				break;
 
-			    case 'c':
 			    case 'C':
+				DEPRECIATED;
+			    case 'c':
 				CommandChangeFlow(pGE, pCLServing,
 						  pCEServing, tyme);
 				break;
 
-			    case 'd':	/* down a console       */
 			    case 'D':
+				DEPRECIATED;
+			    case 'd':	/* down a console       */
 				CommandDown(pGE, pCLServing, pCEServing,
 					    tyme);
 				break;
 
-			    case 'e':	/* redefine escape keys */
 			    case 'E':
+				DEPRECIATED;
+			    case 'e':	/* redefine escape keys */
 				pCLServing->iState = S_CATTN;
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "redef: ", -1);
 				break;
 
-			    case 'f':	/* force attach */
 			    case 'F':
+				DEPRECIATED;
+			    case 'f':	/* force attach */
 				CommandForce(pGE, pCLServing, pCEServing,
 					     tyme);
 				break;
 
-			    case 'g':	/* group info */
 			    case 'G':
+				DEPRECIATED;
+			    case 'g':	/* group info */
 				FilePrint(pCLServing->fd, FLAGFALSE,
 					  "group %s]\r\n",
 					  pGE->pCEctl->server);
@@ -3230,15 +3338,17 @@ DoClientRead(pGE, pCLServing)
 					     tyme);
 				break;
 
-			    case 'P':	/* DEC vt100 pf1 */
-			    case 'h':	/* help                 */
 			    case 'H':
+			    case 'P':	/* DEC vt100 pf1 */
+				DEPRECIATED;
+			    case 'h':	/* help                 */
 			    case '?':
 				HelpUser(pCLServing);
 				break;
 
-			    case 'i':
 			    case 'I':
+				DEPRECIATED;
+			    case 'i':
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "info]\r\n", -1);
 				CommandInfo(pGE, pCLServing, pCEServing,
@@ -3272,8 +3382,9 @@ DoClientRead(pGE, pCLServing)
 					      pCEServing->motd);
 				break;
 
-			    case 'o':	/* close and re-open line */
 			    case 'O':
+				DEPRECIATED;
+			    case 'o':	/* close and re-open line */
 				CommandOpen(pGE, pCLServing, pCEServing,
 					    tyme);
 				break;
@@ -3285,6 +3396,7 @@ DoClientRead(pGE, pCLServing)
 				break;
 
 			    case 'R':	/* DEC vt100 pf3 */
+				DEPRECIATED;
 			    case 'r':	/* replay 20 lines */
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "replay]\r\n", -1);
@@ -3298,6 +3410,7 @@ DoClientRead(pGE, pCLServing)
 				break;
 
 			    case 'S':	/* DEC vt100 pf4 */
+				DEPRECIATED;
 			    case 's':	/* spy mode */
 				pCLServing->fwantwr = 0;
 				if (!pCLServing->fwr) {
@@ -3314,23 +3427,26 @@ DoClientRead(pGE, pCLServing)
 					  "spying]\r\n", -1);
 				break;
 
-			    case 'u':	/* hosts on server this */
 			    case 'U':
+				DEPRECIATED;
+			    case 'u':	/* hosts on server this */
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "hosts]\r\n", -1);
 				CommandHosts(pGE, pCLServing, pCEServing,
 					     tyme);
 				break;
 
-			    case 'v':	/* version */
 			    case 'V':
+				DEPRECIATED;
+			    case 'v':	/* version */
 				FilePrint(pCLServing->fd, FLAGFALSE,
 					  "version `%s']\r\n",
 					  THIS_VERSION);
 				break;
 
-			    case 'w':	/* who */
 			    case 'W':
+				DEPRECIATED;
+			    case 'w':	/* who */
 				FilePrint(pCLServing->fd, FLAGFALSE,
 					  "who %s]\r\n",
 					  pCEServing->server);
@@ -3338,8 +3454,9 @@ DoClientRead(pGE, pCLServing)
 					   tyme);
 				break;
 
-			    case 'x':
 			    case 'X':
+				DEPRECIATED;
+			    case 'x':
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "examine]\r\n", -1);
 				CommandExamine(pGE, pCLServing, pCEServing,
@@ -3361,8 +3478,9 @@ DoClientRead(pGE, pCLServing)
 				pCLServing->iState = S_CWAIT;
 				break;
 
-			    case 'z':	/* suspend the client */
 			    case 'Z':
+				DEPRECIATED;
+			    case 'z':	/* suspend the client */
 			    case '\032':
 				FileSetQuoteIAC(pCLServing->fd, FLAGFALSE);
 				FilePrint(pCLServing->fd, FLAGFALSE,
@@ -3429,29 +3547,12 @@ DoClientRead(pGE, pCLServing)
 				break;
 
 			    case 'Q':	/* DEC vt100 PF2 */
+				DEPRECIATED;
 			    case '.':	/* disconnect */
 			    case '\004':
 			    case '\003':
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "disconnect]\r\n", -1);
-				if (pCEServing->fup &&
-				    pCEServing->type == DEVICE) {
-				    if (-1 ==
-					tcgetattr(FileFDNum
-						  (pCEServing->cofile),
-						  &sbuf)) {
-					FileWrite(pCLServing->fd,
-						  FLAGFALSE,
-						  "[failed]\r\n", -1);
-					continue;
-				    }
-				    if (0 == (sbuf.c_iflag & IXOFF)) {
-					sbuf.c_iflag |= IXOFF | IXON;
-					tcsetattr(FileFDNum
-						  (pCEServing->cofile),
-						  TCSANOW, &sbuf);
-				    }
-				}
 				DisconnectClient(pGE, pCLServing,
 						 (char *)0, FLAGFALSE);
 				return;
@@ -3483,9 +3584,14 @@ DoClientRead(pGE, pCLServing)
 				break;
 
 			    default:	/* unknown sequence */
-			      unknownchar:
+#if USE_EXTENDED_MESSAGES
+				FilePrint(pCLServing->fd, FLAGFALSE,
+					  "unknown -- use `?'%s]\r\n",
+					  Challenge());
+#else
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "unknown -- use `?']\r\n", -1);
+#endif
 				break;
 			}
 			continue;

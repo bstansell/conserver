@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.79 2003/11/28 23:36:02 bryan Exp $
+ *  $Id: client.c,v 5.80 2004/03/10 02:55:45 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -367,8 +367,7 @@ Replay(pCE, fdOut, iBack)
  */
 #define WHEN_SPY	0x01
 #define WHEN_ATTACH	0x02
-#define WHEN_VT100	0x04
-#define WHEN_EXPERT	0x08	/* ZZZ no way to set his yet    */
+#define WHEN_EXPERT	0x04	/* ZZZ no way to set his yet    */
 #define WHEN_ALWAYS	0x40
 
 #define HALFLINE	40
@@ -380,6 +379,7 @@ typedef struct HLnode {
 
 static HELP aHLTable[] = {
     {WHEN_ALWAYS, ".    disconnect"},
+    {WHEN_ALWAYS, ";    switch to another console"},
     {WHEN_ALWAYS, "a    attach read/write"},
     {WHEN_ALWAYS, "b    send broadcast message"},
     {WHEN_ATTACH, "c    toggle flow control"},
@@ -403,16 +403,12 @@ static HELP aHLTable[] = {
     {WHEN_ALWAYS, "x    show console baud info"},
     {WHEN_ALWAYS, "z    suspend the connection"},
     {WHEN_ATTACH, "|    attach local command"},
-    {WHEN_ALWAYS, "<cr> ignore/abort command"},
     {WHEN_ALWAYS, "?    print this message"},
+    {WHEN_ALWAYS, "<cr> ignore/abort command"},
     {WHEN_ALWAYS, "^R   replay the last line"},
     {WHEN_ATTACH, "\\ooo send character by octal code"},
     {WHEN_EXPERT, "^I   toggle tab expansion"},
     {WHEN_EXPERT, "+(-) do (not) drop line"},
-    {WHEN_VT100, "PF1  print this message"},
-    {WHEN_VT100, "PF2  disconnect"},
-    {WHEN_VT100, "PF3  replay the last 20 lines"},
-    {WHEN_VT100, "PF4  spy read only"}
 };
 
 /* list the commands we know for the user				(ksb)
@@ -440,9 +436,6 @@ HelpUser(pCL)
 	iCmp |= WHEN_ATTACH;
     } else {
 	FileWrite(pCL->fd, FLAGTRUE, acH2, sizeof(acH2) - 1);
-    }
-    if ('\033' == pCL->ic[0] && 'O' == pCL->ic[1]) {
-	iCmp |= WHEN_VT100;
     }
 
     BuildString((char *)0, acLine);
