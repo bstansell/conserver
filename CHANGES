@@ -1,6 +1,19 @@
 				CHANGES
 				=======
 
+version 8.0.5 (Oct 31,2003):
+	- added 'loghostnames' config option (default is on) to log
+	  client hostnames instead of ip addresses (like pre-8.0.0) -
+	  suggested by Han Pilmeyer <han@zk3.dec.com>
+	- fixed bug where 'daemonmode' config file option wasn't being
+	  used
+	- fixed potential logfile (-L) opening problem processing SIGHUP
+	- fixed various potential conserver.cf issues with 'config'
+	  block values processing SIGHUP
+	- added 'setproctitle' config option (default is off) to enable
+	  changing the process title to contain runtime information -
+	  patch by Dmitry Morozovsky <marck@rinet.ru>
+
 version 8.0.4 (Oct 10, 2003):
 	- fixed client rejection bug that can nearly never happen -
 	  reported by Han Pilmeyer <han@zk3.dec.com>
@@ -573,5 +586,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.118 2003-10-10 09:02:38-07 bryan Exp $
+#  $Id: CHANGES,v 1.120 2003-10-31 10:04:12-08 bryan Exp $
 #

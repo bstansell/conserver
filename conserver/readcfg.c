@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.146 2003-10-10 08:58:12-07 bryan Exp $
+ *  $Id: readcfg.c,v 5.148 2003-10-31 09:55:55-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -3148,8 +3148,6 @@ DestroyConfig(c)
 	return;
     if (c->logfile != (char *)0)
 	free(c->logfile);
-    if (c->initcmd != (char *)0)
-	free(c->initcmd);
     if (c->passwdfile != (char *)0)
 	free(c->passwdfile);
     if (c->primaryport != (char *)0)
@@ -3209,12 +3207,6 @@ ConfigEnd()
 		pConfig->logfile = parserConfigTemp->logfile;
 		parserConfigTemp->logfile = (char *)0;
 	    }
-	    if (parserConfigTemp->initcmd != (char *)0) {
-		if (pConfig->initcmd != (char *)0)
-		    free(pConfig->initcmd);
-		pConfig->initcmd = parserConfigTemp->initcmd;
-		parserConfigTemp->initcmd = (char *)0;
-	    }
 	    if (parserConfigTemp->passwdfile != (char *)0) {
 		if (pConfig->passwdfile != (char *)0)
 		    free(pConfig->passwdfile);
@@ -3233,6 +3225,8 @@ ConfigEnd()
 		pConfig->daemonmode = parserConfigTemp->daemonmode;
 	    if (parserConfigTemp->redirect != FLAGUNKNOWN)
 		pConfig->redirect = parserConfigTemp->redirect;
+	    if (parserConfigTemp->loghostnames != FLAGUNKNOWN)
+		pConfig->loghostnames = parserConfigTemp->loghostnames;
 	    if (parserConfigTemp->reinitcheck != 0)
 		pConfig->reinitcheck = parserConfigTemp->reinitcheck;
 	    if (parserConfigTemp->secondaryport != (char *)0) {
@@ -3422,6 +3416,18 @@ ConfigItemRedirect(id)
 
 void
 #if PROTOTYPES
+ConfigItemLoghostnames(char *id)
+#else
+ConfigItemLoghostnames(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConfigItemLoghostnames(%s) [%s:%d]", id, file, line));
+    ProcessYesNo(id, &(parserConfigTemp->loghostnames));
+}
+
+void
+#if PROTOTYPES
 ConfigItemReinitcheck(char *id)
 #else
 ConfigItemReinitcheck(id)
@@ -3472,7 +3478,6 @@ ConfigItemSecondaryport(id)
 	OutOfMem();
 }
 
-#if HAVE_OPENSSL
 void
 #if PROTOTYPES
 ConfigItemSslcredentials(char *id)
@@ -3482,6 +3487,7 @@ ConfigItemSslcredentials(id)
 #endif
 {
     CONDDEBUG((1, "ConfigItemSslcredentials(%s) [%s:%d]", id, file, line));
+#if HAVE_OPENSSL
     if ((id == (char *)0) || (*id == '\000')) {
 	if (parserConfigTemp->sslcredentials != (char *)0) {
 	    free(parserConfigTemp->sslcredentials);
@@ -3492,6 +3498,11 @@ ConfigItemSslcredentials(id)
     if ((parserConfigTemp->sslcredentials = StrDup(id))
 	== (char *)0)
 	OutOfMem();
+#else
+    Error
+	("sslcredentials ignored - encryption not compiled into code [%s:%d]",
+	 file, line);
+#endif
 }
 
 void
@@ -3503,9 +3514,32 @@ ConfigItemSslrequired(id)
 #endif
 {
     CONDDEBUG((1, "ConfigItemSslrequired(%s) [%s:%d]", id, file, line));
+#if HAVE_OPENSSL
     ProcessYesNo(id, &(parserConfigTemp->sslrequired));
-}
+#else
+    Error
+	("sslrequired ignored - encryption not compiled into code [%s:%d]",
+	 file, line);
 #endif
+}
+
+void
+#if PROTOTYPES
+ConfigItemSetproctitle(char *id)
+#else
+ConfigItemSetproctitle(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConfigItemSetproctitle(%s) [%s:%d]", id, file, line));
+#if HAVE_SETPROCTITLE
+    ProcessYesNo(id, &(parserConfigTemp->setproctitle));
+#else
+    Error
+	("setproctitle ignored - operating system support does not exist [%s:%d]",
+	 file, line);
+#endif
+}
 
 /* now all the real nitty-gritty bits for making things work */
 ITEM keyBreak[] = {
@@ -3577,15 +3611,15 @@ ITEM keyConfig[] = {
     {"defaultaccess", ConfigItemDefaultaccess},
     {"daemonmode", ConfigItemDaemonmode},
     {"logfile", ConfigItemLogfile},
+    {"loghostnames", ConfigItemLoghostnames},
     {"passwdfile", ConfigItemPasswordfile},
     {"primaryport", ConfigItemPrimaryport},
     {"redirect", ConfigItemRedirect},
     {"reinitcheck", ConfigItemReinitcheck},
     {"secondaryport", ConfigItemSecondaryport},
-#if HAVE_OPENSSL
+    {"setproctitle", ConfigItemSetproctitle},
     {"sslcredentials", ConfigItemSslcredentials},
     {"sslrequired", ConfigItemSslrequired},
-#endif
     {(char *)0, (void *)0}
 };
 
@@ -4074,49 +4108,77 @@ ReReadCfg(fd)
     }
 
     /* check for changes to master & child values */
-    if (optConf->logfile == (char *)0 && pConfig->logfile != (char *)0 &&
-	(config->logfile == (char *)0 ||
-	 strcmp(pConfig->logfile, config->logfile) != 0)) {
-	if (config->logfile != (char *)0)
-	    free(config->logfile);
-	if ((config->logfile = StrDup(pConfig->logfile))
-	    == (char *)0)
-	    OutOfMem();
-	ReopenLogfile();
+    if (optConf->logfile == (char *)0) {
+	char *p;
+	if (pConfig->logfile == (char *)0)
+	    p = defConfig.logfile;
+	else
+	    p = pConfig->logfile;
+	if (config->logfile == (char *)0 ||
+	    strcmp(p, config->logfile) != 0) {
+	    if (config->logfile != (char *)0)
+		free(config->logfile);
+	    if ((config->logfile = StrDup(p))
+		== (char *)0)
+		OutOfMem();
+	    ReopenLogfile();
+	}
     }
-    if (optConf->defaultaccess == '\000' &&
-	pConfig->defaultaccess != '\000' &&
-	pConfig->defaultaccess != config->defaultaccess) {
-	config->defaultaccess = pConfig->defaultaccess;
+
+    if (optConf->defaultaccess == '\000') {
+	if (pConfig->defaultaccess == '\000')
+	    config->defaultaccess = defConfig.defaultaccess;
+	else if (pConfig->defaultaccess != config->defaultaccess)
+	    config->defaultaccess = pConfig->defaultaccess;
 	/* gets used below by SetDefAccess() */
     }
-    if (optConf->passwdfile == (char *)0 &&
-	pConfig->passwdfile != (char *)0 &&
-	(config->passwdfile == (char *)0 ||
-	 strcmp(pConfig->passwdfile, config->passwdfile) != 0)) {
-	if (config->passwdfile != (char *)0)
-	    free(config->passwdfile);
-	if ((config->passwdfile = StrDup(pConfig->passwdfile))
-	    == (char *)0)
-	    OutOfMem();
+
+    if (optConf->passwdfile == (char *)0) {
+	char *p;
+	if (pConfig->passwdfile == (char *)0)
+	    p = defConfig.passwdfile;
+	else
+	    p = pConfig->passwdfile;
+	if (config->passwdfile == (char *)0 ||
+	    strcmp(p, config->passwdfile) != 0) {
+	    if (config->passwdfile != (char *)0)
+		free(config->passwdfile);
+	    if ((config->passwdfile = StrDup(p))
+		== (char *)0)
+		OutOfMem();
+	    /* gets used on-the-fly */
+	}
+    }
+
+    if (optConf->redirect == FLAGUNKNOWN) {
+	if (pConfig->redirect == FLAGUNKNOWN)
+	    config->redirect = defConfig.redirect;
+	else if (pConfig->redirect != config->redirect)
+	    config->redirect = pConfig->redirect;
 	/* gets used on-the-fly */
     }
-    if (optConf->redirect == FLAGUNKNOWN &&
-	pConfig->redirect != FLAGUNKNOWN &&
-	pConfig->redirect != config->redirect) {
-	config->redirect = pConfig->redirect;
+
+    if (optConf->loghostnames == FLAGUNKNOWN) {
+	if (pConfig->loghostnames == FLAGUNKNOWN)
+	    config->loghostnames = defConfig.loghostnames;
+	else if (pConfig->loghostnames != config->loghostnames)
+	    config->loghostnames = pConfig->loghostnames;
 	/* gets used on-the-fly */
     }
-    if (optConf->reinitcheck == 0 && pConfig->reinitcheck != 0 &&
-	pConfig->reinitcheck != config->reinitcheck) {
-	config->reinitcheck = pConfig->reinitcheck;
+
+    if (optConf->reinitcheck == 0) {
+	if (pConfig->reinitcheck == 0)
+	    config->reinitcheck = defConfig.reinitcheck;
+	else if (pConfig->reinitcheck != config->reinitcheck)
+	    config->reinitcheck = pConfig->reinitcheck;
 	/* gets used on-the-fly */
     }
 #if HAVE_OPENSSL
-    if (optConf->sslrequired == FLAGUNKNOWN &&
-	pConfig->sslrequired != FLAGUNKNOWN &&
-	pConfig->sslrequired != config->sslrequired) {
-	config->sslrequired = pConfig->sslrequired;
+    if (optConf->sslrequired == FLAGUNKNOWN) {
+	if (pConfig->sslrequired == FLAGUNKNOWN)
+	    config->sslrequired = defConfig.sslrequired;
+	else if (pConfig->sslrequired != config->sslrequired)
+	    config->sslrequired = pConfig->sslrequired;
 	/* gets used on-the-fly */
     }
 #endif
@@ -4131,49 +4193,81 @@ ReReadCfg(fd)
 
 	/* process any new options (command-line flags might have
 	 * overridden things, so just need to check on new pConfig
-	 * values for changes)
+	 * values for changes).
+	 * the checks here produce warnings, and are inside the
+	 * isMaster check so it only pops out once.
 	 */
-	if (optConf->daemonmode == FLAGUNKNOWN &&
-	    pConfig->daemonmode != FLAGUNKNOWN &&
-	    pConfig->daemonmode != config->daemonmode) {
-	    config->daemonmode = pConfig->daemonmode;
-	    Msg("warning: `daemonmode' config option changed - you must restart for it to take effect");
+	if (optConf->daemonmode == FLAGUNKNOWN) {
+	    if (pConfig->daemonmode == FLAGUNKNOWN)
+		pConfig->daemonmode = defConfig.daemonmode;
+	    if (pConfig->daemonmode != config->daemonmode) {
+		config->daemonmode = pConfig->daemonmode;
+		Msg("warning: `daemonmode' config option changed - you must restart for it to take effect");
+	    }
 	}
-	if (optConf->primaryport == (char *)0 &&
-	    pConfig->primaryport != (char *)0 &&
-	    (config->primaryport == (char *)0 ||
-	     strcasecmp(pConfig->primaryport, config->primaryport) != 0)) {
-	    if (config->primaryport != (char *)0)
-		free(config->primaryport);
-	    if ((config->primaryport = StrDup(pConfig->primaryport))
-		== (char *)0)
-		OutOfMem();
-	    Msg("warning: `primaryport' config option changed - you must restart for it to take effect");
+	if (optConf->primaryport == (char *)0) {
+	    char *p;
+	    if (pConfig->primaryport == (char *)0)
+		p = defConfig.primaryport;
+	    else
+		p = pConfig->primaryport;
+	    if (config->primaryport == (char *)0 ||
+		strcmp(p, config->primaryport) != 0) {
+		if (config->primaryport != (char *)0)
+		    free(config->primaryport);
+		if ((config->primaryport = StrDup(p))
+		    == (char *)0)
+		    OutOfMem();
+		Msg("warning: `primaryport' config option changed - you must restart for it to take effect");
+	    }
 	}
-	if (optConf->secondaryport == (char *)0 &&
-	    pConfig->secondaryport != (char *)0 &&
-	    (config->secondaryport == (char *)0 ||
-	     strcasecmp(pConfig->secondaryport,
-			config->secondaryport) != 0)) {
-	    if (config->secondaryport != (char *)0)
-		free(config->secondaryport);
-	    if ((config->secondaryport = StrDup(pConfig->secondaryport))
-		== (char *)0)
-		OutOfMem();
-	    Msg("warning: `secondaryport' config option changed - you must restart for it to take effect");
+	if (optConf->secondaryport == (char *)0) {
+	    char *p;
+	    if (pConfig->secondaryport == (char *)0)
+		p = defConfig.secondaryport;
+	    else
+		p = pConfig->secondaryport;
+	    if (config->secondaryport == (char *)0 ||
+		strcmp(p, config->secondaryport) != 0) {
+		if (config->secondaryport != (char *)0)
+		    free(config->secondaryport);
+		if ((config->secondaryport = StrDup(p))
+		    == (char *)0)
+		    OutOfMem();
+		Msg("warning: `secondaryport' config option changed - you must restart for it to take effect");
+	    }
 	}
 #if HAVE_OPENSSL
-	if (optConf->sslcredentials == (char *)0 &&
-	    pConfig->sslcredentials != (char *)0 &&
-	    (config->sslcredentials == (char *)0 ||
-	     strcasecmp(pConfig->sslcredentials,
-			config->sslcredentials) != 0)) {
-	    if (config->sslcredentials != (char *)0)
-		free(config->sslcredentials);
-	    if ((config->sslcredentials = StrDup(pConfig->sslcredentials))
-		== (char *)0)
-		OutOfMem();
-	    Msg("warning: `sslcredentials' config option changed - you must restart for it to take effect");
+	if (optConf->sslcredentials == (char *)0) {
+	    if (pConfig->sslcredentials == (char *)0) {
+		if (config->sslcredentials != (char *)0) {
+		    free(config->sslcredentials);
+		    config->sslcredentials = (char *)0;
+		    Msg("warning: `sslcredentials' config option changed - you must restart for it to take effect");
+		}
+	    } else {
+		if (config->sslcredentials == (char *)0 ||
+		    strcmp(pConfig->sslcredentials,
+			   config->sslcredentials) != 0) {
+		    if (config->sslcredentials != (char *)0)
+			free(config->sslcredentials);
+		    if ((config->sslcredentials =
+			 StrDup(pConfig->sslcredentials))
+			== (char *)0)
+			OutOfMem();
+		    Msg("warning: `sslcredentials' config option changed - you must restart for it to take effect");
+		}
+	    }
+	}
+#endif
+#if HAVE_SETPROCTITLE
+	if (optConf->setproctitle == FLAGUNKNOWN) {
+	    if (pConfig->setproctitle == FLAGUNKNOWN)
+		pConfig->setproctitle = defConfig.setproctitle;
+	    if (pConfig->setproctitle != config->setproctitle) {
+		config->setproctitle = pConfig->setproctitle;
+		Msg("warning: `setproctitle' config option changed - you must restart for it to take effect");
+	    }
 	}
 #endif
 
@@ -4208,4 +4302,22 @@ ReReadCfg(fd)
 	    }
 	}
     }
+#if HAVE_SETPROCTITLE
+    if (config->setproctitle == FLAGTRUE) {
+	if (isMaster) {
+	    REMOTE *pRC;
+	    GRPENT *pGE;
+	    int local = 0, remote = 0;
+	    for (pGE = pGroups; pGE != (GRPENT *)0; pGE = pGE->pGEnext)
+		local += pGE->imembers;
+	    for (pRC = pRCList; (REMOTE *)0 != pRC; pRC = pRC->pRCnext)
+		remote++;
+	    setproctitle("master: port %hu, %d local, %d remote", bindPort,
+			 local, remote);
+	} else
+	    setproctitle("group %u: port %hu, %d %s", pGroups->id,
+			 pGroups->port, pGroups->imembers,
+			 pGroups->imembers == 1 ? "console" : "consoles");
+    }
+#endif
 }

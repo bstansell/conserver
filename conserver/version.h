@@ -1,5 +1,5 @@
 /*
- *  $Id: version.h,v 1.50 2003-10-10 09:02:08-07 bryan Exp $
+ *  $Id: version.h,v 1.51 2003-10-31 10:04:19-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -14,4 +14,4 @@
 @(#) Copyright 2000 conserver.com.\n\
 All rights reserved.\n"
 
-#define THIS_VERSION "conserver.com version 8.0.4"
+#define THIS_VERSION "conserver.com version 8.0.5"

@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.161 2003-10-03 06:32:34-07 bryan Exp $
+ *  $Id: main.c,v 5.163 2003-10-31 09:55:04-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -49,10 +49,8 @@
 #endif
 
 
-int fAll = 0, fNoinit = 0, fVersion = 0, fStrip = 0, fDaemon = 0, fReopen =
+int fAll = 0, fNoinit = 0, fVersion = 0, fStrip = 0, fReopen =
     0, fNoautoreup = 0, fSyntaxOnly = 0;
-
-char chDefAcc = 'r';
 
 char *pcConfig = CONFIGFILE;
 int isMaster = 1;
@@ -64,6 +62,17 @@ static STRING *startedMsg = (STRING *)0;
 CONFIG *optConf = (CONFIG *)0;
 CONFIG *config = (CONFIG *)0;
 char *interface = (char *)0;
+CONFIG defConfig =
+    { (STRING *)0, 'r', FLAGFALSE, LOGFILEPATH, PASSWDFILE, DEFPORT,
+    FLAGTRUE,
+    FLAGTRUE, 0, DEFBASEPORT
+#if HAVE_SETPROCTITLE
+	, FLAGFALSE
+#endif
+#if HAVE_OPENSSL
+	, (char *)0, FLAGTRUE
+#endif
+};
 
 struct sockaddr_in in_port;
 
@@ -383,10 +392,23 @@ ReopenLogfile()
      * after that, all bets are off...probably not see the errors (well,
      * aside from the tail of the old logfile, if it was rolled).
      */
-    if (!fDaemon || config->logfile == (char *)0)
+    if (config->daemonmode != FLAGTRUE)
 	return;
 
     close(1);
+
+    /* so, if we aren't in daemon mode, we just return before closing
+     * anything.  if we are, there are two possibilities.  first, if
+     * logfile is set, we close fd 1, open a file, etc.  all should be
+     * well.  if logfile isn't set, we end up closing fd 1 and 2 and
+     * returning (in case the logfile was set and then unset [config
+     * file change]).
+     */
+    if (config->logfile == (char *)0) {
+	close(2);
+	return;
+    }
+
     if (1 != open(config->logfile, O_WRONLY | O_CREAT | O_APPEND, 0644)) {
 	tag = 0;
 	Error("ReopenLogfile(): open(%s): %s", config->logfile,
@@ -555,17 +577,18 @@ Version()
     isMultiProc = 0;
 
     Msg("%s", THIS_VERSION);
-    Msg("default access type `%c'", chDefAcc);
+    Msg("default access type `%c'", defConfig.defaultaccess);
     Msg("default escape sequence `%s%s'", FmtCtl(DEFATTN, acA1),
 	FmtCtl(DEFESC, acA2));
     Msg("default configuration in `%s'", CONFIGFILE);
-    Msg("default password in `%s'", PASSWDFILE);
-    Msg("default logfile is `%s'", LOGFILEPATH);
+    Msg("default password in `%s'", defConfig.passwdfile);
+    Msg("default logfile is `%s'", defConfig.logfile);
     Msg("default pidfile is `%s'", PIDFILE);
     Msg("default limit is %d member%s per group", MAXMEMB,
 	MAXMEMB == 1 ? "" : "s");
-    Msg("default primary port referenced as `%s'", DEFPORT);
-    Msg("default secondary base port referenced as `%s'", DEFBASEPORT);
+    Msg("default primary port referenced as `%s'", defConfig.primaryport);
+    Msg("default secondary base port referenced as `%s'",
+	defConfig.secondaryport);
 
     BuildString((char *)0, acA1);
     if (optionlist[0] == (char *)0)
@@ -1126,9 +1149,9 @@ main(argc, argv)
 
     thepid = getpid();
     if ((char *)0 == (progname = strrchr(argv[0], '/'))) {
-	progname = argv[0];
+	progname = StrDup(argv[0]);
     } else {
-	++progname;
+	progname = StrDup(++progname);
     }
 
     setpwent();
@@ -1190,10 +1213,10 @@ main(argc, argv)
 #endif
 		break;
 	    case 'C':
-		pcConfig = optarg;
+		pcConfig = StrDup(optarg);
 		break;
 	    case 'd':
-		fDaemon = 1;
+		optConf->daemonmode = FLAGTRUE;
 		break;
 	    case 'D':
 		fDebug++;
@@ -1225,7 +1248,7 @@ main(argc, argv)
 		}
 		break;
 	    case 'M':
-		interface = optarg;
+		interface = StrDup(optarg);
 		break;
 	    case 'n':
 		/* noop now */
@@ -1360,7 +1383,7 @@ main(argc, argv)
     else if (pConfig->primaryport != (char *)0)
 	config->primaryport = StrDup(pConfig->primaryport);
     else
-	config->primaryport = StrDup(DEFPORT);
+	config->primaryport = StrDup(defConfig.primaryport);
     if (config->primaryport == (char *)0)
 	OutOfMem();
 
@@ -1391,7 +1414,7 @@ main(argc, argv)
     else if (pConfig->secondaryport != (char *)0)
 	config->secondaryport = StrDup(pConfig->secondaryport);
     else
-	config->secondaryport = StrDup(DEFBASEPORT);
+	config->secondaryport = StrDup(defConfig.secondaryport);
     if (config->secondaryport == (char *)0)
 	OutOfMem();
 
@@ -1421,7 +1444,7 @@ main(argc, argv)
     else if (pConfig->passwdfile != (char *)0)
 	config->passwdfile = StrDup(pConfig->passwdfile);
     else
-	config->passwdfile = StrDup(PASSWDFILE);
+	config->passwdfile = StrDup(defConfig.passwdfile);
     if (config->passwdfile == (char *)0)
 	OutOfMem();
 
@@ -1430,7 +1453,7 @@ main(argc, argv)
     else if (pConfig->logfile != (char *)0)
 	config->logfile = StrDup(pConfig->logfile);
     else
-	config->logfile = StrDup(LOGFILEPATH);
+	config->logfile = StrDup(defConfig.logfile);
     if (config->logfile == (char *)0)
 	OutOfMem();
 
@@ -1439,21 +1462,35 @@ main(argc, argv)
     else if (pConfig->reinitcheck != 0)
 	config->reinitcheck = pConfig->reinitcheck;
     else
-	config->reinitcheck = 0;
+	config->reinitcheck = defConfig.reinitcheck;
 
     if (optConf->defaultaccess != '\000')
 	config->defaultaccess = optConf->defaultaccess;
     else if (pConfig->defaultaccess != '\000')
 	config->defaultaccess = pConfig->defaultaccess;
     else
-	config->defaultaccess = chDefAcc;
+	config->defaultaccess = defConfig.defaultaccess;
+
+    if (optConf->daemonmode != FLAGUNKNOWN)
+	config->daemonmode = optConf->daemonmode;
+    else if (pConfig->daemonmode != FLAGUNKNOWN)
+	config->daemonmode = pConfig->daemonmode;
+    else
+	config->daemonmode = defConfig.daemonmode;
 
     if (optConf->redirect != FLAGUNKNOWN)
 	config->redirect = optConf->redirect;
     else if (pConfig->redirect != FLAGUNKNOWN)
 	config->redirect = pConfig->redirect;
     else
-	config->redirect = FLAGTRUE;
+	config->redirect = defConfig.redirect;
+
+    if (optConf->loghostnames != FLAGUNKNOWN)
+	config->loghostnames = optConf->loghostnames;
+    else if (pConfig->loghostnames != FLAGUNKNOWN)
+	config->loghostnames = pConfig->loghostnames;
+    else
+	config->loghostnames = defConfig.loghostnames;
 
 #if HAVE_OPENSSL
     if (optConf->sslrequired != FLAGUNKNOWN)
@@ -1461,14 +1498,14 @@ main(argc, argv)
     else if (pConfig->sslrequired != FLAGUNKNOWN)
 	config->sslrequired = pConfig->sslrequired;
     else
-	config->sslrequired = FLAGTRUE;
+	config->sslrequired = defConfig.sslrequired;
 
     if (optConf->sslcredentials != (char *)0)
-	config->sslcredentials = optConf->sslcredentials;
+	config->sslcredentials = StrDup(optConf->sslcredentials);
     else if (pConfig->sslcredentials != (char *)0)
-	config->sslcredentials = pConfig->sslcredentials;
+	config->sslcredentials = StrDup(pConfig->sslcredentials);
     else
-	config->sslcredentials = (char *)0;
+	config->sslcredentials = StrDup(defConfig.sslcredentials);
 #endif
 
 #if HAVE_DMALLOC && DMALLOC_MARK_MAIN
@@ -1483,7 +1520,7 @@ main(argc, argv)
 	SetupSSL();
 #endif
 
-	if (fDaemon)
+	if (config->daemonmode == FLAGTRUE)
 	    Daemonize();
 
 	/* if no one can use us we need to come up with a default
@@ -1502,6 +1539,20 @@ main(argc, argv)
 	    Verbose("group #%d pid %lu on port %hu", pGE->id,
 		    (unsigned long)pGE->pid, pGE->port);
 	}
+
+#if HAVE_SETPROCTITLE
+	if (config->setproctitle == FLAGTRUE) {
+	    REMOTE *pRC;
+	    GRPENT *pGE;
+	    int local = 0, remote = 0;
+	    for (pGE = pGroups; pGE != (GRPENT *)0; pGE = pGE->pGEnext)
+		local += pGE->imembers;
+	    for (pRC = pRCList; (REMOTE *)0 != pRC; pRC = pRC->pRCnext)
+		remote++;
+	    setproctitle("master: port %hu, %d local, %d remote", bindPort,
+			 local, remote);
+	}
+#endif
 
 	if (fVerbose) {
 	    ACCESS *pACtmp;

@@ -1,5 +1,5 @@
 /*
- *  $Id: access.c,v 5.67 2003-10-03 06:32:34-07 bryan Exp $
+ *  $Id: access.c,v 5.68 2003-10-19 22:52:21-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -151,8 +151,15 @@ AccType(addr, peername)
 	CONDDEBUG((1, "AccType(): who=%s, trust=%c", pACtmp->pcwho,
 		   pACtmp->ctrust));
 	if (pACtmp->isCIDR != 0) {
-	    if (AddrCmp(addr, pACtmp->pcwho) == 0)
+	    if (AddrCmp(addr, pACtmp->pcwho) == 0) {
+		if (config->loghostnames == FLAGTRUE &&
+		    (he =
+		     gethostbyaddr((char *)addr, so,
+				   AF_INET)) != (struct hostent *)0) {
+		    *peername = he->h_name;
+		}
 		return pACtmp->ctrust;
+	    }
 	    continue;
 	}
 
@@ -178,8 +185,15 @@ AccType(addr, peername)
 #else
 		   bcmp(&(addr->s_addr), he->h_addr_list[a], he->h_length)
 #endif
-		   == 0)
+		   == 0) {
+		if (config->loghostnames == FLAGTRUE &&
+		    (he =
+		     gethostbyaddr((char *)addr, so,
+				   AF_INET)) != (struct hostent *)0) {
+		    *peername = he->h_name;
+		}
 		return pACtmp->ctrust;
+	    }
 	}
     }
 
@@ -221,6 +235,12 @@ AccType(addr, peername)
 	}
     }
 #endif
+    if (config->loghostnames == FLAGTRUE &&
+	(he =
+	 gethostbyaddr((char *)addr, so,
+		       AF_INET)) != (struct hostent *)0) {
+	*peername = he->h_name;
+    }
     return config->defaultaccess;
 }
 

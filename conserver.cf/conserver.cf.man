@@ -1,5 +1,5 @@
-.\" $Id: conserver.cf.man,v 1.43 2003-10-02 19:01:05-07 bryan Exp $
-.TH CONSERVER.CF 5 "2003-10-02" "conserver-8.0.4" "conserver"
+.\" $Id: conserver.cf.man,v 1.44 2003-10-31 09:54:19-08 bryan Exp $
+.TH CONSERVER.CF 5 "2003-10-31" "conserver-8.0.5" "conserver"
 .SH NAME
 conserver.cf \- console configuration file for
 .BR conserver (8)
@@ -315,6 +315,16 @@ command-line flag).
 Set the base port number used by child processes (see the
 .B \-b
 command-line flag).
+.TP
+.B setproctitle
+.RB [ " yes " | " true " | " on " | " no " | " false " | " off " ]
+.br
+Set whether or not the process title shows master/group functionality
+as well as the port number the process is listening on and how many
+consoles it is managing.
+The operating system must support the
+.BR setproctitle ()
+call.
 .TP
 .B sslcredentials
 .I filename

@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.h,v 5.34 2003-10-10 08:57:17-07 bryan Exp $
+ *  $Id: readcfg.h,v 5.36 2003-10-31 09:54:44-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -11,12 +11,15 @@ typedef struct config {
     char defaultaccess;
     FLAG daemonmode;
     char *logfile;
-    char *initcmd;
     char *passwdfile;
     char *primaryport;
     FLAG redirect;
+    FLAG loghostnames;
     int reinitcheck;
     char *secondaryport;
+#if HAVE_SETPROCTITLE
+    FLAG setproctitle;
+#endif
 #if HAVE_OPENSSL
     char *sslcredentials;
     FLAG sslrequired;

@@ -6155,7 +6155,8 @@ done
 
 
 
-for ac_func in getopt strerror getrlimit getsid setsid getuserattr setgroups tcgetpgrp tcsetpgrp tcgetattr tcsetattr tcsendbreak setpgrp getutent setttyent getspnam setlinebuf setvbuf ptsname grantpt unlockpt sigaction setsockopt getdtablesize putenv memset memcpy memcmp memmove sysconf getlogin inet_aton
+
+for ac_func in getopt strerror getrlimit getsid setsid getuserattr setgroups tcgetpgrp tcsetpgrp tcgetattr tcsetattr tcsendbreak setpgrp getutent setttyent getspnam setlinebuf setvbuf ptsname grantpt unlockpt sigaction setsockopt getdtablesize putenv memset memcpy memcmp memmove sysconf getlogin inet_aton setproctitle
 do
 as_ac_var=`echo "ac_cv_func_$ac_func" | $as_tr_sh`
 echo "$as_me:$LINENO: checking for $ac_func" >&5

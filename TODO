@@ -80,6 +80,9 @@ Bryan Stansell
 - show attach/detach events to/of spy console clients : Greg A. Woods
   <woods@planix.com>
 
+- redefine client escape sequence in conserver.cf : Toby Gerhart
+  <toby.gerhart@eds.com>
+
 #
-#  $Id: TODO,v 1.37 2003-09-28 12:23:23-07 bryan Exp $
+#  $Id: TODO,v 1.38 2003-10-31 09:53:46-08 bryan Exp $
 #

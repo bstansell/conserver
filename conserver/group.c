@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.264 2003-10-10 03:28:49-07 bryan Exp $
+ *  $Id: group.c,v 5.265 2003-10-31 09:54:35-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -4162,6 +4162,14 @@ Spawn(pGE)
 	    isMaster = 0;
 	    break;
     }
+
+#if HAVE_SETPROCTITLE
+    if (config->setproctitle == FLAGTRUE)
+	setproctitle("group %u: port %hu, %d %s", pGE->id, pGE->port,
+		     pGE->imembers,
+		     pGE->imembers == 1 ? "console" : "consoles");
+#endif
+
     /* clean out the master client lists - they aren't useful here and just
      * cause extra file descriptors and memory allocation to lie around,
      * not a very good thing!

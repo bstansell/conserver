@@ -1,5 +1,5 @@
 /*
- *  $Id: main.h,v 5.49 2003-06-15 19:50:28-07 bryan Exp $
+ *  $Id: main.h,v 5.50 2003-10-19 22:52:37-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -47,6 +47,7 @@ extern struct sockaddr_in in_port;
 extern int isMaster;
 extern CONFIG *optConf;
 extern CONFIG *config;
+extern CONFIG defConfig;
 #if HAVE_OPENSSL
 extern SSL_CTX *ctx;
 #endif
