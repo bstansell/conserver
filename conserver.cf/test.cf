@@ -15,10 +15,11 @@
 # name : tty[@host] : baud[parity] : device : group
 DOMAINHACK=
 LOGDIR=/tmp
-ts6-10:!ts6:10010:&:
-ts6-11:!ts6:10011:&:
-ts6-12:!ts6:10012:&:
-ts6-13:!ts6:10013:&:
+shell:|:9600p:&:
+#ts6-10:!ts6:10010:&:
+#ts6-11:!ts6:10011:&:
+#ts6-12:!ts6:10012:&:
+#ts6-13:!ts6:10013:&:
 %%
 # list of clients we allow
 # type machines

@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# $Id: system,v 1.2 1999-01-14 13:44:59-08 bryan Exp $
+# $Id: system,v 1.4 1999-01-15 15:35:44-08 bryan Exp $
 #
 
 PATH=/usr/bin:/bin:/usr/sbin:/sbin:/usr/ucb
@@ -9,8 +9,10 @@ s=`uname -s`
 r=`uname -r`
 
 case "$s-$r" in
-    SunOS-5.*) p="SunOS5" ;;
-    BSD/OS-3.*) p="BSDOS3" ;;
+    SunOS-5.*)	p="SunOS5"	;;
+    BSD/OS-3.*)	p="BSDOS3"	;;
+    Linux-2.*)	p="Linux2"	;;
+    IRIX-6.*)	p="IRIX6"	;;
     *) p="" ;;
 esac
 

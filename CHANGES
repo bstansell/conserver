@@ -1,28 +1,29 @@
 				CHANGES
 				=======
 
-version 6.07:
+version 6.08:
+	- Added support for Linux 2.X and IRIX 6.X
+	- Fixed "suspend" code in client - it shouldn't have worked
+	  before, but slow connections could explain it.
 
+version 6.07:
 	- Porting infrastructure has been set up in ./port.  Solaris
 	  2.5.1 and BSD/OS 3.1 successfully built.
 	- Added CHANGES and README files.  Wow, starting to document!
 
 version 6.06:
-
 	- SIGUSR1 now tells the console server to try and reopen all
 	  currently downed consoles.
 	- Cleaned up configuration file (cons.h) and Makefiles.
 
 version 6.05:
-
 	- conserver.cf change: groups and their passwords have been
 	  removed and timestamp specifications have been added.
 
 before version 6.05:
-
 	- Many, many variations.  Nothing was tracked well.  Bug fixes
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.3 1999-01-14 14:05:16-08 bryan Exp $
+#  $Id: CHANGES,v 1.4 1999-01-15 15:36:21-08 bryan Exp $
 #

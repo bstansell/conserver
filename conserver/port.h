@@ -1,5 +1,5 @@
 /*
- *  $Id: port.h,v 1.3 1999-01-14 13:06:13-08 bryan Exp $
+ *  $Id: port.h,v 1.5 1999-01-15 15:35:29-08 bryan Exp $
  *
  *  GNAC, Inc., 1998
  *
@@ -40,7 +40,7 @@
  *
  * all PTX, PTX2, and PTX4 code added by gregf@sequent.com		(gregf)
  */
-#if !( defined(IBMR2) || defined(HPUX7) || defined(SUN4) || defined(SUN5) || defined(PTX2) || defined(PTX4) || defined(BSDOS3) )
+#if !( defined(SUN5) || defined(BSDOS3) || defined(LINUX2) || defined(IRIX6) )
 #error "Platform needs to be defined.  See port.h"
 #endif
 
@@ -56,7 +56,7 @@
 #endif
 #endif
 #if !defined(HAVE_UWAIT)
-#define HAVE_UWAIT	!(defined(IBMR2)||defined(SUN5)||defined(HPUX8)||defined(HPUX9)||defined(PTX)||defined(IRIX5)||defined(BSDOS3))
+#define HAVE_UWAIT	!(defined(IBMR2)||defined(SUN5)||defined(HPUX8)||defined(HPUX9)||defined(PTX)||defined(IRIX5)||defined(BSDOS3)||defined(IRIX6))
 #endif
 
 #if !defined(HAVE_WAIT3)
@@ -130,7 +130,7 @@
 /* if the encrypted passwd is in a shadow file, define HAVE_SHADOW 	(gregf)
  */
 #if !defined(HAVE_SHADOW)
-#define HAVE_SHADOW	(defined(PTX)||defined(SUN5))
+#define HAVE_SHADOW	(defined(PTX)||defined(SUN5)||defined(IRIX6))
 #endif
 
 /* we'd like to line buffer our output, if we know how
@@ -189,20 +189,20 @@
 #endif /* virtual (process on a pseudo-tty) console support */
 
 #if !defined(HAVE_SETSID)
-#define HAVE_SETSID	(defined(IBMR2)||defined(SUN5)||defined(HPUX7)||defined(HPUX8)||defined(HPUX9)||defined(PTX)||defined(IRIX5))
+#define HAVE_SETSID	(defined(IBMR2)||defined(SUN5)||defined(HPUX7)||defined(HPUX8)||defined(HPUX9)||defined(PTX)||defined(IRIX5)||defined(LINUX2)||defined(IRIX6)||defined(BSDOS3))
 #endif
 
 /* should we use flock to keep multiple conservers from hurting each other?
  * PTX has lockf... should probably port code to work with this (gregf)
  */
 #if !defined(USE_FLOCK)
-#define USE_FLOCK	(!(defined(IBMR2)||defined(SUN5)||defined(HPUX7)||defined(HPUX8)||defined(HPUX9)||defined(PTX)))
+#define USE_FLOCK	(!(defined(IBMR2)||defined(SUN5)||defined(HPUX7)||defined(HPUX8)||defined(HPUX9)||defined(PTX)||defined(LINUX2)||defined(IRIX6)||defined(BSDOS3)))
 #endif
 
 /* should we try to pop streams modules off?
  */
 #if !defined(USE_STREAMS)
-#define USE_STREAMS	(defined(SUN4)||defined(SUN5)||defined(PTX)||defined(IRIX5))
+#define USE_STREAMS	(defined(SUN4)||defined(SUN5)||defined(PTX)||defined(IRIX5)||defined(IRIX6))
 #endif
 
 /* if we do not have old style tty emulation use termios.h
@@ -211,16 +211,16 @@
 #define USE_TERMIO	(defined(ETA10)||defined(V386))
 #endif
 #if !defined(USE_TERMIOS)
-#define USE_TERMIOS	(defined(HPUX7)||defined(HPUX8)||defined(HPUX9)||defined(SUN5)||defined(PTX)||defined(IRIX5))
+#define USE_TERMIOS	(defined(HPUX7)||defined(HPUX8)||defined(HPUX9)||defined(SUN5)||defined(PTX)||defined(IRIX5)||defined(LINUX2)||defined(IRIX6))
 #endif
 #if !defined(USE_TCBREAK)
-#define USE_TCBREAK	(defined(SUN4)||defined(PTX))
+#define USE_TCBREAK	(defined(SUN4)||defined(PTX)||defined(BSDOS3))
 #endif
 
 /* if we have <strings.h> define this to 1, else define to 0
  */
 #if !defined(USE_STRINGS)
-#define USE_STRINGS	(defined(SUN4)||defined(DYNIX)||defined(EPIX)||defined(IRIX5))
+#define USE_STRINGS	(defined(SUN4)||defined(DYNIX)||defined(EPIX)||defined(IRIX5)||defined(LINUX2)||defined(IRIX6)||defined(BSDOS3))
 #endif
 
 #if !defined(NEED_UNISTD_H)
@@ -253,6 +253,9 @@ typedef long fd_set;
 #endif
 
 #if USE_TERMIOS
+#if defined(LINUX2)
+#include <sys/ioctl.h>
+#endif
 #if defined(HPUX7)||defined(HPUX8)||defined(HPUX9)
 #define TCGETS  _IOR('T', 16, struct termios)
 #define TCSETS  _IOW('T', 17, struct termios)
@@ -276,7 +279,7 @@ typedef long fd_set;
 
 /* which type signal handlers return on this machine
  */
-#if defined(sun) || defined(NEXT2) || defined(SUN5) || defined(PTX) || defined(IRIX5) || defined(BSDOS3)
+#if defined(sun) || defined(NEXT2) || defined(SUN5) || defined(PTX) || defined(IRIX5) || defined(BSDOS3) || defined(LINUX2) || defined(IRIX6)
 #define SIGRETS	void
 #else
 #define SIGRETS	int
@@ -285,13 +288,13 @@ typedef long fd_set;
 /* do we have a (working) setsockopt call
  */
 #if !defined(HAVE_SETSOCKOPT)
-#define HAVE_SETSOCKOPT	(defined(sun)||defined(PTX))
+#define HAVE_SETSOCKOPT	(defined(sun)||defined(PTX)||defined(LINUX2)||defined(IRIX6)||defined(BSDOS3))
 #endif
 
 /* does this system have the ANSI strerror() function?
  */
 #if !defined(HAVE_STRERROR)
-#define HAVE_STRERROR	(defined(IBMR2)||defined(ETA10)||defined(V386)||defined(SUN5)||defined(NEXT2)||defined(HPUX8)||defined(HPUX9)||defined(PTX)||defined(IRIX5))
+#define HAVE_STRERROR	(defined(IBMR2)||defined(ETA10)||defined(V386)||defined(SUN5)||defined(NEXT2)||defined(HPUX8)||defined(HPUX9)||defined(PTX)||defined(IRIX5)||defined(LINUX2)||defined(IRIX6)||defined(BSDOS3))
 #endif
 #if ! HAVE_STRERROR
 extern int errno;
@@ -300,7 +303,7 @@ extern char *sys_errlist[];
 #endif
 
 #if !defined(HAVE_H_ERRLIST)
-#define HAVE_H_ERRLIST  (defined(SUN4)||defined(SUN3)||defined(FREEBSD)|defined(NETBSD)||defined(PTX)||defined(IRIX5))
+#define HAVE_H_ERRLIST  (defined(SUN4)||defined(SUN3)||defined(FREEBSD)|defined(NETBSD)||defined(PTX)||defined(IRIX5)||defined(LINUX2)||defined(IRIX6)||defined(BSDOS3))
 #endif
 #if HAVE_H_ERRLIST
 extern int h_errno;
@@ -311,7 +314,7 @@ extern char *h_errlist[];
 #endif
 
 #if !defined(HAVE_RLIMIT)
-#if (defined(SUN5)||defined(PTX4))
+#if (defined(SUN5)||defined(PTX4)||defined(LINUX2)||defined(BSDOS3)||defined(IRIX6))
 #define HAVE_RLIMIT	1
 #else
 #define HAVE_RLIMIT	0

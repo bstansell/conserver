@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.3 1999-01-14 13:30:09-08 bryan Exp $
+#	$Id: Makefile,v 1.4 1999-01-15 15:36:06-08 bryan Exp $
 #
 #	Master Makefile
 #
@@ -29,3 +29,5 @@ config:
 	fi
 
 FRC:
+
+SHELL=/bin/sh

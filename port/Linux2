@@ -1,0 +1,8 @@
+#	$Id: Linux2,v 1.1 1999-01-14 22:25:08-08 bryan Exp $
+#
+'CC=gcc'
+'INSTALL=/usr/bin/install'
+'INCLUDE='
+'DEBUG=-O'
+'CDEFS=-DLINUX2'
+'LIBS=-lcrypt'

@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.22 1999-01-13 11:48:38-08 bryan Exp $
+ *  $Id: console.c,v 5.23 1999-01-15 15:35:19-08 bryan Exp $
  *
  *  GNAC, Inc., 1998
  *
@@ -77,7 +77,7 @@ extern char *sys_errlist[];
 #endif
 
 static char rcsid[] =
-	"$Id: console.c,v 5.22 1999-01-13 11:48:38-08 bryan Exp $";
+	"$Id: console.c,v 5.23 1999-01-15 15:35:19-08 bryan Exp $";
 static char *progname =
 	rcsid;
 int fVerbose = 0, fReplay = 0, fRaw = 0;
@@ -634,6 +634,56 @@ int sig;
 	++SawUrg;
 }
 
+void
+processUrgentData(s)
+int s;
+{
+	static char acCmd[64];
+
+	SawUrg = 0;
+#if defined(SIGURG)
+	(void)signal(SIGURG, oob);
+#endif
+
+	/* get the pending urgent message
+	 */
+	while (recv(s, acCmd, 1, MSG_OOB) < 0) {
+		switch (errno) {
+		case EWOULDBLOCK:
+			/* clear any pending input to make room */
+			(void)read(s, acCmd, sizeof(acCmd));
+			CSTROUT(1, ".");
+			continue;
+		case EINVAL:
+		default:
+			fprintf(stderr, "%s: recv: %d: %s\r\n", progname, s, strerror(errno));
+			sleep(1);
+			continue;
+		}
+	}
+	switch (acCmd[0]) {
+	case OB_SUSP:
+#if defined(SIGSTOP)
+		CSTROUT(1, "stop]");
+		c2cooked();
+		(void)kill(getpid(), SIGSTOP);
+		c2raw();
+		CSTROUT(1, "[press any character to continue");
+#else
+		CSTROUT(1, "stop not supported -- press any character to continue");
+#endif
+		break;
+	case OB_DROP:
+		CSTROUT(1, "dropped by server]\r\n");
+		c2cooked();
+		exit(1);
+		/*NOTREACHED*/
+	default:
+		fprintf(stderr, "%s: unknown out of band command `%c\'\r\n", progname, acCmd[0]);
+		(void)fflush(stderr);
+		break;
+	}
+}
 
 /* interact with a group server					(ksb)
  */
@@ -808,60 +858,16 @@ char *pcMaster, *pcMach, *pcHow, *pcUser;
 	FD_SET(s, &rinit);
 	FD_SET(0, &rinit);
 	for (;;) {
+		if ( SawUrg ) {
+			processUrgentData(s);
+		}
 		/* reset read mask and select on it
 		 */
 		rmask = rinit;
 		while (-1 == select(sizeof(rmask)*8, &rmask, (fd_set *)0, (fd_set *)0, (struct timeval *)0)) {
-			static char acCmd[64];
-
 			rmask = rinit;
-
-			/* if we were suspened, try again */
-			if (EINTR != errno || !SawUrg) {
-				continue;
-			}
-			SawUrg = 0;
-#if defined(SIGURG)
-			(void)signal(SIGURG, oob);
-#endif
-
-			/* get the pending urgent message
-			 */
-			while (recv(s, acCmd, 1, MSG_OOB) < 0) {
-				switch (errno) {
-				case EWOULDBLOCK:
-					/* clear any pending input to make room */
-					(void)read(s, acCmd, sizeof(acCmd));
-					CSTROUT(1, ".");
-					continue;
-				case EINVAL:
-				default:
-					fprintf(stderr, "%s: recv: %d: %s\r\n", progname, s, strerror(errno));
-					sleep(1);
-					continue;
-				}
-			}
-			switch (acCmd[0]) {
-			case OB_SUSP:
-#if defined(SIGSTOP)
-				CSTROUT(1, "stop]");
-				c2cooked();
-				(void)kill(getpid(), SIGSTOP);
-				c2raw();
-				CSTROUT(1, "[press any character to continue");
-#else
-				CSTROUT(1, "stop not supported -- press any character to continue");
-#endif
-				break;
-			case OB_DROP:
-				CSTROUT(1, "dropped by server]\r\n");
-				c2cooked();
-				exit(1);
-				/*NOTREACHED*/
-			default:
-				fprintf(stderr, "%s: unknown out of band command `%c\'\r\n", progname, acCmd[0]);
-				(void)fflush(stderr);
-				break;
+			if ( SawUrg ) {
+				processUrgentData(s);
 			}
 		}
 
