@@ -1,6 +1,10 @@
 				CHANGES
 				=======
 
+version 8.1.10 (Sep 21, 2004):
+	- fix "forwarding level too deep" issue with '^Ec;' - reported by Han
+	  Pilmeyer <han.pilmeyer@hp.com>
+
 version 8.1.9 (Jul 14, 2004):
 	- fixed bug processing access lists when duplicates exist in the
 	  list - reported by Phil Dibowitz <phil@usc.edu>
@@ -769,5 +773,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.192 2004/07/14 18:08:28 bryan Exp $
+#  $Id: CHANGES,v 1.193 2004/09/21 23:45:20 bryan Exp $
 #

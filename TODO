@@ -97,6 +97,9 @@ Bryan Stansell
 - netgroup support?  : Nikolaos Papavassiliou
   <Nikolaos.Papavassiliou@reuters.com>
 
+- send sequences to console on client connect? (to repaint screen,
+  for example) : John Cagle <jcagle@gmail.com>
+
 #
-#  $Id: TODO,v 1.50 2004/05/28 01:58:43 bryan Exp $
+#  $Id: TODO,v 1.51 2004/09/21 23:45:30 bryan Exp $
 #

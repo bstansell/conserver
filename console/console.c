@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.167 2004/05/25 23:03:25 bryan Exp $
+ *  $Id: console.c,v 5.168 2004/09/21 23:45:53 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -1622,19 +1622,21 @@ DoCmds(master, pports, cmdi)
 
 	/* if we're working on finding a console */
 	if (cmds[cmdi][0] == 'c') {
+	    static int limit = 0;
 	    /* did we get a redirect? */
 	    if (result[0] == '@' || (result[0] >= '0' && result[0] <= '9')) {
-		static int limit = 0;
 		if (limit++ > 10) {
 		    Error("forwarding level too deep!");
 		    Bye(EX_SOFTWARE);
 		}
 	    } else if (result[0] != '[') {	/* did we not get a connection? */
+		limit = 0;
 		FilePrint(cfstdout, FLAGFALSE, "%s: %s", serverName,
 			  result);
 		FileClose(&pcf);
 		continue;
 	    } else {
+		limit = 0;
 		CallUp(pcf, server, cmdarg, cmds[0], result);
 		if (pcf != gotoConsole)
 		    FileClose(&pcf);
