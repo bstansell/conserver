@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.145 2003-10-06 10:07:26-07 bryan Exp $
+ *  $Id: readcfg.c,v 5.146 2003-10-10 08:58:12-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -629,6 +629,14 @@ DestroyParserDefaultOrConsole(c, ph, pt)
 	free(c->motd);
     if (c->execSlave != (char *)0)
 	free(c->execSlave);
+    while (c->aliases != (NAMES *)0) {
+	NAMES *name;
+	name = c->aliases->next;
+	if (c->aliases->name != (char *)0)
+	    free(c->aliases->name);
+	free(c->aliases);
+	c->aliases = name;
+    }
     if (c->wbuf != (STRING *)0)
 	DestroyString(c->wbuf);
     free(c);
@@ -2179,6 +2187,16 @@ ConsoleAdd(c)
 	pCEmatch->reinitoncc = c->reinitoncc;
 	pCEmatch->autoreinit = c->autoreinit;
 	pCEmatch->unloved = c->unloved;
+	while (pCEmatch->aliases != (NAMES *)0) {
+	    NAMES *name;
+	    name = pCEmatch->aliases->next;
+	    if (pCEmatch->aliases->name != (char *)0)
+		free(pCEmatch->aliases->name);
+	    free(pCEmatch->aliases);
+	    pCEmatch->aliases = name;
+	}
+	pCEmatch->aliases = c->aliases;
+	c->aliases = (NAMES *)0;
 
 	/* we have to override the ro/rw lists... */
 	/* so first destroy the existing (which point to freed space anyway) */
@@ -3132,8 +3150,6 @@ DestroyConfig(c)
 	free(c->logfile);
     if (c->initcmd != (char *)0)
 	free(c->initcmd);
-    if (c->motd != (char *)0)
-	free(c->motd);
     if (c->passwdfile != (char *)0)
 	free(c->passwdfile);
     if (c->primaryport != (char *)0)
@@ -3198,12 +3214,6 @@ ConfigEnd()
 		    free(pConfig->initcmd);
 		pConfig->initcmd = parserConfigTemp->initcmd;
 		parserConfigTemp->initcmd = (char *)0;
-	    }
-	    if (parserConfigTemp->motd != (char *)0) {
-		if (pConfig->motd != (char *)0)
-		    free(pConfig->motd);
-		pConfig->motd = parserConfigTemp->motd;
-		parserConfigTemp->motd = (char *)0;
 	    }
 	    if (parserConfigTemp->passwdfile != (char *)0) {
 		if (pConfig->passwdfile != (char *)0)

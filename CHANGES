@@ -1,6 +1,17 @@
 				CHANGES
 				=======
 
+version 8.0.4 (Oct 10, 2003):
+	- fixed client rejection bug that can nearly never happen -
+	  reported by Han Pilmeyer <han@zk3.dec.com>
+	- fixed bug where client is reconnected to the previous console
+	  when non-exact console names are used - reported by Rolf
+	  Petter Halle <rph@online.no>
+	- fixed bug where exact matchs on a remote console name never
+	  happened - reported by Toby Gerhart <toby.gerhart@eds.com>
+	- fixed bug where SIGHUP fails to update console aliases -
+	  reported by Han Pilmeyer <han@zk3.dec.com>
+
 version 8.0.3 (Oct 6, 2003):
 	- the SIGHUP process fails to pick up changes to certain fields
 	  because of a horribly broken SwapStr() function [broken in
@@ -562,5 +573,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.116 2003-10-06 10:05:23-07 bryan Exp $
+#  $Id: CHANGES,v 1.118 2003-10-10 09:02:38-07 bryan Exp $
 #

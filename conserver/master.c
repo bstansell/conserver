@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.117 2003-10-03 07:23:37-07 bryan Exp $
+ *  $Id: master.c,v 5.118 2003-10-10 03:29:21-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -231,6 +231,28 @@ SignalKids(arg)
     }
 }
 
+REMOTE *
+#if PROTOTYPES
+FindRemoteConsole(char *args)
+#else
+FindRemoteConsole(args)
+    char *args;
+#endif
+{
+    REMOTE *pRC;
+    NAMES *name;
+
+    for (pRC = pRCList; (REMOTE *)0 != pRC; pRC = pRC->pRCnext) {
+	if (strcasecmp(args, pRC->rserver) == 0)
+	    return pRC;
+	for (name = pRC->aliases; name != (NAMES *)0; name = name->next) {
+	    if (strcasecmp(args, name->name) == 0)
+		return pRC;
+	}
+    }
+    return pRC;
+}
+
 void
 #if PROTOTYPES
 CommandCall(CONSCLIENT *pCL, char *args)
@@ -263,9 +285,7 @@ CommandCall(pCL, args)
     }
     if (config->redirect == FLAGTRUE ||
 	(config->redirect != FLAGTRUE && found == 0)) {
-	for (pRC = pRCList; (REMOTE *)0 != pRC; pRC = pRC->pRCnext) {
-	    if (strcasecmp(args, pRC->rserver) != 0)
-		continue;
+	if ((pRC = FindRemoteConsole(args)) != (REMOTE *)0) {
 	    ambiguous = BuildTmpString(pRC->rserver);
 	    ambiguous = BuildTmpString(", ");
 	    ++found;

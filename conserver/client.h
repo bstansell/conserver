@@ -1,5 +1,5 @@
 /*
- *  $Id: client.h,v 5.32 2003-09-28 08:41:20-07 bryan Exp $
+ *  $Id: client.h,v 5.33 2003-10-10 03:28:49-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -63,7 +63,6 @@ typedef struct client {		/* Connection Information:              */
     time_t typetym;		/* time of last keystroke               */
     char actym[32];		/* pre-formatted time                   */
     struct consent
-     *pCEwant,			/* what machine we would like to be on  */
      *pCEto;			/* host a client gets output from       */
     struct client
     **ppCLbscan,		/* back link for scan ptr               */

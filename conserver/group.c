@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.262 2003-10-05 17:04:02-07 bryan Exp $
+ *  $Id: group.c,v 5.264 2003-10-10 03:28:49-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -2534,6 +2534,7 @@ DoClientRead(pGE, pCLServing)
 		    FileWrite(pCLServing->fd, FLAGFALSE,
 			      "call requires argument\r\n", -1);
 		else {
+		    CONSENT *pCEwant = (CONSENT *)0;
 		    /* try to move to the given console
 		     * we assume all the right checks for ambiguity
 		     * were already done by the master process, so
@@ -2544,33 +2545,33 @@ DoClientRead(pGE, pCLServing)
 			NAMES *n = (NAMES *)0;
 			if (strcasecmp(pcArgs, pCE->server)
 			    == 0) {
-			    pCLServing->pCEwant = pCE;
+			    pCEwant = pCE;
 			    break;
 			}
 			for (n = pCE->aliases; n != (NAMES *)0;
 			     n = n->next) {
 			    if (strcasecmp(pcArgs, n->name)
 				== 0) {
-				pCLServing->pCEwant = pCE;
+				pCEwant = pCE;
 				break;
 			    }
 			}
 			if (n != (NAMES *)0)
 			    break;
 		    }
-		    if (pCLServing->pCEwant == (CONSENT *)0) {
+		    if (pCEwant == (CONSENT *)0) {
 			NAMES *n = (NAMES *)0;
 			int len = strlen(pcArgs);
 			for (pCE = pGE->pCElist; pCE != (CONSENT *)0;
 			     pCE = pCE->pCEnext) {
 			    if (strncasecmp(pcArgs, pCE->server, len) == 0) {
-				pCLServing->pCEwant = pCE;
+				pCEwant = pCE;
 				break;
 			    }
 			    for (n = pCE->aliases; n != (NAMES *)0;
 				 n = n->next) {
 				if (strncasecmp(pcArgs, n->name, len) == 0) {
-				    pCLServing->pCEwant = pCE;
+				    pCEwant = pCE;
 				    break;
 				}
 			    }
@@ -2579,7 +2580,7 @@ DoClientRead(pGE, pCLServing)
 			}
 		    }
 
-		    if (pCLServing->pCEwant == (CONSENT *)0) {
+		    if (pCEwant == (CONSENT *)0) {
 			FilePrint(pCLServing->fd, FLAGFALSE,
 				  "%s: no such console\r\n", pcArgs);
 			DisconnectClient(pGE, pCLServing, (char *)0,
@@ -2588,7 +2589,7 @@ DoClientRead(pGE, pCLServing)
 		    }
 
 		    pCLServing->fro =
-			ClientAccess(pCLServing->pCEwant,
+			ClientAccess(pCEwant,
 				     pCLServing->username->string);
 		    if (pCLServing->fro == -1) {
 			FilePrint(pCLServing->fd, FLAGFALSE,
@@ -2616,14 +2617,13 @@ DoClientRead(pGE, pCLServing)
 		    /* inform operators of the change
 		     */
 		    Verbose("<group> attach %s to %s",
-			    pCLServing->acid->string,
-			    pCLServing->pCEwant->server);
-		    Msg("[%s] login %s", pCLServing->pCEwant->server,
+			    pCLServing->acid->string, pCEwant->server);
+		    Msg("[%s] login %s", pCEwant->server,
 			pCLServing->acid->string);
 
 		    /* set new host and link into new host list
 		     */
-		    pCEServing = pCLServing->pCEwant;
+		    pCEServing = pCEwant;
 		    pCLServing->pCEto = pCEServing;
 		    pCLServing->pCLnext = pCEServing->pCLon;
 		    pCLServing->ppCLbnext = &pCEServing->pCLon;
@@ -4058,11 +4058,11 @@ Kiddie(pGE, sfd)
 	    pCL->ioState = ISNORMAL;
 	    /* say hi to start */
 	    FileWrite(pCL->fd, FLAGFALSE, "ok\r\n", -1);
+	    BuildString(pCL->peername->string, pCL->acid);
+	    CONDDEBUG((1, "Kiddie(): client acid initialized to `%s'",
+		       pCL->acid->string));
 	} else
-	    DisconnectClient(pGE, pCLServing, (char *)0, FLAGFALSE);
-	BuildString(pCL->peername->string, pCL->acid);
-	CONDDEBUG((1, "Kiddie(): client acid initialized to `%s'",
-		   pCL->acid->string));
+	    DisconnectClient(pGE, pCL, (char *)0, FLAGFALSE);
     }
 }
 
