@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# $Id: system,v 1.2 1999-01-14 13:44:59-08 bryan Exp $
+#
+
+PATH=/usr/bin:/bin:/usr/sbin:/sbin:/usr/ucb
+
+s=`uname -s`
+r=`uname -r`
+
+case "$s-$r" in
+    SunOS-5.*) p="SunOS5" ;;
+    BSD/OS-3.*) p="BSDOS3" ;;
+    *) p="" ;;
+esac
+
+echo $p

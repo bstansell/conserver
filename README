@@ -1,0 +1,50 @@
+				README
+				======
+
+Maintainer/Enhancer
+
+    Bryan Stansell (bryan@gnac.com) of GNAC, Inc.
+
+
+Origin
+
+    The console server software found here is a heavily modified version
+    originally written by Tom Fine (fine@cis.ohio-state.edu) and then
+    Kevin S Braunsdorf (ksb@cc.purdue.edu).  Patches from Robert Olson
+    (olson@mcs.anl.gov) were then applied to get network console support.
+
+    Arnold de Leon (arnold@corp.webtv.net) then fixed various bugs and
+    added enhancements while at Synopsys.  I then took the result and
+    continued fixing things and adding features we found useful.
+
+
+The GNAC Version
+
+    The result is a combination of many people's work.  We (GNAC)
+    are releasing this combination in hopes that it will help others.
+    There is no warranty or support implied by our distribution of
+    the software.
+
+
+Downloading
+
+    The latest version can be found at ftp://ftp.gnac.com/pub/conserver/.
+
+Installation
+
+    Quickie instructions:
+
+	    Edit 'conserver/cons.h'
+
+	    Run 'make config'
+
+	    Run 'make'
+
+	    If all is well, run 'make install'
+
+    Things will install in /usr/local.  If you'd like to use a different
+    prefix, use 'make PREFIX=/your/path install'.
+
+#
+#  $Id: README,v 1.3 1999-01-14 14:04:37-08 bryan Exp $
+#

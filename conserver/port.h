@@ -1,5 +1,5 @@
 /*
- *  $Id: port.h,v 1.2 1999-01-13 13:47:32-08 bryan Exp $
+ *  $Id: port.h,v 1.3 1999-01-14 13:06:13-08 bryan Exp $
  *
  *  GNAC, Inc., 1998
  *
@@ -40,7 +40,7 @@
  *
  * all PTX, PTX2, and PTX4 code added by gregf@sequent.com		(gregf)
  */
-#if !( defined(IBMR2) || defined(HPUX7) || defined(SUN4) || defined(SUN5) || defined(PTX2) || defined(PTX4) )
+#if !( defined(IBMR2) || defined(HPUX7) || defined(SUN4) || defined(SUN5) || defined(PTX2) || defined(PTX4) || defined(BSDOS3) )
 #error "Platform needs to be defined.  See port.h"
 #endif
 
@@ -56,7 +56,7 @@
 #endif
 #endif
 #if !defined(HAVE_UWAIT)
-#define HAVE_UWAIT	!(defined(IBMR2)||defined(SUN5)||defined(HPUX8)||defined(HPUX9)||defined(PTX)||defined(IRIX5))
+#define HAVE_UWAIT	!(defined(IBMR2)||defined(SUN5)||defined(HPUX8)||defined(HPUX9)||defined(PTX)||defined(IRIX5)||defined(BSDOS3))
 #endif
 
 #if !defined(HAVE_WAIT3)
@@ -276,7 +276,7 @@ typedef long fd_set;
 
 /* which type signal handlers return on this machine
  */
-#if defined(sun) || defined(NEXT2) || defined(SUN5) || defined(PTX) || defined(IRIX5)
+#if defined(sun) || defined(NEXT2) || defined(SUN5) || defined(PTX) || defined(IRIX5) || defined(BSDOS3)
 #define SIGRETS	void
 #else
 #define SIGRETS	int

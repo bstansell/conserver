@@ -1,21 +1,16 @@
-#	$Id: Makefile,v 1.7 1999-01-13 14:15:46-08 bryan Exp $
+#	$Id: Makefile,v 1.9 1999-01-14 13:30:29-08 bryan Exp $
 #
 #	Makefile for console server
 #
 
-PROG=	conserver
+PROG=conserver
 PREFIX=/usr/local
 BIN=${PREFIX}/bin
 ETC=${PREFIX}/etc
 MAN=${PREFIX}/man
 MANSECT=8
-INSTALL=/usr/ucb/install
 
-INCLUDE=
-DEBUG=-O
-CDEFS=
 CFLAGS= ${DEBUG} ${CDEFS} ${INCLUDE}
-LIBS=-lsocket -lnsl
 
 HDR=	cons.h \
 	access.h client.h consent.h group.h main.h master.h \

@@ -1,23 +1,19 @@
-#	$Id: Makefile,v 1.7 1999-01-13 14:19:02-08 bryan Exp $
+#	$Id: Makefile,v 1.9 1999-01-14 13:05:58-08 bryan Exp $
 #
 #	Makefile for console client progran
 #
 
-PROG=	console
+PROG=console
 PREFIX=/usr/local
 BIN=${PREFIX}/bin
 ETC=${PREFIX}/etc
 MAN=${PREFIX}/man
 MANSECT=8
-INSTALL=/usr/ucb/install
 
 C=../conserver
 
-INCLUDE= -I$C
-DEBUG=-O
-CDEFS=
-CFLAGS= ${DEBUG} ${CDEFS} ${INCLUDE}
-LIBS=-lsocket -lnsl
+LINCLUDE= ${INCLUDE} -I$C
+CFLAGS= ${DEBUG} ${CDEFS} ${LINCLUDE}
 
 HDR=	
 SRC=	console.c
@@ -32,7 +28,7 @@ clean: FRC
 	rm -f Makefile.bak ${PROG} a.out *.o core errs lint.out tags
 
 depend: ${HDR} ${SRC} FRC
-	makedepend ${CDEFS} ${INCLUDE} ${SRC}
+	makedepend ${CDEFS} ${LINCLUDE} ${SRC}
 
 dirs: ${BIN}
 
@@ -46,7 +42,7 @@ install.man: ${MAN}/man${MANSECT}
 	${INSTALL} -c console.man ${MAN}/man${MANSECT}/console.${MANSECT}
 
 lint: ${HDR} ${SRC} FRC
-	lint -h ${CDEFS} ${INCLUDE} ${SRC}
+	lint -h ${CDEFS} ${LINCLUDE} ${SRC}
 
 tags: ${HDR} ${SRC}
 	ctags -t ${HDR} ${SRC}
