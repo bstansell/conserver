@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.127 2003-09-28 10:37:20-07 bryan Exp $
+ *  $Id: consent.c,v 5.128 2003-09-30 13:14:04-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -260,12 +260,13 @@ StopInit(pCE)
 	return;
 
     if (pCE->initpid != 0) {
-	Verbose("[%s] initcmd terminated: pid %lu", pCE->server,
-		(unsigned long)pCE->initpid);
-	CONDDEBUG((1, "StopInit(): sending initcmd pid %lu signal %d",
-		   (unsigned long)pCE->initpid, SIGHUP));
 	kill(pCE->initpid, SIGHUP);
 	pCE->initpid = 0;
+	Verbose("[%s] initcmd terminated: pid %lu", pCE->server,
+		(unsigned long)pCE->initpid);
+	TagLogfileAct(pCE, "initcmd terminated");
+	CONDDEBUG((1, "StopInit(): sending initcmd pid %lu signal %d",
+		   (unsigned long)pCE->initpid, SIGHUP));
     }
 
     if (pCE->initfile != (CONSFILE *)0) {
@@ -360,6 +361,7 @@ StartInit(pCE)
 	    }
 	    Verbose("[%s] initcmd started: pid %lu", pCE->server,
 		    (unsigned long)pCE->initpid);
+	    TagLogfileAct(pCE, "initcmd started");
 	    FD_SET(pin[0], &rinit);
 	    if (maxfd < pin[0] + 1)
 		maxfd = pin[0] + 1;

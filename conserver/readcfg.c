@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.140 2003-09-28 09:32:55-07 bryan Exp $
+ *  $Id: readcfg.c,v 5.144 2003-10-03 06:32:34-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -111,7 +111,7 @@ AddUserList(id)
 	if ((u = (NAMES *)calloc(1, sizeof(NAMES)))
 	    == (NAMES *)0)
 	    OutOfMem();
-	if ((u->name = strdup(id))
+	if ((u->name = StrDup(id))
 	    == (char *)0)
 	    OutOfMem();
 	u->next = userList;
@@ -625,6 +625,8 @@ DestroyParserDefaultOrConsole(c, ph, pt)
 	free(c->logfile);
     if (c->initcmd != (char *)0)
 	free(c->initcmd);
+    if (c->motd != (char *)0)
+	free(c->motd);
     if (c->execSlave != (char *)0)
 	free(c->execSlave);
     if (c->wbuf != (STRING *)0)
@@ -702,37 +704,43 @@ ApplyDefault(d, c)
     if (d->host != (char *)0) {
 	if (c->host != (char *)0)
 	    free(c->host);
-	if ((c->host = strdup(d->host)) == (char *)0)
+	if ((c->host = StrDup(d->host)) == (char *)0)
 	    OutOfMem();
     }
     if (d->master != (char *)0) {
 	if (c->master != (char *)0)
 	    free(c->master);
-	if ((c->master = strdup(d->master)) == (char *)0)
+	if ((c->master = StrDup(d->master)) == (char *)0)
 	    OutOfMem();
     }
     if (d->exec != (char *)0) {
 	if (c->exec != (char *)0)
 	    free(c->exec);
-	if ((c->exec = strdup(d->exec)) == (char *)0)
+	if ((c->exec = StrDup(d->exec)) == (char *)0)
 	    OutOfMem();
     }
     if (d->device != (char *)0) {
 	if (c->device != (char *)0)
 	    free(c->device);
-	if ((c->device = strdup(d->device)) == (char *)0)
+	if ((c->device = StrDup(d->device)) == (char *)0)
 	    OutOfMem();
     }
     if (d->logfile != (char *)0) {
 	if (c->logfile != (char *)0)
 	    free(c->logfile);
-	if ((c->logfile = strdup(d->logfile)) == (char *)0)
+	if ((c->logfile = StrDup(d->logfile)) == (char *)0)
 	    OutOfMem();
     }
     if (d->initcmd != (char *)0) {
 	if (c->initcmd != (char *)0)
 	    free(c->initcmd);
-	if ((c->initcmd = strdup(d->initcmd)) == (char *)0)
+	if ((c->initcmd = StrDup(d->initcmd)) == (char *)0)
+	    OutOfMem();
+    }
+    if (d->motd != (char *)0) {
+	if (c->motd != (char *)0)
+	    free(c->motd);
+	if ((c->motd = StrDup(d->motd)) == (char *)0)
 	    OutOfMem();
     }
     if (d->ro != (CONSENTUSERS *)0) {
@@ -770,7 +778,7 @@ DefaultBegin(id)
 	== (CONSENT *)0)
 	OutOfMem();
 
-    if ((parserDefaultTemp->server = strdup(id))
+    if ((parserDefaultTemp->server = StrDup(id))
 	== (char *)0)
 	OutOfMem();
 }
@@ -918,7 +926,7 @@ ProcessDevice(c, id)
     }
     if ((id == (char *)0) || (*id == '\000'))
 	return;
-    if ((c->device = strdup(id))
+    if ((c->device = StrDup(id))
 	== (char *)0)
 	OutOfMem();
 }
@@ -951,7 +959,7 @@ ProcessExec(c, id)
     if (id == (char *)0 || id[0] == '\000') {
 	return;
     }
-    if ((c->exec = strdup(id))
+    if ((c->exec = StrDup(id))
 	== (char *)0)
 	OutOfMem();
 }
@@ -1008,7 +1016,7 @@ ProcessHost(c, id)
     }
     if ((id == (char *)0) || (*id == '\000'))
 	return;
-    if ((c->host = strdup(id))
+    if ((c->host = StrDup(id))
 	== (char *)0)
 	OutOfMem();
 }
@@ -1074,16 +1082,16 @@ ProcessLogfile(c, id)
     if (id == (char *)0 || id[0] == '\000') {
 	return;
     }
-    if ((c->logfile = strdup(id))
+    if ((c->logfile = StrDup(id))
 	== (char *)0)
 	OutOfMem();
 }
 
 void
 #if PROTOTYPES
-ProcessRuninit(CONSENT *c, char *id)
+ProcessInitcmd(CONSENT *c, char *id)
 #else
-ProcessRuninit(c, id)
+ProcessInitcmd(c, id)
     CONSENT *c;
     char *id;
 #endif
@@ -1095,7 +1103,28 @@ ProcessRuninit(c, id)
     if (id == (char *)0 || id[0] == '\000') {
 	return;
     }
-    if ((c->initcmd = strdup(id))
+    if ((c->initcmd = StrDup(id))
+	== (char *)0)
+	OutOfMem();
+}
+
+void
+#if PROTOTYPES
+ProcessMOTD(CONSENT *c, char *id)
+#else
+ProcessMOTD(c, id)
+    CONSENT *c;
+    char *id;
+#endif
+{
+    if (c->motd != (char *)0) {
+	free(c->motd);
+	c->motd = (char *)0;
+    }
+    if (id == (char *)0 || id[0] == '\000') {
+	return;
+    }
+    if ((c->motd = StrDup(id))
 	== (char *)0)
 	OutOfMem();
 }
@@ -1114,14 +1143,26 @@ DefaultItemLogfile(id)
 
 void
 #if PROTOTYPES
-DefaultItemRuninit(char *id)
+DefaultItemInitcmd(char *id)
 #else
-DefaultItemRuninit(id)
+DefaultItemInitcmd(id)
     char *id;
 #endif
 {
-    CONDDEBUG((1, "DefaultItemRuninit(%s) [%s:%d]", id, file, line));
-    ProcessRuninit(parserDefaultTemp, id);
+    CONDDEBUG((1, "DefaultItemInitcmd(%s) [%s:%d]", id, file, line));
+    ProcessInitcmd(parserDefaultTemp, id);
+}
+
+void
+#if PROTOTYPES
+DefaultItemMOTD(char *id)
+#else
+DefaultItemMOTD(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemMOTD(%s) [%s:%d]", id, file, line));
+    ProcessMOTD(parserDefaultTemp, id);
 }
 
 void
@@ -1139,7 +1180,7 @@ ProcessMaster(c, id)
     }
     if ((id == (char *)0) || (*id == '\000'))
 	return;
-    if ((c->master = strdup(id))
+    if ((c->master = StrDup(id))
 	== (char *)0)
 	OutOfMem();
 }
@@ -1583,7 +1624,7 @@ ConsoleBegin(id)
 				    "*")) != (CONSENT *)0) {
 	ApplyDefault(c, parserConsoleTemp);
     }
-    if ((parserConsoleTemp->server = strdup(id))
+    if ((parserConsoleTemp->server = StrDup(id))
 	== (char *)0)
 	OutOfMem();
 }
@@ -1738,7 +1779,7 @@ ExpandLogfile(c, id)
 	*amp = '&';
     }
     tmp = BuildTmpString(p);
-    if ((c->logfile = strdup(tmp))
+    if ((c->logfile = StrDup(tmp))
 	== (char *)0)
 	OutOfMem();
 }
@@ -1766,10 +1807,10 @@ ConsoleAdd(c)
 	    if ((pRCTemp = (REMOTE *)calloc(1, sizeof(REMOTE)))
 		== (REMOTE *)0)
 		OutOfMem();
-	    if ((pRCTemp->rhost = strdup(c->master))
+	    if ((pRCTemp->rhost = StrDup(c->master))
 		== (char *)0)
 		OutOfMem();
-	    if ((pRCTemp->rserver = strdup(c->server))
+	    if ((pRCTemp->rserver = StrDup(c->server))
 		== (char *)0)
 		OutOfMem();
 	    pRCTemp->aliases = c->aliases;
@@ -2127,6 +2168,7 @@ ConsoleAdd(c)
 	}
 
 	/* and now the rest (minus the "runtime" members - see below) */
+	SwapStr(pCEmatch->motd, c->motd);
 	pCEmatch->activitylog = c->activitylog;
 	pCEmatch->breaklog = c->breaklog;
 	pCEmatch->mark = c->mark;
@@ -2316,7 +2358,7 @@ ConsoleDestroy()
 		    continue;
 		pCL->fro = access;
 		if (access) {
-		    FileWrite(pCL->fd,
+		    FileWrite(pCL->fd, FLAGFALSE,
 			      "[Conserver reconfigured - r/w access removed]\r\n",
 			      -1);
 		    if (pCL->fwr) {
@@ -2333,7 +2375,7 @@ ConsoleDestroy()
 			FindWrite(pCE);
 		    }
 		} else {
-		    FileWrite(pCL->fd,
+		    FileWrite(pCL->fd, FLAGFALSE,
 			      "[Conserver reconfigured - r/w access granted]\r\n",
 			      -1);
 		}
@@ -2403,7 +2445,7 @@ ConsoleItemAliases(id)
 	}
 	if ((name = (NAMES *)calloc(1, sizeof(NAMES))) == (NAMES *)0)
 	    OutOfMem();
-	if ((name->name = strdup(token)) == (char *)0)
+	if ((name->name = StrDup(token)) == (char *)0)
 	    OutOfMem();
 	name->next = parserConsoleTemp->aliases;
 	parserConsoleTemp->aliases = name;
@@ -2508,14 +2550,26 @@ ConsoleItemLogfile(id)
 
 void
 #if PROTOTYPES
-ConsoleItemRuninit(char *id)
+ConsoleItemInitcmd(char *id)
 #else
-ConsoleItemRuninit(id)
+ConsoleItemInitcmd(id)
     char *id;
 #endif
 {
-    CONDDEBUG((1, "ConsoleItemRuninit(%s) [%s:%d]", id, file, line));
-    ProcessRuninit(parserConsoleTemp, id);
+    CONDDEBUG((1, "ConsoleItemInitcmd(%s) [%s:%d]", id, file, line));
+    ProcessInitcmd(parserConsoleTemp, id);
+}
+
+void
+#if PROTOTYPES
+ConsoleItemMOTD(char *id)
+#else
+ConsoleItemMOTD(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemMOTD(%s) [%s:%d]", id, file, line));
+    ProcessMOTD(parserConsoleTemp, id);
 }
 
 void
@@ -2713,7 +2767,7 @@ AccessAddACL(pa, access)
 	== (ACCESS *)0)
 	OutOfMem();
     *new = *access;
-    if ((new->pcwho = strdup(access->pcwho))
+    if ((new->pcwho = StrDup(access->pcwho))
 	== (char *)0)
 	OutOfMem();
     /* link into the list at the end */
@@ -3007,7 +3061,7 @@ AccessProcessACL(trust, acl)
 	    OutOfMem();
 	pa->ctrust = trust;
 	pa->isCIDR = isCIDR;
-	if ((pa->pcwho = strdup(token))
+	if ((pa->pcwho = StrDup(token))
 	    == (char *)0)
 	    OutOfMem();
 
@@ -3078,6 +3132,8 @@ DestroyConfig(c)
 	free(c->logfile);
     if (c->initcmd != (char *)0)
 	free(c->initcmd);
+    if (c->motd != (char *)0)
+	free(c->motd);
     if (c->passwdfile != (char *)0)
 	free(c->passwdfile);
     if (c->primaryport != (char *)0)
@@ -3142,6 +3198,12 @@ ConfigEnd()
 		    free(pConfig->initcmd);
 		pConfig->initcmd = parserConfigTemp->initcmd;
 		parserConfigTemp->initcmd = (char *)0;
+	    }
+	    if (parserConfigTemp->motd != (char *)0) {
+		if (pConfig->motd != (char *)0)
+		    free(pConfig->motd);
+		pConfig->motd = parserConfigTemp->motd;
+		parserConfigTemp->motd = (char *)0;
 	    }
 	    if (parserConfigTemp->passwdfile != (char *)0) {
 		if (pConfig->passwdfile != (char *)0)
@@ -3289,7 +3351,7 @@ ConfigItemLogfile(id)
 	}
 	return;
     }
-    if ((parserConfigTemp->logfile = strdup(id))
+    if ((parserConfigTemp->logfile = StrDup(id))
 	== (char *)0)
 	OutOfMem();
 }
@@ -3310,7 +3372,7 @@ ConfigItemPasswordfile(id)
 	}
 	return;
     }
-    if ((parserConfigTemp->passwdfile = strdup(id))
+    if ((parserConfigTemp->passwdfile = StrDup(id))
 	== (char *)0)
 	OutOfMem();
 }
@@ -3331,7 +3393,7 @@ ConfigItemPrimaryport(id)
 	}
 	return;
     }
-    if ((parserConfigTemp->primaryport = strdup(id))
+    if ((parserConfigTemp->primaryport = StrDup(id))
 	== (char *)0)
 	OutOfMem();
 }
@@ -3395,7 +3457,7 @@ ConfigItemSecondaryport(id)
 	}
 	return;
     }
-    if ((parserConfigTemp->secondaryport = strdup(id))
+    if ((parserConfigTemp->secondaryport = StrDup(id))
 	== (char *)0)
 	OutOfMem();
 }
@@ -3417,7 +3479,7 @@ ConfigItemSslcredentials(id)
 	}
 	return;
     }
-    if ((parserConfigTemp->sslcredentials = strdup(id))
+    if ((parserConfigTemp->sslcredentials = StrDup(id))
 	== (char *)0)
 	OutOfMem();
 }
@@ -3455,13 +3517,14 @@ ITEM keyDefault[] = {
 /*  {"flow", DefaultItemFlow}, */
     {"host", DefaultItemHost},
     {"include", DefaultItemInclude},
+    {"initcmd", DefaultItemInitcmd},
     {"logfile", DefaultItemLogfile},
     {"master", DefaultItemMaster},
+    {"motd", DefaultItemMOTD},
     {"options", DefaultItemOptions},
     {"parity", DefaultItemParity},
     {"port", DefaultItemPort},
     {"ro", DefaultItemRo},
-    {"initcmd", DefaultItemRuninit},
     {"rw", DefaultItemRw},
     {"timestamp", DefaultItemTimestamp},
     {"type", DefaultItemType},
@@ -3477,13 +3540,14 @@ ITEM keyConsole[] = {
 /*  {"flow", ConsoleItemFlow}, */
     {"host", ConsoleItemHost},
     {"include", ConsoleItemInclude},
+    {"initcmd", ConsoleItemInitcmd},
     {"logfile", ConsoleItemLogfile},
     {"master", ConsoleItemMaster},
+    {"motd", ConsoleItemMOTD},
     {"options", ConsoleItemOptions},
     {"parity", ConsoleItemParity},
     {"port", ConsoleItemPort},
     {"ro", ConsoleItemRo},
-    {"initcmd", ConsoleItemRuninit},
     {"rw", ConsoleItemRw},
     {"timestamp", ConsoleItemTimestamp},
     {"type", ConsoleItemType},
@@ -4005,7 +4069,7 @@ ReReadCfg(fd)
 	 strcmp(pConfig->logfile, config->logfile) != 0)) {
 	if (config->logfile != (char *)0)
 	    free(config->logfile);
-	if ((config->logfile = strdup(pConfig->logfile))
+	if ((config->logfile = StrDup(pConfig->logfile))
 	    == (char *)0)
 	    OutOfMem();
 	ReopenLogfile();
@@ -4022,7 +4086,7 @@ ReReadCfg(fd)
 	 strcmp(pConfig->passwdfile, config->passwdfile) != 0)) {
 	if (config->passwdfile != (char *)0)
 	    free(config->passwdfile);
-	if ((config->passwdfile = strdup(pConfig->passwdfile))
+	if ((config->passwdfile = StrDup(pConfig->passwdfile))
 	    == (char *)0)
 	    OutOfMem();
 	/* gets used on-the-fly */
@@ -4071,7 +4135,7 @@ ReReadCfg(fd)
 	     strcasecmp(pConfig->primaryport, config->primaryport) != 0)) {
 	    if (config->primaryport != (char *)0)
 		free(config->primaryport);
-	    if ((config->primaryport = strdup(pConfig->primaryport))
+	    if ((config->primaryport = StrDup(pConfig->primaryport))
 		== (char *)0)
 		OutOfMem();
 	    Msg("warning: `primaryport' config option changed - you must restart for it to take effect");
@@ -4083,7 +4147,7 @@ ReReadCfg(fd)
 			config->secondaryport) != 0)) {
 	    if (config->secondaryport != (char *)0)
 		free(config->secondaryport);
-	    if ((config->secondaryport = strdup(pConfig->secondaryport))
+	    if ((config->secondaryport = StrDup(pConfig->secondaryport))
 		== (char *)0)
 		OutOfMem();
 	    Msg("warning: `secondaryport' config option changed - you must restart for it to take effect");
@@ -4096,7 +4160,7 @@ ReReadCfg(fd)
 			config->sslcredentials) != 0)) {
 	    if (config->sslcredentials != (char *)0)
 		free(config->sslcredentials);
-	    if ((config->sslcredentials = strdup(pConfig->sslcredentials))
+	    if ((config->sslcredentials = StrDup(pConfig->sslcredentials))
 		== (char *)0)
 		OutOfMem();
 	    Msg("warning: `sslcredentials' config option changed - you must restart for it to take effect");

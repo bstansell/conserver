@@ -1,5 +1,5 @@
 /*
- *  $Id: access.c,v 5.66 2003-08-15 14:24:39-07 bryan Exp $
+ *  $Id: access.c,v 5.67 2003-10-03 06:32:34-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -241,7 +241,7 @@ SetDefAccess(pAddr, pHost)
 	addr = inet_ntoa(*pAddr);
 	if ((a = (ACCESS *)calloc(1, sizeof(ACCESS))) == (ACCESS *)0)
 	    OutOfMem();
-	if ((a->pcwho = strdup(addr)) == (char *)0)
+	if ((a->pcwho = StrDup(addr)) == (char *)0)
 	    OutOfMem();
 	a->ctrust = 'a';
 	a->pACnext = pACList;
@@ -258,7 +258,7 @@ SetDefAccess(pAddr, pHost)
 
     if ((a = (ACCESS *)calloc(1, sizeof(ACCESS))) == (ACCESS *)0)
 	OutOfMem();
-    if ((a->pcwho = strdup(pcDomain)) == (char *)0)
+    if ((a->pcwho = StrDup(pcDomain)) == (char *)0)
 	OutOfMem();
     a->ctrust = 'a';
     a->pACnext = pACList;

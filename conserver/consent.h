@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.47 2003-09-28 08:43:04-07 bryan Exp $
+ *  $Id: consent.h,v 5.48 2003-10-02 18:49:03-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -98,6 +98,7 @@ typedef struct consent {	/* console information                  */
     unsigned short breakNum;	/* break type [1-9]                     */
     char *logfile;		/* logfile                              */
     char *initcmd;		/* initcmd command                      */
+    char *motd;			/* motd                                 */
     /* timestamp stuff */
     int mark;			/* Mark (chime) interval                */
     long nextMark;		/* Next mark (chime) time               */

@@ -1,5 +1,5 @@
 /*
- *  $Id: fallback.c,v 5.58 2003-08-15 08:18:26-07 bryan Exp $
+ *  $Id: fallback.c,v 5.59 2003-10-03 06:32:34-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -261,7 +261,7 @@ FallBack(slave, sfd)
     }
     if ((*slave) != (char *)0)
 	free(*slave);
-    if (((*slave) = strdup(pcTSlave->string))
+    if (((*slave) = StrDup(pcTSlave->string))
 	== (char *)0)
 	OutOfMem();
     return fd;

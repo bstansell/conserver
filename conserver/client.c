@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.70 2003-09-28 08:42:06-07 bryan Exp $
+ *  $Id: client.c,v 5.72 2003-10-02 18:49:13-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -78,9 +78,10 @@ FindWrite(pCE)
 	pCL->fwantwr = 0;
 	pCL->fwr = 1;
 	if (pCE->nolog) {
-	    FileWrite(pCL->fd, "\r\n[attached (nologging)]\r\n", -1);
+	    FileWrite(pCL->fd, FLAGFALSE, "\r\n[attached (nologging)]\r\n",
+		      -1);
 	} else {
-	    FileWrite(pCL->fd, "\r\n[attached]\r\n", -1);
+	    FileWrite(pCL->fd, FLAGFALSE, "\r\n[attached]\r\n", -1);
 	}
 	TagLogfileAct(pCE, "%s attached", pCL->acid->string);
 	pCE->pCLwr = pCL;
@@ -130,7 +131,8 @@ Replay(fdLog, fdOut, iBack)
 #endif
 
     if ((CONSFILE *)0 == fdLog) {
-	FileWrite(fdOut, "[no log file on this console]\r\n", -1);
+	FileWrite(fdOut, FLAGFALSE, "[no log file on this console]\r\n",
+		  -1);
 	return;
     }
 
@@ -311,8 +313,8 @@ Replay(fdLog, fdOut, iBack)
 	    if ((char *)0 != s) {
 		*s = '\000';
 	    }
-	    FileWrite(fdOut, lines[i].line->string, -1);
-	    FileWrite(fdOut, " .. ", -1);
+	    FileWrite(fdOut, FLAGTRUE, lines[i].line->string, -1);
+	    FileWrite(fdOut, FLAGTRUE, " .. ", -1);
 
 	    /* build the end string by removing the leading "[-- MARK -- "
 	     * and replacing "]\r\n" on the end with " -- MARK --]\r\n"
@@ -323,12 +325,13 @@ Replay(fdLog, fdOut, iBack)
 	    if ((char *)0 != s) {
 		*s = '\000';
 	    }
-	    FileWrite(fdOut, lines[i].mark_end->string + mark_len, -1);
-	    FileWrite(fdOut, " -- MARK --]\r\n", -1);
+	    FileWrite(fdOut, FLAGTRUE,
+		      lines[i].mark_end->string + mark_len, -1);
+	    FileWrite(fdOut, FLAGFALSE, " -- MARK --]\r\n", -1);
 	    u = lines[i].mark_end->used;
 	    s = lines[i].mark_end->string;
 	} else
-	    FileWrite(fdOut, lines[i].line->string, -1);
+	    FileWrite(fdOut, FLAGFALSE, lines[i].line->string, -1);
     }
 
   common_exit:
@@ -381,6 +384,7 @@ static HELP aHLTable[] = {
     {WHEN_ATTACH, "l?   break sequence list"},
     {WHEN_ATTACH, "l0   send break per config file"},
     {WHEN_ATTACH, "l1-9 send specific break sequence"},
+    {WHEN_ALWAYS, "m    display the message of the day"},
     {WHEN_ALWAYS, "o    (re)open the tty and log file"},
     {WHEN_ALWAYS, "p    replay the last 60 lines"},
     {WHEN_ALWAYS, "r    replay the last 20 lines"},
@@ -424,10 +428,10 @@ HelpUser(pCL)
 
     iCmp = WHEN_ALWAYS | WHEN_SPY;
     if (pCL->fwr) {
-	FileWrite(pCL->fd, acH1, sizeof(acH1) - 1);
+	FileWrite(pCL->fd, FLAGTRUE, acH1, sizeof(acH1) - 1);
 	iCmp |= WHEN_ATTACH;
     } else {
-	FileWrite(pCL->fd, acH2, sizeof(acH2) - 1);
+	FileWrite(pCL->fd, FLAGTRUE, acH2, sizeof(acH2) - 1);
     }
     if ('\033' == pCL->ic[0] && 'O' == pCL->ic[1]) {
 	iCmp |= WHEN_VT100;
@@ -445,12 +449,12 @@ HelpUser(pCL)
 		}
 		BuildString(aHLTable[i].actext, acLine);
 		BuildString(acEoln, acLine);
-		FileWrite(pCL->fd, acLine->string, -1);
+		FileWrite(pCL->fd, FLAGTRUE, acLine->string, -1);
 		BuildString((char *)0, acLine);
 		continue;
 	    } else {
 		BuildString(acEoln, acLine);
-		FileWrite(pCL->fd, acLine->string, -1);
+		FileWrite(pCL->fd, FLAGTRUE, acLine->string, -1);
 		BuildString((char *)0, acLine);
 	    }
 	}
@@ -459,15 +463,16 @@ HelpUser(pCL)
 	    BuildString(aHLTable[i].actext, acLine);
 	    if (acLine->used > HALFLINE) {
 		BuildString(acEoln, acLine);
-		FileWrite(pCL->fd, acLine->string, -1);
+		FileWrite(pCL->fd, FLAGTRUE, acLine->string, -1);
 		BuildString((char *)0, acLine);
 	    }
 	}
     }
     if (acLine->used != 0) {
 	BuildString(acEoln, acLine);
-	FileWrite(pCL->fd, acLine->string, -1);
+	FileWrite(pCL->fd, FLAGTRUE, acLine->string, -1);
     }
+    FileWrite(pCL->fd, FLAGFALSE, (char *)0, 0);
 }
 
 int
@@ -493,7 +498,8 @@ ClientAccessOk(pCL)
 	request_init(&request, RQ_DAEMON, progname, RQ_FILE, cfd, 0);
 	fromhost(&request);
 	if (!hosts_access(&request)) {
-	    FileWrite(pCL->fd, "access from your host refused\r\n", -1);
+	    FileWrite(pCL->fd, FLAGFALSE,
+		      "access from your host refused\r\n", -1);
 	    retval = 0;
 	    goto setpeer;
 	}
@@ -503,13 +509,14 @@ ClientAccessOk(pCL)
     so = sizeof(in_port);
     if (-1 ==
 	(getpeer = getpeername(cfd, (struct sockaddr *)&in_port, &so))) {
-	FileWrite(pCL->fd, "getpeername failed\r\n", -1);
+	FileWrite(pCL->fd, FLAGFALSE, "getpeername failed\r\n", -1);
 	retval = 0;
 	goto setpeer;
     }
     pCL->caccess = AccType(&in_port.sin_addr, &peername);
     if (pCL->caccess == 'r') {
-	FileWrite(pCL->fd, "access from your host refused\r\n", -1);
+	FileWrite(pCL->fd, FLAGFALSE, "access from your host refused\r\n",
+		  -1);
 	retval = 0;
     }
 

@@ -1,5 +1,5 @@
 /*
- *  $Id: util.c,v 1.99 2003-09-28 08:51:52-07 bryan Exp $
+ *  $Id: util.c,v 1.102 2003-10-03 06:32:34-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -1012,9 +1012,15 @@ FileRead(cfp, buf, len)
 	    if (tmpString == (STRING *)0)
 		tmpString = AllocString();
 	    BuildString((char *)0, tmpString);
-	    FmtCtlStr(buf, retval > 30 ? 30 : retval, tmpString);
-	    CONDDEBUG((2, "FileRead(): read `%s' from fd %d",
-		       tmpString->string, cfp->fd));
+	    if (retval > 30) {
+		FmtCtlStr(buf, 30, tmpString);
+		CONDDEBUG((2, "FileRead(): read `%s'... from fd %d",
+			   tmpString->string, cfp->fd));
+	    } else {
+		FmtCtlStr(buf, retval, tmpString);
+		CONDDEBUG((2, "FileRead(): read `%s' from fd %d",
+			   tmpString->string, cfp->fd));
+	    }
 	}
     } else {
 	CONDDEBUG((2,
@@ -1027,10 +1033,11 @@ FileRead(cfp, buf, len)
 /* returns: -1 on error or eof, >= 0 for valid reads */
 int
 #if PROTOTYPES
-FileWrite(CONSFILE *cfp, char *buf, int len)
+FileWrite(CONSFILE *cfp, FLAG bufferonly, char *buf, int len)
 #else
-FileWrite(cfp, buf, len)
+FileWrite(cfp, bufferonly, buf, len)
     CONSFILE *cfp;
+    FLAG bufferonly;
     char *buf;
     int len;
 #endif
@@ -1053,13 +1060,22 @@ FileWrite(cfp, buf, len)
 	if (tmpString == (STRING *)0)
 	    tmpString = AllocString();
 	BuildString((char *)0, tmpString);
-	FmtCtlStr(buf, len > 30 ? 30 : len, tmpString);
-	CONDDEBUG((2, "FileWrite(): sending `%s' to fd %d",
-		   tmpString->string, fdout));
+	if (len > 30) {
+	    FmtCtlStr(buf, 30, tmpString);
+	    CONDDEBUG((2, "FileWrite(): sending `%s'... to fd %d",
+		       tmpString->string, fdout));
+	} else {
+	    FmtCtlStr(buf, len, tmpString);
+	    CONDDEBUG((2, "FileWrite(): sending `%s' to fd %d",
+		       tmpString->string, fdout));
+	}
     }
     /* save the data */
     if (len > 0 && buf != (char *)0)
 	BuildStringN(buf, len, cfp->wbuf);
+
+    if (bufferonly == FLAGTRUE)
+	return 0;
 
     /* point at the local data */
     buf = cfp->wbuf->string;
@@ -1253,12 +1269,12 @@ FileBufEmpty(cfp)
 
 void
 #if PROTOTYPES
-VWrite(CONSFILE *cfp, STRING *str, unsigned which, char *fmt, va_list ap)
+VWrite(CONSFILE *cfp, FLAG bufferonly, STRING *str, char *fmt, va_list ap)
 #else
-VWrite(cfp, str, which, fmt, ap)
+VWrite(cfp, bufferonly, str, fmt, ap)
     CONSFILE *cfp;
+    FLAG bufferonly;
     STRING *str;
-    unsigned which;
     char *fmt;
     va_list ap;
 #endif
@@ -1266,41 +1282,28 @@ VWrite(cfp, str, which, fmt, ap)
     int s, l, e;
     char c;
     static STRING *msg = (STRING *)0;
+    static STRING *output = (STRING *)0;
     static short flong, fneg;
 
-    if (fmt == (char *)0)
+    if (fmt == (char *)0 || (cfp == (CONSFILE *)0 && str == (STRING *)0))
 	return;
-    switch (which) {
-	case 0:
-	    if (cfp == (CONSFILE *)0)
-		return;
-	    break;
-	case 1:
-	    if (str == (STRING *)0)
-		return;
-	    BuildString((char *)0, str);
-	    break;
-	default:
-	    return;
-    }
 
     if (msg == (STRING *)0)
 	msg = AllocString();
+    if (output == (STRING *)0)
+	output = AllocString();
+
+    BuildString((char *)0, output);
+
     fneg = flong = 0;
     for (e = s = l = 0; (c = fmt[s + l]) != '\000'; l++) {
 	if (c == '%') {
 	    if (e) {
 		e = 0;
-		if (which == 0)
-		    FileWrite(cfp, "%", 1);
-		else if (which == 1)
-		    BuildStringChar('%', str);
+		BuildStringChar('%', output);
 	    } else {
 		e = 1;
-		if (which == 0)
-		    FileWrite(cfp, fmt + s, l);
-		else if (which == 1)
-		    BuildStringN(fmt + s, l, str);
+		BuildStringN(fmt + s, l, output);
 		s += l;
 		l = 0;
 	    }
@@ -1320,17 +1323,11 @@ VWrite(cfp, str, which, fmt, ap)
 		    continue;
 		case 'c':
 		    cc = (char)va_arg(ap, int);
-		    if (which == 0)
-			FileWrite(cfp, &cc, 1);
-		    else if (which == 1)
-			BuildStringChar(cc, str);
+		    BuildStringChar(cc, output);
 		    break;
 		case 's':
 		    p = va_arg(ap, char *);
-		    if (which == 0)
-			FileWrite(cfp, p, -1);
-		    else if (which == 1)
-			BuildString(p, str);
+		    BuildString(p, output);
 		    break;
 		case 'd':
 		    i = (flong ? va_arg(ap, long) : (long)va_arg(ap, int));
@@ -1361,16 +1358,10 @@ VWrite(cfp, str, which, fmt, ap)
 			msg->string[u - i - 1] = temp;
 		    }
 		    if (fneg) {
-			if (which == 0)
-			    FileWrite(cfp, "-", 1);
-			else if (which == 1)
-			    BuildStringChar('-', str);
+			BuildStringChar('-', output);
 			fneg = 0;
 		    }
-		    if (which == 0)
-			FileWrite(cfp, msg->string, msg->used - 1);
-		    else if (which == 1)
-			BuildString(msg->string, str);
+		    BuildString(msg->string, output);
 		    break;
 		default:
 		    Error
@@ -1383,11 +1374,17 @@ VWrite(cfp, str, which, fmt, ap)
 	    e = flong = 0;
 	}
     }
-    if (l) {
-	if (which == 0)
-	    FileWrite(cfp, fmt + s, l);
-	else if (which == 1)
-	    BuildStringN(fmt + s, l, str);
+    if (l)
+	BuildStringN(fmt + s, l, output);
+
+    if (str != (STRING *)0)
+	BuildString((char *)0, str);
+
+    if (output->used > 1) {
+	if (str != (STRING *)0)
+	    BuildStringN(output->string, output->used - 1, str);
+	if (cfp != (CONSFILE *)0)
+	    FileWrite(cfp, bufferonly, output->string, output->used - 1);
     }
 }
 
@@ -1407,7 +1404,7 @@ BuildStringPrint(str, fmt, va_alist)
 #else
     va_start(ap);
 #endif
-    VWrite((CONSFILE *)0, str, 1, fmt, ap);
+    VWrite((CONSFILE *)0, FLAGFALSE, str, fmt, ap);
     va_end(ap);
     if (str == (STRING *)0)
 	return (char *)0;
@@ -1417,23 +1414,25 @@ BuildStringPrint(str, fmt, va_alist)
 
 void
 #if PROTOTYPES
-FileVWrite(CONSFILE *cfp, char *fmt, va_list ap)
+FileVWrite(CONSFILE *cfp, FLAG bufferonly, char *fmt, va_list ap)
 #else
-FileVWrite(cfp, fmt, ap)
+FileVWrite(cfp, bufferonly, fmt, ap)
     CONSFILE *cfp;
+    FLAG bufferonly;
     char *fmt;
     va_list ap;
 #endif
 {
-    VWrite(cfp, (STRING *)0, 0, fmt, ap);
+    VWrite(cfp, bufferonly, (STRING *)0, fmt, ap);
 }
 
 void
 #if PROTOTYPES
-FilePrint(CONSFILE *cfp, char *fmt, ...)
+FilePrint(CONSFILE *cfp, FLAG bufferonly, char *fmt, ...)
 #else
-FilePrint(cfp, fmt, va_alist)
+FilePrint(cfp, bufferonly, fmt, va_alist)
     CONSFILE *cfp;
+    FLAG bufferonly;
     char *fmt;
     va_dcl
 #endif
@@ -1444,7 +1443,7 @@ FilePrint(cfp, fmt, va_alist)
 #else
     va_start(ap);
 #endif
-    FileVWrite(cfp, fmt, ap);
+    FileVWrite(cfp, bufferonly, fmt, ap);
     va_end(ap);
 }
 
@@ -1914,4 +1913,29 @@ SetFlags(fd, s, c)
 	return 0;
     }
     return 1;
+}
+
+char *
+#if PROTOTYPES
+StrDup(char *msg)
+#else
+StrDup(msg)
+    char *msg;
+#endif
+{
+    int len;
+    char *buf;
+
+    if (msg == (char *)0)
+	return (char *)0;
+    len = strlen(msg) + 1;
+    buf = malloc(len);
+    if (buf == (char *)0)
+	return (char *)0;
+#if HAVE_MEMCPY
+    memcpy(buf, msg, len);
+#else
+    bcopy(msg, buf, len);
+#endif
+    return buf;
 }

@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.141 2003-09-29 08:36:06-07 bryan Exp $
+ *  $Id: console.c,v 5.147 2003-10-03 15:21:34-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -586,7 +586,7 @@ ReadReply(fd)
 		if (toEOF)	/* if toEOF, read until EOF */
 		    continue;
 		if ((result->used > 1) &&
-		    (result->string[result->used - 2] == '\n'))
+		    strchr(result->string, '\n') != (char *)0)
 		    break;
 		continue;
 	}
@@ -695,6 +695,7 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
     fd_set rmask, rinit;
     int i;
     int justProcessedUrg = 0;
+    char *r = (char *)0;
 
     if (fVerbose) {
 	Msg("%s to %s (on %s)", pcHow, pcMach, pcMaster);
@@ -755,7 +756,7 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 	    printf("o\' to open console line]\n");
 	}
     } else {
-	FilePrint(cfstdout, "%s: %s", pcMach, result);
+	FilePrint(cfstdout, FLAGFALSE, "%s: %s", pcMach, result);
 	Bye(EX_UNAVAILABLE);
     }
 
@@ -766,13 +767,11 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 	chAttn = DEFATTN;
 	chEsc = DEFESC;
     } else {
-	char *r;
 	/* tell the conserver to change escape sequences, assume OK
 	 * (we'll find out soon enough)
 	 */
 	sprintf(acMesg, "%c%ce%c%c", DEFATTN, DEFESC, chAttn, chEsc);
-	FileWrite(pcf, acMesg, 5);
-	/* -bryan */
+	FileWrite(pcf, FLAGFALSE, acMesg, 5);
 	r = ReadReply(pcf, 0);
 	if (strncmp(r, "[redef:", 7) != 0) {
 	    Error("protocol botch on redef of escape sequence");
@@ -785,6 +784,19 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
     PutCtlc(chEsc, stdout);
     printf("?\' for help]\n");
 
+    /* try and display the MOTD */
+    FilePrint(pcf, FLAGFALSE, "%c%cm", chAttn, chEsc);
+    r = ReadReply(pcf, 0);
+    if (strncmp(r, "[unknown", 8) != 0 &&
+	strncmp(r, "[-- MOTD --]", 12) != 0)
+	FileWrite(cfstdout, FLAGFALSE, r, -1);
+
+    FilePrint(pcf, FLAGFALSE, "%c%c;", chAttn, chEsc);
+    r = ReadReply(pcf, 0);
+    if (strncmp(r, "[unknown", 8) != 0 &&
+	strncmp(r, "[connected]", 11) != 0)
+	FileWrite(cfstdout, FLAGFALSE, r, -1);
+
     /* if the host is not down, finish the connection, and force
      * the correct attachment for the user
      */
@@ -795,14 +807,14 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 	    }
 	} else if (fIn != (*pcHow == 'f' ? 'a' : *pcHow)) {
 	    sprintf(acMesg, "%c%c%c", chAttn, chEsc, *pcHow);
-	    FileWrite(pcf, acMesg, 3);
+	    FileWrite(pcf, FLAGFALSE, acMesg, 3);
 	}
 	if (fReplay) {
 	    sprintf(acMesg, "%c%cr", chAttn, chEsc);
-	    FileWrite(pcf, acMesg, 3);
+	    FileWrite(pcf, FLAGFALSE, acMesg, 3);
 	} else if (fVerbose) {
 	    sprintf(acMesg, "%c%c\022", chAttn, chEsc);
-	    FileWrite(pcf, acMesg, 3);
+	    FileWrite(pcf, FLAGFALSE, acMesg, 3);
 	}
     }
     fflush(stdout);
@@ -853,7 +865,7 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 		for (i = 0; i < nc; ++i)
 		    acMesg[i] &= 127;
 	    }
-	    FileWrite(cfstdout, acMesg, nc);
+	    FileWrite(cfstdout, FLAGFALSE, acMesg, nc);
 	}
 
 	/* anything from stdin? */
@@ -870,7 +882,7 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 		for (i = 0; i < nc; ++i)
 		    acMesg[i] &= 127;
 	    }
-	    FileWrite(pcf, acMesg, nc);
+	    FileWrite(pcf, FLAGFALSE, acMesg, nc);
 	}
     }
     C2Cooked();
@@ -944,11 +956,11 @@ DoCmds(master, ports, cmdi)
 	t = ReadReply(pcf, 0);
 	if (strcmp(t, "ok\r\n") != 0) {
 	    FileClose(&pcf);
-	    FilePrint(cfstdout, "%s: %s", server, t);
+	    FilePrint(cfstdout, FLAGFALSE, "%s: %s", server, t);
 	    continue;
 	}
 #if HAVE_OPENSSL
-	FileWrite(pcf, "ssl\r\n", 5);
+	FileWrite(pcf, FLAGFALSE, "ssl\r\n", 5);
 	t = ReadReply(pcf, 0);
 	if (strcmp(t, "ok\r\n") == 0) {
 	    AttemptSSL(pcf);
@@ -964,7 +976,7 @@ DoCmds(master, ports, cmdi)
 	BuildTmpString("login ");
 	BuildTmpString(pcUser);
 	t = BuildTmpString("\r\n");
-	FileWrite(pcf, t, -1);
+	FileWrite(pcf, FLAGFALSE, t, -1);
 
 	t = ReadReply(pcf, 0);
 	if (strncmp(t, "passwd?", 7) == 0) {
@@ -994,10 +1006,11 @@ DoCmds(master, ports, cmdi)
 		BuildString(pass, tmpString);
 		BuildString("\r\n", tmpString);
 	    }
-	    FileWrite(pcf, tmpString->string, tmpString->used - 1);
+	    FileWrite(pcf, FLAGFALSE, tmpString->string,
+		      tmpString->used - 1);
 	    t = ReadReply(pcf, 0);
 	    if (strcmp(t, "ok\r\n") != 0) {
-		FilePrint(cfstdout, "%s: %s", server, t);
+		FilePrint(cfstdout, FLAGFALSE, "%s: %s", server, t);
 		if (++count < 3) {
 		    BuildString((char *)0, tmpString);
 		    goto attemptLogin;
@@ -1015,9 +1028,9 @@ DoCmds(master, ports, cmdi)
 	 * have an arg (always true if it's 'call'), then send the arg
 	 */
 	if ((cmdi == 0 || cmds[cmdi][0] == 'c') && cmdarg != (char *)0)
-	    FilePrint(pcf, "%s %s\r\n", cmds[cmdi], cmdarg);
+	    FilePrint(pcf, FLAGFALSE, "%s %s\r\n", cmds[cmdi], cmdarg);
 	else
-	    FilePrint(pcf, "%s\r\n", cmds[cmdi]);
+	    FilePrint(pcf, FLAGFALSE, "%s\r\n", cmds[cmdi]);
 
 	/* if we haven't gone down the stack, do "normal" stuff.
 	 * if we did hit the bottom, we send the exit\r\n now so
@@ -1026,7 +1039,7 @@ DoCmds(master, ports, cmdi)
 	if (cmdi != 0) {
 	    t = ReadReply(pcf, 0);
 	    /* save the result */
-	    if ((result = strdup(t)) == (char *)0)
+	    if ((result = StrDup(t)) == (char *)0)
 		OutOfMem();
 	}
 
@@ -1040,7 +1053,7 @@ DoCmds(master, ports, cmdi)
 		    Bye(EX_SOFTWARE);
 		}
 	    } else if (result[0] != '[') {	/* did we not get a connection? */
-		FilePrint(cfstdout, "%s: %s", server, result);
+		FilePrint(cfstdout, FLAGFALSE, "%s: %s", server, result);
 		FileClose(&pcf);
 		continue;
 	    } else {
@@ -1054,20 +1067,20 @@ DoCmds(master, ports, cmdi)
 	    }
 	} else if (cmds[cmdi][0] == 'q') {
 	    t = ReadReply(pcf, 0);
-	    FileWrite(cfstdout, t, -1);
+	    FileWrite(cfstdout, FLAGFALSE, t, -1);
 	    if (t[0] != 'o' || t[1] != 'k') {
-		FileWrite(pcf, "exit\r\n", 6);
+		FileWrite(pcf, FLAGFALSE, "exit\r\n", 6);
 		t = ReadReply(pcf, 1);
 	    }
 	} else {
 	    /* all done */
-	    FileWrite(pcf, "exit\r\n", 6);
+	    FileWrite(pcf, FLAGFALSE, "exit\r\n", 6);
 	    t = ReadReply(pcf, cmdi == 0 ? 1 : 0);
 
 	    if (cmdi == 0) {
 		int len;
 		/* if we hit bottom, this is where we get our results */
-		if ((result = strdup(t)) == (char *)0)
+		if ((result = StrDup(t)) == (char *)0)
 		    OutOfMem();
 		len = strlen(result);
 		if (len > 8 &&
@@ -1081,9 +1094,9 @@ DoCmds(master, ports, cmdi)
 		 */
 		if (cmds[0][0] == 'd') {
 		    if (result[0] != 'o' || result[1] != 'k') {
-			FileWrite(cfstdout, server, -1);
-			FileWrite(cfstdout, ": ", 2);
-			FileWrite(cfstdout, result, len);
+			FileWrite(cfstdout, FLAGTRUE, server, -1);
+			FileWrite(cfstdout, FLAGTRUE, ": ", 2);
+			FileWrite(cfstdout, FLAGFALSE, result, len);
 		    } else {
 			disconnectCount += atoi(result + 19);
 		    }
@@ -1091,10 +1104,10 @@ DoCmds(master, ports, cmdi)
 			   (result[0] != 'o' || result[1] != 'k')) {
 		    /* did a 'master' before this or doing a 'disconnect' */
 		    if (cmds[1][0] == 'm' || cmds[0][0] == 'd') {
-			FileWrite(cfstdout, server, -1);
-			FileWrite(cfstdout, ": ", 2);
+			FileWrite(cfstdout, FLAGTRUE, server, -1);
+			FileWrite(cfstdout, FLAGTRUE, ": ", 2);
 		    }
-		    FileWrite(cfstdout, result, len);
+		    FileWrite(cfstdout, FLAGFALSE, result, len);
 		}
 	    }
 	}
@@ -1413,7 +1426,8 @@ main(argc, argv)
     retval = DoCmds(pcInMaster, acPorts->string, cmdi);
 
     if (*pcCmd == 'd')
-	FilePrint(cfstdout, "Disconnected %d users\n", disconnectCount);
+	FilePrint(cfstdout, FLAGFALSE, "Disconnected %d users\n",
+		  disconnectCount);
 
     Bye(retval);
     return 0;			/* noop - Bye() terminates us */

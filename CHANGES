@@ -1,6 +1,22 @@
 				CHANGES
 				=======
 
+version 8.0.2 (Oct 5, 2003):
+	- reworked the i/o calls to better buffer data
+	- added console 'motd' option for holding a "message of the
+	  day", displayed to the client on attachment to console -
+	  suggested by Toby Gerhart <toby.gerhart@eds.com>
+	- added ^Ecm client command for displaying MOTD and integrated
+	  it into the client console attachment sequence
+	- now unallocate client lists when forking new child conserver
+	  processes
+	- changed strdup() to local StrDup() so dmalloc can gracefully
+	  track changes
+	- added a ^Ec; sequence to let client signal server when it's
+	  ready to see console data, otherwise a chatty console can
+	  cause the login sequence to fail and you can never attach to
+	  the console
+
 version 8.0.1 (Sep 29, 2003):
 	- fixed bug in access list parsing where multiple addresses per
 	  line can cause errors - reported by Jay McCanta
@@ -540,5 +556,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.109 2003-09-29 08:41:20-07 bryan Exp $
+#  $Id: CHANGES,v 1.115 2003-10-05 18:04:09-07 bryan Exp $
 #

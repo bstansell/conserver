@@ -1,5 +1,5 @@
 /*
- *  $Id: util.h,v 1.53 2003-09-28 08:45:31-07 bryan Exp $
+ *  $Id: util.h,v 1.55 2003-10-03 06:32:34-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -102,9 +102,9 @@ extern CONSFILE *FileOpenPipe PARAMS((int, int));
 extern CONSFILE *FileOpen PARAMS((const char *, int, int));
 extern int FileClose PARAMS((CONSFILE **));
 extern int FileRead PARAMS((CONSFILE *, void *, int));
-extern int FileWrite PARAMS((CONSFILE *, char *, int));
-extern void FileVWrite PARAMS((CONSFILE *, char *, va_list));
-extern void FilePrint PARAMS((CONSFILE *, char *, ...));
+extern int FileWrite PARAMS((CONSFILE *, FLAG, char *, int));
+extern void FileVWrite PARAMS((CONSFILE *, FLAG, char *, va_list));
+extern void FilePrint PARAMS((CONSFILE *, FLAG, char *, ...));
 extern int FileStat PARAMS((CONSFILE *, struct stat *));
 extern int FileSeek PARAMS((CONSFILE *, off_t, int));
 extern int FileSend PARAMS((CONSFILE *, const void *, size_t, int));
@@ -134,6 +134,7 @@ extern int FileCanRead PARAMS((CONSFILE *, fd_set *, fd_set *));
 extern int FileCanWrite PARAMS((CONSFILE *, fd_set *, fd_set *));
 extern int FileBufEmpty PARAMS((CONSFILE *));
 extern int SetFlags PARAMS((int, int, int));
+extern char *StrDup PARAMS((char *));
 #if HAVE_OPENSSL
 extern SSL *FileGetSSL PARAMS((CONSFILE *));
 extern void FileSetSSL PARAMS((CONSFILE *, SSL *));

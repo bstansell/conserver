@@ -1,5 +1,5 @@
 /*
- *  $Id: master.h,v 5.16 2003-03-06 10:13:41-08 bryan Exp $
+ *  $Id: master.h,v 5.17 2003-10-03 07:23:37-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -37,5 +37,7 @@
 /*
  * stuff the master process needs
  */
+extern CONSCLIENT *pCLmall;
+extern CONSCLIENT *pCLmfree;
 extern void Master PARAMS((void));
 extern void SignalKids PARAMS((int));

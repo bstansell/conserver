@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.160 2003-09-29 07:01:35-07 bryan Exp $
+ *  $Id: main.c,v 5.161 2003-10-03 06:32:34-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -1179,13 +1179,13 @@ main(argc, argv)
 		}
 		break;
 	    case 'b':
-		if ((optConf->secondaryport = strdup(optarg)) == (char *)0)
+		if ((optConf->secondaryport = StrDup(optarg)) == (char *)0)
 		    OutOfMem();
 		break;
 	    case 'c':
 #if HAVE_OPENSSL
 		if ((optConf->sslcredentials =
-		     strdup(optarg)) == (char *)0)
+		     StrDup(optarg)) == (char *)0)
 		    OutOfMem();
 #endif
 		break;
@@ -1213,7 +1213,7 @@ main(argc, argv)
 		fNoinit = 1;
 		break;
 	    case 'L':
-		if ((optConf->logfile = strdup(optarg)) == (char *)0)
+		if ((optConf->logfile = StrDup(optarg)) == (char *)0)
 		    OutOfMem();
 		break;
 	    case 'm':
@@ -1239,11 +1239,11 @@ main(argc, argv)
 		optConf->reinitcheck = atoi(optarg);
 		break;
 	    case 'p':
-		if ((optConf->primaryport = strdup(optarg)) == (char *)0)
+		if ((optConf->primaryport = StrDup(optarg)) == (char *)0)
 		    OutOfMem();
 		break;
 	    case 'P':
-		if ((optConf->passwdfile = strdup(optarg)) == (char *)0)
+		if ((optConf->passwdfile = StrDup(optarg)) == (char *)0)
 		    OutOfMem();
 		break;
 	    case 'R':
@@ -1356,11 +1356,11 @@ main(argc, argv)
 
     /* set up the port to bind to */
     if (optConf->primaryport != (char *)0)
-	config->primaryport = strdup(optConf->primaryport);
+	config->primaryport = StrDup(optConf->primaryport);
     else if (pConfig->primaryport != (char *)0)
-	config->primaryport = strdup(pConfig->primaryport);
+	config->primaryport = StrDup(pConfig->primaryport);
     else
-	config->primaryport = strdup(DEFPORT);
+	config->primaryport = StrDup(DEFPORT);
     if (config->primaryport == (char *)0)
 	OutOfMem();
 
@@ -1387,11 +1387,11 @@ main(argc, argv)
 
     /* set up the secondary port to bind to */
     if (optConf->secondaryport != (char *)0)
-	config->secondaryport = strdup(optConf->secondaryport);
+	config->secondaryport = StrDup(optConf->secondaryport);
     else if (pConfig->secondaryport != (char *)0)
-	config->secondaryport = strdup(pConfig->secondaryport);
+	config->secondaryport = StrDup(pConfig->secondaryport);
     else
-	config->secondaryport = strdup(DEFBASEPORT);
+	config->secondaryport = StrDup(DEFBASEPORT);
     if (config->secondaryport == (char *)0)
 	OutOfMem();
 
@@ -1417,20 +1417,20 @@ main(argc, argv)
     }
 
     if (optConf->passwdfile != (char *)0)
-	config->passwdfile = strdup(optConf->passwdfile);
+	config->passwdfile = StrDup(optConf->passwdfile);
     else if (pConfig->passwdfile != (char *)0)
-	config->passwdfile = strdup(pConfig->passwdfile);
+	config->passwdfile = StrDup(pConfig->passwdfile);
     else
-	config->passwdfile = strdup(PASSWDFILE);
+	config->passwdfile = StrDup(PASSWDFILE);
     if (config->passwdfile == (char *)0)
 	OutOfMem();
 
     if (optConf->logfile != (char *)0)
-	config->logfile = strdup(optConf->logfile);
+	config->logfile = StrDup(optConf->logfile);
     else if (pConfig->logfile != (char *)0)
-	config->logfile = strdup(pConfig->logfile);
+	config->logfile = StrDup(pConfig->logfile);
     else
-	config->logfile = strdup(LOGFILEPATH);
+	config->logfile = StrDup(LOGFILEPATH);
     if (config->logfile == (char *)0)
 	OutOfMem();
 

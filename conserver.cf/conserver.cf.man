@@ -1,5 +1,5 @@
-.\" $Id: conserver.cf.man,v 1.42 2003-09-28 12:23:04-07 bryan Exp $
-.TH CONSERVER.CF 5 "2003-09-28" "conserver-8.0.1" "conserver"
+.\" $Id: conserver.cf.man,v 1.43 2003-10-02 19:01:05-07 bryan Exp $
+.TH CONSERVER.CF 5 "2003-10-02" "conserver-8.0.2" "conserver"
 .SH NAME
 conserver.cf \- console configuration file for
 .BR conserver (8)
@@ -455,6 +455,16 @@ The host may be specified by
 .I hostname
 or using the address
 .IR ipaddr .
+.TP
+.B motd
+.RI [ " message "
+| "" ]
+.br
+Set the "message of the day" for the console to
+.IR message ,
+which gets displayed when a client attaches to the console.
+If the null string (``""'') is used, the MOTD is unset and
+no message will occur.
 .TP
 .B options
 .RI [ " option" ,...

@@ -1,5 +1,5 @@
-.\" $Id: console.man,v 1.36 2003-09-28 15:30:52-07 bryan Exp $
-.TH CONSOLE 1 "2003-09-28" "conserver-8.0.1" "conserver"
+.\" $Id: console.man,v 1.37 2003-10-02 19:00:45-07 bryan Exp $
+.TH CONSOLE 1 "2003-10-02" "conserver-8.0.2" "conserver"
 .SH NAME
 console \- console server client program
 .SH SYNOPSIS
@@ -413,6 +413,9 @@ send the break sequence associated with this console
 .TP
 .B l1-9
 send the specific break sequence
+.TP
+.B m
+display the "message of the day"
 .TP
 .B o
 close (if open) and reopen the line (to clear errors (silo overflows))

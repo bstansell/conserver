@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.115 2003-09-29 08:39:13-07 bryan Exp $
+ *  $Id: master.c,v 5.117 2003-10-03 07:23:37-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -42,7 +42,8 @@
 
 static sig_atomic_t fSawQuit = 0, fSawHUP = 0, fSawUSR2 = 0, fSawUSR1 =
     0, fSawCHLD = 0;
-static CONSCLIENT *pCLfree = (CONSCLIENT *)0;
+CONSCLIENT *pCLmfree = (CONSCLIENT *)0;
+CONSCLIENT *pCLmall = (CONSCLIENT *)0;
 #if HAVE_DMALLOC && DMALLOC_MARK_CLIENT_CONNECTION
 static unsigned long dmallocMarkClientConnection = 0;
 #endif
@@ -331,25 +332,27 @@ CommandCall(pCL, args)
     }
     switch (found) {
 	case 0:
-	    FilePrint(pCL->fd, "console `%s' not found\r\n", args);
+	    FilePrint(pCL->fd, FLAGFALSE, "console `%s' not found\r\n",
+		      args);
 	    break;
 	case 1:
 	    if ((REMOTE *)0 != pRCFound) {
 		if (config->redirect != FLAGTRUE) {
-		    FilePrint(pCL->fd,
+		    FilePrint(pCL->fd, FLAGFALSE,
 			      "automatic redirection disabled - console on master `%s'\r\n",
 			      pRCFound->rhost);
 		} else {
-		    FilePrint(pCL->fd, "@%s\r\n", pRCFound->rhost);
+		    FilePrint(pCL->fd, FLAGFALSE, "@%s\r\n",
+			      pRCFound->rhost);
 		}
 	    } else {
-		FilePrint(pCL->fd, "%hu\r\n", prnum);
+		FilePrint(pCL->fd, FLAGFALSE, "%hu\r\n", prnum);
 	    }
 	    break;
 	default:
 	    found = strlen(ambiguous);
 	    ambiguous[found - 2] = '\000';
-	    FilePrint(pCL->fd,
+	    FilePrint(pCL->fd, FLAGFALSE,
 		      "ambiguous console abbreviation, `%s'\r\n\tchoices are %s\r\n",
 		      args, ambiguous);
 	    break;
@@ -390,8 +393,8 @@ DropMasterClient(pCLServing, force)
     }
     *(pCLServing->ppCLbscan) = pCLServing->pCLscan;
     /* put on the free list */
-    pCLServing->pCLnext = pCLfree;
-    pCLfree = pCLServing;
+    pCLServing->pCLnext = pCLmfree;
+    pCLmfree = pCLServing;
 
     /* we didn't touch pCLServing->pCLscan so the loop works */
 #if HAVE_DMALLOC && DMALLOC_MARK_CLIENT_CONNECTION
@@ -436,13 +439,14 @@ DoNormalRead(pCLServing)
 	if (pCLServing->iState == S_PASSWD) {
 	    if (CheckPasswd(pCLServing, pCLServing->accmd->string) !=
 		AUTH_SUCCESS) {
-		FileWrite(pCLServing->fd, "invalid password\r\n", -1);
+		FileWrite(pCLServing->fd, FLAGFALSE,
+			  "invalid password\r\n", -1);
 		BuildString((char *)0, pCLServing->accmd);
 		DropMasterClient(pCLServing, FLAGFALSE);
 		return;
 	    }
 	    Verbose("<master> login %s", pCLServing->acid->string);
-	    FileWrite(pCLServing->fd, "ok\r\n", -1);
+	    FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", -1);
 	    pCLServing->iState = S_NORMAL;
 	    BuildString((char *)0, pCLServing->accmd);
 	    continue;
@@ -484,16 +488,17 @@ DoNormalRead(pCLServing)
 	    for (ppc =
 		 (pCLServing->iState == S_IDENT ? apcHelp1 : apcHelp2);
 		 (char *)0 != *ppc; ++ppc) {
-		FileWrite(pCLServing->fd, *ppc, -1);
+		FileWrite(pCLServing->fd, FLAGTRUE, *ppc, -1);
 	    }
+	    FileWrite(pCLServing->fd, FLAGFALSE, (char *)0, 0);
 	} else if (strcmp(pcCmd, "exit") == 0) {
-	    FileWrite(pCLServing->fd, "goodbye\r\n", -1);
+	    FileWrite(pCLServing->fd, FLAGFALSE, "goodbye\r\n", -1);
 	    DropMasterClient(pCLServing, FLAGFALSE);
 	    return;
 #if HAVE_OPENSSL
 	} else if (pCLServing->iState == S_IDENT &&
 		   strcmp(pcCmd, "ssl") == 0) {
-	    FileWrite(pCLServing->fd, "ok\r\n", -1);
+	    FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", -1);
 	    if (!AttemptSSL(pCLServing)) {
 		DropMasterClient(pCLServing, FLAGFALSE);
 		return;
@@ -504,11 +509,12 @@ DoNormalRead(pCLServing)
 #if HAVE_OPENSSL
 	    if (config->sslrequired == FLAGTRUE &&
 		FileGetType(pCLServing->fd) != SSLSocket) {
-		FileWrite(pCLServing->fd, "encryption required\r\n", -1);
+		FileWrite(pCLServing->fd, FLAGFALSE,
+			  "encryption required\r\n", -1);
 	    } else {
 #endif
 		if (pcArgs == (char *)0) {
-		    FileWrite(pCLServing->fd,
+		    FileWrite(pCLServing->fd, FLAGFALSE,
 			      "login requires argument\r\n", -1);
 		} else {
 		    BuildString((char *)0, pCLServing->username);
@@ -523,10 +529,10 @@ DoNormalRead(pCLServing)
 			pCLServing->iState = S_NORMAL;
 			Verbose("<master> login %s",
 				pCLServing->acid->string);
-			FileWrite(pCLServing->fd, "ok\r\n", -1);
+			FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", -1);
 		    } else {
-			FilePrint(pCLServing->fd, "passwd? %s\r\n",
-				  myHostname);
+			FilePrint(pCLServing->fd, FLAGFALSE,
+				  "passwd? %s\r\n", myHostname);
 			pCLServing->iState = S_PASSWD;
 		    }
 		}
@@ -543,52 +549,60 @@ DoNormalRead(pCLServing)
 		if (-1 ==
 		    getsockname(FileFDNum(pCLServing->fd),
 				(struct sockaddr *)&lcl, &so)) {
-		    FileWrite(pCLServing->fd,
+		    FileWrite(pCLServing->fd, FLAGFALSE,
 			      "getsockname failed, try again later\r\n",
 			      -1);
 		    Error("Master(): getsockname(%u): %s",
 			  FileFDNum(pCLServing->fd), strerror(errno));
 		    Bye(EX_OSERR);
 		}
-		FilePrint(pCLServing->fd, "@%s", inet_ntoa(lcl.sin_addr));
+		FilePrint(pCLServing->fd, FLAGTRUE, "@%s",
+			  inet_ntoa(lcl.sin_addr));
 		iSep = 0;
 	    }
 	    if (config->redirect == FLAGTRUE) {
 		REMOTE *pRC;
 		for (pRC = pRCUniq; (REMOTE *)0 != pRC; pRC = pRC->pRCuniq) {
-		    FilePrint(pCLServing->fd, ":@%s" + iSep, pRC->rhost);
+		    FilePrint(pCLServing->fd, FLAGTRUE, ":@%s" + iSep,
+			      pRC->rhost);
 		    iSep = 0;
 		}
 	    }
-	    FileWrite(pCLServing->fd, "\r\n", -1);
+	    FileWrite(pCLServing->fd, FLAGFALSE, "\r\n", -1);
 	} else if (pCLServing->iState == S_NORMAL &&
 		   strcmp(pcCmd, "pid") == 0) {
-	    FilePrint(pCLServing->fd, "%lu\r\n", (unsigned long)thepid);
+	    FilePrint(pCLServing->fd, FLAGFALSE, "%lu\r\n",
+		      (unsigned long)thepid);
 	} else if (pCLServing->iState == S_NORMAL &&
 		   strcmp(pcCmd, "version") == 0) {
-	    FilePrint(pCLServing->fd, "version `%s'\r\n", THIS_VERSION);
+	    FilePrint(pCLServing->fd, FLAGFALSE, "version `%s'\r\n",
+		      THIS_VERSION);
 	} else if (pCLServing->iState == S_NORMAL &&
 		   strcmp(pcCmd, "quit") == 0) {
 	    if (ConsentFindUser(pADList, pCLServing->username->string) !=
 		(CONSENTUSERS *)0 ||
 		ConsentFindUser(pADList, "*") != (CONSENTUSERS *)0) {
 		Verbose("quit command by %s", pCLServing->acid->string);
-		FileWrite(pCLServing->fd, "ok -- terminated\r\n", -1);
+		FileWrite(pCLServing->fd, FLAGFALSE,
+			  "ok -- terminated\r\n", -1);
 		DropMasterClient(pCLServing, FLAGFALSE);
 		kill(thepid, SIGTERM);
 		return;
 	    } else
-		FileWrite(pCLServing->fd, "unauthorized command\r\n", -1);
+		FileWrite(pCLServing->fd, FLAGFALSE,
+			  "unauthorized command\r\n", -1);
 	} else if (pCLServing->iState == S_NORMAL &&
 		   strcmp(pcCmd, "restart") == 0) {
 	    if (ConsentFindUser(pADList, pCLServing->username->string) !=
 		(CONSENTUSERS *)0 ||
 		ConsentFindUser(pADList, "*") != (CONSENTUSERS *)0) {
-		FileWrite(pCLServing->fd, "ok -- restarting\r\n", -1);
+		FileWrite(pCLServing->fd, FLAGFALSE,
+			  "ok -- restarting\r\n", -1);
 		Verbose("restart command by %s", pCLServing->acid->string);
 		kill(thepid, SIGHUP);
 	    } else
-		FileWrite(pCLServing->fd, "unauthorized command\r\n", -1);
+		FileWrite(pCLServing->fd, FLAGFALSE,
+			  "unauthorized command\r\n", -1);
 	} else if (pCLServing->iState == S_NORMAL &&
 		   strcmp(pcCmd, "groups") == 0) {
 	    int iSep = 1;
@@ -597,19 +611,21 @@ DoNormalRead(pCLServing)
 	    for (pGE = pGroups; pGE != (GRPENT *)0; pGE = pGE->pGEnext) {
 		if (0 == pGE->imembers)
 		    continue;
-		FilePrint(pCLServing->fd, ":%hu" + iSep, pGE->port);
+		FilePrint(pCLServing->fd, FLAGTRUE, ":%hu" + iSep,
+			  pGE->port);
 		iSep = 0;
 	    }
-	    FileWrite(pCLServing->fd, "\r\n", -1);
+	    FileWrite(pCLServing->fd, FLAGFALSE, "\r\n", -1);
 	} else if (pCLServing->iState == S_NORMAL &&
 		   strcmp(pcCmd, "call") == 0) {
 	    if (pcArgs == (char *)0)
-		FileWrite(pCLServing->fd, "call requires argument\r\n",
-			  -1);
+		FileWrite(pCLServing->fd, FLAGFALSE,
+			  "call requires argument\r\n", -1);
 	    else
 		CommandCall(pCLServing, pcArgs);
 	} else {
-	    FileWrite(pCLServing->fd, "unknown command\r\n", -1);
+	    FileWrite(pCLServing->fd, FLAGFALSE, "unknown command\r\n",
+		      -1);
 	}
 	BuildString((char *)0, pCLServing->accmd);
     }
@@ -633,7 +649,6 @@ Master()
     FILE *fp;
     CONSCLIENT *pCLServing = (CONSCLIENT *)0;
     CONSCLIENT *pCL = (CONSCLIENT *)0;
-    CONSCLIENT *pCLall = (CONSCLIENT *)0;
 
 
     /* set up signal handler */
@@ -656,13 +671,13 @@ Master()
     SimpleSignal(SIGINT, FlagSawINT);
 
     /* prime the free connection slots */
-    if ((pCLfree = (CONSCLIENT *)calloc(1, sizeof(CONSCLIENT)))
+    if ((pCLmfree = (CONSCLIENT *)calloc(1, sizeof(CONSCLIENT)))
 	== (CONSCLIENT *)0)
 	OutOfMem();
-    pCLfree->accmd = AllocString();
-    pCLfree->peername = AllocString();
-    pCLfree->username = AllocString();
-    pCLfree->acid = AllocString();
+    pCLmfree->accmd = AllocString();
+    pCLmfree->peername = AllocString();
+    pCLmfree->username = AllocString();
+    pCLmfree->acid = AllocString();
 
     /* set up port for master to listen on
      */
@@ -731,7 +746,7 @@ Master()
 	    ReReadCfg(msfd);
 	    /* fix up the client descriptors since ReReadCfg() doesn't
 	     * see them like it can in the child processes */
-	    for (pCL = pCLall; pCL != (CONSCLIENT *)0; pCL = pCL->pCLscan) {
+	    for (pCL = pCLmall; pCL != (CONSCLIENT *)0; pCL = pCL->pCLscan) {
 		FD_SET(FileFDNum(pCL->fd), &rinit);
 		if (maxfd < FileFDNum(pCL->fd) + 1)
 		    maxfd = FileFDNum(pCL->fd) + 1;
@@ -768,7 +783,7 @@ Master()
 	}
 
 	/* anything on a connection? */
-	for (pCLServing = pCLall; (CONSCLIENT *)0 != pCLServing;
+	for (pCLServing = pCLmall; (CONSCLIENT *)0 != pCLServing;
 	     pCLServing = pCLServing->pCLscan) {
 	    switch (pCLServing->ioState) {
 #if HAVE_OPENSSL
@@ -791,7 +806,9 @@ Master()
 			FileCanWrite(pCLServing->fd, &rmask, &wmask)) {
 			CONDDEBUG((1, "Master(): flushing fd %d",
 				   FileFDNum(pCLServing->fd)));
-			if (FileWrite(pCLServing->fd, (char *)0, 0) < 0) {
+			if (FileWrite
+			    (pCLServing->fd, FLAGFALSE, (char *)0,
+			     0) < 0) {
 			    DropMasterClient(pCLServing, FLAGTRUE);
 			    break;
 			}
@@ -823,7 +840,7 @@ Master()
 	so = sizeof(struct sockaddr_in);
 	for (cfd = 0; cfd == 0;) {
 	    cfd =
-		accept(msfd, (struct sockaddr *)&pCLfree->cnct_port, &so);
+		accept(msfd, (struct sockaddr *)&pCLmfree->cnct_port, &so);
 	    if (cfd < 0 && errno == EINTR)
 		cfd = 0;
 	}
@@ -838,11 +855,11 @@ Master()
 
 	/* set to non-blocking and wrap in a File object */
 	if (SetFlags(cfd, O_NONBLOCK, 0))
-	    pCLfree->fd = FileOpenFD(cfd, simpleSocket);
+	    pCLmfree->fd = FileOpenFD(cfd, simpleSocket);
 	else
-	    pCLfree->fd = (CONSFILE *)0;
+	    pCLmfree->fd = (CONSFILE *)0;
 
-	if ((CONSFILE *)0 == pCLfree->fd) {
+	if ((CONSFILE *)0 == pCLmfree->fd) {
 	    Error("Master(): FileOpenFD(%u): %s", cfd, strerror(errno));
 #if HAVE_DMALLOC && DMALLOC_MARK_CLIENT_CONNECTION
 	    CONDDEBUG((1, "Master(): dmalloc / MarkClientConnection"));
@@ -852,27 +869,27 @@ Master()
 	}
 
 	/* remove from the free list */
-	pCL = pCLfree;
-	pCLfree = pCL->pCLnext;
+	pCL = pCLmfree;
+	pCLmfree = pCL->pCLnext;
 
 	/* add another if we ran out */
-	if (pCLfree == (CONSCLIENT *)0) {
-	    if ((pCLfree = (CONSCLIENT *)calloc(1, sizeof(CONSCLIENT)))
+	if (pCLmfree == (CONSCLIENT *)0) {
+	    if ((pCLmfree = (CONSCLIENT *)calloc(1, sizeof(CONSCLIENT)))
 		== (CONSCLIENT *)0)
 		OutOfMem();
-	    pCLfree->accmd = AllocString();
-	    pCLfree->peername = AllocString();
-	    pCLfree->username = AllocString();
-	    pCLfree->acid = AllocString();
+	    pCLmfree->accmd = AllocString();
+	    pCLmfree->peername = AllocString();
+	    pCLmfree->username = AllocString();
+	    pCLmfree->acid = AllocString();
 	}
 
 	/* link into all clients list */
-	pCL->pCLscan = pCLall;
-	pCL->ppCLbscan = &pCLall;
+	pCL->pCLscan = pCLmall;
+	pCL->ppCLbscan = &pCLmall;
 	if ((CONSCLIENT *)0 != pCL->pCLscan) {
 	    pCL->pCLscan->ppCLbscan = &pCL->pCLscan;
 	}
-	pCLall = pCL;
+	pCLmall = pCL;
 
 	FD_SET(cfd, &rinit);
 	if (maxfd < cfd + 1)
@@ -888,16 +905,16 @@ Master()
 	if (ClientAccessOk(pCL)) {
 	    pCL->ioState = ISNORMAL;
 	    /* say hi to start */
-	    FileWrite(pCL->fd, "ok\r\n", -1);
+	    FileWrite(pCL->fd, FLAGFALSE, "ok\r\n", -1);
 	} else
 	    DropMasterClient(pCL, FLAGFALSE);
     }
 
     /* clean up the free list */
-    while (pCLfree != (CONSCLIENT *)0) {
-	pCL = pCLfree->pCLnext;
-	DestroyClient(pCLfree);
-	pCLfree = pCL;
+    while (pCLmfree != (CONSCLIENT *)0) {
+	pCL = pCLmfree->pCLnext;
+	DestroyClient(pCLmfree);
+	pCLmfree = pCL;
     }
 
     unlink(PIDFILE);

@@ -10,6 +10,15 @@ Upgrading?
     new features added to the client if you're considering *not*
     upgrading.
 
+    Version 8.0.2
+
+	- I've added a '^Ec;' sequence to allow the client to signal the
+	  server as to when it's ready to see console data.  Without
+	  this, verbose consoles will prevent clients from attaching
+	  (the client sees unexpected data).  An 8.0.2 client should be
+	  compatible with an 8.0.1 server, but an 8.0.1 client is not
+	  compatible with an 8.0.2 server.
+
     Version 8.0.1
 
 	- There's a slight client/server protocol change to implement
@@ -246,5 +255,5 @@ Other Information And Gotchas
 
 
 #
-#  $Id: INSTALL,v 1.33 2003-09-28 17:50:05-07 bryan Exp $
+#  $Id: INSTALL,v 1.34 2003-10-03 10:52:31-07 bryan Exp $
 #
