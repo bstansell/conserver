@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.144 2003-10-03 06:32:34-07 bryan Exp $
+ *  $Id: readcfg.c,v 5.145 2003-10-06 10:07:26-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -1736,17 +1736,17 @@ ConsoleAbort()
 
 void
 #if PROTOTYPES
-SwapStr(char *s1, char *s2)
+SwapStr(char **s1, char **s2)
 #else
 SwapStr(s1, s2)
-    char *s1;
-    char *s2;
+    char **s1;
+    char **s2;
 #endif
 {
     char *s;
-    s = s1;
-    s1 = s2;
-    s2 = s;
+    s = *s1;
+    *s1 = *s2;
+    *s2 = s;
 }
 
 void
@@ -2046,24 +2046,24 @@ ConsoleAdd(c)
 	}
 	if (pCEmatch->logfile != (char *)0 && c->logfile != (char *)0) {
 	    if (strcmp(pCEmatch->logfile, c->logfile) != 0) {
-		SwapStr(pCEmatch->logfile, c->logfile);
+		SwapStr(&pCEmatch->logfile, &c->logfile);
 		closeMatch = 0;
 	    }
 	} else if (pCEmatch->logfile != (char *)0 ||
 		   c->logfile != (char *)0) {
-	    SwapStr(pCEmatch->logfile, c->logfile);
+	    SwapStr(&pCEmatch->logfile, &c->logfile);
 	    closeMatch = 0;
 	}
 	if (pCEmatch->initcmd != (char *)0 && c->initcmd != (char *)0) {
 	    if (strcmp(pCEmatch->initcmd, c->initcmd) != 0) {
-		SwapStr(pCEmatch->initcmd, c->initcmd);
+		SwapStr(&pCEmatch->initcmd, &c->initcmd);
 		/* only trigger reinit if we're running the old command */
 		if (pCEmatch->initpid != 0)
 		    closeMatch = 0;
 	    }
 	} else if (pCEmatch->initcmd != (char *)0 ||
 		   c->initcmd != (char *)0) {
-	    SwapStr(pCEmatch->initcmd, c->initcmd);
+	    SwapStr(&pCEmatch->initcmd, &c->initcmd);
 	    /* only trigger reinit if we're running the old command */
 	    if (pCEmatch->initpid != 0)
 		closeMatch = 0;
@@ -2073,12 +2073,12 @@ ConsoleAdd(c)
 	    case EXEC:
 		if (pCEmatch->exec != (char *)0 && c->exec != (char *)0) {
 		    if (strcmp(pCEmatch->exec, c->exec) != 0) {
-			SwapStr(pCEmatch->exec, c->exec);
+			SwapStr(&pCEmatch->exec, &c->exec);
 			closeMatch = 0;
 		    }
 		} else if (pCEmatch->exec != (char *)0 ||
 			   c->exec != (char *)0) {
-		    SwapStr(pCEmatch->exec, c->exec);
+		    SwapStr(&pCEmatch->exec, &c->exec);
 		    closeMatch = 0;
 		}
 		if (pCEmatch->ixany != c->ixany) {
@@ -2104,12 +2104,12 @@ ConsoleAdd(c)
 		if (pCEmatch->device != (char *)0 &&
 		    c->device != (char *)0) {
 		    if (strcmp(pCEmatch->device, c->device) != 0) {
-			SwapStr(pCEmatch->device, c->device);
+			SwapStr(&pCEmatch->device, &c->device);
 			closeMatch = 0;
 		    }
 		} else if (pCEmatch->device != (char *)0 ||
 			   c->device != (char *)0) {
-		    SwapStr(pCEmatch->device, c->device);
+		    SwapStr(&pCEmatch->device, &c->device);
 		    closeMatch = 0;
 		}
 		if (pCEmatch->baud != c->baud) {
@@ -2150,12 +2150,12 @@ ConsoleAdd(c)
 	    case HOST:
 		if (pCEmatch->host != (char *)0 && c->host != (char *)0) {
 		    if (strcasecmp(pCEmatch->host, c->host) != 0) {
-			SwapStr(pCEmatch->host, c->host);
+			SwapStr(&pCEmatch->host, &c->host);
 			closeMatch = 0;
 		    }
 		} else if (pCEmatch->host != (char *)0 ||
 			   c->host != (char *)0) {
-		    SwapStr(pCEmatch->host, c->host);
+		    SwapStr(&pCEmatch->host, &c->host);
 		    closeMatch = 0;
 		}
 		if (pCEmatch->port != c->port) {
@@ -2168,7 +2168,7 @@ ConsoleAdd(c)
 	}
 
 	/* and now the rest (minus the "runtime" members - see below) */
-	SwapStr(pCEmatch->motd, c->motd);
+	SwapStr(&pCEmatch->motd, &c->motd);
 	pCEmatch->activitylog = c->activitylog;
 	pCEmatch->breaklog = c->breaklog;
 	pCEmatch->mark = c->mark;

@@ -1,6 +1,12 @@
 				CHANGES
 				=======
 
+version 8.0.3 (Oct 6, 2003):
+	- the SIGHUP process fails to pick up changes to certain fields
+	  because of a horribly broken SwapStr() function [broken in
+	  all previous 8.0.x versions] - reported by Toby Gerhart
+	  <toby.gerhart@eds.com>
+
 version 8.0.2 (Oct 5, 2003):
 	- reworked the i/o calls to better buffer data
 	- added console 'motd' option for holding a "message of the
@@ -556,5 +562,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.115 2003-10-05 18:04:09-07 bryan Exp $
+#  $Id: CHANGES,v 1.116 2003-10-06 10:05:23-07 bryan Exp $
 #
