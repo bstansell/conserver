@@ -1,76 +1,26 @@
-# conserver config file
 #
-# $Id: conserver.cf,v 4.20 94/05/22 11:17:26 ksb Exp $
+# $Id: conserver.cf,v 1.3 1999-01-25 14:38:19-08 bryan Exp $
+#
+# The character '&' in logfile names are substituted with the console
+# name.  Any logfile name that doesn't begin with a '/' has LOGDIR
+# prepended to it.  So, most consoles will just have a '&' as the logfile
+# name which causes /var/consoles/<consolename> to be used.
+#
+LOGDIR=/var/consoles
 #
 # list of consoles we serve
-# name : tty[@host] : baud[parity] : device : group
-# our local console
-console:|@console.cc.purdue.edu:9600p:/usr/adm/consoles/console:0
-nextwatch:|@console.cc.purdue.edu:9600p:/usr/adm/consoles/nextwatch:0
-# real machine
-speedy:/dev/ttyC12@console.cc.purdue.edu:9600s:/usr/adm/consoles/speedy:1
-nis35:/dev/ttyC13@console.cc.purdue.edu:9600s:/usr/adm/consoles/nis35:1
-sun3watch:/dev/ttyC40@console.cc.purdue.edu:9600p:/usr/adm/consoles/sun3watch:1
-keep:/dev/ttyC29@console.cc.purdue.edu:9600s:/usr/adm/consoles/keep:1
-dart:/dev/ttyC32@console.cc.purdue.edu:9600s:/usr/adm/consoles/dart:1
-lively:/dev/ttyC10@console.cc.purdue.edu:9600s:/usr/adm/consoles/lively:2
-sentinel:/dev/ttyC11@console.cc.purdue.edu:9600s:/usr/adm/consoles/sentinel:2
-ipscgate:/dev/ttyC26@console.cc.purdue.edu:9600e:/usr/adm/consoles/ipscgate:2
-snap.stat:/dev/ttyC27@console.cc.purdue.edu:9600s:/usr/adm/consoles/snap.stat:2
-b.stat:/dev/ttyC33@console.cc.purdue.edu:9600s:/usr/adm/consoles/b.stat:2
-expert:/dev/ttyC14@console.cc.purdue.edu:9600e:/usr/adm/consoles/expert:3
-quick:/dev/ttyC15@console.cc.purdue.edu:9600s:/usr/adm/consoles/quick:3
-helios:/dev/ttyC31@console.cc.purdue.edu:9600s:/usr/adm/consoles/helios:3
-probe:/dev/ttyC34@console.cc.purdue.edu:9600s:/usr/adm/consoles/probe:3
-mace:/dev/ttyC8@console.cc.purdue.edu:4800s:/usr/adm/consoles/mace:4
-sage:/dev/ttyC9@console.cc.purdue.edu:9600e:/usr/adm/consoles/sage:4
-flash:/dev/ttyC24@console.cc.purdue.edu:9600s:/usr/adm/consoles/flash:4
-labwatch:/dev/ttyC25@console.cc.purdue.edu:9600s:/usr/adm/consoles/labwatch:4
-dash:/dev/ttyC35@console.cc.purdue.edu:9600s:/usr/adm/consoles/dash:4
-icd92:/dev/ttyC4@console.cc.purdue.edu:9600s:/usr/adm/consoles/icd92:5
-pop.stat:/dev/ttyC5@console.cc.purdue.edu:9600s:/usr/adm/consoles/pop.stat:5
-icd94:/dev/ttyC20@console.cc.purdue.edu:9600s:/usr/adm/consoles/icd94:5
-oasis:/dev/ttyC21@console.cc.purdue.edu:9600s:/usr/adm/consoles/oasis:5
-deft:/dev/ttyC36@console.cc.purdue.edu:9600s:/usr/adm/consoles/deft:5
-mentor:/dev/ttyC2@console.cc.purdue.edu:9600e:/usr/adm/consoles/mentor:6
-icd84:/dev/ttyC3@console.cc.purdue.edu:9600s:/usr/adm/consoles/icd84:6
-franklin:/dev/ttyC18@console.cc.purdue.edu:9600s:/usr/adm/consoles/franklin:6
-icd82:/dev/ttyC19@console.cc.purdue.edu:9600s:/usr/adm/consoles/icd82:6
-prism:/dev/ttyC38@console.cc.purdue.edu:9600s:/usr/adm/consoles/prism:6
-rapid:/dev/ttyC6@console.cc.purdue.edu:9600s:/usr/adm/consoles/rapid:7
-tyro:/dev/ttyC7@console.cc.purdue.edu:9600e:/usr/adm/consoles/tyro:7
-staff:/dev/ttyC22@console.cc.purdue.edu:9600s:/usr/adm/consoles/staff:7
-swift:/dev/ttyC23@console.cc.purdue.edu:9600s:/usr/adm/consoles/swift:7
-quest:/dev/ttyC37@console.cc.purdue.edu:9600s:/usr/adm/consoles/quest:7
-icd96:/dev/ttyC0@console.cc.purdue.edu:9600s:/usr/adm/consoles/icd96:8
-fleet:/dev/ttyC1@console.cc.purdue.edu:9600s:/usr/adm/consoles/fleet:8
-feserve:/dev/ttyC16@console.cc.purdue.edu:9600s:/usr/adm/consoles/feserve:8
-curator:/dev/ttyC17@console.cc.purdue.edu:9600s:/usr/adm/consoles/curator:8
-soltest:/dev/ttyC39@console.cc.purdue.edu:9600s:/usr/adm/consoles/soltest:8
-mozo:/dev/ttyC41@console.cc.purdue.edu:9600s:/usr/adm/consoles/mozo:9
-notus:/dev/ttyC42@console.cc.purdue.edu:9600s:/usr/adm/consoles/notus:
-eurus:/dev/ttyC43@console.cc.purdue.edu:9600s:/usr/adm/consoles/eurus:
-boreas:/dev/ttyC44@console.cc.purdue.edu:9600s:/usr/adm/consoles/boreas:
-zephyrus:/dev/ttyC45@console.cc.purdue.edu:9600s:/usr/adm/consoles/zephyrus:
-fegrader:/dev/ttyC46@console.cc.purdue.edu:9600s:/usr/adm/consoles/fegrader:
-galaxy:/dev/ttyC47@console.cc.purdue.edu:9600s:/usr/adm/consoles/galaxy:
-# ups monitor connection (ksb -- testing)
-ups:/dev/ttyb@console.cc.purdue.edu:9600e:/usr/adm/consoles/ups:10
-# VM Group consoles
-tag:/dev/ttyC30@console.cc.purdue.edu:9600s:/usr/adm/consoles/tag:11:R85ONdmDqSwQ6
-# All remote consoles
-# on staff.cc.purdue.edu
-extra:/dev/ttyb@staff.cc.purdue.edu:9600s:/usr/adm/extra.log:0
-vet:/dev/tty0d@staff.cc.purdue.edu:9600s:/usr/adm/vet.log:1:5m6N/RqJcay6I
-bull:/dev/tty0e@staff.cc.purdue.edu:9600s:/usr/adm/bull.log:
-serval:/dev/tty0f@staff.cc.purdue.edu:9600s:/usr/adm/serval.log:
-# virtual consoles on remote hosts
-tbtape:|su - informix@oasis.cc.purdue.edu:9600p:/usr/adm/tbtape.log:0
-# so we can write on mace.cc
-wmace:|/bin/csh -i@mace.cc.purdue.edu:9600p:/usr/adm/mace.log:0
+#    name : tty[@host] : baud[parity] : logfile : mark-interval[m|h|d]
+#    name : !host : port : logfile : mark-interval[m|h|d]
+#    name : |command : : logfile : mark-interval[m|h|d]
+#
+tweety:!ts1:2002:&:
+bambam:!ts1:2003:&:
+shell:|::/dev/null:
+telnet:|telnet host::/dev/null:
+ttya:/dev/ttya:9600p:&:
 %%
+#
 # list of clients we allow
-# type machines
-trusted: console.cc.purdue.edu
-allowed: cc.purdue.edu stat.purdue.edu
-allowed: 128.210.10.8 128.210.33.1 128.210.7.49 127.0.0.1
+# {trusted|allowed|rejected} : machines
+#
+allowed: 127.0.0.1 gnac.com

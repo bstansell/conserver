@@ -1,11 +1,11 @@
-#	$Id: Makefile,v 1.4 1999-01-15 15:36:06-08 bryan Exp $
+#	$Id: Makefile,v 1.5 1999-01-25 15:10:05-08 bryan Exp $
 #
 #	Master Makefile
 #
 
-SUBDIRS=conserver console
+SUBDIRS=conserver console conserver.cf
 
-all clean install: FRC
+all clean install install.man: FRC
 	@if [ -f .settings ]; then \
     	    s=`cat .settings | grep -v '^#'`; \
 	    settings=`echo $$s`; \

@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.9 1999-01-14 13:30:29-08 bryan Exp $
+#	$Id: Makefile,v 1.10 1999-01-21 23:32:43-08 bryan Exp $
 #
 #	Makefile for console server
 #
@@ -19,7 +19,7 @@ SRC=	access.c client.c consent.c group.c main.c master.c \
 	readcfg.c fallback.c
 OBJ=	access.o client.o consent.o group.o main.o master.o \
 	readcfg.o fallback.o
-INIT=	init.script
+INIT=	conserver.rc
 
 all: ${PROG}
 

@@ -1,0 +1,75 @@
+				INSTALL
+				=======
+
+Quickie Instructions
+
+	- Edit 'conserver/cons.h' (if necessary)
+
+	- Run 'make config'
+
+	- Run 'make'
+
+	- If all is well, run 'make install install.man'
+
+	- Now set up config files, etc. (see below)
+
+    Things will install in /usr/local.  If you'd like to use a different
+    prefix, use 'make PREFIX=/your/path install'.
+
+
+Detailed Instructions
+
+    - First thing to do is set up a custom conserver/cons.h file.  If you
+      like all the defaults provided in conserver/port.h, your set.
+      Just use the default cons.h cons.h file.  Here are some of the
+      more important #define's to look for:
+
+	PORT or SERVICE		- Socket used to communicate
+	HOST			- Hostname of console server
+	CONFIG			- Config file path
+	PASSWD_FILE		- Password file path
+	MAXMEMB			- Number of consoles per child process
+	MAXGRP			- Number of child processes
+
+    - Now it's time to run 'make config'.  If you're platform is supported
+      you'll get a nice message about "Configuring for ...".  Otherwise,
+      you'll have to port the software - follow the instructions you
+      received.
+
+    - Now run 'make'.  If you run into problems (like needing a different
+      compiler or something), check out the .settings file ('make config'
+      symlinks it to port/<ostype>).
+
+    - If things built fine, you can run 'make install install.man'.
+      This will put things into the /usr/local tree.  If you'd like
+      things deposited elsewhere, you can use 'make PREFIX=/your/path
+      install install.man'.  We like to use something like 'make
+      PREFIX=/tools/conserver install install.man'.
+
+    - Now that the binaries are in place, we need to set up the
+      configuration files and such.
+
+      If you used a blank cons.h file or defined a service name (SERVICE
+      token above), you'll need to enter a definition in your services
+      file (directly, via NIS, or whatever).  Here's what we use:
+
+	    console      782/tcp      conserver    # console server
+
+      If you defined PORT, you shouldn't have to worry about this step.
+
+      Next, make sure conserver runs during boot.  The init script
+      we use under Solaris is installed in <PREFIX>/etc/conserver.rc.
+      Use that or some form of it for your own /etc/init.d script or an
+      entry in startup files (/etc/rc, /etc/rc.local, or whatever).
+
+      Now for the fun stuff.  You need to create a conserver.cf and
+      conserver.passwd file.  Those are defined with the CONFIG and
+      PASSWD_FILE settings.  If you ever need to know what values
+      were compiled into conserver, run 'conserver -V'.  See the
+      conserver.cf/INSTALL file for instructions on setup of these files.
+
+    - That's it!  Just start up the console server and enjoy!
+
+#
+#  $Id: INSTALL,v 1.4 1999-01-25 18:30:03-08 bryan Exp $
+#

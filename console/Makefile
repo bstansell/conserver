@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.9 1999-01-14 13:05:58-08 bryan Exp $
+#	$Id: Makefile,v 1.11 1999-01-25 15:38:39-08 bryan Exp $
 #
 #	Makefile for console client progran
 #
@@ -25,7 +25,7 @@ ${PROG}: ${OBJ}
 	${CC} -o $@ ${CFLAGS} ${OBJ} ${LIBS}
 
 clean: FRC
-	rm -f Makefile.bak ${PROG} a.out *.o core errs lint.out tags
+	rm -f Makefile.bak ${PROG} *.tbl a.out *.o core errs lint.out tags
 
 depend: ${HDR} ${SRC} FRC
 	makedepend ${CDEFS} ${LINCLUDE} ${SRC}
@@ -39,7 +39,8 @@ ${MAN}/man${MANSECT}:
 	${INSTALL} -d $@
 
 install.man: ${MAN}/man${MANSECT}
-	${INSTALL} -c console.man ${MAN}/man${MANSECT}/console.${MANSECT}
+	tbl console.man > console.tbl
+	${INSTALL} -c console.tbl ${MAN}/man${MANSECT}/console.${MANSECT}
 
 lint: ${HDR} ${SRC} FRC
 	lint -h ${CDEFS} ${LINCLUDE} ${SRC}

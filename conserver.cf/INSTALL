@@ -1,26 +1,19 @@
-# $Id: INSTALL,v 4.1 91/06/19 14:20:54 ksb Exp $
+The two files you need to set up are the conserver.cf and conserver.passwd
+files.  See the sample conserver.cf and conserver.passwd files
+for examples.  You can start with those and then modify extensively.
+The man page for conserver.cf should explain that file with enough detail
+to get you going.
 
-Prep:
+As for the conserver.passwd file, here are some instructions.  The file
+contains three fields seperated by colons: <username>:<passwd>:<hosts>.
+The <passwd> field should either be an encrypted password or the special
+string '*passwd*', which will cause the console server to do a getpwnam()
+call.  The <hosts> field can be a comma seperated list of console names
+(from conserver.cf) or the special string 'all'.  Access for the user
+is only granted to the hosts listed here (or all if 'all' is used).
 
- Start in the conserver directory.
+That's about it.  Good luck.
 
- Now read conserver.cf.5l (if you have mk(1L) installed just mk it).
- Run:
-	$  tbl conserver.cf.5l |nroff -man |${PAGER-more}
-
- Now edit dummy.cf and follow the instructions there.
- [If you are just shopping stop here.]
-
- Now edit conserver.cf and put your real hosts in there.
-
- Edit the Makefile and change LIB.
-
-
-Compile:
-
- None.
-
-
-Install:
-
- Make install.
+#
+#  $Id: INSTALL,v 1.1 1999-01-25 15:36:52-08 bryan Exp $
+#

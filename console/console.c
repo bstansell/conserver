@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.23 1999-01-15 15:35:19-08 bryan Exp $
+ *  $Id: console.c,v 5.24 1999-01-25 15:10:14-08 bryan Exp $
  *
  *  GNAC, Inc., 1998
  *
@@ -77,7 +77,7 @@ extern char *sys_errlist[];
 #endif
 
 static char rcsid[] =
-	"$Id: console.c,v 5.23 1999-01-15 15:35:19-08 bryan Exp $";
+	"$Id: console.c,v 5.24 1999-01-25 15:10:14-08 bryan Exp $";
 static char *progname =
 	rcsid;
 int fVerbose = 0, fReplay = 0, fRaw = 0;
@@ -1273,9 +1273,9 @@ char **argv;
 			break;
 
 		case 'h':
-			printf("%s: usage [-aAfFsS] [-v] [-e esc] [-M mach] [-l username] machine\n", progname);
-			printf("%s: usage [-hpuVw]\n", progname);
-			printf("%s: usage [-qQ] [-v] [-M mach]\n", progname);
+			printf("%s: usage [-aAfFsS] [-rv] [-e esc] [-M mach] [-l username] machine\n", progname);
+			printf("%s: usage [-v] [-hdDuVwx]\n", progname);
+			printf("%s: usage [-qQ] [-M mach]\n", progname);
 			Usage(stdout, apcLong);
 			exit(0);
 			/*NOTREACHED*/

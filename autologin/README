@@ -1,13 +1,16 @@
-# $Id: README,v 1.3 93/04/21 16:13:37 ksb Exp $
 
-This program can be used to put a root shell on the console at boot time.
-See the manual page.
+I have not touched the autologin directory.  See the README.old and
+INSTALL.old files if you interested in the program.  I cannot guarantee
+it will compile, install, or run.  It is definately not integrated with
+../Makefile or any of the porting support.  If you have patches that
+make it work, please send them to me and I'll be more than happy to
+incorporate them.
 
-ksb
+No one I've ever talked to found a need for something like autologin.
+Good luck.
 
-Ports to: HOST	OS	CDEFS
-	SUN3	4.1.1	-DSUNOS
-	SUN4	4.1.2	-DSUNOS
-	V386	?	-DSRM
-	EPIX	?	-DEPIX -systype posix -I/usr/include (+ extra .o files)
-	IBMR2		-DIBMR2
+Bryan Stansell
+
+#
+#  $Id: README,v 1.1 1999-01-21 22:59:40-08 bryan Exp $
+#

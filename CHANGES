@@ -1,6 +1,10 @@
 				CHANGES
 				=======
 
+version 6.09:
+	- Added more documentation (look for README and INSTALL files).
+	- Fixed up man pages so they are more accurate.
+
 version 6.08:
 	- Added support for Linux 2.X and IRIX 6.X
 	- Fixed "suspend" code in client - it shouldn't have worked
@@ -25,5 +29,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.4 1999-01-15 15:36:21-08 bryan Exp $
+#  $Id: CHANGES,v 1.5 1999-01-25 15:37:38-08 bryan Exp $
 #

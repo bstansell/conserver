@@ -1,0 +1,48 @@
+				Porting
+				=======
+
+Well, porting should be a fairly simple process.  There are three things
+that need to be set up to get things to work.  First, you need to modify
+the 'system' script so that it can properly detect your system and
+associate it with a name.  Next, create a file in this directory of the
+same name with the proper makefile definitions.  You should be able to
+just copy the SunOS5 file to the name you created and modify the values
+defined.  One of the important things to do is create a token name to be
+used during compilation (see the CDEFS lines - Solaris 5.X uses SUN5, for
+example).  This token will then be used in the ../conserver/port.h file.
+
+So, as an example, say you're porting to the "Unix OS" version 6.4.
+You'd add a line like the following to the system script:
+
+		UnixOS-6.*)	p="UnixOS6"	;;
+
+Then you'd create a UnixOS6 file in this directory with the contents of:
+
+		#	Sample UnixOS6 file
+		#
+		'CC=gcc'
+		'INSTALL=/usr/ucb/install'
+		'INCLUDE='
+		'DEBUG=-O'
+		'CDEFS=-DUNIXOS6'
+		'LIBS='
+
+Again, the key is the -DUNIXOS6 line...the others should be whatever is
+required to get things to build.
+
+Now you need to go define UNIXOS6 in ../conserver/port.h and have
+it define the appropriate things.  You'll need to add UNIXOS6 to the
+line above '#error "Platform needs to be defined.  See port.h"' and
+then work through the file inserting UNIXOS6 at the appropriate spots.
+Hopefully that's all you'll need to get the software to build.  If, for
+some reason, a porting issue is not dealt with properly in the source
+files, you may need to adjust other .c and .h files.  But, hopefully not.
+Most of the tricky stuff can be adjusted via the port.h file.
+
+That's about all the instructions I have.  If I've missed anything
+important, I'll be more than happy to supplement these instructions.
+Just let me know.  Just let me know.
+
+#
+#  $Id: README,v 1.1 1999-01-22 13:24:21-08 bryan Exp $
+#

@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.29 1999-01-13 11:48:11-08 bryan Exp $
+ *  $Id: main.c,v 5.30 1999-01-22 00:02:35-08 bryan Exp $
  *
  *  GNAC, Inc., 1998
  *
@@ -58,7 +58,7 @@
 #endif
 
 char rcsid[] =
-	"$Id: main.c,v 5.29 1999-01-13 11:48:11-08 bryan Exp $";
+	"$Id: main.c,v 5.30 1999-01-22 00:02:35-08 bryan Exp $";
 char *progname =
 	rcsid;
 int fAll = 1, fVerbose = 0, fSoftcar = 0;
@@ -287,11 +287,13 @@ char **argv;
 		}
 	}
 
+#if HAVE_SHADOW
 /*  Why force root???  Cause of getsp*() calls... */
 	if (0 != geteuid()) {
 		fprintf(stderr, "%s: must be the superuser\n", progname);
 		exit(1);
 	}
+#endif
 
 	/* read the config file
 	 */

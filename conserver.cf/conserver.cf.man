@@ -1,0 +1,129 @@
+.\" $Id: conserver.cf.man,v 1.3 1999-01-25 15:05:17-08 bryan Exp $
+.\" @(#)constab.5 01/06/91 OSU CIS; Thomas A. Fine
+.TH CONSERVER.CF 5L "Local"
+.SH NAME
+conserver.cf \- table of server console terminals used by conserver(8L)
+.SH SYNOPSIS
+.br
+LOGDIR=\fIlogdirectory\fP
+.br
+\fIserver\fP:\fIdevice\fP[@\fIconserver\fP]:\fIbaud\fP:\fIlogfile\fP:\fImark-interval\fP[\fIm|h|d\fP]
+.br
+\fIserver\fP:!\fIhost\fP[@\fIconserver\fP]:\fIport\fP:\fIlogfile\fP:\fImark-interval\fP[\fIm|h|d\fP]
+.br
+\fIserver\fP:|\fIcommand\fP[@\fIconserver\fP]::\fIlogfile\fP:\fImark-interval\fP[\fIm|h|d\fP]
+.br
+\fB%%\fP
+.br
+\fIaccess hosts\fP
+.SH DESCRIPTION
+.B Conserver.cf
+is the configuration file for
+.IR conserver (8L).
+All lines starting with the pound sign `#' are considered comment lines.
+Blank lines are ignored.
+.PP
+The first section of the file has lines that are separated into
+six colon-separated fields:
+.PP
+\fIserver\fP name - this doesn't have to be the name of the server;
+it is used to refer to the server when using the console program.
+.PP
+\fIdevice\fP file name - the full path name of the device for this server.
+The \fIbaud\fP rate is the speed and parity for this console.
+Speed may be given as an integer,
+parity only requires the first letter of any of: even, odd, mark, space.
+the conserver will send connections for this server to \fIconserver\fP.
+.PP
+!\fIhost\fP - the hostname of the server to connect to.
+A socket connection will be made to port \fIport\fP (an integer).
+.PP
+|\fIcommand\fP - the command to invoke on the console server.
+.PP
+\fIdevice\fP, !\fIhost\fP, and |\fIcommand\fP may contain a remote
+console server name (ex. \fIhost\fP@\fIconserver\fP) in which case
+the conserver will send connections for this server to \fIconserver\fP.
+.PP
+\fIlogfile\fP - the full path name of file where all output from
+this server is logged.  Any occurance of `&' will be replaced with
+the \fIserver\fP name.  Any path that doesn't begin with a `/' will
+have \fIlogdirectory\fP (value of LOGDIR) prepended to it.
+.PP
+\fImark-interval\fP[\fIm|h|d\fP] - specifies the time between
+timestamps applied to the console log file.  The timestamps look like
+`[-- MARK -- Mon Jan 25 14:46:56 PST 1999]'.
+.PP
+This section is terminated with a `%%' token on a line by itself.
+.PP
+The next section of the file contains a list of hosts and addresses
+which are allowed to connect to the console server.  Three levels
+of access all allowed, ``trust'', ``allow'',
+and ``refuse''.
+The access modifier is followed by a colon and a list of addresses or
+host names.
+Any complete suffix of a host name my be used to allow access for all hosts
+in that subdomain.
+For example `cc.purdue.edu' will allow `mentor.cc.purdue.edu'
+and `mace.cc.purdue.edu', but not `pucc.purdue.edu' or `hack.purdue.edu'.
+.SH EXAMPLE
+# server:path:baud:/usr/adm/logfile:mark
+.br
+LOGDIR=/tmp
+.br
+#
+.br
+# This logs to /tmp/treelog...
+.br
+tree:/dev/ttyj0:9600e:&log:
+.br
+#
+.br
+# This logs to /tmp/fishlog...
+.br
+fish:/dev/ttyj1:4800e:fishlog:
+.br
+#
+.br
+# Now we're defaulting to /var/tmp for logfiles...
+.br
+LOGDIR=/var/tmp
+.br
+#
+.br
+# So, this is /var/tmp/birdlog
+.br
+bird:/dev/ttyj2:4800m:&log:
+.br
+#
+.br
+# And this is /var/tmp/solarlog...
+.br
+solar:|telnet solar::solarlog:
+.br
+#
+.br
+# Now things are all in /var/consoles/<console name>
+.br
+LOGDIR=/var/consoles
+.br
+shell:|::&:
+.br
+#
+.br
+# This opens a connection to port 2003 of ts1...
+.br
+tribe:!ts1:2003:&:
+.br
+reptile:!ts1:2004:&:
+.br
+mentor:/dev/ttyh0@extra.cc.purdue.edu:2400e:&:
+.br
+%%
+.br
+# access restrictions
+.br
+trusted: console.cc.purdue.edu 128.210.7.90
+.br
+allow: cc.purdue.edu stat.cc.purdue.edu
+.SH "SEE ALSO"
+console(1L), conserver(8L)
