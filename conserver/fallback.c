@@ -1,5 +1,5 @@
 /*
- *  $Id: fallback.c,v 5.60 2003/11/20 13:56:38 bryan Exp $
+ *  $Id: fallback.c,v 5.61 2004/04/16 16:58:09 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -210,7 +210,7 @@ GetPseudoTTY(slave, slaveFD)
 	    continue;
 	}
 
-	if (0 > (fd = open(acMaster, O_RDWR | O_NDELAY, 0))) {
+	if (0 > (fd = open(acMaster, O_RDWR | O_NONBLOCK, 0))) {
 	    continue;
 	}
 	acSlave[iIndex] = *pcOne;

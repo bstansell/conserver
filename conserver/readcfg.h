@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.h,v 5.38 2003/11/10 15:37:24 bryan Exp $
+ *  $Id: readcfg.h,v 5.39 2004/05/07 03:42:49 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -20,6 +20,7 @@ typedef struct config {
     int reinitcheck;
     char *secondaryport;
     char *unifiedlog;
+    int initdelay;
 #if HAVE_SETPROCTITLE
     FLAG setproctitle;
 #endif

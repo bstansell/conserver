@@ -1,5 +1,5 @@
 /*
- *  $Id: group.h,v 5.43 2003/12/20 06:11:53 bryan Exp $
+ *  $Id: group.h,v 5.45 2004/05/07 03:42:49 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -41,7 +41,8 @@
 #define T_REINIT	3
 #define T_AUTOUP	4
 #define T_ROLL		5
-#define T_MAX		6	/* T_MAX *must* be last */
+#define T_INITDELAY	6
+#define T_MAX		7	/* T_MAX *must* be last */
 
 /* return values used by CheckPass()
  */
@@ -80,6 +81,7 @@ extern int ClientAccess PARAMS((CONSENT *, char *));
 extern void DestroyClient PARAMS((CONSCLIENT *));
 extern int CheckPasswd PARAMS((CONSCLIENT *, char *));
 extern void ExpandString PARAMS((char *, CONSENT *, short));
+extern void DeUtmp PARAMS((GRPENT *, int));
 #if HAVE_OPENSSL
 extern int AttemptSSL PARAMS((CONSCLIENT *));
 #endif

@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.293 2004/04/13 18:12:00 bryan Exp $
+ *  $Id: group.c,v 5.298 2004/05/07 15:39:51 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -901,6 +901,75 @@ FlagReUp(sig)
 #endif
 }
 
+static struct delay {
+    char *host;
+    time_t last;
+    struct delay *next;
+} *delays = (struct delay *)0;
+
+/* returns zero if the delay has been reached, otherwise returns
+ * the time when the next init should happen
+ */
+static time_t
+#if PROTOTYPES
+InitDelay(CONSENT *pCE)
+#else
+InitDelay(pCE)
+    CONSENT *pCE;
+#endif
+{
+    char *l;
+    struct delay *d;
+
+    if (pCE->host != (char *)0)
+	l = pCE->host;
+    else
+	l = "";
+
+    for (d = delays; d != (struct delay *)0; d = d->next) {
+	if (strcmp(l, d->host) == 0) {
+	    if ((time((time_t *)0) - d->last) >= config->initdelay) {
+		return (time_t)0;
+	    } else
+		return d->last + config->initdelay;
+	}
+    }
+    return (time_t)0;
+}
+
+static void
+#if PROTOTYPES
+UpdateDelay(CONSENT *pCE)
+#else
+UpdateDelay(pCE)
+    CONSENT *pCE;
+#endif
+{
+    char *l;
+    struct delay *d;
+
+    if (pCE->host != (char *)0)
+	l = pCE->host;
+    else
+	l = "";
+
+    for (d = delays; d != (struct delay *)0; d = d->next) {
+	if (strcmp(l, d->host) == 0) {
+	    d->last = time((time_t *)0);
+	    return;
+	}
+    }
+    if ((d =
+	 (struct delay *)malloc(sizeof(struct delay))) ==
+	(struct delay *)0)
+	OutOfMem();
+    if ((d->host = StrDup(l)) == (char *)0)
+	OutOfMem();
+    d->last = time((time_t *)0);
+    d->next = delays;
+    delays = d;
+}
+
 static void
 #if PROTOTYPES
 ReUp(GRPENT *pGE, short automatic)
@@ -913,6 +982,9 @@ ReUp(pGE, automatic)
     CONSENT *pCE;
     int autoReUp;
     time_t tyme;
+    short retry;
+    static short autoup = 0;
+    short wasAuto = 0;
 
     if ((GRPENT *)0 == pGE)
 	return;
@@ -924,19 +996,49 @@ ReUp(pGE, automatic)
 	(!config->reinitcheck || (tyme < timers[T_REINIT])))
 	return;
 
-    for (pCE = pGE->pCElist; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
-	if (pCE->fup || pCE->ondemand == FLAGTRUE ||
-	    (automatic == 1 && !pCE->autoReUp))
-	    continue;
-	autoReUp = pCE->autoReUp;
-	if (automatic)
-	    Msg("[%s] automatic reinitialization", pCE->server);
-	ConsInit(pCE);
-	if (pCE->fup)
-	    FindWrite(pCE);
-	else if (automatic)
-	    pCE->autoReUp = autoReUp;
-    }
+    if (automatic == -1)
+	wasAuto = autoup;
+    autoup = 0;
+
+    /* we loop here 'cause the init process could take a bit of time
+     * (depending on how many things we init in the run through the
+     * consoles) and we might be able to then initialize more stuff.
+     * we'll eventually run through too fast, run out of consoles, or
+     * have a big enough delay to go back to the main loop.
+     */
+    do {
+	retry = 0;
+	for (pCE = pGE->pCElist; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
+	    short updateDelay = 0;
+
+	    if (pCE->fup || pCE->ondemand == FLAGTRUE ||
+		(automatic == 1 && !pCE->autoReUp))
+		continue;
+	    if (config->initdelay > 0) {
+		time_t t;
+		if ((t = InitDelay(pCE)) > 0) {
+		    if (timers[T_INITDELAY] == (time_t)0 ||
+			timers[T_INITDELAY] > t)
+			timers[T_INITDELAY] = t;
+		    continue;
+		} else {
+		    updateDelay = retry = 1;
+		}
+	    }
+	    autoReUp = pCE->autoReUp;
+	    if (automatic > 0 || wasAuto) {
+		Msg("[%s] automatic reinitialization", pCE->server);
+		autoup = 1;
+	    }
+	    ConsInit(pCE);
+	    if (updateDelay)
+		UpdateDelay(pCE);
+	    if (pCE->fup)
+		FindWrite(pCE);
+	    else if (automatic > 0)
+		pCE->autoReUp = autoReUp;
+	}
+    } while (retry);
 
     /* update all the timers */
     if (automatic == 0 || automatic == 2) {
@@ -1255,7 +1357,7 @@ FlagReapVirt(sig)
 
 /* on a TERM we have to cleanup utmp entries (ask ptyd to do it)	(ksb)
  */
-static void
+void
 #if PROTOTYPES
 DeUtmp(GRPENT *pGE, int sfd)
 #else
@@ -2710,7 +2812,7 @@ DoClientRead(pGE, pCLServing)
 			"help         this help message\r\n",
 			"hosts        show host status and user\r\n",
 			"info         show console information\r\n",
-			"textmsg	  send a text message\r\n",
+			"textmsg      send a text message\r\n",
 			"* = requires admin privileges\r\n",
 			(char *)0
 		    };
@@ -4104,6 +4206,12 @@ Kiddie(pGE, sfd)
 	if (timers[T_MARK] != (time_t)0 &&
 	    time((time_t *)0) >= timers[T_MARK])
 	    Mark(pGE);
+
+	if (timers[T_INITDELAY] != (time_t)0 &&
+	    time((time_t *)0) >= timers[T_INITDELAY]) {
+	    timers[T_INITDELAY] = (time_t)0;
+	    ReUp(pGE, -1);
+	}
 
 	if (timers[T_REINIT] != (time_t)0 &&
 	    time((time_t *)0) >= timers[T_REINIT])

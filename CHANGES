@@ -1,6 +1,20 @@
 				CHANGES
 				=======
 
+version 8.1.5 (May 7, 2004):
+	- changed remaining O_NDELAY flags to O_NONBLOCK
+	- added PROTOCOLS file to describe the client/server protocol
+	- added '#include' capability to conserver.cf file
+	- added '@group' syntax to conserver.cf file to support use of
+	  system groups
+	- added -U client option to allow client to ask for encryption
+	  but fall back to non-encrypted connections otherwise -
+	  suggested by Mike Hendon <mike.hendon@uk.nomura.com>
+	- fixed bug where socket not properly deleted on exit - reported
+	  by William P LePera <lepera@us.ibm.com>
+	- added 'initdelay' option for throttling startup of consoles -
+	  suggested by Jay McCanta <mccantaj@amgen.com>
+
 version 8.1.4 (Apr 13, 2004):
 	- fixed macro use in manpages to hopefully be more compatible
 	- removed extra newline of --MARK-- range output
@@ -708,5 +722,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.167 2004/04/13 19:40:07 bryan Exp $
+#  $Id: CHANGES,v 1.174 2004/05/07 16:04:58 bryan Exp $
 #

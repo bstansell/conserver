@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.125 2004/04/13 18:12:00 bryan Exp $
+ *  $Id: master.c,v 5.126 2004/05/06 02:09:07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -571,6 +571,7 @@ DoNormalRead(pCLServing)
 		if ((GRPENT *)0 != pGroups) {
 #if USE_UNIX_DOMAIN_SOCKETS
 		    FilePrint(pCLServing->fd, FLAGTRUE, "@0");
+		    iSep = 0;
 #else
 		    struct sockaddr_in lcl;
 		    socklen_t so = sizeof(lcl);
@@ -582,23 +583,26 @@ DoNormalRead(pCLServing)
 				  -1);
 			Error("Master(): getsockname(%u): %s",
 			      FileFDNum(pCLServing->fd), strerror(errno));
-			Bye(EX_OSERR);
-		    }
-		    FilePrint(pCLServing->fd, FLAGTRUE, "@%s",
-			      inet_ntoa(lcl.sin_addr));
-#endif
-		    iSep = 0;
-		}
-		if (config->redirect == FLAGTRUE) {
-		    REMOTE *pRC;
-		    for (pRC = pRCUniq; (REMOTE *)0 != pRC;
-			 pRC = pRC->pRCuniq) {
-			FilePrint(pCLServing->fd, FLAGTRUE, ":@%s" + iSep,
-				  pRC->rhost);
+			iSep = -1;
+		    } else {
+			FilePrint(pCLServing->fd, FLAGTRUE, "@%s",
+				  inet_ntoa(lcl.sin_addr));
 			iSep = 0;
 		    }
+#endif
 		}
-		FileWrite(pCLServing->fd, FLAGFALSE, "\r\n", -1);
+		if (iSep >= 0) {
+		    if (config->redirect == FLAGTRUE) {
+			REMOTE *pRC;
+			for (pRC = pRCUniq; (REMOTE *)0 != pRC;
+			     pRC = pRC->pRCuniq) {
+			    FilePrint(pCLServing->fd, FLAGTRUE,
+				      ":@%s" + iSep, pRC->rhost);
+			    iSep = 0;
+			}
+		    }
+		    FileWrite(pCLServing->fd, FLAGFALSE, "\r\n", -1);
+		}
 	    } else if (pCLServing->iState == S_NORMAL &&
 		       strcmp(pcCmd, "pid") == 0) {
 		FilePrint(pCLServing->fd, FLAGFALSE, "%lu\r\n",

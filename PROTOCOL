@@ -1,0 +1,290 @@
+			   Conserver Protocol
+			   ==================
+
+
+What Is This?
+-------------
+
+The following is an attempt to describe the client/server protocol used
+between the server (conserver) and the client (console).  This document
+bases it's information on conserver version 8.1.4, as it's the release
+currently available.  If there are changes to the client/server
+protocol, the INSTALL file should reference them and, ideally, this
+document will be updated.
+
+The information is looked at from the point of the server, since it's
+the server that controls all information and triggers actions on the
+client (like a suspend).  The client's perspective should be obvious
+from this information.
+
+
+SSL
+---
+
+The client and server can negotiate an SSL connection.  As far as the
+code is concerned, the SSL "layer" is transparent.  Data is sent and
+received just as if it was unencrypted.  Therefore, aside bringing up
+the SSL connection, the SSL bits are unimportant from a protocol
+standpoint.  The client and server still send and receive the same
+information - it just happens to be encrypted to everyone else.
+
+
+"On-The-Wire" Data
+------------------
+
+The low-level, "on-the-wire" data is encapsulated similar to the telnet
+protocol.  All data is sent "as-is" with the exception of 0xFF.  0xFF is
+used as a "command character" and both the client and server expect to
+see a predefined option after it.  The possible options are: 0xFF, 'E',
+'G', 'Z', and '.'.
+
+The 0xFF option says to use the literal character 0xFF.  So, if there is
+a 0xFF character in the data stream to be sent, the code will send two
+0xFF characters (it's similar to using '\\' in C strings to embed a
+'\').
+
+The other options are used in various contexts, which will be described
+in detail below.
+
+
+Life As A Server
+----------------
+
+There are three different interfaces presented to clients by the server.
+I'm going to name the three modes "master", "group", and "console".  The
+first two are line-based, and the third is character-based.
+
+To understand the differences, I must outline how conserver manages
+consoles.  When conserver starts, it reads the configuration file,
+listens on the master socket, and, for each group of consoles it must
+manage (where the group size is set by -m), it forks off a copy of
+itself.  Those child processes are what actually connect to the consoles
+and they each listen on a new socket for client connections.  So, you
+end up with a parent process (that knows about all consoles) that
+manages the child processes (that know only about consoles it manages),
+and everyone is listening on an individual socket for connections from
+clients.
+
+The parent process interacts with clients in "master" mode.  That mode
+expects line-based commands and responds similarly.  Because it's the
+master, it understands a certain set of commands that are different than
+in "group" mode.
+
+The child processes interact with clients in "group" mode first, and
+negotiate a change to "console" mode when a client requests a connection
+to a specific console.
+
+
+"master" Mode
+-------------
+
+When parent process gets a connection from a client, it either sends an
+"ok" string to signal it's ready or an error message (like "access from
+your host is refused") and the connection is dropped.  At this point,
+there are a small number of commands recognized by the server, since
+most are restricted to "logged in" clients.  Here's the list of
+available commands:
+
+    exit   disconnect
+    help   this help message
+    login  log in
+    ssl    start ssl session
+
+An "exit" is sent a "goodbye" response and the connection is dropped.  A
+"help" is sent the list above.  A "ssl" is sent an "ok" response and
+then the server expects the client to negotiate an ssl connection.  A
+"login" requires one argument (the username) and is either sent an "ok",
+meaning the client is logged in, or a "passwd?" followed by the local
+hostname, asking for the user's password, which it expects next.  If the
+client sends a valid password, an "ok" is sent, otherwise an error
+message and the connection is dropped.
+
+Upon successful login, the commands available are:
+
+    call      provide port for given console
+    exit      disconnect
+    groups    provide ports for group leaders
+    help      this help message
+    master    provide a list of master servers
+    pid       provide pid of master process
+    quit*     terminate conserver (SIGTERM)
+    restart*  restart conserver (SIGHUP)
+    version   provide version info for server
+    * = requires admin privileges
+
+"exit" and "help" are the same as before the client logged login.
+
+The "call" command expects one argument, the console name to connect to.
+The server will respond with either a port number (if it's a locally
+managed console), an "@hostname" where hostname is the name of the
+remote conserver host managing the console (if it's a remotely managed
+console), or an error message (possibly multi-line).  The client is not
+disconnected, whatever the response.
+
+The "groups" command responds with a colon-separated list of port
+numbers, which correspond to each of the child processes running on the
+local host.  The client is not disconnected.
+
+The "master" command responds with a colon-separated list of "@hostname"
+names.  The list includes any hosts (including the possibility of the
+local host) which have locally managed consoles.  The client is not
+disconnected.
+
+The "pid" command responds with the pid of the master process (in this
+case, the one the client is talking to).  The client is not
+disconnected.
+
+The "quit" command will shut down conserver, assuming the user has
+administrative access.  It responds with a message starting with "ok" if
+successful, and an error message otherwise (like "unauthorized
+command").  The client is disconnected if it's successful.
+
+The "restart" command will shut down conserver, assuming the user has
+administrative access.  It responds with a message starting with "ok" if
+successful, and an error message otherwise (like "unauthorized
+command").  The client is not disconnected.
+
+The "version" command responds with the version string.  The client is
+not disconnected.
+
+
+"group" Mode
+------------
+
+When a child process gets a connection from a client, it either sends an
+"ok" string to signal it's ready or an error message (like "access from
+your host is refused") and the connection is dropped.  At this point,
+"group" mode acts just like "master" mode.  Once the client successfully
+logs in, however, "group" mode has the recognizes the following
+commands:
+
+    broadcast    send broadcast message
+    call         connect to given console
+    disconnect*  disconnect the given user(s)
+    examine      examine port and baud rates
+    exit         disconnect
+    group        show users in this group
+    help         this help message
+    hosts        show host status and user
+    info         show console information
+    textmsg      send a text message
+    * = requires admin privileges
+
+The "exit" and "help" commands are like the others documented above.
+
+The "broadcast" command expects a text string of the message to be sent
+to all users connected to this process.  An "ok" is sent as a response.
+
+The "call" command expects one argument, the console name to connect to,
+just like in "master" mode.  The difference here is that this requests
+the server to attach the client to the console and go into "console"
+mode.  If the attachment is successful, the response will begin with a
+'[' character.  If not, an error message is returned.  The success
+responses are:
+
+    [console is read-only]	 - console is read only
+    [read-only -- initializing]	 - console is initializing, and
+				   read-only for the time being
+    [line to console is down]	 - console is down
+    [attached]			 - attached read-write
+    [spy]			 - attached read-only
+
+
+The "disconnect" command expects an argument of the form "user@console"
+where either the "user" or "@console" part may be omitted.  Upon
+success, a response of the form "ok -- disconnected X users" is sent,
+where X is the number of users disconnected.  If a user is unauthorized
+or some other problem occurs, an error message (like "unauthorized
+command") is sent.
+
+The "examine" command returns a list of console information of the form
+that 'console -x' shows.
+
+The "group" command returns a list of console information of the form
+that 'console -w' shows.
+
+The "hosts" command returns a list of console information of the form
+that 'console -u' shows.
+
+The "info" command returns a list of console information of the form
+that 'console -i' shows.
+
+The "textmsg" command expects two arguments, the first being the
+recipient of the message in the form "user@console" (again, where the
+"user" or "@console" portion may be omitted) and the second being the
+string, like the "broadcast" command.  The server returns "ok".
+
+
+"console" Mode
+--------------
+
+As mentioned above, "console" mode is obtained by using the "call"
+command when connected to a child processes operating in "group" mode.
+
+"console" mode should look very familiar to a user of conserver, as it's
+what the user interacts with when connected to a console.  There's
+really nothings special here.  Each character received from the client
+is compared to the escape sequence, and if it matches, an action occurs
+on the server side.  If it doesn't match the escape sequence, the data
+is sent on to the console.  All data received from the console is sent
+to the client(s).  Of course, there are certain exceptions to these
+rules, based on the state of the console and the state of the client.
+And, certain escape sequences cause special behaviors to occur.
+
+Most escape sequences cause the server to send information back to the
+user.  Stuff like "^Ecw", "^Eci", and "^Ecu" are examples.  The escape
+sequence is absorbed by the server, the server sends the client a
+variety of information, and things continue as before.
+
+The more "interesting" escape sequences are the following.
+
+"^Ec;"  The server sends a 0xFF,'G' command sequence to the client, to
+	signal a wish to move to a new console.  The client then gets
+	put into the same state as the "^Ecz" sequence (paused), which
+	gives the client a chance to either resume the connection or
+	disconnect.
+
+"^Ec|"  The server sends a 0xFF,'E' command sequence to the client, to
+	signal a wish to have the client program interact with a
+	program, as opposed to the user.  The server discards all data
+	until it receives one of the following command sequences from
+	the client:
+
+	    0xFF,'E'	Signals successful redirection of interaction to
+			a program.  The server then responds with "[rw]"
+			or "[ro]" to tell the client whether or not they
+			have read-write access.  If not, the client
+			should abort the program and send the abort
+			command sequence below, as other data received by
+			the server will just get dropped.
+
+	    0xFF,'.'	Abort the operation.  The server assumes the
+			redirection didn't happen and returns the client
+			to it's normal mode.
+
+	The server keeps the client in the "redirected" state until it
+	receives a 0xFF,'.' command sequence from the client (which
+	usually occurs when the client command terminates).
+
+	If the client is "bumped" from read-write to read-only by
+	another user, the server will send the client a 0xFF,'.' command
+	sequence to tell it to abort the redirection and return control
+	back to the user.
+
+"^Ecz"  The server sends a 0xFF,'Z' command sequence to the client, to
+	signal a wish to suspend to client process.  The client is then
+	put into a "paused" state where it receives no more data from
+	the server.  When the client is ready to resume receiving data,
+	it sends a character of data to the server, at which point the
+	server discards the character and sends back a status message of
+	the form " -- MSG]".  The current set of possible messages are:
+
+	    " -- line down]"
+	    " -- read-only]"
+	    " -- attached (nologging)]"
+	    " -- attached]"
+	    " -- spy mode]"
+
+#
+#  $Id: PROTOCOL,v 1.1 2004/04/16 16:50:55 bryan Exp $
+#

@@ -1,11 +1,11 @@
-.\" $Id: console.man,v 1.46 2004/03/23 18:32:09 bryan Exp $
-.TH CONSOLE 1 "2004/03/23" "conserver-8.1.4" "conserver"
+.\" $Id: console.man,v 1.48 2004/04/20 01:30:13 bryan Exp $
+.TH CONSOLE 1 "2004/04/20" "conserver-8.1.5" "conserver"
 .SH NAME
 console \- console server client program
 .SH SYNOPSIS
 .B console
-.RB [ \-aAEfFsS ]
-.RB [ \-7Dv ]
+.RB [ \-aAfFsS ]
+.RB [ \-7DEUv ]
 .RB [ \-c
 .IR cred ]
 .BR [ \-M
@@ -20,7 +20,9 @@ console \- console server client program
 .br
 .B console
 .RB [ \-hiIPrRuVwWx ]
-.RB [ \-7Dv ]
+.RB [ \-7DEUv ]
+.RB [ \-c
+.IR cred ]
 .RB [ \-M
 .IR mach ]
 .RB [ \-p
@@ -35,7 +37,9 @@ console \- console server client program
 .br
 .B console
 .RB [ \-qQ ]
-.RB [ \-7Dv ]
+.RB [ \-7DEUv ]
+.RB [ \-c
+.IR cred ]
 .RB [ \-M
 .IR mach ]
 .RB [ \-p
@@ -150,9 +154,13 @@ The default value is
 .B \-E
 If encryption has been built into the code
 .RB ( --with-openssl ),
-encrypted client connections are a requirement.
-This option allows the client to connect to a console
-over a non-encrypted connection.
+encrypted client connections are, by default, a requirement.
+This option disables any attempt at creating an
+encrypted connection.
+If you'd like to use encrypted connections when your server
+supports it, but fallback to non-encrypted otherwise, the
+.B \-U
+option is what you want.
 .TP
 .B \-f
 Same as
@@ -264,6 +272,18 @@ and attached users
 .RI ( user @ host
 if attached read-write, `<spies>' if only users in spy mode, or `<none>').
 .TP
+.B \-U
+If encryption has been built into the code
+.RB ( --with-openssl ),
+encrypted client connections are, by default, a requirement.
+This option allows the client to attempt an encrypted connection
+but fall back to a non-encrypted connection if the server doesn't
+support encryption.
+If the encryption handshake is failing, disabling encryption on the
+client with the
+.B \-E
+option is probably what you want.
+.TP
 .B \-v
 Be more verbose when building the connection(s).
 Use this option in combination with any of `show' options (below)
@@ -297,7 +317,7 @@ The
 options have the same effect as their lower-case variants.
 In addition, they each request the last 20 lines of the console output after
 making the connection (as if
-.RB ` ^Ecr '
+.RB `` ^Ecr ''
 were typed).
 .PP
 The
@@ -349,7 +369,7 @@ that the server can open the file for read, but not write.
 The details regarding the logging for the console.
 The comma-separated
 values will be the logfile, ``log'' or ``nolog'' (if logging is on
-or not - toggled via ^EcL), ``act'' or ``noact'' (if activity logging is
+or not - toggled via ``^EcL''), ``act'' or ``noact'' (if activity logging is
 enabled or not - the `a' timestamp option), the timestamp interval, and
 the file descriptor of the logfile.
 .TP
@@ -493,12 +513,16 @@ In the
 output, the login ``<none>'' indicates no one is
 viewing that console, and the login ``<spies>'' indicates that
 no one has a full two-way attachment.
-When no one is attached to
-a console its output is cloned to the stdout of the server process if
-.B conserver
-was started with the
-.B \-u
-option.
+.PP
+When running a local command via
+.RB `` ^Ec| '',
+you can type 
+.B ^C
+to send the command a SIGHUP,
+.B ^\e
+to send the command a SIGKILL, and
+.B o
+to toggle the display of the console data.
 .SH EXAMPLES
 .TP 15
 console \-u

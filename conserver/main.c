@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.179 2004/04/13 18:12:00 bryan Exp $
+ *  $Id: main.c,v 5.180 2004/05/07 03:42:49 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -65,8 +65,7 @@ CONFIG *config = (CONFIG *)0;
 char *interface = (char *)0;
 CONFIG defConfig =
     { (STRING *)0, 'r', FLAGFALSE, LOGFILEPATH, PASSWDFILE, DEFPORT,
-    FLAGTRUE,
-    FLAGTRUE, 0, DEFBASEPORT, (char *)0
+    FLAGTRUE, FLAGTRUE, 0, DEFBASEPORT, (char *)0, 0
 #if HAVE_SETPROCTITLE
 	, FLAGFALSE
 #endif
@@ -1663,6 +1662,14 @@ main(argc, argv)
 	if (config->unifiedlog == (char *)0)
 	    OutOfMem();
     }
+
+    if (optConf->initdelay != 0)
+	config->initdelay = optConf->initdelay;
+    else if (pConfig->initdelay != 0)
+	config->initdelay = pConfig->initdelay;
+    else
+	config->initdelay = defConfig.initdelay;
+
 #if HAVE_OPENSSL
     if (optConf->sslrequired != FLAGUNKNOWN)
 	config->sslrequired = optConf->sslrequired;

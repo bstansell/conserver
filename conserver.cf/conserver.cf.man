@@ -1,5 +1,5 @@
-.\" $Id: conserver.cf.man,v 1.61 2004/03/26 13:03:01 bryan Exp $
-.TH CONSERVER.CF 5 "2004/03/26" "conserver-8.1.4" "conserver"
+.\" $Id: conserver.cf.man,v 1.63 2004/05/07 03:42:51 bryan Exp $
+.TH CONSERVER.CF 5 "2004/05/07" "conserver-8.1.5" "conserver"
 .SH NAME
 conserver.cf \- console configuration file for
 .BR conserver (8)
@@ -107,6 +107,24 @@ of things, we have:
 "defa"ult my\e defs { rw *; in\eclude "other defs"  ; }
 .fi
 .ft
+.PP
+There is one special line the parser recognizes: a ``#include'' statement.
+It is of the form:
+.IP
+.B #include
+.I filename
+.PP
+Any whitespace around
+.I filename
+is ignored, but whitespace embedded inside is preserved.
+Everything in
+.I filename
+is taken literally, so none of the normal parser quoting applies.
+The
+.B #include
+must begin in ``column 0'' - no whitespace is allowed between it and
+the start of the physical line.
+There is an include file depth limit of 10 to prevent infinite recursion.
 .SH BLOCKS
 .TP 8
 .B access
@@ -132,7 +150,18 @@ If
 matches a previously defined group name, all members of the previous
 group are applied to the admin list (with access reversed if prefixed
 with a `!').
-Otherwise, users will be granted (or denied if prefixed with `!') access.
+If
+.I username
+doesn't match a previously defined group and
+.I username
+begins with `@', the name (minus the `@') is checked against the
+host's group database.
+All users found in the group will be granted (or denied, if prefixed
+with `!') access.
+If
+.I username
+doesn't match a previous group and doesn't begin with `@', the users
+will be granted (or denied, if prefixed with `!') access.
 If the null string (``""'') is used, any
 users previously defined for the console servers's admin list are removed.
 .TP
@@ -280,6 +309,33 @@ command-line flag).
 Set whether or not to become a daemon when run (see the
 .B \-d
 command-line flag).
+.TP
+.B initdelay
+.I number
+.br
+Set the number of seconds between console initializations.
+All consoles with the same
+.B host
+value will be throttled as a group (those without a
+.B host
+value are their own group).
+In other words, each console within a group will only be initialized after
+.I number
+seconds passes from the previous initialization of a console in that group.
+Different throttle groups are initialized simultaneously.
+One warning: since consoles are split up and managed by seperate conserver
+processes, it's possible for more than one conserver process to
+have a throttle group based on a particular
+.B host
+value.
+If this happens, each conserver process will throttle their groups 
+independently of the other conserver processes, which results in a
+more rapid initialization (per
+.B host
+value) than one might otherwise expect.
+If
+.I number
+is zero, all consoles are initialized without delay.
 .TP
 .B logfile
 .I filename
@@ -882,8 +938,18 @@ If
 matches a previously defined group name, all members of the previous
 group are applied to the read-only access list (with access reversed
 if prefixed with a `!').
-Otherwise, users will be granted (or denied if prefixed with `!')
-read-only access.
+If
+.I username
+doesn't match a previously defined group and
+.I username
+begins with `@', the name (minus the `@') is checked against the
+host's group database.
+All users found in the group will be granted (or denied, if prefixed
+with `!') read-only access.
+If
+.I username
+doesn't match a previous group and doesn't begin with `@', the users
+will be granted (or denied, if prefixed with `!') read-only access.
 If the null string (``""'') is used, any
 users previously defined for the console's read-only list are removed.
 .TP
@@ -898,8 +964,18 @@ If
 matches a previously defined group name, all members of the previous
 group are applied to the read-write access list (with access reversed
 if prefixed with a `!').
-Otherwise, users will be granted (or denied if prefixed with `!')
-read-write access.
+If
+.I username
+doesn't match a previously defined group and
+.I username
+begins with `@', the name (minus the `@') is checked against the
+host's group database.
+All users found in the group will be granted (or denied, if prefixed
+with `!') read-write access.
+If
+.I username
+doesn't match a previous group and doesn't begin with `@', the users
+will be granted (or denied, if prefixed with `!') read-write access.
 If the null string (``""'') is used, any
 users previously defined for the console's read-write list are removed.
 .TP
@@ -976,8 +1052,18 @@ If
 matches a previously defined group name, all members of the previous
 group are applied to the current group (with access reversed
 if prefixed with a `!').
-Otherwise, users will be recorded with (or without if prefixed with `!')
-access.
+If
+.I username
+doesn't match a previously defined group and
+.I username
+begins with `@', the name (minus the `@') is checked against the
+host's group database.
+All users found in the group will be recorded with (or without, if prefixed
+with `!') access.
+If
+.I username
+doesn't match a previous group and doesn't begin with `@', the users
+will be recorded with (or without, if prefixed with `!') access.
 If the null string (``""'') is used, any
 users previously defined for this group are removed.
 .RE

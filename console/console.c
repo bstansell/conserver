@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.162 2004/04/13 18:12:03 bryan Exp $
+ *  $Id: console.c,v 5.164 2004/04/20 01:30:13 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -42,8 +42,10 @@
 
 
 int fReplay = 0, fVersion = 0, fStrip = 0;
+int showExecData = 1;
 #if HAVE_OPENSSL
 int fReqEncryption = 1;
+int fAllowUnencrypted = 0;
 char *pcCredFile = (char *)0;
 #endif
 int chAttn = -1, chEsc = -1;
@@ -217,6 +219,11 @@ Usage(wantfull)
 	"s(S)    spy on a console (and replay)",
 	"t       send a text message to [user][@console]",
 	"u       show users on the various consoles",
+#if HAVE_OPENSSL
+	"U       allow unencrypted connections if SSL not available",
+#else
+	"U       ignored - encryption not compiled into code",
+#endif
 	"v       be more verbose",
 	"V       show version information",
 	"w(W)    show who is on which console (on master)",
@@ -225,12 +232,13 @@ Usage(wantfull)
     };
 
     fprintf(stderr,
-	    "usage: %s [-aAEfFsS] [-7Dv] [-c cred] [-M mach] [-p port] [-e esc] [-l username] console\n",
+	    "usage: %s [-aAfFsS] [-7DEUv] [-c cred] [-M mach] [-p port] [-e esc] [-l username] console\n",
 	    progname);
     fprintf(stderr,
-	    "usage: %s [-hiIPrRuVwWx] [-7Dv] [-M mach] [-p port] [-d [user][@console]] [-[bB] message] [-t [user][@console] message]\n",
+	    "       %s [-hiIPrRuVwWx] [-7DEUv] [-c cred] [-M mach] [-p port] [-d [user][@console]] [-[bB] message] [-t [user][@console] message]\n",
 	    progname);
-    fprintf(stderr, "usage: %s [-qQ] [-7Dv] [-M mach] [-p port]\n",
+    fprintf(stderr,
+	    "       %s [-qQ] [-7DEUv] [-c cred] [-M mach] [-p port]\n",
 	    progname);
 
     if (wantfull) {
@@ -889,6 +897,7 @@ DoExec(pcf)
     CONSFILE *pcf;
 #endif
 {
+    showExecData = 1;
     FileWrite(cfstdout, FLAGFALSE, "exec: ", 6);
 
     GetUserInput(execCmd);
@@ -1086,10 +1095,12 @@ Interact(pcf, pcMach)
 		    for (i = 0; i < l; ++i)
 			acMesg[i] &= 127;
 		}
-		FileWrite(cfstdout, FLAGFALSE, acMesg, l);
 		if (execCmdFile != (CONSFILE *)0) {
 		    FileWrite(execCmdFile, FLAGFALSE, acMesg, l);
-		}
+		    if (showExecData)
+			FileWrite(cfstdout, FLAGFALSE, acMesg, l);
+		} else
+		    FileWrite(cfstdout, FLAGFALSE, acMesg, l);
 		nc -= l;
 		MemMove(acMesg, acMesg + l, nc);
 	    }
@@ -1133,6 +1144,11 @@ Interact(pcf, pcMach)
 			FilePrint(cfstdout, FLAGFALSE,
 				  "[local command sent SIGKILL - pid %lu]\r\n",
 				  execCmdPid);
+		    } else if (acMesg[i] == 'o' || acMesg[i] == 'O') {
+			showExecData = !showExecData;
+			FilePrint(cfstdout, FLAGFALSE,
+				  "[local command data %s]\r\n",
+				  showExecData ? "on" : "off");
 		    }
 		}
 	    }
@@ -1375,8 +1391,13 @@ DoCmds(master, pports, cmdi)
 	    t = ReadReply(pcf, 0);
 	    if (strcmp(t, "ok\r\n") == 0) {
 		AttemptSSL(pcf);
-	    }
-	    if (FileGetType(pcf) != SSLSocket) {
+		if (FileGetType(pcf) != SSLSocket) {
+		    Error("Encryption not supported by server `%s'",
+			  serverName);
+		    FileClose(&pcf);
+		    continue;
+		}
+	    } else if (fAllowUnencrypted == 0) {
 		Error("Encryption not supported by server `%s'",
 		      serverName);
 		FileClose(&pcf);
@@ -1569,7 +1590,7 @@ main(argc, argv)
     int opt;
     int fLocal;
     static STRING *acPorts = (STRING *)0;
-    static char acOpts[] = "7aAb:B:c:d:De:EfFhiIl:M:p:PqQrRsSt:uvVwWx";
+    static char acOpts[] = "7aAb:B:c:d:De:EfFhiIl:M:p:PqQrRsSt:uUvVwWx";
     extern int optind;
     extern int optopt;
     extern char *optarg;
@@ -1712,6 +1733,12 @@ main(argc, argv)
 		BuildString("textmsg ", textMsg);
 		BuildString(optarg, textMsg);
 		pcCmd = textMsg->string;
+		break;
+
+	    case 'U':
+#if HAVE_OPENSSL
+		fAllowUnencrypted = 1;
+#endif
 		break;
 
 	    case 'u':

@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.137 2004/02/20 14:58:13 bryan Exp $
+ *  $Id: consent.c,v 5.138 2004/04/16 16:58:09 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -817,7 +817,7 @@ ConsInit(pCE)
 	    break;
 	case DEVICE:
 	    if (-1 ==
-		(cofile = open(pCE->device, O_RDWR | O_NDELAY, 0600))) {
+		(cofile = open(pCE->device, O_RDWR | O_NONBLOCK, 0600))) {
 
 		Error("[%s] open(%s): %s: forcing down", pCE->server,
 		      pCE->device, strerror(errno));

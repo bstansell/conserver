@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.169 2004/04/13 18:12:01 bryan Exp $
+ *  $Id: readcfg.c,v 5.173 2004/05/07 03:42:49 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -24,6 +24,8 @@
  */
 
 #include <compat.h>
+
+#include <grp.h>
 
 #include <cutil.h>
 #include <consent.h>
@@ -530,14 +532,26 @@ GroupItemUsers(id)
 
     for (token = strtok(id, ALLWORDSEP); token != (char *)0;
 	 token = strtok(NULL, ALLWORDSEP)) {
-	int not;
+	short not;
 	if (token[0] == '!') {
 	    token++;
 	    not = 1;
 	} else
 	    not = 0;
 	if ((pg = GroupFind(token)) == (PARSERGROUP *)0) {
-	    GroupAddUser(parserGroupTemp, token, not);
+	    if (token[0] == '@' && token[1] != '\000') {
+		struct group *g;
+		if ((g = getgrnam(token + 1)) == (struct group *)0) {
+		    if (isMaster)
+			Error("unknown group name `%s': %s [%s:%d]",
+			      token + 1, strerror(errno), file, line);
+		} else if (g->gr_mem != (char **)0) {
+		    char **m;
+		    for (m = g->gr_mem; *m != (char *)0; m++)
+			GroupAddUser(parserGroupTemp, *m, not);
+		}
+	    } else
+		GroupAddUser(parserGroupTemp, token, not);
 	} else {
 	    PARSERGROUPUSERS *pgu;
 	    for (pgu = pg->users; pgu != (PARSERGROUPUSERS *)0;
@@ -1946,7 +1960,19 @@ ProcessRoRw(ppCU, id)
 	} else
 	    not = 0;
 	if ((pg = GroupFind(token)) == (PARSERGROUP *)0) {
-	    ConsentAddUser(ppCU, token, not);
+	    if (token[0] == '@' && token[1] != '\000') {
+		struct group *g;
+		if ((g = getgrnam(token + 1)) == (struct group *)0) {
+		    if (isMaster)
+			Error("unknown group name `%s': %s [%s:%d]",
+			      token + 1, strerror(errno), file, line);
+		} else if (g->gr_mem != (char **)0) {
+		    char **m;
+		    for (m = g->gr_mem; *m != (char *)0; m++)
+			ConsentAddUser(ppCU, *m, not);
+		}
+	    } else
+		ConsentAddUser(ppCU, token, not);
 	} else {
 	    PARSERGROUPUSERS *pgu;
 	    for (pgu = pg->users; pgu != (PARSERGROUPUSERS *)0;
@@ -3088,7 +3114,7 @@ ConsoleDestroy()
     parserConsoles = parserConsoleTemp = (CONSENT *)0;
 
     /* here we check on the client permissions and adjust accordingly */
-    if (!isMaster) {
+    if (!isMaster && pGroups != (GRPENT *)0) {
 	CONSENT *pCE = (CONSENT *)0;
 	CONSCLIENT *pCL = (CONSCLIENT *)0;
 	CONSCLIENT *pCLnext = (CONSCLIENT *)0;
@@ -4081,6 +4107,8 @@ ConfigEnd()
 		pConfig->loghostnames = parserConfigTemp->loghostnames;
 	    if (parserConfigTemp->reinitcheck != 0)
 		pConfig->reinitcheck = parserConfigTemp->reinitcheck;
+	    if (parserConfigTemp->initdelay != 0)
+		pConfig->initdelay = parserConfigTemp->initdelay;
 	    if (parserConfigTemp->secondaryport != (char *)0) {
 		if (pConfig->secondaryport != (char *)0)
 		    free(pConfig->secondaryport);
@@ -4337,6 +4365,36 @@ ConfigItemReinitcheck(id)
 
 void
 #if PROTOTYPES
+ConfigItemInitdelay(char *id)
+#else
+ConfigItemInitdelay(id)
+    char *id;
+#endif
+{
+    char *p;
+
+    CONDDEBUG((1, "ConfigItemInitdelay(%s) [%s:%d]", id, file, line));
+
+    if ((id == (char *)0) || (*id == '\000')) {
+	parserConfigTemp->initdelay = 0;
+	return;
+    }
+
+    for (p = id; *p != '\000'; p++)
+	if (!isdigit((int)(*p)))
+	    break;
+
+    /* if it wasn't a number or the number was zero */
+    if (*p != '\000') {
+	if (isMaster)
+	    Error("invalid initdelay value `%s' [%s:%d]", id, file, line);
+	return;
+    }
+    parserConfigTemp->initdelay = atoi(id);
+}
+
+void
+#if PROTOTYPES
 ConfigItemSecondaryport(char *id)
 #else
 ConfigItemSecondaryport(id)
@@ -4508,6 +4566,7 @@ ITEM keyAccess[] = {
 ITEM keyConfig[] = {
     {"defaultaccess", ConfigItemDefaultaccess},
     {"daemonmode", ConfigItemDaemonmode},
+    {"initdelay", ConfigItemInitdelay},
     {"logfile", ConfigItemLogfile},
     {"loghostnames", ConfigItemLoghostnames},
     {"passwdfile", ConfigItemPasswordfile},
@@ -4575,7 +4634,8 @@ typedef enum tokens {
     LEFTBRACE,
     RIGHTBRACE,
     SEMICOLON,
-    WORD
+    WORD,
+    INCLUDE
 } TOKEN;
 
 TOKEN
@@ -4595,14 +4655,60 @@ GetWord(fp, line, spaceok, word)
     short comment = 0;
     short sawQuote = 0;
     short quotedBackslash = 0;
+    char *include = "include";
+    short checkInc = -1;
+    /* checkInc == -3, saw #include
+     *          == -2, saw nothin'
+     *          == -1, saw \n or start of file
+     *          == 0, saw "\n#"
+     */
 
     BuildString((char *)0, word);
     while ((c = fgetc(fp)) != EOF) {
-	if (c == '\n')
+	if (c == '\n') {
 	    (*line)++;
+	    if (checkInc == -2)
+		checkInc = -1;
+	}
 	if (comment) {
 	    if (c == '\n')
 		comment = 0;
+	    if (checkInc >= 0) {
+		if (include[checkInc] == '\000') {
+		    if (isspace(c))
+			checkInc = -3;
+		} else if (c == include[checkInc])
+		    checkInc++;
+		else
+		    checkInc = -2;
+	    } else if (checkInc == -3) {
+		static STRING *fname = (STRING *)0;
+		if (fname == (STRING *)0)
+		    fname = AllocString();
+		if (fname->used != 0 || !isspace(c)) {
+		    if (c == '\n') {
+			if (fname->used > 0) {
+			    while (fname->used > 1 && isspace((int)
+							      (fname->
+							       string
+							       [fname->
+								used -
+								2])))
+				fname->used--;
+			    if (fname->used > 0)
+				fname->string[fname->used - 1] = '\000';
+			}
+			checkInc = -2;
+			if (fname->used > 0) {
+			    BuildString((char *)0, word);
+			    BuildString(fname->string, word);
+			    BuildString((char *)0, fname);
+			    return INCLUDE;
+			}
+		    } else
+			BuildStringChar(c, fname);
+		}
+	    }
 	    continue;
 	}
 	if (backslash) {
@@ -4633,6 +4739,8 @@ GetWord(fp, line, spaceok, word)
 	    backslash = 1;
 	} else if (c == '#') {
 	    comment = 1;
+	    if (checkInc == -1)
+		checkInc = 0;
 	} else if (c == '"') {
 	    quote = 1;
 	    sawQuote = 1;
@@ -4691,6 +4799,282 @@ GetWord(fp, line, spaceok, word)
 
 void
 #if PROTOTYPES
+ParseFile(char *filename, FILE *fp, int level)
+#else
+ParseFile(filename, fp, level)
+    char *filename;
+    FILE *fp;
+    int level;
+#endif
+{
+    /* things that should be used between recursions */
+    static STATES state = START;
+    static STRING *word = (STRING *)0;
+    static short spaceok = 0;
+    static int secIndex = 0;
+    static int keyIndex = 0;
+
+    /* other stuff that's local to each recursion */
+    char *p;
+    TOKEN token = DONE;
+    int nextline = 1;		/* "next" line number */
+
+    if (level >= 10) {
+	if (isMaster)
+	    Error("ParseFile(): nesting too deep, not parsing `%s'",
+		  filename);
+	return;
+    }
+
+    /* set some globals */
+    line = 1;
+    file = filename;
+
+    /* if we're parsing the base file, set static vars */
+    if (level == 0) {
+	state = START;
+	spaceok = 0;
+	secIndex = 0;
+	keyIndex = 0;
+    }
+
+    /* initialize local things */
+    if (word == (STRING *)0)
+	word = AllocString();
+
+    while ((token = GetWord(fp, &nextline, spaceok, word)) != DONE) {
+	if (token == INCLUDE) {
+	    FILE *lfp;
+	    if ((FILE *)0 == (lfp = fopen(word->string, "r"))) {
+		if (isMaster)
+		    Error("ParseFile(): fopen(%s): %s", word->string,
+			  strerror(errno));
+	    } else {
+		char *fname;
+		/* word gets destroyed, so save the name */
+		fname = StrDup(word->string);
+		ParseFile(fname, lfp, level + 1);
+		fclose(lfp);
+		free(fname);
+	    }
+	} else {
+	    switch (state) {
+		case START:
+		    switch (token) {
+			case WORD:
+			    for (secIndex = 0;
+				 (p = sections[secIndex].id) != (char *)0;
+				 secIndex++) {
+				if (strcasecmp(word->string, p) == 0) {
+				    CONDDEBUG((1,
+					       "ReadCfg(): got keyword '%s' [%s:%d]",
+					       word->string, file, line));
+				    state = NAME;
+				    break;
+				}
+			    }
+			    if (state == START) {
+				if (isMaster)
+				    Error("invalid keyword '%s' [%s:%d]",
+					  word->string, file, line);
+			    }
+			    break;
+			case LEFTBRACE:
+			case RIGHTBRACE:
+			case SEMICOLON:
+			    if (isMaster)
+				Error("invalid token '%s' [%s:%d]",
+				      word->string, file, line);
+			    break;
+			case DONE:	/* just shutting up gcc */
+			case INCLUDE:	/* just shutting up gcc */
+			    break;
+		    }
+		    break;
+		case NAME:
+		    switch (token) {
+			case WORD:
+			    (*sections[secIndex].begin) (word->string);
+			    state = LEFTB;
+			    break;
+			case RIGHTBRACE:
+			    if (isMaster)
+				Error("premature token '%s' [%s:%d]",
+				      word->string, file, line);
+			    state = START;
+			    break;
+			case LEFTBRACE:
+			case SEMICOLON:
+			    if (isMaster)
+				Error("invalid token '%s' [%s:%d]",
+				      word->string, file, line);
+			    break;
+			case DONE:	/* just shutting up gcc */
+			case INCLUDE:	/* just shutting up gcc */
+			    break;
+		    }
+		    break;
+		case LEFTB:
+		    switch (token) {
+			case LEFTBRACE:
+			    state = KEY;
+			    break;
+			case RIGHTBRACE:
+			    if (isMaster)
+				Error("premature token '%s' [%s:%d]",
+				      word->string, file, line);
+			    (*sections[secIndex].abort) ();
+			    state = START;
+			    break;
+			case SEMICOLON:
+			    if (isMaster)
+				Error("invalid token '%s' [%s:%d]",
+				      word->string, file, line);
+			    break;
+			case WORD:
+			    if (isMaster)
+				Error("invalid word '%s' [%s:%d]",
+				      word->string, file, line);
+			    break;
+			case DONE:	/* just shutting up gcc */
+			case INCLUDE:	/* just shutting up gcc */
+			    break;
+		    }
+		    break;
+		case KEY:
+		    switch (token) {
+			case WORD:
+			    for (keyIndex = 0;
+				 (p =
+				  sections[secIndex].items[keyIndex].id) !=
+				 (char *)0; keyIndex++) {
+				if (strcasecmp(word->string, p) == 0) {
+				    CONDDEBUG((1,
+					       "got keyword '%s' [%s:%d]",
+					       word->string, file, line));
+				    state = VALUE;
+				    break;
+				}
+			    }
+			    if (state == KEY) {
+				if (isMaster)
+				    Error("invalid keyword '%s' [%s:%d]",
+					  word->string, file, line);
+			    }
+			    break;
+			case RIGHTBRACE:
+			    (*sections[secIndex].end) ();
+			    state = START;
+			    break;
+			case LEFTBRACE:
+			    if (isMaster)
+				Error("invalid token '%s' [%s:%d]",
+				      word->string, file, line);
+			    break;
+			case SEMICOLON:
+			    if (isMaster)
+				Error("premature token '%s' [%s:%d]",
+				      word->string, file, line);
+			case DONE:	/* just shutting up gcc */
+			case INCLUDE:	/* just shutting up gcc */
+			    break;
+		    }
+		    break;
+		case VALUE:
+		    switch (token) {
+			case WORD:
+			    (*sections[secIndex].items[keyIndex].
+			     reg) (word->string);
+			    state = SEMI;
+			    break;
+			case SEMICOLON:
+			    if (isMaster)
+				Error("invalid token '%s' [%s:%d]",
+				      word->string, file, line);
+			    state = KEY;
+			    break;
+			case RIGHTBRACE:
+			    if (isMaster)
+				Error("premature token '%s' [%s:%d]",
+				      word->string, file, line);
+			    (*sections[secIndex].abort) ();
+			    state = START;
+			    break;
+			case LEFTBRACE:
+			    if (isMaster)
+				Error("invalid token '%s' [%s:%d]",
+				      word->string, file, line);
+			    break;
+			case DONE:	/* just shutting up gcc */
+			case INCLUDE:	/* just shutting up gcc */
+			    break;
+		    }
+		    break;
+		case SEMI:
+		    switch (token) {
+			case SEMICOLON:
+			    state = KEY;
+			    break;
+			case RIGHTBRACE:
+			    if (isMaster)
+				Error("premature token '%s' [%s:%d]",
+				      word->string, file, line);
+			    (*sections[secIndex].abort) ();
+			    state = START;
+			    break;
+			case LEFTBRACE:
+			    if (isMaster)
+				Error("invalid token '%s' [%s:%d]",
+				      word->string, file, line);
+			    break;
+			case WORD:
+			    if (isMaster)
+				Error("invalid word '%s' [%s:%d]",
+				      word->string, file, line);
+			    break;
+			case DONE:	/* just shutting up gcc */
+			case INCLUDE:	/* just shutting up gcc */
+			    break;
+		    }
+		    break;
+	    }
+	    switch (state) {
+		case NAME:
+		case VALUE:
+		    spaceok = 1;
+		    break;
+		case KEY:
+		case LEFTB:
+		case START:
+		case SEMI:
+		    spaceok = 0;
+		    break;
+	    }
+	}
+	line = nextline;
+    }
+
+    if (level == 0) {
+	/* check for proper ending of file and do any cleanup */
+	switch (state) {
+	    case START:
+		break;
+	    case KEY:
+	    case LEFTB:
+	    case VALUE:
+	    case SEMI:
+		(*sections[secIndex].abort) ();
+		/* fall through */
+	    case NAME:
+		if (isMaster)
+		    Error("premature EOF seen [%s:%d]", file, line);
+		break;
+	}
+    }
+}
+
+void
+#if PROTOTYPES
 ReadCfg(char *filename, FILE *fp)
 #else
 ReadCfg(filename, fp)
@@ -4698,14 +5082,7 @@ ReadCfg(filename, fp)
     FILE *fp;
 #endif
 {
-    static STRING *word = (STRING *)0;
-    STATES state = START;
-    int secIndex = 0;
-    int keyIndex = 0;
-    TOKEN token = DONE;
-    short spaceok = 0;
     char *p;
-    int nextline = 1;		/* "next" line number */
     int i;
 #if HAVE_DMALLOC && DMALLOC_MARK_READCFG
     unsigned long dmallocMarkReadCfg = 0;
@@ -4715,12 +5092,6 @@ ReadCfg(filename, fp)
     dmallocMarkReadCfg = dmalloc_mark();
 #endif
     isStartup = (pGroups == (GRPENT *)0 && pRCList == (REMOTE *)0);
-
-    /* initialize local things */
-    if (word == (STRING *)0)
-	word = AllocString();
-    line = 1;
-    file = filename;
 
     /* initialize the break lists */
     for (i = 0; i < 9; i++) {
@@ -4750,215 +5121,11 @@ ReadCfg(filename, fp)
 	OutOfMem();
 
     /* ready to read in the data */
-    while ((token = GetWord(fp, &nextline, spaceok, word)) != DONE) {
-	switch (state) {
-	    case START:
-		switch (token) {
-		    case WORD:
-			for (secIndex = 0;
-			     (p = sections[secIndex].id) != (char *)0;
-			     secIndex++) {
-			    if (strcasecmp(word->string, p) == 0) {
-				CONDDEBUG((1,
-					   "ReadCfg(): got keyword '%s' [%s:%d]",
-					   word->string, file, line));
-				state = NAME;
-				break;
-			    }
-			}
-			if (state == START) {
-			    if (isMaster)
-				Error("invalid keyword '%s' [%s:%d]",
-				      word->string, file, line);
-			}
-			break;
-		    case LEFTBRACE:
-		    case RIGHTBRACE:
-		    case SEMICOLON:
-			if (isMaster)
-			    Error("invalid token '%s' [%s:%d]",
-				  word->string, file, line);
-			break;
-		    case DONE:	/* just shutting up gcc */
-			break;
-		}
-		break;
-	    case NAME:
-		switch (token) {
-		    case WORD:
-			(*sections[secIndex].begin) (word->string);
-			state = LEFTB;
-			break;
-		    case RIGHTBRACE:
-			if (isMaster)
-			    Error("premature token '%s' [%s:%d]",
-				  word->string, file, line);
-			state = START;
-			break;
-		    case LEFTBRACE:
-		    case SEMICOLON:
-			if (isMaster)
-			    Error("invalid token '%s' [%s:%d]",
-				  word->string, file, line);
-			break;
-		    case DONE:	/* just shutting up gcc */
-			break;
-		}
-		break;
-	    case LEFTB:
-		switch (token) {
-		    case LEFTBRACE:
-			state = KEY;
-			break;
-		    case RIGHTBRACE:
-			if (isMaster)
-			    Error("premature token '%s' [%s:%d]",
-				  word->string, file, line);
-			(*sections[secIndex].abort) ();
-			state = START;
-			break;
-		    case SEMICOLON:
-			if (isMaster)
-			    Error("invalid token '%s' [%s:%d]",
-				  word->string, file, line);
-			break;
-		    case WORD:
-			if (isMaster)
-			    Error("invalid word '%s' [%s:%d]",
-				  word->string, file, line);
-			break;
-		    case DONE:	/* just shutting up gcc */
-			break;
-		}
-		break;
-	    case KEY:
-		switch (token) {
-		    case WORD:
-			for (keyIndex = 0;
-			     (p =
-			      sections[secIndex].items[keyIndex].id) !=
-			     (char *)0; keyIndex++) {
-			    if (strcasecmp(word->string, p) == 0) {
-				CONDDEBUG((1, "got keyword '%s' [%s:%d]",
-					   word->string, file, line));
-				state = VALUE;
-				break;
-			    }
-			}
-			if (state == KEY) {
-			    if (isMaster)
-				Error("invalid keyword '%s' [%s:%d]",
-				      word->string, file, line);
-			}
-			break;
-		    case RIGHTBRACE:
-			(*sections[secIndex].end) ();
-			state = START;
-			break;
-		    case LEFTBRACE:
-			if (isMaster)
-			    Error("invalid token '%s' [%s:%d]",
-				  word->string, file, line);
-			break;
-		    case SEMICOLON:
-			if (isMaster)
-			    Error("premature token '%s' [%s:%d]",
-				  word->string, file, line);
-		    case DONE:	/* just shutting up gcc */
-			break;
-		}
-		break;
-	    case VALUE:
-		switch (token) {
-		    case WORD:
-			(*sections[secIndex].items[keyIndex].reg) (word->
-								   string);
-			state = SEMI;
-			break;
-		    case SEMICOLON:
-			if (isMaster)
-			    Error("invalid token '%s' [%s:%d]",
-				  word->string, file, line);
-			state = KEY;
-			break;
-		    case RIGHTBRACE:
-			if (isMaster)
-			    Error("premature token '%s' [%s:%d]",
-				  word->string, file, line);
-			(*sections[secIndex].abort) ();
-			state = START;
-			break;
-		    case LEFTBRACE:
-			if (isMaster)
-			    Error("invalid token '%s' [%s:%d]",
-				  word->string, file, line);
-			break;
-		    case DONE:	/* just shutting up gcc */
-			break;
-		}
-		break;
-	    case SEMI:
-		switch (token) {
-		    case SEMICOLON:
-			state = KEY;
-			break;
-		    case RIGHTBRACE:
-			if (isMaster)
-			    Error("premature token '%s' [%s:%d]",
-				  word->string, file, line);
-			(*sections[secIndex].abort) ();
-			state = START;
-			break;
-		    case LEFTBRACE:
-			if (isMaster)
-			    Error("invalid token '%s' [%s:%d]",
-				  word->string, file, line);
-			break;
-		    case WORD:
-			if (isMaster)
-			    Error("invalid word '%s' [%s:%d]",
-				  word->string, file, line);
-			break;
-		    case DONE:	/* just shutting up gcc */
-			break;
-		}
-		break;
-	}
-	switch (state) {
-	    case NAME:
-	    case VALUE:
-		spaceok = 1;
-		break;
-	    case KEY:
-	    case LEFTB:
-	    case START:
-	    case SEMI:
-		spaceok = 0;
-		break;
-	}
-	line = nextline;
-    }
-
-    /* check for proper ending of file and do any cleanup */
-    switch (state) {
-	case START:
-	    break;
-	case KEY:
-	case LEFTB:
-	case VALUE:
-	case SEMI:
-	    (*sections[secIndex].abort) ();
-	    /* fall through */
-	case NAME:
-	    if (isMaster)
-		Error("premature EOF seen [%s:%d]", file, line);
-	    break;
-    }
+    ParseFile(filename, fp, 0);
 
     /* now clean up all the temporary space used */
-    for (nextline = 0; (p = sections[nextline].id) != (char *)0;
-	 nextline++) {
-	(*sections[nextline].destroy) ();
+    for (i = 0; (p = sections[i].id) != (char *)0; i++) {
+	(*sections[i].destroy) ();
     }
 
 #if HAVE_DMALLOC && DMALLOC_MARK_READCFG
@@ -5002,7 +5169,7 @@ ReReadCfg(fd)
 	    return;
 	} else {
 	    Error("no consoles to manage after reconfiguration - exiting");
-	    Bye(EX_OK);
+	    DeUtmp((GRPENT *)0, fd);
 	}
     }
 
@@ -5095,6 +5262,14 @@ ReReadCfg(fd)
 	    config->reinitcheck = pConfig->reinitcheck;
 	/* gets used on-the-fly */
     }
+
+    if (optConf->initdelay == 0) {
+	if (pConfig->initdelay == 0)
+	    config->initdelay = defConfig.initdelay;
+	else if (pConfig->initdelay != config->initdelay)
+	    config->initdelay = pConfig->initdelay;
+	/* gets used on-the-fly */
+    }
 #if HAVE_OPENSSL
     if (optConf->sslrequired == FLAGUNKNOWN) {
 	if (pConfig->sslrequired == FLAGUNKNOWN)
@@ -5127,6 +5302,7 @@ ReReadCfg(fd)
 		Msg("warning: `daemonmode' config option changed - you must restart for it to take effect");
 	    }
 	}
+#if !USE_UNIX_DOMAIN_SOCKETS
 	if (optConf->primaryport == (char *)0) {
 	    char *p;
 	    if (pConfig->primaryport == (char *)0)
@@ -5159,6 +5335,7 @@ ReReadCfg(fd)
 		Msg("warning: `secondaryport' config option changed - you must restart for it to take effect");
 	    }
 	}
+#endif
 #if HAVE_OPENSSL
 	if (optConf->sslcredentials == (char *)0) {
 	    if (pConfig->sslcredentials == (char *)0) {
