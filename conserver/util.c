@@ -1,5 +1,5 @@
 /*
- *  $Id: util.c,v 1.57 2002-10-14 13:53:48-07 bryan Exp $
+ *  $Id: util.c,v 1.74 2003-03-09 15:20:05-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -22,15 +22,18 @@
 #include <openssl/ssl.h>
 #endif
 
-int outputPid = 0;
+int fVerbose = 0;
+int isMultiProc = 0;
 char *progname = "conserver package";
-int thepid = 0;
+pid_t thepid = 0;
 int fDebug = 0;
+STRING *allStrings = (STRING *) 0;
+int stringCount = 0;		/* count of allStrings list */
 
 /* in the routines below (the init code) we can bomb if malloc fails	(ksb)
  */
 void
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 OutOfMem()
 #else
 OutOfMem()
@@ -43,11 +46,51 @@ OutOfMem()
     exit(EX_UNAVAILABLE);
 }
 
+/* do a general cleanup and exit */
 void
-#if USE_ANSI_PROTO
-checkRW(int fd, int *r, int *w)
+#if PROTOTYPES
+Bye(int status)
 #else
-checkRW(fd, r, w)
+Bye(status)
+    int status;
+#endif
+{
+    DestroyDataStructures();
+#if HAVE_OPENSSL
+    ERR_free_strings();
+#endif
+    exit(status);
+}
+
+/* This returns a string with the current time in ascii form.
+ * (same as ctime() but without the \n)
+ * optionally returns the time in time_t form (pass in NULL if you don't care).
+ * It's overwritten each time, so use it and forget it.
+ */
+const char *
+#if PROTOTYPES
+StrTime(time_t * ltime)
+#else
+StrTime(ltime)
+    time_t *ltime;
+#endif
+{
+    static char curtime[25];
+    time_t tyme;
+
+    tyme = time((time_t *) 0);
+    strcpy(curtime, ctime(&tyme));
+    curtime[24] = '\000';
+    if (ltime != NULL)
+	*ltime = tyme;
+    return (const char *)curtime;
+}
+
+void
+#if PROTOTYPES
+CheckRW(int fd, int *r, int *w)
+#else
+CheckRW(fd, r, w)
     int fd, int *r, int *w;
 #endif
 {
@@ -63,47 +106,49 @@ checkRW(fd, r, w)
     *w = FD_ISSET(fd, &wfd);
 }
 
+#define STRING_ALLOC_SIZE 64
+
 char *
-#if USE_ANSI_PROTO
-buildMyStringChar(const char ch, STRING * msg)
+#if PROTOTYPES
+BuildStringChar(const char ch, STRING * msg)
 #else
-buildMyStringChar(ch, msg)
+BuildStringChar(ch, msg)
     const char ch;
     STRING *msg;
 #endif
 {
     if (msg->used + 1 >= msg->allocated) {
 	if (0 == msg->allocated) {
-	    msg->allocated = 1024 * sizeof(char);
+	    msg->allocated = STRING_ALLOC_SIZE * sizeof(char);
 	    msg->string = (char *)calloc(1, msg->allocated);
 	} else {
-	    msg->allocated += 1024 * sizeof(char);
+	    msg->allocated += STRING_ALLOC_SIZE * sizeof(char);
 	    msg->string = (char *)realloc(msg->string, msg->allocated);
 	}
-	Debug(2, "buildMyStringChar: tried allocating %lu bytes",
-	      msg->allocated);
+	Debug(3, "BuildStringChar(): 0x%lx tried allocating %lu bytes",
+	      (void *)msg, msg->allocated);
 	if (msg->string == (char *)0)
 	    OutOfMem();
     }
     if (msg->used) {
 	msg->string[msg->used - 1] = ch;	/* overwrite NULL and */
 	msg->string[msg->used++] = '\000';	/* increment by one */
-	Debug(2, "buildMyStringChar: added 1 char (%d/%d now)", msg->used,
-	      msg->allocated);
+	Debug(3, "BuildStringChar(): 0x%lx added 1 char (%d/%d now)",
+	      (void *)msg, msg->used, msg->allocated);
     } else {
 	msg->string[msg->used++] = ch;	/* no NULL, so store stuff */
 	msg->string[msg->used++] = '\000';	/* and increment by two */
-	Debug(2, "buildMyStringChar: added 2 chars (%d/%d now)", msg->used,
-	      msg->allocated);
+	Debug(3, "BuildStringChar(): 0x%lx added 2 chars (%d/%d now)",
+	      (void *)msg, msg->used, msg->allocated);
     }
     return msg->string;
 }
 
 char *
-#if USE_ANSI_PROTO
-buildMyString(const char *str, STRING * msg)
+#if PROTOTYPES
+BuildString(const char *str, STRING * msg)
 #else
-buildMyString(str, msg)
+BuildString(str, msg)
     const char *str;
     STRING *msg;
 #endif
@@ -114,41 +159,45 @@ buildMyString(str, msg)
 	msg->used = 0;
 	if (msg->string != (char *)0)
 	    msg->string[0] = '\000';
-	Debug(2, "buildMyString: reset");
+	Debug(3, "BuildString(): 0x%lx reset", (void *)msg);
 	return msg->string;
     }
     len = strlen(str) + 1;
     if (msg->used + len >= msg->allocated) {
 	if (0 == msg->allocated) {
-	    msg->allocated = (len / 1024 + 1) * 1024 * sizeof(char);
+	    msg->allocated =
+		(len / STRING_ALLOC_SIZE +
+		 1) * STRING_ALLOC_SIZE * sizeof(char);
 	    msg->string = (char *)calloc(1, msg->allocated);
 	} else {
-	    msg->allocated += (len / 1024 + 1) * 1024 * sizeof(char);
+	    msg->allocated +=
+		((msg->used + len - msg->allocated) / STRING_ALLOC_SIZE +
+		 1) * STRING_ALLOC_SIZE * sizeof(char);
 	    msg->string = (char *)realloc(msg->string, msg->allocated);
 	}
-	Debug(2, "buildMyString: tried allocating %lu bytes",
-	      msg->allocated);
+	Debug(3, "BuildString(): 0x%lx tried allocating %lu bytes",
+	      (void *)msg, msg->allocated);
 	if (msg->string == (char *)0)
 	    OutOfMem();
     }
 #if HAVE_MEMCPY
-    (void)memcpy(msg->string + (msg->used ? msg->used - 1 : 0), str, len);
+    memcpy(msg->string + (msg->used ? msg->used - 1 : 0), str, len);
 #else
-    (void)bcopy(str, msg->string + (msg->used ? msg->used - 1 : 0), len);
+    bcopy(str, msg->string + (msg->used ? msg->used - 1 : 0), len);
 #endif
     if (msg->used)
 	len--;
     msg->used += len;
-    Debug(2, "buildMyString: added %d chars (%d/%d now)", len, msg->used,
-	  msg->allocated);
+    Debug(3, "BuildString(): 0x%lx added %d chars (%d/%d now)",
+	  (void *)msg, len, msg->used, msg->allocated);
     return msg->string;
 }
 
 void
-#if USE_ANSI_PROTO
-initString(STRING * msg)
+#if PROTOTYPES
+InitString(STRING * msg)
 #else
-initString(msg)
+InitString(msg)
     STRING *msg;
 #endif
 {
@@ -157,47 +206,104 @@ initString(msg)
 }
 
 void
-#if USE_ANSI_PROTO
-destroyString(STRING * msg)
+#if PROTOTYPES
+DestroyString(STRING * msg)
 #else
-destroyString(msg)
+DestroyString(msg)
     STRING *msg;
 #endif
 {
+    if (msg->prev == (STRING *) 0 && msg->next == (STRING *) 0 &&
+	allStrings != msg) {
+	Debug(1, "DestroyString(): 0x%lx non-pooled string destroyed",
+	      (void *)msg, stringCount);
+    } else {
+	if (msg->prev != (STRING *) 0)
+	    msg->prev->next = msg->next;
+	if (msg->next != (STRING *) 0)
+	    msg->next->prev = msg->prev;
+	if (msg == allStrings) {
+	    allStrings = msg->next;
+	}
+	stringCount--;
+	Debug(1, "DestroyString(): 0x%lx string destroyed (count==%d)",
+	      (void *)msg, stringCount);
+    }
     if (msg->allocated)
 	free(msg->string);
-    initString(msg);
+    InitString(msg);
 }
 
-static STRING mymsg = { (char *)0, 0, 0 };
+STRING *
+#if PROTOTYPES
+AllocString(void)
+#else
+AllocString()
+#endif
+{
+    STRING *s;
+    s = (STRING *) calloc(1, sizeof(STRING));
+    if (s == (STRING *) 0)
+	OutOfMem();
+    if (allStrings != (STRING *) 0) {
+	allStrings->prev = s;
+	s->next = allStrings;
+    }
+    allStrings = s;
+    InitString(s);
+    stringCount++;
+    Debug(1, "AllocString(): 0x%lx created string #%d", (void *)s,
+	  stringCount);
+    return s;
+}
+
+void
+#if PROTOTYPES
+DestroyStrings(void)
+#else
+DestroyStrings()
+#endif
+{
+    while (allStrings != (STRING *) 0) {
+	STRING *s = allStrings;
+	DestroyString(allStrings);
+	free(s);
+    }
+}
+
+static STRING *mymsg = (STRING *) 0;
 
 char *
-#if USE_ANSI_PROTO
-buildString(const char *str)
+#if PROTOTYPES
+BuildTmpString(const char *str)
 #else
-buildString(str)
+BuildTmpString(str)
     const char *str;
 #endif
 {
-    return buildMyString(str, &mymsg);
+    if (mymsg == (STRING *) 0)
+	mymsg = AllocString();
+    return BuildString(str, mymsg);
 }
 
 char *
-#if USE_ANSI_PROTO
-buildStringChar(const char c)
+#if PROTOTYPES
+BuildTmpStringChar(const char c)
 #else
-buildStringChar(c)
+BuildTmpStringChar(c)
     const char c;
 #endif
 {
-    return buildMyStringChar(c, &mymsg);
+    if (mymsg == (STRING *) 0)
+	mymsg = AllocString();
+    return BuildStringChar(c, mymsg);
 }
 
 char *
-#if USE_ANSI_PROTO
-readLine(FILE * fp, STRING * save, int *iLine)
+#if PROTOTYPES
+ReadLine(FILE * fp, STRING * save, int *iLine)
 #else
-readLine(fp, save, iLine)
+ReadLine(fp, save, iLine)
     FILE *fp;
     STRING *save;
     int *iLine;
@@ -207,20 +313,23 @@ readLine(fp, save, iLine)
     char *wholeline = (char *)0;
     char *ret = (char *)0;
     int i, buflen, peek, commentCheck = 1, comment = 0;
-    static STRING bufstr = { (char *)0, 0, 0 };
-    static STRING wholestr = { (char *)0, 0, 0 };
+    static STRING *bufstr = (STRING *) 0;
+    static STRING *wholestr = (STRING *) 0;
 
-
+    if (bufstr == (STRING *) 0)
+	bufstr = AllocString();
+    if (wholestr == (STRING *) 0)
+	wholestr = AllocString();
     peek = 0;
     wholeline = (char *)0;
-    buildMyString((char *)0, &bufstr);
-    buildMyString((char *)0, &wholestr);
+    BuildString((char *)0, bufstr);
+    BuildString((char *)0, wholestr);
     while (save->used || ((ret = fgets(buf, sizeof(buf), fp)) != (char *)0)
 	   || peek) {
 	/* If we have a previously saved line, use it instead */
 	if (save->used) {
-	    (void)strcpy(buf, save->string);
-	    buildMyString((char *)0, save);
+	    strcpy(buf, save->string);
+	    BuildString((char *)0, save);
 	}
 
 	if (peek) {
@@ -232,8 +341,8 @@ readLine(fp, save, iLine)
 	     * some worthy data
 	     */
 	    if (!isspace((int)buf[0]) && (wholeline != (char *)0)) {
-		buildMyString((char *)0, save);
-		buildMyString(buf, save);
+		BuildString((char *)0, save);
+		BuildString(buf, save);
 		break;
 	    }
 
@@ -259,16 +368,16 @@ readLine(fp, save, iLine)
 	    if (comment == 0 && commentCheck == 0) {
 		/* Finish off the chunk without the \n */
 		buf[buflen - 1] = '\000';
-		buildMyString(buf, &bufstr);
-		wholeline = buildMyString(bufstr.string, &wholestr);
+		BuildString(buf, bufstr);
+		wholeline = BuildString(bufstr->string, wholestr);
 	    }
 	    peek = 1;
 	    comment = 0;
 	    commentCheck = 1;
-	    buildMyString((char *)0, &bufstr);
+	    BuildString((char *)0, bufstr);
 	} else {
 	    /* Save off the partial chunk */
-	    buildMyString(buf, &bufstr);
+	    BuildString(buf, bufstr);
 	}
     }
 
@@ -278,16 +387,52 @@ readLine(fp, save, iLine)
     if (!peek && (ret == (char *)0) && (comment == 0) &&
 	(commentCheck == 0)) {
 	(*iLine)++;
-	wholeline = buildMyString(bufstr.string, &wholestr);
+	wholeline = BuildString(bufstr->string, wholestr);
     }
 
-    Debug(1, "readLine: returning <%s>",
+    Debug(1, "ReadLine(): returning <%s>",
 	  (wholeline != (char *)0) ? wholeline : "<NULL>");
     return wholeline;
 }
 
+/* show a character as a string so the user cannot mistake it for	(ksb)
+ * another
+ */
+char *
+#if PROTOTYPES
+FmtCtl(int ci, STRING * pcIn)
+#else
+FmtCtl(ci, pcIn)
+    int ci;
+    STRING *pcIn;
+#endif
+{
+    unsigned char c;
+
+    BuildString((char *)0, pcIn);
+    c = ci & 0xff;
+    if (c > 127) {
+	c -= 128;
+	BuildString("M-", pcIn);
+    }
+
+    if (c < ' ' || c == '\177') {
+	BuildStringChar('^', pcIn);
+	BuildStringChar(c ^ 0100, pcIn);
+    } else if (c == ' ') {
+	BuildString("<space>", pcIn);
+    } else if (c == '^') {
+	BuildString("<circumflex>", pcIn);
+    } else if (c == '\\') {
+	BuildString("<backslash>", pcIn);
+    } else {
+	BuildStringChar(c, pcIn);
+    }
+    return pcIn->string;
+}
+
 void
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 FmtCtlStr(char *pcIn, int len, STRING * pcOut)
 #else
 FmtCtlStr(pcIn, len, pcOut)
@@ -301,25 +446,25 @@ FmtCtlStr(pcIn, len, pcOut)
     if (len < 0)
 	len = strlen(pcIn);
 
-    buildMyString((char *)0, pcOut);
+    BuildString((char *)0, pcOut);
     for (; len; len--, pcIn++) {
 	c = *pcIn & 0xff;
 	if (c > 127) {
 	    c -= 128;
-	    buildMyString("M-", pcOut);
+	    BuildString("M-", pcOut);
 	}
 
 	if (c < ' ' || c == '\177') {
-	    buildMyStringChar('^', pcOut);
-	    buildMyStringChar(c ^ 0100, pcOut);
+	    BuildStringChar('^', pcOut);
+	    BuildStringChar(c ^ 0100, pcOut);
 	} else {
-	    buildMyStringChar(c, pcOut);
+	    BuildStringChar(c, pcOut);
 	}
     }
 }
 
 void
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 Debug(int level, char *fmt, ...)
 #else
 Debug(level, fmt, va_alist)
@@ -329,15 +474,16 @@ Debug(level, fmt, va_alist)
 #endif
 {
     va_list ap;
-#if USE_ANSI_PROTO
+#if PROTOTYPES
     va_start(ap, fmt);
 #else
     va_start(ap);
 #endif
     if (fDebug < level)
 	return;
-    if (outputPid)
-	fprintf(stderr, "%s (%d): DEBUG: ", progname, thepid);
+    if (isMultiProc)
+	fprintf(stderr, "[%s] %s (%lu): DEBUG: ", StrTime(NULL), progname,
+		(unsigned long)thepid);
     else
 	fprintf(stderr, "%s: DEBUG: ", progname);
     vfprintf(stderr, fmt, ap);
@@ -346,7 +492,7 @@ Debug(level, fmt, va_alist)
 }
 
 void
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 Error(char *fmt, ...)
 #else
 Error(fmt, va_alist)
@@ -355,13 +501,14 @@ Error(fmt, va_alist)
 #endif
 {
     va_list ap;
-#if USE_ANSI_PROTO
+#if PROTOTYPES
     va_start(ap, fmt);
 #else
     va_start(ap);
 #endif
-    if (outputPid)
-	fprintf(stderr, "%s (%d): ", progname, thepid);
+    if (isMultiProc)
+	fprintf(stderr, "[%s] %s (%lu): ERROR: ", StrTime(NULL), progname,
+		(unsigned long)thepid);
     else
 	fprintf(stderr, "%s: ", progname);
     vfprintf(stderr, fmt, ap);
@@ -370,22 +517,23 @@ Error(fmt, va_alist)
 }
 
 void
-#if USE_ANSI_PROTO
-Info(char *fmt, ...)
+#if PROTOTYPES
+Msg(char *fmt, ...)
 #else
-Info(fmt, va_alist)
+Msg(fmt, va_alist)
     char *fmt;
     va_dcl
 #endif
 {
     va_list ap;
-#if USE_ANSI_PROTO
+#if PROTOTYPES
     va_start(ap, fmt);
 #else
     va_start(ap);
 #endif
-    if (outputPid)
-	fprintf(stdout, "%s (%d): ", progname, thepid);
+    if (isMultiProc)
+	fprintf(stdout, "[%s] %s (%lu): ", StrTime(NULL), progname,
+		(unsigned long)thepid);
     else
 	fprintf(stdout, "%s: ", progname);
     vfprintf(stdout, fmt, ap);
@@ -394,10 +542,39 @@ Info(fmt, va_alist)
 }
 
 void
-#if USE_ANSI_PROTO
-simpleSignal(int sig, RETSIGTYPE(*disp) (int))
+#if PROTOTYPES
+Verbose(char *fmt, ...)
 #else
-simpleSignal(sig, disp)
+Verbose(fmt, va_alist)
+    char *fmt;
+    va_dcl
+#endif
+{
+    va_list ap;
+
+    if (!fVerbose)
+	return;
+
+#if PROTOTYPES
+    va_start(ap, fmt);
+#else
+    va_start(ap);
+#endif
+    if (isMultiProc)
+	fprintf(stdout, "[%s] %s (%lu): INFO: ", StrTime(NULL), progname,
+		(unsigned long)thepid);
+    else
+	fprintf(stdout, "%s: ", progname);
+    vfprintf(stdout, fmt, ap);
+    fprintf(stdout, "\n");
+    va_end(ap);
+}
+
+void
+#if PROTOTYPES
+SimpleSignal(int sig, RETSIGTYPE(*disp) (int))
+#else
+SimpleSignal(sig, disp)
     int sig;
 RETSIGTYPE(*disp) (int);
 #endif
@@ -410,15 +587,15 @@ RETSIGTYPE(*disp) (int);
     sigemptyset(&sa.sa_mask);
     sigaction(sig, &sa, NULL);
 #else
-    (void)signal(sig, disp);
+    signal(sig, disp);
 #endif
 }
 
 int
-#if USE_ANSI_PROTO
-cmaxfiles()
+#if PROTOTYPES
+GetMaxFiles()
 #else
-cmaxfiles()
+GetMaxFiles()
 #endif
 {
     int mf;
@@ -428,7 +605,7 @@ cmaxfiles()
 # if HAVE_GETRLIMIT
     struct rlimit rl;
 
-    (void)getrlimit(RLIMIT_NOFILE, &rl);
+    getrlimit(RLIMIT_NOFILE, &rl);
     mf = rl.rlim_cur;
 # else
 #  if HAVE_GETDTABLESIZE
@@ -446,7 +623,7 @@ cmaxfiles()
 	mf = (FD_SETSIZE - 1);
     }
 #endif
-    Debug(1, "maxfiles=%d", mf);
+    Debug(1, "GetMaxFiles(): maxfiles=%d", mf);
     return mf;
 }
 
@@ -458,10 +635,10 @@ cmaxfiles()
  * object.  Returns a CONSFILE pointer to that object.
  */
 CONSFILE *
-#if USE_ANSI_PROTO
-fileOpenFD(int fd, enum consFileType type)
+#if PROTOTYPES
+FileOpenFD(int fd, enum consFileType type)
 #else
-fileOpenFD(fd, type)
+FileOpenFD(fd, type)
     int fd;
     enum consFileType type;
 #endif
@@ -478,16 +655,16 @@ fileOpenFD(fd, type)
     cfp->waitonWrite = cfp->waitonRead = 0;
 #endif
 
-    Debug(1, "File I/O: Encapsulated fd %d type %d", fd, type);
+    Debug(2, "FileOpenFD(): encapsulated fd %d type %d", fd, type);
     return cfp;
 }
 
 /* This is to "unencapsulate" the file descriptor */
 int
-#if USE_ANSI_PROTO
-fileUnopen(CONSFILE * cfp)
+#if PROTOTYPES
+FileUnopen(CONSFILE * cfp)
 #else
-fileUnopen(cfp)
+FileUnopen(cfp)
     CONSFILE *cfp;
 #endif
 {
@@ -509,7 +686,7 @@ fileUnopen(cfp)
 	    retval = -1;
 	    break;
     }
-    Debug(1, "File I/O: Unopened fd %d", cfp->fd);
+    Debug(2, "FileUnopen(): unopened fd %d", cfp->fd);
     free(cfp);
 
     return retval;
@@ -519,10 +696,10 @@ fileUnopen(cfp)
  * or a (CONSFILE *)0 on error
  */
 CONSFILE *
-#if USE_ANSI_PROTO
-fileOpen(const char *path, int flag, int mode)
+#if PROTOTYPES
+FileOpen(const char *path, int flag, int mode)
 #else
-fileOpen(path, flag, mode)
+FileOpen(path, flag, mode)
     const char *path;
     int flag;
     int mode;
@@ -532,7 +709,7 @@ fileOpen(path, flag, mode)
     int fd;
 
     if (-1 == (fd = open(path, flag, mode))) {
-	Debug(1, "File I/O: Failed to open `%s'", path);
+	Debug(2, "FileOpen(): failed to open `%s'", path);
 	return (CONSFILE *) 0;
     }
     cfp = (CONSFILE *) calloc(1, sizeof(CONSFILE));
@@ -545,7 +722,7 @@ fileOpen(path, flag, mode)
     cfp->waitonWrite = cfp->waitonRead = 0;
 #endif
 
-    Debug(1, "File I/O: Opened `%s' as fd %d", path, fd);
+    Debug(2, "FileOpen(): opened `%s' as fd %d", path, fd);
     return cfp;
 }
 
@@ -554,10 +731,10 @@ fileOpen(path, flag, mode)
  * this function - even if there was an error.
  */
 int
-#if USE_ANSI_PROTO
-fileClose(CONSFILE ** pcfp)
+#if PROTOTYPES
+FileClose(CONSFILE ** pcfp)
 #else
-fileClose(cfp)
+FileClose(cfp)
     CONSFILE **pcfp;
 #endif
 {
@@ -612,19 +789,20 @@ fileClose(cfp)
 	case SSLSocket:
 	    sflags = fcntl(cfp->fd, F_GETFL, 0);
 	    if (sflags != -1) {
-		Debug(1, "File I/O: Setting socket to BLOCKING on fd %d",
+		Debug(2,
+		      "FileClose(): setting socket to BLOCKING on fd %d",
 		      cfp->fd);
 		fcntl(cfp->fd, F_SETFL, sflags & ~O_NONBLOCK);
 	    }
-	    Debug(1, "File I/O: Performing a SSL_shutdown() on fd %d",
+	    Debug(2, "FileClose(): performing a SSL_shutdown() on fd %d",
 		  cfp->fd);
 	    SSL_shutdown(cfp->ssl);
-	    Debug(1, "File I/O: Performing a SSL_free() on fd %d",
+	    Debug(2, "FileClose(): performing a SSL_free() on fd %d",
 		  cfp->fd);
 	    SSL_free(cfp->ssl);
 	    if (sflags != -1) {
-		Debug(1,
-		      "File I/O: Restoring socket blocking mode on fd %d",
+		Debug(2,
+		      "FileClose(): restoring socket blocking mode on fd %d",
 		      cfp->fd);
 		fcntl(cfp->fd, F_SETFL, sflags);
 	    }
@@ -633,13 +811,13 @@ fileClose(cfp)
 	     * we return so we don't try and free(0).  -bryan
 	     */
 	    cfp->ftype = simpleSocket;
-	    return fileClose(pcfp);
+	    return FileClose(pcfp);
 #endif
 	default:
 	    retval = -1;
 	    break;
     }
-    Debug(1, "File I/O: Closed fd %d", cfp->fd);
+    Debug(2, "FileClose(): closed fd %d", cfp->fd);
     free(cfp);
     *pcfp = (CONSFILE *) 0;
 
@@ -648,10 +826,10 @@ fileClose(cfp)
 
 /* Unless otherwise stated, returns the same values as read(2) */
 int
-#if USE_ANSI_PROTO
-fileRead(CONSFILE * cfp, void *buf, int len)
+#if PROTOTYPES
+FileRead(CONSFILE * cfp, void *buf, int len)
 #else
-fileRead(cfp, buf, len)
+FileRead(cfp, buf, len)
     CONSFILE *cfp;
     void *buf;
     int len;
@@ -670,10 +848,10 @@ fileRead(cfp, buf, len)
 	    break;
 #if HAVE_OPENSSL
 	case SSLSocket:
-	    /*checkRW(cfp->fd, &r, &w); */
+	    /*CheckRW(cfp->fd, &r, &w); */
 	    sflags = fcntl(cfp->fd, F_GETFL, 0);
 	    if (sflags != -1) {
-		Debug(1, "File I/O: Setting socket to BLOCKING on fd %d",
+		Debug(2, "FileRead(): setting socket to BLOCKING on fd %d",
 		      cfp->fd);
 		fcntl(cfp->fd, F_SETFL, sflags & ~O_NONBLOCK);
 	    }
@@ -684,15 +862,16 @@ fileRead(cfp, buf, len)
 		case SSL_ERROR_WANT_READ:	/* these two shouldn't */
 		case SSL_ERROR_WANT_WRITE:	/* happen (yet) */
 		    Error
-			("Ugh, ok..an SSL_ERROR_WANT_* happened and I didn't think it ever would.  Code needs serious work!");
+			("FileRead(): Ugh, ok..an SSL_ERROR_WANT_* happened and I didn't think it ever would.  Code needs serious work!");
 		    exit(EX_UNAVAILABLE);
 		case SSL_ERROR_ZERO_RETURN:
 		default:
-		    Debug(1,
-			  "File I/O: Performing a SSL_shutdown() on fd %d",
+		    Debug(2,
+			  "FileRead(): performing a SSL_shutdown() on fd %d",
 			  cfp->fd);
 		    SSL_shutdown(cfp->ssl);
-		    Debug(1, "File I/O: Performing a SSL_free() on fd %d",
+		    Debug(2,
+			  "FileRead(): performing a SSL_free() on fd %d",
 			  cfp->fd);
 		    SSL_free(cfp->ssl);
 		    cfp->ssl = (SSL *) 0;
@@ -701,8 +880,8 @@ fileRead(cfp, buf, len)
 		    break;
 	    }
 	    if (sflags != -1) {
-		Debug(1,
-		      "File I/O: Restoring socket blocking mode on fd %d",
+		Debug(2,
+		      "FileRead(): restoring socket blocking mode on fd %d",
 		      cfp->fd);
 		fcntl(cfp->fd, F_SETFL, sflags);
 	    }
@@ -714,10 +893,10 @@ fileRead(cfp, buf, len)
     }
 
     if (retval >= 0) {
-	Debug(1, "File I/O: Read %d byte%s from fd %d", retval,
+	Debug(2, "FileRead(): read %d byte%s from fd %d", retval,
 	      (retval == 1) ? "" : "s", cfp->fd);
     } else {
-	Debug(1, "File I/O: Read of %d byte%s from fd %d: %s", len,
+	Debug(2, "FileRead(): read of %d byte%s from fd %d: %s", len,
 	      (retval == 1) ? "" : "s", cfp->fd, strerror(errno));
     }
     return retval;
@@ -725,10 +904,10 @@ fileRead(cfp, buf, len)
 
 /* Unless otherwise stated, returns the same values as write(2) */
 int
-#if USE_ANSI_PROTO
-fileWrite(CONSFILE * cfp, const char *buf, int len)
+#if PROTOTYPES
+FileWrite(CONSFILE * cfp, const char *buf, int len)
 #else
-fileWrite(cfp, buf, len)
+FileWrite(cfp, buf, len)
     CONSFILE *cfp;
     const char *buf;
     int len;
@@ -765,10 +944,11 @@ fileWrite(cfp, buf, len)
 	    break;
 #if HAVE_OPENSSL
 	case SSLSocket:
-	    /*checkRW(cfp->fd, &r, &w); */
+	    /*CheckRW(cfp->fd, &r, &w); */
 	    sflags = fcntl(cfp->fd, F_GETFL, 0);
 	    if (sflags != -1) {
-		Debug(1, "File I/O: Setting socket to BLOCKING on fd %d",
+		Debug(2,
+		      "FileWrite(): setting socket to BLOCKING on fd %d",
 		      cfp->fd);
 		fcntl(cfp->fd, F_SETFL, sflags & ~O_NONBLOCK);
 	    }
@@ -780,16 +960,16 @@ fileWrite(cfp, buf, len)
 		    case SSL_ERROR_WANT_READ:	/* these two shouldn't */
 		    case SSL_ERROR_WANT_WRITE:	/* happen (yet) */
 			Error
-			    ("Ugh, ok..an SSL_ERROR_WANT_* happened and I didn't think it ever would.  Code needs serious work!");
+			    ("FileWrite(): Ugh, ok..an SSL_ERROR_WANT_* happened and I didn't think it ever would.  Code needs serious work!");
 			exit(EX_UNAVAILABLE);
 		    case SSL_ERROR_ZERO_RETURN:
 		    default:
-			Debug(1,
-			      "File I/O: Performing a SSL_shutdown() on fd %d",
+			Debug(2,
+			      "FileWrite(): performing a SSL_shutdown() on fd %d",
 			      cfp->fd);
 			SSL_shutdown(cfp->ssl);
-			Debug(1,
-			      "File I/O: Performing a SSL_free() on fd %d",
+			Debug(2,
+			      "FileWrite(): performing a SSL_free() on fd %d",
 			      cfp->fd);
 			SSL_free(cfp->ssl);
 			cfp->ssl = (SSL *) 0;
@@ -806,8 +986,8 @@ fileWrite(cfp, buf, len)
 		len_out += retval;
 	    }
 	    if (sflags != -1) {
-		Debug(1,
-		      "File I/O: Restoring socket blocking mode on fd %d",
+		Debug(2,
+		      "FileWrite(): restoring socket blocking mode on fd %d",
 		      cfp->fd);
 		fcntl(cfp->fd, F_SETFL, sflags);
 	    }
@@ -819,20 +999,20 @@ fileWrite(cfp, buf, len)
     }
 
     if (len_out >= 0) {
-	Debug(1, "File I/O: Wrote %d byte%s to fd %d", len_out,
+	Debug(2, "FileWrite(): wrote %d byte%s to fd %d", len_out,
 	      (len_out == 1) ? "" : "s", cfp->fd);
     } else {
-	Debug(1, "File I/O: Write of %d byte%s to fd %d: %s", len_orig,
+	Debug(2, "FileWrite(): write of %d byte%s to fd %d: %s", len_orig,
 	      (len_out == 1) ? "" : "s", cfp->fd, strerror(errno));
     }
     return len_out;
 }
 
 void
-#if USE_ANSI_PROTO
-fileVwrite(CONSFILE * cfp, const char *fmt, va_list ap)
+#if PROTOTYPES
+FileVWrite(CONSFILE * cfp, const char *fmt, va_list ap)
 #else
-fileVwrite(cfp, fmt, ap)
+FileVWrite(cfp, fmt, ap)
     CONSFILE *cfp;
     const char *fmt;
     va_list ap;
@@ -840,21 +1020,23 @@ fileVwrite(cfp, fmt, ap)
 {
     int s, l, e;
     char c;
-    static STRING msg = { (char *)0, 0, 0 };
-    static short int flong, fneg;
+    static STRING *msg = (STRING *) 0;
+    static short flong, fneg;
 
     if (fmt == (char *)0)
 	return;
 
+    if (msg == (STRING *) 0)
+	msg = AllocString();
     fneg = flong = 0;
     for (e = s = l = 0; (c = fmt[s + l]) != '\000'; l++) {
 	if (c == '%') {
 	    if (e) {
 		e = 0;
-		fileWrite(cfp, "%", 1);
+		FileWrite(cfp, "%", 1);
 	    } else {
 		e = 1;
-		fileWrite(cfp, fmt + s, l);
+		FileWrite(cfp, fmt + s, l);
 		s += l;
 		l = 0;
 	    }
@@ -866,16 +1048,19 @@ fileVwrite(cfp, fmt, ap)
 	    char *p;
 	    char cc;
 	    switch (c) {
+		case 'h':
+		    /* noop since shorts are promoted to int in va_arg */
+		    continue;
 		case 'l':
 		    flong = 1;
 		    continue;
 		case 'c':
 		    cc = (char)va_arg(ap, int);
-		    fileWrite(cfp, &cc, 1);
+		    FileWrite(cfp, &cc, 1);
 		    break;
 		case 's':
 		    p = va_arg(ap, char *);
-		    fileWrite(cfp, p, -1);
+		    FileWrite(cfp, p, -1);
 		    break;
 		case 'd':
 		    i = (flong ? va_arg(ap, long) : (long)va_arg(ap, int));
@@ -888,32 +1073,33 @@ fileVwrite(cfp, fmt, ap)
 		    i = (flong ? va_arg(ap, unsigned long)
 			 : (unsigned long)va_arg(ap, unsigned int));
 		  number:
-		    buildMyString((char *)0, &msg);
+		    BuildString((char *)0, msg);
 		    while (i >= 10) {
-			buildMyStringChar((i % 10) + '0', &msg);
+			BuildStringChar((i % 10) + '0', msg);
 			i /= 10;
 		    }
-		    buildMyStringChar(i + '0', &msg);
+		    BuildStringChar(i + '0', msg);
 		    /* reverse the text to put it in forward order
 		     */
-		    u = msg.used - 1;
+		    u = msg->used - 1;
 		    for (i = 0; i < u / 2; i++) {
 			char temp;
 
-			temp = msg.string[i];
-			msg.string[i]
-			    = msg.string[u - i - 1];
-			msg.string[u - i - 1] = temp;
+			temp = msg->string[i];
+			msg->string[i]
+			    = msg->string[u - i - 1];
+			msg->string[u - i - 1] = temp;
 		    }
 		    if (fneg) {
-			fileWrite(cfp, "-", 1);
+			FileWrite(cfp, "-", 1);
 			fneg = 0;
 		    }
-		    fileWrite(cfp, msg.string, msg.used - 1);
+		    FileWrite(cfp, msg->string, msg->used - 1);
 		    break;
 		default:
-		    Error("unknown conversion character `%c' in `%s'", c,
-			  fmt);
+		    Error
+			("FileVWrite(): unknown conversion character `%c' in `%s'",
+			 c, fmt);
 		    break;
 	    }
 	    s += l + 1;
@@ -922,35 +1108,35 @@ fileVwrite(cfp, fmt, ap)
 	}
     }
     if (l)
-	fileWrite(cfp, fmt + s, l);
+	FileWrite(cfp, fmt + s, l);
 }
 
 void
-#if USE_ANSI_PROTO
-filePrint(CONSFILE * cfp, const char *fmt, ...)
+#if PROTOTYPES
+FilePrint(CONSFILE * cfp, const char *fmt, ...)
 #else
-filePrint(cfp, fmt, va_alist)
+FilePrint(cfp, fmt, va_alist)
     CONSFILE *cfp;
     const char *fmt;
     va_dcl
 #endif
 {
     va_list ap;
-#if USE_ANSI_PROTO
+#if PROTOTYPES
     va_start(ap, fmt);
 #else
     va_start(ap);
 #endif
-    fileVwrite(cfp, fmt, ap);
+    FileVWrite(cfp, fmt, ap);
     va_end(ap);
 }
 
 /* Unless otherwise stated, returns the same values as fstat(2) */
 int
-#if USE_ANSI_PROTO
-fileStat(CONSFILE * cfp, struct stat *buf)
+#if PROTOTYPES
+FileStat(CONSFILE * cfp, struct stat *buf)
 #else
-fileStat(cfp, buf)
+FileStat(cfp, buf)
     CONSFILE *cfp;
     struct stat *buf;
 #endif
@@ -979,10 +1165,10 @@ fileStat(cfp, buf)
 
 /* Unless otherwise stated, returns the same values as lseek(2) */
 int
-#if USE_ANSI_PROTO
-fileSeek(CONSFILE * cfp, off_t offset, int whence)
+#if PROTOTYPES
+FileSeek(CONSFILE * cfp, off_t offset, int whence)
 #else
-fileSeek(cfp, offset, whence)
+FileSeek(cfp, offset, whence)
     CONSFILE *cfp;
     off_t offset;
     int whence;
@@ -1012,10 +1198,10 @@ fileSeek(cfp, offset, whence)
 
 /* Returns the file descriptor number of the underlying file */
 int
-#if USE_ANSI_PROTO
-fileFDNum(CONSFILE * cfp)
+#if PROTOTYPES
+FileFDNum(CONSFILE * cfp)
 #else
-fileFDNum(cfp)
+FileFDNum(cfp)
     CONSFILE *cfp;
 #endif
 {
@@ -1043,10 +1229,10 @@ fileFDNum(cfp)
 
 /* Returns the file type */
 enum consFileType
-#if USE_ANSI_PROTO
-fileGetType(CONSFILE * cfp)
+#if PROTOTYPES
+FileGetType(CONSFILE * cfp)
 #else
-fileGetType(cfp)
+FileGetType(cfp)
     CONSFILE *cfp;
 #endif
 {
@@ -1066,10 +1252,10 @@ fileGetType(cfp)
 
 /* Sets the file type */
 void
-#if USE_ANSI_PROTO
-fileSetType(CONSFILE * cfp, enum consFileType type)
+#if PROTOTYPES
+FileSetType(CONSFILE * cfp, enum consFileType type)
 #else
-fileSetType(cfp, type)
+FileSetType(cfp, type)
     CONSFILE *cfp;
     enum consFileType type;
 #endif
@@ -1080,10 +1266,10 @@ fileSetType(cfp, type)
 #if HAVE_OPENSSL
 /* Get the SSL instance */
 SSL *
-#if USE_ANSI_PROTO
-fileGetSSL(CONSFILE * cfp)
+#if PROTOTYPES
+FileGetSSL(CONSFILE * cfp)
 #else
-fileGetSSL(cfp)
+FileGetSSL(cfp)
     CONSFILE *cfp;
 #endif
 {
@@ -1092,10 +1278,10 @@ fileGetSSL(cfp)
 
 /* Sets the SSL instance */
 void
-#if USE_ANSI_PROTO
-fileSetSSL(CONSFILE * cfp, SSL * ssl)
+#if PROTOTYPES
+FileSetSSL(CONSFILE * cfp, SSL * ssl)
 #else
-fileSetSSL(cfp, ssl)
+FileSetSSL(cfp, ssl)
     CONSFILE *cfp;
     SSL *ssl;
 #endif
@@ -1106,10 +1292,10 @@ fileSetSSL(cfp, ssl)
 
 /* Unless otherwise stated, returns the same values as send(2) */
 int
-#if USE_ANSI_PROTO
-fileSend(CONSFILE * cfp, const void *msg, size_t len, int flags)
+#if PROTOTYPES
+FileSend(CONSFILE * cfp, const void *msg, size_t len, int flags)
 #else
-fileSend(cfp, msg, len, flags)
+FileSend(cfp, msg, len, flags)
     CONSFILE *cfp;
     const void *msg;
     size_t len;
@@ -1141,10 +1327,10 @@ fileSend(cfp, msg, len, flags)
 #if HAVE_OPENSSL
 /* Unless otherwise stated, returns the same values as send(2) */
 int
-#if USE_ANSI_PROTO
-ssl_verify_callback(int ok, X509_STORE_CTX * store)
+#if PROTOTYPES
+SSLVerifyCallback(int ok, X509_STORE_CTX * store)
 #else
-ssl_verify_callback(ok, store)
+SSLVerifyCallback(ok, store)
     int ok;
     X509_STORE_CTX *store;
 #endif
@@ -1155,23 +1341,27 @@ ssl_verify_callback(ok, store)
 	    X509 *cert = X509_STORE_CTX_get_current_cert(store);
 	    int depth = X509_STORE_CTX_get_error_depth(store);
 
-	    Debug(1, "Info of SSL certificate at depth: %d", depth);
+	    Debug(1,
+		  "SSLVerifyCallback(): info of certificate at depth: %d",
+		  depth);
 	    X509_NAME_oneline(X509_get_issuer_name(cert), data, 256);
-	    Debug(1, "  Issuer  = %s", data);
+	    Debug(1, "SSLVerifyCallback():   issuer  = %s", data);
 	    X509_NAME_oneline(X509_get_subject_name(cert), data, 256);
-	    Debug(1, "  Subject = %s", data);
+	    Debug(1, "SSLVerifyCallback():   subject = %s", data);
 	}
     } else {
 	X509 *cert = X509_STORE_CTX_get_current_cert(store);
 	int depth = X509_STORE_CTX_get_error_depth(store);
 	int err = X509_STORE_CTX_get_error(store);
 
-	Error("Error with SSL certificate at depth: %d", depth);
+	Error("SSLVerifyCallback(): error with certificate at depth: %d",
+	      depth);
 	X509_NAME_oneline(X509_get_issuer_name(cert), data, 256);
-	Error("  Issuer  = %s", data);
+	Error("SSLVerifyCallback():  issuer  = %s", data);
 	X509_NAME_oneline(X509_get_subject_name(cert), data, 256);
-	Error("  Subject = %s", data);
-	Error("  Error #%d: %s", err, X509_verify_cert_error_string(err));
+	Error("SSLVerifyCallback():  subject = %s", data);
+	Error("SSLVerifyCallback():  error #%d: %s", err,
+	      X509_verify_cert_error_string(err));
     }
     return ok;
 }

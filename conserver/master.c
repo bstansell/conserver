@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.82 2003-01-08 17:18:44-08 bryan Exp $
+ *  $Id: master.c,v 5.91 2003-03-10 17:37:04-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -66,7 +66,7 @@ static sig_atomic_t fSawQuit = 0, fSawHUP = 0, fSawUSR2 = 0, fSawUSR1 =
 
 
 static RETSIGTYPE
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 FlagSawCHLD(int sig)
 #else
 FlagSawCHLD(sig)
@@ -75,7 +75,7 @@ FlagSawCHLD(sig)
 {
     fSawCHLD = 1;
 #if !HAVE_SIGACTION
-    simpleSignal(SIGCHLD, FlagSawCHLD);
+    SimpleSignal(SIGCHLD, FlagSawCHLD);
 #endif
 }
 
@@ -83,13 +83,13 @@ FlagSawCHLD(sig)
  * Called when master process receives SIGCHLD
  */
 static void
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 FixKids()
 #else
 FixKids()
 #endif
 {
-    int pid;
+    pid_t pid;
     int UWbuf;
     GRPENT *pGE;
 
@@ -114,36 +114,30 @@ FixKids()
 		fSawQuit = 1;
 		/* So we don't kill something that's dead */
 		pGE->pid = -1;
-		Info("%s: exit(%d), shutdown [%s]",
-		     pGE->pCElist->server.string, WEXITSTATUS(UWbuf),
-		     strtime(NULL));
+		Msg("[%s] exit(%d), shutdown", pGE->pCElist->server.string,
+		    WEXITSTATUS(UWbuf));
 		break;
 	    }
 	    if (WIFSIGNALED(UWbuf) && (WTERMSIG(UWbuf) == SIGTERM)) {
 		fSawQuit = 1;
 		/* So we don't kill something that's dead */
 		pGE->pid = -1;
-		Info("%s: signal(%d), shutdown [%s]",
-		     pGE->pCElist->server.string, WTERMSIG(UWbuf),
-		     strtime(NULL));
+		Msg("[%s] signal(%d), shutdown",
+		    pGE->pCElist->server.string, WTERMSIG(UWbuf));
 		break;
 	    }
 
 	    /* If not, then just a simple restart of the child */
 	    if (WIFEXITED(UWbuf))
-		Info("%s(%d): exit(%d), restarted [%s]", progname, pid,
-		     WEXITSTATUS(UWbuf), strtime(NULL));
+		Msg("[%s] exit(%d), restarted", WEXITSTATUS(UWbuf));
 	    if (WIFSIGNALED(UWbuf))
-		Info("%s(%d): signal(%d), restarted [%s]", progname, pid,
-		     WTERMSIG(UWbuf), strtime(NULL));
+		Msg("[%s] signal(%d), restarted", WTERMSIG(UWbuf));
 
 	    /* this kid kid is dead, start another
 	     */
 	    Spawn(pGE);
-	    if (fVerbose) {
-		Info("group #%d pid %d on port %u", pGE->id, pGE->pid,
-		     ntohs(pGE->port));
-	    }
+	    Verbose("group #%d pid %lu on port %hu", pGE->id,
+		    (unsigned long)pGE->pid, ntohs(pGE->port));
 	}
     }
 }
@@ -152,7 +146,7 @@ FixKids()
  * Called when master process receives SIGTERM
  */
 static RETSIGTYPE
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 FlagQuitIt(int arg)
 #else
 FlagQuitIt(arg)
@@ -161,7 +155,7 @@ FlagQuitIt(arg)
 {
     fSawQuit = 1;
 #if !HAVE_SIGACTION
-    simpleSignal(SIGTERM, FlagQuitIt);
+    SimpleSignal(SIGTERM, FlagQuitIt);
 #endif
 }
 
@@ -169,7 +163,7 @@ FlagQuitIt(arg)
  * want to do something special on SIGINT at some point.
  */
 static RETSIGTYPE
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 FlagSawINT(int arg)
 #else
 FlagSawINT(arg)
@@ -178,12 +172,12 @@ FlagSawINT(arg)
 {
     fSawQuit = 1;
 #if !HAVE_SIGACTION
-    simpleSignal(SIGINT, FlagSawINT);
+    SimpleSignal(SIGINT, FlagSawINT);
 #endif
 }
 
 static RETSIGTYPE
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 FlagSawHUP(int arg)
 #else
 FlagSawHUP(arg)
@@ -192,12 +186,12 @@ FlagSawHUP(arg)
 {
     fSawHUP = 1;
 #if !HAVE_SIGACTION
-    simpleSignal(SIGHUP, FlagSawHUP);
+    SimpleSignal(SIGHUP, FlagSawHUP);
 #endif
 }
 
 static RETSIGTYPE
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 FlagSawUSR2(int arg)
 #else
 FlagSawUSR2(arg)
@@ -206,12 +200,12 @@ FlagSawUSR2(arg)
 {
     fSawUSR2 = 1;
 #if !HAVE_SIGACTION
-    simpleSignal(SIGUSR2, FlagSawUSR2);
+    SimpleSignal(SIGUSR2, FlagSawUSR2);
 #endif
 }
 
 static RETSIGTYPE
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 FlagSawUSR1(int arg)
 #else
 FlagSawUSR1(arg)
@@ -220,14 +214,14 @@ FlagSawUSR1(arg)
 {
     fSawUSR1 = 1;
 #if !HAVE_SIGACTION
-    simpleSignal(SIGUSR1, FlagSawUSR1);
+    SimpleSignal(SIGUSR1, FlagSawUSR1);
 #endif
 }
 
 /* Signal all the kids...
  */
 void
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 SignalKids(int arg)
 #else
 SignalKids(arg)
@@ -239,9 +233,11 @@ SignalKids(arg)
     for (pGE = pGroups; pGE != (GRPENT *) 0; pGE = pGE->pGEnext) {
 	if (0 == pGE->imembers || -1 == pGE->pid)
 	    continue;
-	Debug(1, "Sending pid %d signal %d", pGE->pid, arg);
+	Debug(1, "SignalKids(): sending pid %lu signal %d",
+	      (unsigned long)pGE->pid, arg);
 	if (-1 == kill(pGE->pid, arg)) {
-	    Error("kill: %s", strerror(errno));
+	    Error("SignalKids(): kill(%lu): %s", (unsigned long)pGE->pid,
+		  strerror(errno));
 	}
     }
 }
@@ -250,7 +246,7 @@ SignalKids(arg)
 /* this routine is used by the master console server process		(ksb)
  */
 void
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 Master(void)
 #else
 Master()
@@ -269,7 +265,7 @@ Master()
     unsigned char acIn[1024];	/* a command to the master is limited to this */
     struct sockaddr_in master_port, response_port;
     int true = 1;
-    int pid, parentpid;
+    pid_t pid, parentpid;
     char *ambiguous = (char *)0;
     GRPENT *pGE;
     CONSENT *pCE;
@@ -277,63 +273,65 @@ Master()
 
 
     /* set up signal handler */
-    simpleSignal(SIGPIPE, SIG_IGN);
-    simpleSignal(SIGQUIT, SIG_IGN);
+    SimpleSignal(SIGPIPE, SIG_IGN);
+    SimpleSignal(SIGQUIT, SIG_IGN);
 #if defined(SIGTTOU)
-    simpleSignal(SIGTTOU, SIG_IGN);
+    SimpleSignal(SIGTTOU, SIG_IGN);
 #endif
 #if defined(SIGTTIN)
-    simpleSignal(SIGTTIN, SIG_IGN);
+    SimpleSignal(SIGTTIN, SIG_IGN);
 #endif
 #if defined(SIGPOLL)
-    simpleSignal(SIGPOLL, SIG_IGN);
+    SimpleSignal(SIGPOLL, SIG_IGN);
 #endif
-    simpleSignal(SIGCHLD, FlagSawCHLD);
-    simpleSignal(SIGTERM, FlagQuitIt);
-    simpleSignal(SIGUSR1, FlagSawUSR1);
-    simpleSignal(SIGHUP, FlagSawHUP);
-    simpleSignal(SIGUSR2, FlagSawUSR2);
-    simpleSignal(SIGINT, FlagSawINT);
+    SimpleSignal(SIGCHLD, FlagSawCHLD);
+    SimpleSignal(SIGTERM, FlagQuitIt);
+    SimpleSignal(SIGUSR1, FlagSawUSR1);
+    SimpleSignal(SIGHUP, FlagSawHUP);
+    SimpleSignal(SIGUSR2, FlagSawUSR2);
+    SimpleSignal(SIGINT, FlagSawINT);
 
     /* set up port for master to listen on
      */
 #if HAVE_MEMSET
-    (void)memset((void *)&master_port, 0, sizeof(master_port));
+    memset((void *)&master_port, 0, sizeof(master_port));
 #else
-    (void)bzero((char *)&master_port, sizeof(master_port));
+    bzero((char *)&master_port, sizeof(master_port));
 #endif
     master_port.sin_family = AF_INET;
     master_port.sin_addr.s_addr = bindAddr;
     master_port.sin_port = htons(bindPort);
 
     if ((msfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-	Error("socket: %s", strerror(errno));
+	Error("Master(): socket(AF_INET,SOCK_STREAM): %s",
+	      strerror(errno));
 	return;
     }
 #if  HAVE_SETSOCKOPT
     if (setsockopt
 	(msfd, SOL_SOCKET, SO_REUSEADDR, (char *)&true,
 	 sizeof(true)) < 0) {
-	Error("setsockopt: %s", strerror(errno));
+	Error("Master(): setsockopt(%u,SO_REUSEADDR): %s", msfd,
+	      strerror(errno));
 	return;
     }
 #endif
     if (bind(msfd, (struct sockaddr *)&master_port, sizeof(master_port)) <
 	0) {
-	Error("bind: %s", strerror(errno));
+	Error("Master(): bind(%u): %s", msfd, strerror(errno));
 	return;
     }
     if (listen(msfd, SOMAXCONN) < 0) {
-	Error("listen: %s", strerror(errno));
+	Error("Master(): listen(%u): %s", msfd, strerror(errno));
 	return;
     }
 
     fp = fopen(PIDFILE, "w");
     if (fp) {
-	fprintf(fp, "%d\n", (int)getpid());
+	fprintf(fp, "%lu\n", (unsigned long)getpid());
 	fclose(fp);
     } else {
-	Error("can't write pid to %s", PIDFILE);
+	Error("Master(): can't write pid to %s", PIDFILE);
     }
 
     FD_ZERO(&rmaster);
@@ -346,20 +344,20 @@ Master()
 	}
 	if (fSawHUP) {
 	    fSawHUP = 0;
-	    Info("Processing SIGHUP at %s", strtime(NULL));
-	    reopenLogfile();
+	    Msg("processing SIGHUP");
+	    ReopenLogfile();
 	    SignalKids(SIGHUP);
 	    ReReadCfg();
 	}
 	if (fSawUSR1) {
 	    fSawUSR1 = 0;
-	    Info("Processing SIGUSR1 at %s", strtime(NULL));
+	    Msg("processing SIGUSR1");
 	    SignalKids(SIGUSR1);
 	}
 	if (fSawUSR2) {
 	    fSawUSR2 = 0;
-	    Info("Processing SIGUSR2 at %s", strtime(NULL));
-	    reopenLogfile();
+	    Msg("processing SIGUSR2");
+	    ReopenLogfile();
 	    SignalKids(SIGUSR2);
 	}
 	if (fSawQuit) {		/* Something above set the quit flag */
@@ -372,7 +370,7 @@ Master()
 	    select(msfd + 1, &rmask, (fd_set *) 0, (fd_set *) 0,
 		   (struct timeval *)0)) {
 	    if (errno != EINTR) {
-		Error("select: %s", strerror(errno));
+		Error("Master(): select(): %s", strerror(errno));
 	    }
 	    continue;
 	}
@@ -382,12 +380,12 @@ Master()
 	so = sizeof(response_port);
 	cfd = accept(msfd, (struct sockaddr *)&response_port, &so);
 	if (cfd < 0) {
-	    Error("accept: %s", strerror(errno));
+	    Error("Master(): accept(%u): %s", msfd, strerror(errno));
 	    continue;
 	}
 
-	if ((CONSFILE *) 0 == (csocket = fileOpenFD(cfd, simpleSocket))) {
-	    Error("fileOpenFD: %s", strerror(errno));
+	if ((CONSFILE *) 0 == (csocket = FileOpenFD(cfd, simpleSocket))) {
+	    Error("Master(): FileOpenFD(%u): %s", cfd, strerror(errno));
 	    close(cfd);
 	    continue;
 	}
@@ -397,9 +395,9 @@ Master()
 	    request_init(&request, RQ_DAEMON, progname, RQ_FILE, cfd, 0);
 	    fromhost(&request);
 	    if (!hosts_access(&request)) {
-		fileWrite(csocket, "access from your host refused\r\n",
+		FileWrite(csocket, "access from your host refused\r\n",
 			  -1);
-		fileClose(&csocket);
+		FileClose(&csocket);
 		continue;
 	    }
 	}
@@ -407,10 +405,10 @@ Master()
 
 	so = sizeof(in_port);
 	if (-1 ==
-	    getpeername(fileFDNum(csocket), (struct sockaddr *)&in_port,
+	    getpeername(FileFDNum(csocket), (struct sockaddr *)&in_port,
 			&so)) {
-	    fileWrite(csocket, "getpeername failed\r\n", -1);
-	    fileClose(&csocket);
+	    FileWrite(csocket, "getpeername failed\r\n", -1);
+	    FileClose(&csocket);
 	    continue;
 	}
 	so = sizeof(in_port.sin_addr);
@@ -422,33 +420,33 @@ Master()
 	    cType = AccType(&in_port.sin_addr, hpPeer->h_name);
 	}
 	if ('r' == cType) {
-	    fileWrite(csocket, "access from your host refused\r\n", -1);
-	    fileClose(&csocket);
+	    FileWrite(csocket, "access from your host refused\r\n", -1);
+	    FileClose(&csocket);
 	    continue;
 	}
 
-	(void)fflush(stdin);
-	(void)fflush(stderr);
+	fflush(stdin);
+	fflush(stderr);
 	switch (pid = fork()) {
 	    case -1:
-		fileWrite(csocket, "fork failed, try again later\r\n", -1);
-		fileClose(&csocket);
-		Error("fork: %s", strerror(errno));
+		FileWrite(csocket, "fork failed, try again later\r\n", -1);
+		FileClose(&csocket);
+		Error("Master(): fork(): %s", strerror(errno));
 		continue;
 	    default:
 #if defined(__CYGWIN__)
-		/* Since we've got all that "special" stuff in the fileClose
+		/* Since we've got all that "special" stuff in the FileClose
 		 * routine for getting around a winsock bug, we have to
 		 * shut things down differently here.  Instead of calling
-		 * fileClose (which half-closes the socket as well as just
+		 * FileClose (which half-closes the socket as well as just
 		 * closing the descriptor), we "unopen" the structure (to
 		 * free memory) and then do a regular close.  The child (which
-		 * writes to the client) will do a fileClose and all the
+		 * writes to the client) will do a FileClose and all the
 		 * flushing magic will happen.  UGH! -bryan
 		 */
-		close(fileUnopen(csocket));
+		close(FileUnopen(csocket));
 #else
-		fileClose(&csocket);
+		FileClose(&csocket);
 #endif
 		continue;
 	    case 0:
@@ -460,10 +458,10 @@ Master()
 	/* handle the connection
 	 * (port lookup, who, users, or quit)
 	 */
-	fileWrite(csocket, "ok\r\n", -1);
+	FileWrite(csocket, "ok\r\n", -1);
 	for (i = 0; i < sizeof(acIn) - 1; /* i+=nr */ ) {
 	    if ((nr =
-		 fileRead(csocket, &acIn[i], sizeof(acIn) - 1 - i)) <= 0) {
+		 FileRead(csocket, &acIn[i], sizeof(acIn) - 1 - i)) <= 0) {
 		break;
 	    }
 	    for (j = 0; j < nr; j++, i++) {
@@ -479,9 +477,9 @@ Master()
 	    acIn[i] = '\000';
 	}
 	if (0 == i) {
-	    Error("lost connection");
-	    fileClose(&csocket);
-	    exit(EX_OK);
+	    Error("Master(): lost connection (%u)", FileFDNum(csocket));
+	    FileClose(&csocket);
+	    Bye(EX_OK);
 	}
 	if ((char *)0 != (pcArgs = strchr((char *)acIn, ':'))) {
 	    *pcArgs++ = '\000';
@@ -501,30 +499,30 @@ Master()
 	    };
 	    char **ppc;
 	    for (ppc = apcHelp; (char *)0 != *ppc; ++ppc) {
-		(void)fileWrite(csocket, *ppc, -1);
+		FileWrite(csocket, *ppc, -1);
 	    }
-	    fileClose(&csocket);
-	    exit(EX_OK);
+	    FileClose(&csocket);
+	    Bye(EX_OK);
 	}
 	if (0 == strcmp((char *)acIn, "quit")) {
 	    if ('t' == cType) {
-		fileWrite(csocket, "trusted -- terminated\r\n", -1);
+		FileWrite(csocket, "trusted -- terminated\r\n", -1);
 		kill(parentpid, SIGTERM);
 	    } else if ((char *)0 == pcArgs) {
-		fileWrite(csocket, "must be trusted to terminate\r\n", -1);
+		FileWrite(csocket, "must be trusted to terminate\r\n", -1);
 	    } else if (CheckPass("root", pcArgs) != AUTH_SUCCESS) {
-		fileWrite(csocket, "Sorry.\r\n", -1);
+		FileWrite(csocket, "Sorry.\r\n", -1);
 	    } else {
-		fileWrite(csocket, "ok -- terminated\r\n", -1);
+		FileWrite(csocket, "ok -- terminated\r\n", -1);
 		kill(parentpid, SIGTERM);
 	    }
-	    fileClose(&csocket);
-	    exit(EX_OK);
+	    FileClose(&csocket);
+	    Bye(EX_OK);
 	}
 	if (0 == strcmp((char *)acIn, "pid")) {
-	    filePrint(csocket, "%d\r\n", parentpid);
-	    fileClose(&csocket);
-	    exit(EX_OK);
+	    FilePrint(csocket, "%lu\r\n", (unsigned long)parentpid);
+	    FileClose(&csocket);
+	    Bye(EX_OK);
 	}
 	if (0 == strcmp((char *)acIn, "groups")) {
 	    int iSep = 1;
@@ -532,12 +530,12 @@ Master()
 	    for (pGE = pGroups; pGE != (GRPENT *) 0; pGE = pGE->pGEnext) {
 		if (0 == pGE->imembers)
 		    continue;
-		filePrint(csocket, ":%u" + iSep, ntohs(pGE->port));
+		FilePrint(csocket, ":%hu" + iSep, ntohs(pGE->port));
 		iSep = 0;
 	    }
-	    fileWrite(csocket, "\r\n", -1);
-	    fileClose(&csocket);
-	    exit(EX_OK);
+	    FileWrite(csocket, "\r\n", -1);
+	    FileClose(&csocket);
+	    Bye(EX_OK);
 	}
 	if (0 == strcmp((char *)acIn, "master")) {
 	    int iSep = 1;
@@ -546,43 +544,44 @@ Master()
 		struct sockaddr_in lcl;
 		so = sizeof(lcl);
 		if (-1 ==
-		    getsockname(fileFDNum(csocket),
+		    getsockname(FileFDNum(csocket),
 				(struct sockaddr *)&lcl, &so)) {
-		    fileWrite(csocket,
+		    FileWrite(csocket,
 			      "getsockname failed, try again later\r\n",
 			      -1);
-		    Error("getsockname: %s", strerror(errno));
+		    Error("Master(): getsockname(%u): %s",
+			  FileFDNum(csocket), strerror(errno));
 		    exit(EX_UNAVAILABLE);
 		}
-		filePrint(csocket, "@%s", inet_ntoa(lcl.sin_addr));
+		FilePrint(csocket, "@%s", inet_ntoa(lcl.sin_addr));
 		iSep = 0;
 	    }
 	    if (!fNoredir) {
 		for (pRC = pRCUniq; (REMOTE *) 0 != pRC;
 		     pRC = pRC->pRCuniq) {
-		    filePrint(csocket, ":@%s" + iSep, pRC->rhost.string);
+		    FilePrint(csocket, ":@%s" + iSep, pRC->rhost.string);
 		    iSep = 0;
 		}
 	    }
-	    fileWrite(csocket, "\r\n", -1);
-	    fileClose(&csocket);
-	    exit(EX_OK);
+	    FileWrite(csocket, "\r\n", -1);
+	    FileClose(&csocket);
+	    Bye(EX_OK);
 	}
 	if (0 == strcmp((char *)acIn, "version")) {
-	    filePrint(csocket, "version `%s\'\r\n", THIS_VERSION);
-	    fileClose(&csocket);
-	    exit(EX_OK);
+	    FilePrint(csocket, "version `%s'\r\n", THIS_VERSION);
+	    FileClose(&csocket);
+	    Bye(EX_OK);
 	}
 	if (0 != strcmp((char *)acIn, "call")) {
-	    fileWrite(csocket, "unknown command\r\n", -1);
-	    fileClose(&csocket);
-	    exit(EX_OK);
+	    FileWrite(csocket, "unknown command\r\n", -1);
+	    FileClose(&csocket);
+	    Bye(EX_OK);
 	}
 
 	if ((char *)0 == pcArgs) {
-	    fileWrite(csocket, "call requires argument\r\n", -1);
-	    fileClose(&csocket);
-	    exit(EX_OK);
+	    FileWrite(csocket, "call requires argument\r\n", -1);
+	    FileClose(&csocket);
+	    Bye(EX_OK);
 	}
 
 	/* look up the machine to call
@@ -599,8 +598,8 @@ Master()
 		    continue;
 		}
 		prnum = ntohs(pGE->port);
-		ambiguous = buildString(pCE->server.string);
-		ambiguous = buildString(", ");
+		ambiguous = BuildTmpString(pCE->server.string);
+		ambiguous = BuildTmpString(", ");
 		++found;
 	    }
 	}
@@ -608,14 +607,16 @@ Master()
 	 * duplicates - a bad state to be in.
 	 * Does the readcfg.c code even check for dups?
 	 */
-	for (pRC = pRCList; (REMOTE *) 0 != pRC; pRC = pRC->pRCnext) {
-	    if (0 != strcmp(pcArgs, pRC->rserver.string)) {
-		continue;
+	if (!fNoredir || (fNoredir && found == 0)) {
+	    for (pRC = pRCList; (REMOTE *) 0 != pRC; pRC = pRC->pRCnext) {
+		if (0 != strcmp(pcArgs, pRC->rserver.string)) {
+		    continue;
+		}
+		ambiguous = BuildTmpString(pRC->rserver.string);
+		ambiguous = BuildTmpString(", ");
+		++found;
+		pRCFound = pRC;
 	    }
-	    ambiguous = buildString(pRC->rserver.string);
-	    ambiguous = buildString(", ");
-	    ++found;
-	    pRCFound = pRC;
 	}
 	if (found == 0) {	/* Then look for substring matches */
 	    for (pGE = pGroups; pGE != (GRPENT *) 0; pGE = pGE->pGEnext) {
@@ -629,55 +630,59 @@ Master()
 			continue;
 		    }
 		    prnum = ntohs(pGE->port);
-		    ambiguous = buildString(pCE->server.string);
-		    ambiguous = buildString(", ");
+		    ambiguous = BuildTmpString(pCE->server.string);
+		    ambiguous = BuildTmpString(", ");
 		    ++found;
 		}
 	    }
 	    /* look for a remote server */
 	    /* again, looks for dups with local consoles */
-	    for (pRC = pRCList; (REMOTE *) 0 != pRC; pRC = pRC->pRCnext) {
-		if (0 !=
-		    strncmp(pcArgs, pRC->rserver.string, strlen(pcArgs))) {
-		    continue;
+	    if (!fNoredir || (fNoredir && found != 1)) {
+		for (pRC = pRCList; (REMOTE *) 0 != pRC;
+		     pRC = pRC->pRCnext) {
+		    if (0 !=
+			strncmp(pcArgs, pRC->rserver.string,
+				strlen(pcArgs))) {
+			continue;
+		    }
+		    ambiguous = BuildTmpString(pRC->rserver.string);
+		    ambiguous = BuildTmpString(", ");
+		    ++found;
+		    pRCFound = pRC;
 		}
-		ambiguous = buildString(pRC->rserver.string);
-		ambiguous = buildString(", ");
-		++found;
-		pRCFound = pRC;
 	    }
 	}
 	switch (found) {
 	    case 0:
-		filePrint(csocket, "console `%s' not found\r\n", pcArgs);
+		FilePrint(csocket, "console `%s' not found\r\n", pcArgs);
 		break;
 	    case 1:
 		if ((REMOTE *) 0 != pRCFound) {
 		    if (fNoredir) {
-			filePrint(csocket,
+			FilePrint(csocket,
 				  "automatic redirection disabled - console on master `%s'\r\n",
 				  pRCFound->rhost.string);
 		    } else {
-			filePrint(csocket, "@%s\r\n",
+			FilePrint(csocket, "@%s\r\n",
 				  pRCFound->rhost.string);
 		    }
 		} else {
-		    filePrint(csocket, "%u\r\n", prnum);
+		    FilePrint(csocket, "%hu\r\n", prnum);
 		}
 		break;
 	    default:
 		found = strlen(ambiguous);
 		ambiguous[found - 2] = '\000';
-		filePrint(csocket,
+		FilePrint(csocket,
 			  "ambiguous console abbreviation, `%s'\r\n\tchoices are %s\r\n",
 			  pcArgs, ambiguous);
 		break;
 	}
-	buildString((char *)0);	/* we're done - clean up */
+	BuildTmpString((char *)0);	/* we're done - clean up */
 	ambiguous = (char *)0;
-	fileClose(&csocket);
-	exit(EX_OK);
+	FileClose(&csocket);
+	Bye(EX_OK);
     }
 
-    (void)unlink(PIDFILE);
+    unlink(PIDFILE);
 }

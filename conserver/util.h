@@ -1,12 +1,12 @@
 /*
- *  $Id: util.h,v 1.32 2002-10-01 20:52:02-07 bryan Exp $
+ *  $Id: util.h,v 1.41 2003-03-08 08:39:57-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  */
 
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 #include <stdarg.h>
 #else
 #include <varargs.h>
@@ -38,6 +38,8 @@ typedef struct dynamicString {
     char *string;
     int used;
     int allocated;
+    struct dynamicString *next;
+    struct dynamicString *prev;
 } STRING;
 
 typedef struct consFile {
@@ -53,74 +55,47 @@ typedef struct consFile {
     /* Add crypto stuff to suit */
 } CONSFILE;
 
-extern int outputPid, fDebug;
+extern int isMultiProc, fDebug, fVerbose;
 extern char *progname;
-extern int thepid;
+extern pid_t thepid;
 
-#if USE_ANSI_PROTO
-extern void Debug(int, char *, ...);
-extern void Error(char *, ...);
-extern void Info(char *, ...);
-extern void simpleSignal(int, RETSIGTYPE(*)(int));
-extern int cmaxfiles();
-extern void FmtCtlStr(char *, int, STRING *);
-extern CONSFILE *fileOpenFD(int, enum consFileType);
-extern CONSFILE *fileOpen(const char *, int, int);
-extern int fileClose(CONSFILE **);
-extern int fileRead(CONSFILE *, void *, int);
-extern int fileWrite(CONSFILE *, const char *, int);
-extern void fileVwrite(CONSFILE *, const char *, va_list);
-extern void filePrint(CONSFILE *, const char *, ...);
-extern int fileStat(CONSFILE *, struct stat *);
-extern int fileSeek(CONSFILE *, off_t, int);
-extern int fileSend(CONSFILE *, const void *, size_t, int);
-extern int fileFDNum(CONSFILE *);
-extern void OutOfMem();
-extern char *buildString(const char *);
-extern char *buildStringChar(const char);
-extern char *buildMyString(const char *, STRING *);
-extern char *buildMyStringChar(const char, STRING *);
-extern void initString(STRING *);
-extern void destroyString(STRING *);
-extern char *readLine(FILE *, STRING *, int *);
-extern enum consFileType fileGetType(CONSFILE *);
-extern void fileSetType(CONSFILE *, enum consFileType);
+extern const char *StrTime PARAMS((time_t *));
+extern void Debug PARAMS((int, char *, ...));
+extern void Error PARAMS((char *, ...));
+extern void Msg PARAMS((char *, ...));
+extern void Verbose PARAMS((char *, ...));
+extern void SimpleSignal PARAMS((int, RETSIGTYPE(*)(int)));
+extern int GetMaxFiles PARAMS(());
+extern char *FmtCtl PARAMS((int, STRING *));
+extern void FmtCtlStr PARAMS((char *, int, STRING *));
+extern CONSFILE *FileOpenFD PARAMS((int, enum consFileType));
+extern CONSFILE *FileOpen PARAMS((const char *, int, int));
+extern int FileClose PARAMS((CONSFILE **));
+extern int FileRead PARAMS((CONSFILE *, void *, int));
+extern int FileWrite PARAMS((CONSFILE *, const char *, int));
+extern void FileVWrite PARAMS((CONSFILE *, const char *, va_list));
+extern void FilePrint PARAMS((CONSFILE *, const char *, ...));
+extern int FileStat PARAMS((CONSFILE *, struct stat *));
+extern int FileSeek PARAMS((CONSFILE *, off_t, int));
+extern int FileSend PARAMS((CONSFILE *, const void *, size_t, int));
+extern int FileFDNum PARAMS((CONSFILE *));
+extern int FileUnopen PARAMS((CONSFILE *));
+extern void OutOfMem PARAMS(());
+extern char *BuildTmpString PARAMS((const char *));
+extern char *BuildTmpStringChar PARAMS((const char));
+extern char *BuildString PARAMS((const char *, STRING *));
+extern char *BuildStringChar PARAMS((const char, STRING *));
+extern void InitString PARAMS((STRING *));
+extern void DestroyString PARAMS((STRING *));
+extern void DestroyStrings PARAMS((void));
+extern STRING *AllocString PARAMS((void));
+extern char *ReadLine PARAMS((FILE *, STRING *, int *));
+extern enum consFileType FileGetType PARAMS((CONSFILE *));
+extern void FileSetType PARAMS((CONSFILE *, enum consFileType));
+extern void Bye PARAMS((int));
+extern void DestroyDataStructures PARAMS((void));
 #if HAVE_OPENSSL
-extern SSL *fileGetSSL(CONSFILE *);
-extern void fileSetSSL(CONSFILE *, SSL *);
-extern int ssl_verify_callback(int, X509_STORE_CTX *);
-#endif
-#else
-extern void Debug();
-extern void Error();
-extern void Info();
-extern void simpleSignal();
-extern int cmaxfiles();
-extern void FmtCtlStr();
-extern CONSFILE *fileOpenFD();
-extern CONSFILE *fileOpen();
-extern int fileClose();
-extern int fileRead();
-extern int fileWrite();
-extern void fileVWrite();
-extern void filePrint();
-extern int fileStat();
-extern int fileSeek();
-extern int fileSend();
-extern int fileFDNum();
-extern void OutOfMem();
-extern char *buildString();
-extern char *buildStringChar();
-extern char *buildMyString();
-extern char *buildMyStringChar();
-extern void initString();
-extern void destroyString();
-extern char *readLine();
-extern enum consFileType fileGetType();
-extern void fileSetType();
-#if HAVE_OPENSSL
-extern SSL *fileGetSSL();
-extern void fileSetSSL();
-extern int ssl_verify_callback();
-#endif
+extern SSL *FileGetSSL PARAMS((CONSFILE *));
+extern void FileSetSSL PARAMS((CONSFILE *, SSL *));
+extern int SSLVerifyCallback PARAMS((int, X509_STORE_CTX *));
 #endif

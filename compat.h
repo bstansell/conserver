@@ -259,3 +259,15 @@ typedef int socklen_t;
 #ifndef ONLRET
 #define ONLRET 0
 #endif
+
+#ifndef PARAMS
+# if PROTOTYPES
+#  define PARAMS(protos) protos
+# else /* no PROTOTYPES */
+#  define PARAMS(protos) ()
+# endif /* no PROTOTYPES */
+#endif
+
+#if HAVE_DMALLOC
+#include <dmalloc.h>
+#endif

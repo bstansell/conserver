@@ -1,6 +1,32 @@
 				CHANGES
 				=======
 
+version 7.2.6 (Mar 20, 2003):
+	- the -b conserver option was mostly broken (since 7.2.0)
+	- changed logging format so that all messages are of a similar
+	  form
+	- fixed bad port number in 'cached previous timeout' message -
+	  reported by Dave Stuit <djs@tellme.com>
+	- now using pid_t type for better compatibility
+	- fixed the RPM and Solaris package to include the man
+	  page for conserver.passwd - suggested by R P Herrold
+	  <herrold@owlriver.com>
+	- added restart option (-HUP) to conserver startup scripts
+	- added -B option to client for sending messages to a single
+	  server - suggested by Dave Stuit <djs@tellme.com>
+	- added --with-dmalloc for memory usage debugging
+	- bug with multiple interfaces and -M option not maching hostname
+	  in configuration file - patch by Igor Sviridov <sia@nest.org>
+	- memory leak using openssl library plugged
+	- automatic reinitialization of failed consoles now retries
+	  every minute like the manpage says it does - reported by Chris
+	  Fowler <cfowler@outpostsentinel.com>
+	- when -R option is used, substring matches on console names
+	  from clients only match local console names (and if that
+	  fails just remote console names) but ambiguous name list
+	  returns both local and remote consoles - suggested by Todd
+	  Stansell <todd@stansell.org>
+
 version 7.2.5 (Jan 27, 2003):
 	- fixed many documentation bugs - reported by Dave Stuit
 	  <djs@tellme.com>
@@ -377,5 +403,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.75 2003-01-27 17:47:59-08 bryan Exp $
+#  $Id: CHANGES,v 1.78 2003-03-10 17:45:55-08 bryan Exp $
 #

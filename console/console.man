@@ -1,4 +1,4 @@
-.\" $Id: console.man,v 1.24 2003-01-08 17:07:51-08 bryan Exp $
+.\" $Id: console.man,v 1.25 2003-03-04 07:53:03-08 bryan Exp $
 .TH CONSOLE 1 "Local"
 .SH NAME
 console \- console server client program
@@ -9,7 +9,7 @@ console \- console server client program
 \fIconsole\fP
 .br
 \fBconsole\fP [\fB\-hiIPrRuVwWx\fP] [\fB\-7Dv\fP] [\fB\-M\fP \fImach\fP]
-[\fB\-p\fP \fIport\fP] [\fB\-b\fP \fImessage\fP]
+[\fB\-p\fP \fIport\fP] [\fB\-\fP[\fBbB\fP] \fImessage\fP]
 .br
 \fBconsole\fP [\fB\-qQ\fP] [\fB\-7Dv\fP] [\fB\-M\fP \fImach\fP]
 [\fB\-p\fP \fIport\fP]
@@ -73,7 +73,10 @@ Access a console with a two-way (read-write) connection (this is the default).
 The connection is dropped to spy mode if someone else is attached read-write.
 .TP
 .BI \-b message
-Broadcast a \fImessage\fP to all users connected to the console server.
+Broadcast a \fImessage\fP to all users connected to each server.
+.TP
+.BI \-B message
+Same as \fB\-b\fP but just send a \fImessage\fP to users on the primary server.
 .TP
 .BI \-c cred
 Load an SSL certificate and key from the PEM encoded file \fIcred\fP.

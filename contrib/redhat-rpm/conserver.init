@@ -38,8 +38,9 @@ case "$1" in
     status conserver
     ;;
   restart)
-    $0 stop
-    $0 start
+    echo -n "Restarting conserver: "
+    killproc conserver -HUP
+    echo
     ;;
   *)
     echo "Usage: conserver {start|stop|restart|status}"

@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.106 2003-01-08 17:18:59-08 bryan Exp $
+ *  $Id: main.c,v 5.120 2003-03-09 15:20:43-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -53,8 +53,8 @@
 #include <readcfg.h>
 #include <version.h>
 
-int fAll = 0, fVerbose = 0, fSoftcar = 0, fNoinit = 0, fVersion =
-    0, fStrip = 0, fDaemon = 0, fUseLogfile = 0, fReopen = 0, fReopenall =
+int fAll = 0, fSoftcar = 0, fNoinit = 0, fVersion = 0, fStrip =
+    0, fDaemon = 0, fUseLogfile = 0, fReopen = 0, fReopenall =
     0, fNoautoreup = 0, fNoredir = 0;
 
 char chDefAcc = 'r';
@@ -64,13 +64,14 @@ char *pcConfig = CONFIGFILE;
 char *pcPasswd = PASSWDFILE;
 char *pcPort = DEFPORT;
 char *pcBasePort = DEFBASEPORT;
+STRING *defaultShell = (STRING *) 0;
 int domainHack = 0;
 int isMaster = 1;
 int cMaxMemb = MAXMEMB;
 char *pcAddress = NULL;
 in_addr_t bindAddr;
-unsigned int bindPort;
-unsigned int bindBasePort;
+unsigned short bindPort;
+unsigned short bindBasePort;
 
 struct sockaddr_in in_port;
 struct in_addr acMyAddr;
@@ -80,12 +81,17 @@ char acMyHost[1024];		/* staff.cc.purdue.edu                  */
 SSL_CTX *ctx = (SSL_CTX *) 0;
 int fReqEncryption = 1;
 char *pcCredFile = (char *)0;
+DH *dh512 = (DH *) 0;
+DH *dh1024 = (DH *) 0;
+DH *dh2048 = (DH *) 0;
+DH *dh4096 = (DH *) 0;
+
 
 DH *
-#if USE_ANSI_PROTO
-get_dh512(void)
+#if PROTOTYPES
+GetDH512(void)
 #else
-get_dh512()
+GetDH512()
 #endif
 {
     static unsigned char dh512_p[] = {
@@ -114,10 +120,10 @@ get_dh512()
 }
 
 DH *
-#if USE_ANSI_PROTO
-get_dh1024(void)
+#if PROTOTYPES
+GetDH1024(void)
 #else
-get_dh1024()
+GetDH1024()
 #endif
 {
     static unsigned char dh1024_p[] = {
@@ -152,10 +158,10 @@ get_dh1024()
 }
 
 DH *
-#if USE_ANSI_PROTO
-get_dh2048(void)
+#if PROTOTYPES
+GetDH2048(void)
 #else
-get_dh2048()
+GetDH2048()
 #endif
 {
     static unsigned char dh2048_p[] = {
@@ -203,10 +209,10 @@ get_dh2048()
 }
 
 DH *
-#if USE_ANSI_PROTO
-get_dh4096()
+#if PROTOTYPES
+GetDH4096(void)
 #else
-get_dh4096(void)
+GetDH4096()
 #endif
 {
     static unsigned char dh4096_p[] = {
@@ -280,61 +286,73 @@ get_dh4096(void)
 }
 
 DH *
-#if USE_ANSI_PROTO
-tmp_dh_callback(SSL * ssl, int is_export, int keylength)
+#if PROTOTYPES
+TmpDHCallback(SSL * ssl, int is_export, int keylength)
 #else
-tmp_dh_callback(ssl, is_export, keylength)
+TmpDHCallback(ssl, is_export, keylength)
     SSL *ssl;
     int is_export;
     int keylength;
 #endif
 {
+    Debug(1, "TmpDHCallback(): asked for a DH key length %u", keylength);
     switch (keylength) {
 	case 512:
-	    return get_dh512();
+	    if (dh512 == (DH *) 0)
+		dh512 = GetDH512();
+	    return dh512;
 	case 1024:
-	    return get_dh1024();
+	    if (dh1024 == (DH *) 0)
+		dh1024 = GetDH1024();
+	    return dh1024;
 	case 2048:
-	    return get_dh2048();
+	    if (dh2048 == (DH *) 0)
+		dh2048 = GetDH2048();
+	    return dh2048;
 	default:
-	    return get_dh4096();
+	    if (dh4096 == (DH *) 0)
+		dh4096 = GetDH4096();
+	    return dh4096;
     }
 }
 
 void
-#if USE_ANSI_PROTO
-setupSSL(void)
+#if PROTOTYPES
+SetupSSL(void)
 #else
-setupSSL()
+SetupSSL()
 #endif
 {
     if (ctx == (SSL_CTX *) 0) {
 	SSL_load_error_strings();
 	if (!SSL_library_init()) {
-	    Error("SSL library initialization failed");
+	    Error("SetupSSL(): SSL_library_init() failed");
 	    exit(EX_UNAVAILABLE);
 	}
 	if ((ctx = SSL_CTX_new(SSLv23_method())) == (SSL_CTX *) 0) {
-	    Error("Creating SSL context failed");
+	    Error("SetupSSL(): SSL_CTX_new() failed");
 	    exit(EX_UNAVAILABLE);
 	}
 	if (SSL_CTX_set_default_verify_paths(ctx) != 1) {
-	    Error("Could not load SSL default CA file and/or directory");
+	    Error
+		("SetupSSL(): could not load SSL default CA file and/or directory");
 	    exit(EX_UNAVAILABLE);
 	}
 	if (pcCredFile != (char *)0) {
 	    if (SSL_CTX_use_certificate_chain_file(ctx, pcCredFile) != 1) {
-		Error("Could not load SSL certificate from '%s'",
-		      pcCredFile);
+		Error
+		    ("SetupSSL(): could not load SSL certificate from `%s'",
+		     pcCredFile);
 		exit(EX_UNAVAILABLE);
 	    }
 	    if (SSL_CTX_use_PrivateKey_file
 		(ctx, pcCredFile, SSL_FILETYPE_PEM) != 1) {
-		Error("Could not SSL private key from '%s'", pcCredFile);
+		Error("SetupSSL(): could not SSL private key from `%s'",
+		      pcCredFile);
 		exit(EX_UNAVAILABLE);
 	    }
 	}
-	SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, ssl_verify_callback);
+	SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, SSLVerifyCallback);
 	SSL_CTX_set_options(ctx,
 			    SSL_OP_ALL | SSL_OP_NO_SSLv2 |
 			    SSL_OP_SINGLE_DH_USE);
@@ -342,21 +360,25 @@ setupSSL()
 			 SSL_MODE_ENABLE_PARTIAL_WRITE |
 			 SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |
 			 SSL_MODE_AUTO_RETRY);
-	SSL_CTX_set_tmp_dh_callback(ctx, tmp_dh_callback);
+	SSL_CTX_set_tmp_dh_callback(ctx, TmpDHCallback);
 	if (SSL_CTX_set_cipher_list(ctx, "ALL:!LOW:!EXP:!MD5:@STRENGTH") !=
 	    1) {
-	    Error("Setting SSL cipher list failed");
+	    Error("SetupSSL(): setting SSL cipher list failed");
 	    exit(EX_UNAVAILABLE);
 	}
+	/* might want to turn this back on at some point, but i can't
+	 * see why right now.
+	 */
+	SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_OFF);
     }
 }
 #endif
 
 void
-#if USE_ANSI_PROTO
-reopenLogfile(void)
+#if PROTOTYPES
+ReopenLogfile(void)
 #else
-reopenLogfile()
+ReopenLogfile()
 #endif
 {
     /* redirect stdout and stderr to the logfile.
@@ -370,7 +392,7 @@ reopenLogfile()
 
     close(1);
     if (1 != open(pcLogfile, O_WRONLY | O_CREAT | O_APPEND, 0644)) {
-	Error("open: %s: %s", pcLogfile, strerror(errno));
+	Error("ReopenLogfile(): open(%s): %s", pcLogfile, strerror(errno));
 	exit(EX_TEMPFAIL);
     }
     close(2);
@@ -380,10 +402,10 @@ reopenLogfile()
 /* become a daemon							(ksb)
  */
 static void
-#if USE_ANSI_PROTO
-daemonize()
+#if PROTOTYPES
+Daemonize()
 #else
-daemonize()
+Daemonize()
 #endif
 {
     int res;
@@ -391,117 +413,123 @@ daemonize()
     int td;
 #endif
 
-    simpleSignal(SIGQUIT, SIG_IGN);
-    simpleSignal(SIGINT, SIG_IGN);
+    SimpleSignal(SIGQUIT, SIG_IGN);
+    SimpleSignal(SIGINT, SIG_IGN);
 #if defined(SIGTTOU)
-    simpleSignal(SIGTTOU, SIG_IGN);
+    SimpleSignal(SIGTTOU, SIG_IGN);
 #endif
 #if defined(SIGTTIN)
-    simpleSignal(SIGTTIN, SIG_IGN);
+    SimpleSignal(SIGTTIN, SIG_IGN);
 #endif
 #if defined(SIGTSTP)
-    simpleSignal(SIGTSTP, SIG_IGN);
+    SimpleSignal(SIGTSTP, SIG_IGN);
 #endif
 
-    (void)fflush(stdout);
-    (void)fflush(stderr);
+    fflush(stdout);
+    fflush(stderr);
 
     switch (res = fork()) {
 	case -1:
-	    Error("fork: %s", strerror(errno));
+	    Error("Daemonize(): fork(): %s", strerror(errno));
 	    exit(EX_UNAVAILABLE);
 	case 0:
 	    thepid = getpid();
 	    break;
 	default:
-	    exit(EX_OK);
+	    Bye(EX_OK);
     }
 
-    reopenLogfile();
+    ReopenLogfile();
 
     /* Further disassociate this process from the terminal
      * Maybe this will allow you to start a daemon from rsh,
      * i.e. with no controlling terminal.
      */
 #if HAVE_SETSID
-    (void)setsid();
+    setsid();
 #else
-    (void)setpgrp(0, getpid());
+    setpgrp(0, getpid());
 
     /* lose our controlling terminal
      */
     if (-1 != (td = open("/dev/tty", O_RDWR, 0600))) {
-	(void)ioctl(td, TIOCNOTTY, (char *)0);
+	ioctl(td, TIOCNOTTY, (char *)0);
 	close(td);
     }
 #endif
 }
 
 
-static char u_terse[] =
-    " [-7dDEFhinRouvV] [-a type] [-m max] [-M addr] [-p port] [-b port] [-c cred] [-C config] [-P passwd] [-L logfile] [-O min]";
-static char *apcLong[] = {
-    "7          strip the high bit of all console data",
-    "a type     set the default access type",
-    "b port     base port for secondary channel (any by default)",
-#if HAVE_OPENSSL
-    "c cred     load an SSL certificate and key from the PEM encoded file",
-#else
-    "c cred     ignored - encryption not compiled into code",
-#endif
-    "C config   give a new config file to the server process",
-    "d          become a daemon, redirecting stdout/stderr to logfile",
-    "D          enable debug output, sent to stderr",
-#if HAVE_OPENSSL
-    "E          don't require encrypted client connections",
-#else
-    "E          ignored - encryption not compiled into code",
-#endif
-    "F          do not automatically reinitialize failed consoles",
-    "h          output this message",
-    "i          initialize console connections on demand",
-    "L logfile  give a new logfile path to the server process",
-    "m max      maximum consoles managed per process",
-    "M addr     address to listen on (all addresses by default)",
-    "n          obsolete - see -u",
-    "o          reopen downed console on client connect",
-    "O min      reopen all downed consoles every <min> minutes",
-    "p port     port to listen on",
-    "P passwd   give a new passwd file to the server process",
-    "R          disable automatic client redirection",
-    "u          copy \"unloved\" console data to stdout",
-    "v          be verbose on startup",
-    "V          output version info",
-    (char *)0
-};
-
 /* output a long message to the user					(ksb)
  */
 static void
-#if USE_ANSI_PROTO
-Usage(char **ppc)
+#if PROTOTYPES
+Usage(int wantfull)
 #else
-Usage(ppc)
-    char **ppc;
+Usage(wantfull)
+    int wantfull;
 #endif
 {
-    for ( /* passed */ ; (char *)0 != *ppc; ++ppc)
-	fprintf(stderr, "\t%s\n", *ppc);
+    static char u_terse[] =
+	"[-7dDEFhinRouvV] [-a type] [-m max] [-M addr] [-p port] [-b port] [-c cred] [-C config] [-P passwd] [-L logfile] [-O min]";
+    static char *full[] = {
+	"7          strip the high bit of all console data",
+	"a type     set the default access type",
+	"b port     base port for secondary channel (any by default)",
+#if HAVE_OPENSSL
+	"c cred     load an SSL certificate and key from the PEM encoded file",
+#else
+	"c cred     ignored - encryption not compiled into code",
+#endif
+	"C config   give a new config file to the server process",
+	"d          become a daemon, redirecting stdout/stderr to logfile",
+	"D          enable debug output, sent to stderr",
+#if HAVE_OPENSSL
+	"E          don't require encrypted client connections",
+#else
+	"E          ignored - encryption not compiled into code",
+#endif
+	"F          do not automatically reinitialize failed consoles",
+	"h          output this message",
+	"i          initialize console connections on demand",
+	"L logfile  give a new logfile path to the server process",
+	"m max      maximum consoles managed per process",
+	"M addr     address to listen on (all addresses by default)",
+	"n          obsolete - see -u",
+	"o          reopen downed console on client connect",
+	"O min      reopen all downed consoles every <min> minutes",
+	"p port     port to listen on",
+	"P passwd   give a new passwd file to the server process",
+	"R          disable automatic client redirection",
+	"u          copy \"unloved\" console data to stdout",
+	"v          be verbose on startup",
+	"V          output version info",
+	(char *)0
+    };
+    fprintf(stderr, "%s: usage %s\n", progname, u_terse);
+    if (wantfull) {
+	int i;
+	for (i = 0; full[i] != (char *)0; i++)
+	    fprintf(stderr, "\t%s\n", full[i]);
+    }
 }
 
 /* show the user our version info					(ksb)
  */
 static void
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 Version()
 #else
 Version()
 #endif
 {
-    static STRING acA1 = { (char *)0, 0, 0 };
-    static STRING acA2 = { (char *)0, 0, 0 };
+    static STRING *acA1 = (STRING *) 0;
+    static STRING *acA2 = (STRING *) 0;
     int i;
     char *optionlist[] = {
+#if HAVE_DMALLOC
+	"dmalloc",
+#endif
 #if USE_LIBWRAP
 	"libwrap",
 #endif
@@ -517,18 +545,23 @@ Version()
 	(char *)0
     };
 
-    outputPid = 0;
+    if (acA1 == (STRING *) 0)
+	acA1 = AllocString();
+    if (acA2 == (STRING *) 0)
+	acA2 = AllocString();
 
-    Info("%s", THIS_VERSION);
-    Info("default access type `%c\'", chDefAcc);
-    Info("default escape sequence `%s%s\'", FmtCtl(DEFATTN, &acA1),
-	 FmtCtl(DEFESC, &acA2));
-    Info("configuration in `%s\'", pcConfig);
-    Info("password in `%s\'", pcPasswd);
-    Info("logfile is `%s\'", pcLogfile);
-    Info("pidfile is `%s\'", PIDFILE);
-    Info("limited to %d member%s per group", cMaxMemb,
-	 cMaxMemb == 1 ? "" : "s");
+    isMultiProc = 0;
+
+    Msg("%s", THIS_VERSION);
+    Msg("default access type `%c'", chDefAcc);
+    Msg("default escape sequence `%s%s'", FmtCtl(DEFATTN, acA1),
+	FmtCtl(DEFESC, acA2));
+    Msg("configuration in `%s'", pcConfig);
+    Msg("password in `%s'", pcPasswd);
+    Msg("logfile is `%s'", pcLogfile);
+    Msg("pidfile is `%s'", PIDFILE);
+    Msg("limited to %d member%s per group", cMaxMemb,
+	cMaxMemb == 1 ? "" : "s");
 
     /* Look for non-numeric characters */
     for (i = 0; pcPort[i] != '\000'; i++)
@@ -538,15 +571,16 @@ Version()
     if (pcPort[i] == '\000') {
 	/* numeric only */
 	bindPort = atoi(pcPort);
-	Info("on port %u (referenced as `%s')", bindPort, pcPort);
+	Msg("on port %hu (referenced as `%s')", bindPort, pcPort);
     } else {
 	/* non-numeric only */
 	struct servent *pSE;
 	if ((struct servent *)0 == (pSE = getservbyname(pcPort, "tcp"))) {
-	    Error("getservbyname: %s: %s", pcPort, strerror(errno));
+	    Error("Version(): getservbyname(%s): %s", pcPort,
+		  strerror(errno));
 	} else {
-	    bindPort = ntohs((u_short) pSE->s_port);
-	    Info("on port %u (referenced as `%s')", bindPort, pcPort);
+	    bindPort = ntohs((unsigned short)pSE->s_port);
+	    Msg("on port %hu (referenced as `%s')", bindPort, pcPort);
 	}
     }
 
@@ -558,44 +592,91 @@ Version()
     if (pcBasePort[i] == '\000') {
 	/* numeric only */
 	bindBasePort = atoi(pcBasePort);
-	Info("secondary channel base port %u (referenced as `%s')",
-	     bindBasePort, pcBasePort);
+	Msg("secondary channel base port %hu (referenced as `%s')",
+	    bindBasePort, pcBasePort);
     } else {
 	/* non-numeric only */
 	struct servent *pSE;
 	if ((struct servent *)0 ==
 	    (pSE = getservbyname(pcBasePort, "tcp"))) {
-	    Error("getservbyname: %s: %s", pcBasePort, strerror(errno));
+	    Error("Version(): getservbyname(%s): %s", pcBasePort,
+		  strerror(errno));
 	} else {
-	    bindBasePort = ntohs((u_short) pSE->s_port);
-	    Info("secondary channel base port %u (referenced as `%s')",
-		 bindBasePort, pcBasePort);
+	    bindBasePort = ntohs((unsigned short)pSE->s_port);
+	    Msg("secondary channel base port %hu (referenced as `%s')",
+		bindBasePort, pcBasePort);
 	}
     }
-    buildMyString((char *)0, &acA1);
+    BuildString((char *)0, acA1);
     if (optionlist[0] == (char *)0)
-	buildMyString("none", &acA1);
+	BuildString("none", acA1);
     for (i = 0; optionlist[i] != (char *)0; i++) {
 	if (i == 0)
-	    buildMyString(optionlist[i], &acA1);
+	    BuildString(optionlist[i], acA1);
 	else {
-	    buildMyString(", ", &acA1);
-	    buildMyString(optionlist[i], &acA1);
+	    BuildString(", ", acA1);
+	    BuildString(optionlist[i], acA1);
 	}
     }
-    Info("options: %s", acA1.string);
-    Info("built with `%s'", CONFIGINVOCATION);
+    Msg("options: %s", acA1->string);
+    Msg("built with `%s'", CONFIGINVOCATION);
 
     if (fVerbose)
 	printf(COPYRIGHT);
-    exit(EX_OK);
+    Bye(EX_OK);
 }
 
 void
-#if USE_ANSI_PROTO
-dumpDataStructures(void)
+#if PROTOTYPES
+DestroyDataStructures(void)
 #else
-dumpDataStructures()
+DestroyDataStructures()
+#endif
+{
+    GRPENT *pGE;
+    REMOTE *pRC;
+    ACCESS *pAC;
+
+    while (pGroups != (GRPENT *) 0) {
+	pGE = pGroups->pGEnext;
+	DestroyGroup(pGroups);
+	pGroups = pGE;
+    }
+
+    while (pRCList != (REMOTE *) 0) {
+	pRC = pRCList->pRCnext;
+	DestroyRemoteConsole(pRCList);
+	pRCList = pRC;
+    }
+
+    while (pACList != (ACCESS *) 0) {
+	pAC = pACList->pACnext;
+	DestroyAccessList(pACList);
+	pACList = pAC;
+    }
+
+#if HAVE_OPENSSL
+    if (ctx != (SSL_CTX *) 0)
+	SSL_CTX_free(ctx);
+    if (dh512 != (DH *) 0)
+	DH_free(dh512);
+    if (dh1024 != (DH *) 0)
+	DH_free(dh1024);
+    if (dh2048 != (DH *) 0)
+	DH_free(dh2048);
+    if (dh4096 != (DH *) 0)
+	DH_free(dh4096);
+#endif
+
+    DestroyBreakList();
+    DestroyStrings();
+}
+
+void
+#if PROTOTYPES
+DumpDataStructures(void)
+#else
+DumpDataStructures()
 #endif
 {
     GRPENT *pGE;
@@ -607,8 +688,9 @@ dumpDataStructures()
 	return;
 
     for (pGE = pGroups; pGE != (GRPENT *) 0; pGE = pGE->pGEnext) {
-	Debug(1, "Group: id=%u pid=%d, port=%d, imembers=%d", pGE->id,
-	      pGE->port, pGE->pid, pGE->imembers);
+	Debug(1,
+	      "DumpDataStructures(): group: id=%u pid=%lu, port=%hu, imembers=%d",
+	      pGE->id, pGE->port, (unsigned long)pGE->pid, pGE->imembers);
 
 	for (pCE = pGE->pCElist; pCE != (CONSENT *) 0; pCE = pCE->pCEnext) {
 	    if (pCE->pccmd.string == (char *)0)
@@ -624,29 +706,36 @@ dumpDataStructures()
 	    if (pCE->acslave.string == (char *)0)
 		pCE->acslave.string = empty;
 
-	    Debug(1, "  server=%s, dfile=%s, lfile=%s", pCE->server.string,
-		  pCE->dfile.string, pCE->lfile.string);
-	    Debug(1, "  mark=%d, nextMark=%ld, breakType=%d", pCE->mark,
-		  pCE->nextMark, pCE->breakType);
+	    Debug(1,
+		  "DumpDataStructures():  server=%s, dfile=%s, lfile=%s",
+		  pCE->server.string, pCE->dfile.string,
+		  pCE->lfile.string);
+	    Debug(1,
+		  "DumpDataStructures():  mark=%d, nextMark=%ld, breakType=%d",
+		  pCE->mark, pCE->nextMark, pCE->breakType);
 
-	    Debug(1, "  isNetworkConsole=%d, networkConsoleHost=%s",
+	    Debug(1,
+		  "DumpDataStructures():  isNetworkConsole=%d, networkConsoleHost=%s",
 		  pCE->isNetworkConsole, pCE->networkConsoleHost.string);
 	    Debug(1,
-		  "  networkConsolePort=%d, telnetState=%d, autoReup=%d",
+		  "DumpDataStructures():  networkConsolePort=%hu, telnetState=%d, autoReup=%d",
 		  pCE->networkConsolePort, pCE->telnetState,
 		  pCE->autoReUp);
 
-	    Debug(1, "  baud=%s, parity=%c", pCE->pbaud->acrate,
-		  pCE->pparity->ckey);
+	    Debug(1, "DumpDataStructures():  baud=%s, parity=%c",
+		  pCE->pbaud->acrate, pCE->pparity->ckey);
 
-	    Debug(1, "  fvirtual=%d, acslave=%s, pccmd=%s, ipid=%d",
+	    Debug(1,
+		  "DumpDataStructures():  fvirtual=%d, acslave=%s, pccmd=%s, ipid=%lu",
 		  pCE->fvirtual, pCE->acslave.string, pCE->pccmd.string,
-		  pCE->ipid);
+		  (unsigned long)pCE->ipid);
 
-	    Debug(1, "  nolog=%d, fdtty=%d, activitylog=%d, breaklog=%d",
+	    Debug(1,
+		  "DumpDataStructures():  nolog=%d, fdtty=%d, activitylog=%d, breaklog=%d",
 		  pCE->nolog, pCE->fdtty, pCE->activitylog, pCE->breaklog);
-	    Debug(1, "  fup=%d, fronly=%d", pCE->fup, pCE->fronly);
-	    Debug(1, "  ------");
+	    Debug(1, "DumpDataStructures():  fup=%d, fronly=%d", pCE->fup,
+		  pCE->fronly);
+	    Debug(1, "DumpDataStructures():  ------");
 	}
     }
     for (pRC = pRCList; (REMOTE *) 0 != pRC; pRC = pRC->pRCnext) {
@@ -654,8 +743,8 @@ dumpDataStructures()
 	    pRC->rserver.string = empty;
 	if (pRC->rhost.string == (char *)0)
 	    pRC->rhost.string = empty;
-	Debug(1, "Remote: rserver=%s, rhost =%s", pRC->rserver.string,
-	      pRC->rhost.string);
+	Debug(1, "DumpDataStructures(): remote: rserver=%s, rhost =%s",
+	      pRC->rserver.string, pRC->rhost.string);
     }
 }
 
@@ -668,7 +757,7 @@ dumpDataStructures()
  * exit happy
  */
 int
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 main(int argc, char **argv)
 #else
 main(argc, argv)
@@ -689,7 +778,7 @@ main(argc, argv)
     GRPENT *pGE;
     CONSENT *pCE;
 
-    outputPid = 1;		/* make sure stuff has the pid */
+    isMultiProc = 1;		/* make sure stuff has the pid */
 
     thepid = getpid();
     if ((char *)0 == (progname = strrchr(argv[0], '/'))) {
@@ -698,7 +787,7 @@ main(argc, argv)
 	++progname;
     }
 
-    (void)setpwent();
+    setpwent();
 
 #if HAVE_SETLINEBUF
     setlinebuf(stdout);
@@ -710,7 +799,7 @@ main(argc, argv)
 #endif
 
 
-    (void)gethostname(acMyHost, sizeof(acMyHost));
+    gethostname(acMyHost, sizeof(acMyHost));
     if ((struct hostent *)0 == (hpMe = gethostbyname(acMyHost))) {
 	Error("gethostbyname(%s): %s", acMyHost, hstrerror(h_errno));
 	exit(EX_UNAVAILABLE);
@@ -721,9 +810,9 @@ main(argc, argv)
 	exit(EX_UNAVAILABLE);
     }
 #if HAVE_MEMCPY
-    (void)memcpy(&acMyAddr, hpMe->h_addr, hpMe->h_length);
+    memcpy(&acMyAddr, hpMe->h_addr, hpMe->h_length);
 #else
-    (void)bcopy(hpMe->h_addr, &acMyAddr, hpMe->h_length);
+    bcopy(hpMe->h_addr, &acMyAddr, hpMe->h_length);
 #endif
 
     while (EOF != (i = getopt(argc, argv, acOpts))) {
@@ -742,7 +831,7 @@ main(argc, argv)
 		    case 't':
 			break;
 		    default:
-			Error("unknown access type `%s\'", optarg);
+			Error("unknown access type `%s'", optarg);
 			exit(EX_UNAVAILABLE);
 		}
 		break;
@@ -773,9 +862,8 @@ main(argc, argv)
 		fNoautoreup = 1;
 		break;
 	    case 'h':
-		fprintf(stderr, "%s: usage%s\n", progname, u_terse);
-		Usage(apcLong);
-		exit(EX_OK);
+		Usage(1);
+		Bye(EX_OK);
 	    case 'i':
 		fNoinit = 1;
 		break;
@@ -821,7 +909,7 @@ main(argc, argv)
 		fVerbose = 1;
 		break;
 	    case '\?':
-		fprintf(stderr, "%s: usage%s\n", progname, u_terse);
+		Usage(0);
 		exit(EX_UNAVAILABLE);
 	    default:
 		Error("option %c needs a parameter", optopt);
@@ -839,25 +927,35 @@ main(argc, argv)
      */
     close(0);
     if (0 != open("/dev/null", O_RDWR, 0644)) {
-	Error("open: /dev/null: %s", strerror(errno));
+	Error("open(/dev/null): %s", strerror(errno));
 	exit(EX_UNAVAILABLE);
     }
 
     if (fVersion) {
 	Version();
-	exit(EX_OK);
+	Bye(EX_OK);
     }
 
     if (fDaemon) {
-	daemonize();
+	Daemonize();
     }
 
-    Info("%s", THIS_VERSION);
+    Msg("%s", THIS_VERSION);
 
 #if HAVE_GETLOGIN
     origuser = getlogin();
 #endif
     curuid = getuid();
+
+    if (defaultShell == (STRING *) 0)
+	defaultShell = AllocString();
+    if ((pwd = getpwuid(0)) != (struct passwd *)0 &&
+	pwd->pw_shell[0] != '\000') {
+	BuildString(pwd->pw_shell, defaultShell);
+    } else {
+	BuildString("/bin/sh", defaultShell);
+    }
+
     if ((struct passwd *)0 != (pwd = getpwuid(curuid)))
 	curuser = pwd->pw_name;
 
@@ -867,20 +965,17 @@ main(argc, argv)
 
     if (curuser == (char *)0)
 	if (origuser == (char *)0)
-	    Info("Started as uid %d by uid %d at %s", curuid, curuid,
-		 strtime(NULL));
+	    Msg("started as uid %d by uid %d", curuid, curuid);
 	else
-	    Info("Started as uid %d by `%s' at %s", curuid, origuser,
-		 strtime(NULL));
+	    Msg("started as uid %d by `%s'", curuid, origuser);
     else
-	Info("Started as `%s' by `%s' at %s", curuser,
-	     (origuser == (char *)0) ? curuser : origuser, strtime(NULL));
-    (void)endpwent();
+	Msg("started as `%s' by `%s'", curuser,
+	    (origuser == (char *)0) ? curuser : origuser);
+    endpwent();
 
 #if HAVE_GETSPNAM && !HAVE_PAM
     if (0 != geteuid()) {
-	Error
-	    ("Warning: Running as a non-root user - any shadow password usage will most likely fail!");
+	Msg("Warning: running as a non-root user - any shadow password usage will most likely fail!");
     }
 #endif
 
@@ -889,18 +984,20 @@ main(argc, argv)
     } else {
 	bindAddr = inet_addr(pcAddress);
 	if (bindAddr == (in_addr_t) (-1)) {
-	    Error("inet_addr: %s: %s", pcAddress, "invalid IP address");
+	    Error("inet_addr(%s): %s", pcAddress, "invalid IP address");
 	    exit(EX_UNAVAILABLE);
 	}
+	acMyAddr.s_addr = bindAddr;
     }
     if (fDebug) {
 	struct in_addr ba;
 	ba.s_addr = bindAddr;
-	Debug(1, "Bind address set to `%s'", inet_ntoa(ba));
+	Debug(1, "main(): bind address set to `%s'", inet_ntoa(ba));
     }
 
     if (pcPort == NULL) {
-	Error("Severe error: pcPort is NULL????  How can that be?");
+	Error
+	    ("main(): severe error - pcPort is NULL????  how can that be?");
 	exit(EX_UNAVAILABLE);
     }
 
@@ -916,10 +1013,10 @@ main(argc, argv)
 	/* non-numeric only */
 	struct servent *pSE;
 	if ((struct servent *)0 == (pSE = getservbyname(pcPort, "tcp"))) {
-	    Error("getservbyname: %s: %s", pcPort, strerror(errno));
+	    Error("getservbyname(%s): %s", pcPort, strerror(errno));
 	    exit(EX_UNAVAILABLE);
 	} else {
-	    bindPort = ntohs((u_short) pSE->s_port);
+	    bindPort = ntohs((unsigned short)pSE->s_port);
 	}
     }
 
@@ -936,39 +1033,28 @@ main(argc, argv)
 	struct servent *pSE;
 	if ((struct servent *)0 ==
 	    (pSE = getservbyname(pcBasePort, "tcp"))) {
-	    Error("getservbyname: %s: %s", pcBasePort, strerror(errno));
+	    Error("getservbyname(%s): %s", pcBasePort, strerror(errno));
 	    exit(EX_UNAVAILABLE);
 	} else {
-	    bindBasePort = ntohs((u_short) pSE->s_port);
+	    bindBasePort = ntohs((unsigned short)pSE->s_port);
 	}
     }
 
     /* read the config file
      */
     if ((FILE *) 0 == (fpConfig = fopen(pcConfig, "r"))) {
-	Error("fopen: %s: %s", pcConfig, strerror(errno));
+	Error("fopen(%s): %s", pcConfig, strerror(errno));
 	exit(EX_UNAVAILABLE);
     }
-#if HAVE_FLOCK
-    /* we lock the configuration file so that two identical
-     * conservers will not be running together  (but two with
-     * different configurations can run on the same host).
-     */
-    if (-1 == flock(fileno(fpConfig), LOCK_NB | LOCK_EX)) {
-	Error("%s is locked, won\'t run more than one conserver?",
-	      pcConfig);
-	exit(EX_UNAVAILABLE);
-    }
-#endif
 
     ReadCfg(pcConfig, fpConfig);
 
     if (pGroups == (GRPENT *) 0 && pRCList == (REMOTE *) 0) {
-	Error("No consoles found in configuration file");
+	Error("no consoles found in configuration file");
     } else {
 #if HAVE_OPENSSL
 	/* Prep the SSL layer */
-	setupSSL();
+	SetupSSL();
 #endif
 
 	/* if no one can use us we need to come up with a default
@@ -985,14 +1071,12 @@ main(argc, argv)
 
 	    Spawn(pGE);
 
-	    if (fVerbose) {
-		Info("group #%d pid %d on port %u", pGE->id, pGE->pid,
-		     ntohs(pGE->port));
-	    }
+	    Verbose("group #%d pid %lu on port %hu", pGE->id,
+		    (unsigned long)pGE->pid, ntohs(pGE->port));
 	    for (pCE = pGE->pCElist; pCE != (CONSENT *) 0;
 		 pCE = pCE->pCEnext) {
 		if (-1 != pCE->fdtty)
-		    (void)close(pCE->fdtty);
+		    close(pCE->fdtty);
 	    }
 	}
 
@@ -1000,8 +1084,8 @@ main(argc, argv)
 	    ACCESS *pACtmp;
 	    for (pACtmp = pACList; pACtmp != (ACCESS *) 0;
 		 pACtmp = pACtmp->pACnext) {
-		Info("access type '%c' for \"%s\"", pACtmp->ctrust,
-		     pACtmp->pcwho);
+		Verbose("access type `%c' for `%s'", pACtmp->ctrust,
+			pACtmp->pcwho);
 	    }
 	}
 
@@ -1011,24 +1095,25 @@ main(argc, argv)
 	if (fVerbose) {
 	    REMOTE *pRC;
 	    for (pRC = pRCUniq; (REMOTE *) 0 != pRC; pRC = pRC->pRCuniq) {
-		Info("peer server on `%s'", pRC->rhost.string);
+		Verbose("peer server on `%s'", pRC->rhost.string);
 	    }
 	}
 
-	(void)fflush(stdout);
-	(void)fflush(stderr);
+	fflush(stdout);
+	fflush(stderr);
 	Master();
 
 	/* stop putting kids back, and shoot them
 	 */
-	simpleSignal(SIGCHLD, SIG_DFL);
+	SimpleSignal(SIGCHLD, SIG_DFL);
 	SignalKids(SIGTERM);
     }
 
-    dumpDataStructures();
+    DumpDataStructures();
 
-    Info("Stopped at %s", strtime(NULL));
-    (void)endpwent();
-    (void)fclose(fpConfig);
-    exit(EX_OK);
+    Msg("terminated");
+    endpwent();
+    fclose(fpConfig);
+    Bye(EX_OK);
+    return EX_OK;		/* never gets here clears the compiler warning */
 }

@@ -16,8 +16,13 @@ case "$1" in
 		[ "$master" ] && kill -TERM $master
 		;;
 
+	'restart')
+		master=`ps -ef | grep conserver | awk '$3 == "1"{print $2}'`
+		[ "$master" ] && kill -HUP $master
+		;;
+
 	*)
-		echo "Usage: $0 { start | stop }"
+		echo "Usage: $0 { start | stop | restart }"
 		;;
 
 esac

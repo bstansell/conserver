@@ -10,10 +10,10 @@ AH_TEMPLATE([MAXMEMB], [Number of consoles per child process])
 AH_TEMPLATE([CONNECTTIMEOUT], [TCP connection timeout])
 AH_TEMPLATE([PIDFILE], [pidfile to write to])
 AH_TEMPLATE([USE_LIBWRAP], [use tcp_wrappers libwrap])
-AH_TEMPLATE([USE_ANSI_PROTO], [use ansi prototypes/decls])
 AH_TEMPLATE([HAVE_POSIX_REGCOMP], [have POSIX regcomp])
 AH_TEMPLATE([HAVE_PAM], [have PAM support])
 AH_TEMPLATE([HAVE_OPENSSL], [have openssl support])
+AH_TEMPLATE([HAVE_DMALLOC], [have dmalloc support])
 
 dnl ### Normal initialization. ######################################
 AC_INIT
@@ -174,8 +174,9 @@ AC_PROG_LN_S
 AC_PROG_MAKE_SET
 dnl ### Compiler characteristics. ##################################
 AC_AIX
-AC_PROG_CC_STDC
+AC_PROG_CC
 AC_C_CONST
+AC_C_PROTOTYPES
 
 AC_CHECK_SIZEOF(long)
 if test "$ac_cv_sizeof_long" -gt 4; then
@@ -184,10 +185,6 @@ if test "$ac_cv_sizeof_long" -gt 4; then
     else
 	AC_MSG_WARN([building a 64bit version of conserver - good luck!])
     fi
-fi
-
-if test "$ac_cv_prog_cc_stdc" != "no"; then
-    AC_DEFINE_UNQUOTED(USE_ANSI_PROTO, 1)
 fi
 
 dnl ### Checks for header files. ###################################
@@ -213,6 +210,7 @@ AC_HEADER_TIME
 AC_HEADER_SYS_WAIT
 AC_TYPE_MODE_T
 AC_TYPE_SIGNAL
+AC_TYPE_PID_T
 
 AC_CHECK_TYPE([sig_atomic_t],,
     AC_DEFINE(sig_atomic_t, volatile int,
@@ -312,6 +310,44 @@ AC_ARG_WITH(openssl,
     fi]
 )
 
+AC_ARG_WITH(dmalloc,
+    AC_HELP_STRING([--with-dmalloc@<:@=PATH@:>@],
+	[Compile in dmalloc support]),
+    [if test "$withval" != "no"; then
+	if test "$withval" != "yes"; then
+	    DMALLOCCPPFLAGS="-I$withval/include"
+	    DMALLOCLDFLAGS="-L$withval/lib"
+	else
+	    DMALLOCCPPFLAGS=""
+	    DMALLOCLDFLAGS=""
+	fi
+
+	oCPPFLAGS="$CPPFLAGS"
+	oLDFLAGS="$LDFLAGS"
+	oLIBS="$LIBS"
+	have_dmalloc=no
+
+	CPPFLAGS="$CPPFLAGS $DMALLOCCPPFLAGS"
+	LDFLAGS="$LDFLAGS $DMALLOCLDFLAGS"
+
+	AC_CHECK_HEADER([dmalloc.h],
+	    [LIBS="$LIBS -ldmalloc"
+	    AC_MSG_CHECKING(for dmalloc libraries -ldmalloc)
+	    AC_TRY_LINK([#include <dmalloc.h>
+		],[dmalloc_debug(0)],
+		[AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_DMALLOC)
+		have_dmalloc=yes],
+		[AC_MSG_RESULT(no)])],)
+
+	if test $have_dmalloc = no; then
+	    LIBS="$oLIBS"
+	    CPPFLAGS="$oCPPFLAGS"
+	    LDFLAGS="$oLDFLAGS"
+	fi
+    fi]
+)
+
 
 dnl ### Check for needed functions. ################################
 
@@ -374,7 +410,7 @@ AC_ARG_WITH(pam,
 	fi],)
 
 
-AC_CHECK_FUNCS(getopt strerror getrlimit getsid setsid getuserattr setgroups tcgetpgrp tcsetpgrp tcgetattr tcsetattr tcsendbreak setpgrp getutent setttyent getspnam setlinebuf setvbuf ptsname grantpt unlockpt flock sigaction setsockopt getdtablesize putenv memset memcpy memcmp sysconf getpassphrase getlogin)
+AC_CHECK_FUNCS(getopt strerror getrlimit getsid setsid getuserattr setgroups tcgetpgrp tcsetpgrp tcgetattr tcsetattr tcsendbreak setpgrp getutent setttyent getspnam setlinebuf setvbuf ptsname grantpt unlockpt sigaction setsockopt getdtablesize putenv memset memcpy memcmp sysconf getpassphrase getlogin)
 AC_FUNC_SETPGRP
 
 dnl    Checks for libbsm functions

@@ -1,5 +1,5 @@
 /*
- *  $Id: group.h,v 5.25 2002-09-20 23:04:45-07 bryan Exp $
+ *  $Id: group.h,v 5.30 2003-03-09 15:21:49-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -43,7 +43,7 @@
 typedef struct grpent {		/* group info                           */
     unsigned int id;		/* uniqueue group id                    */
     unsigned short port;	/* port group listens on                */
-    int pid;			/* pid of server for group              */
+    pid_t pid;			/* pid of server for group              */
     int imembers;		/* number of consoles in this group     */
     fd_set rinit;		/* descriptor list                      */
     CONSENT *pCElist;		/* list of consoles in this group       */
@@ -53,24 +53,11 @@ typedef struct grpent {		/* group info                           */
     struct grpent *pGEnext;	/* next group entry                     */
 } GRPENT;
 
-#if USE_ANSI_PROTO
-extern void Spawn(GRPENT *);
-extern int CheckPass(char *, char *);
-extern const char *strtime(time_t *);
-extern void tagLogfile(const CONSENT *, const char *, ...);
-extern void cleanupBreak(short int);
-extern void destroyGroup(GRPENT *);
-extern void destroyConsent(GRPENT *, CONSENT *);
-extern void SendClientsMsg(CONSENT *, char *);
-extern void resetMark(void);
-#else
-extern void Spawn();
-extern int CheckPass();
-extern const char *strtime();
-extern void tagLogfile();
-extern void cleanupBreak();
-extern void destroyGroup();
-extern void destroyConsent();
-extern void SendClientsMsg();
-extern void resetMark();
-#endif
+extern void Spawn PARAMS((GRPENT *));
+extern int CheckPass PARAMS((char *, char *));
+extern void TagLogfile PARAMS((const CONSENT *, const char *, ...));
+extern void CleanupBreak PARAMS((short));
+extern void DestroyGroup PARAMS((GRPENT *));
+extern void DestroyConsent PARAMS((GRPENT *, CONSENT *));
+extern void SendClientsMsg PARAMS((CONSENT *, char *));
+extern void ResetMark PARAMS((void));

@@ -12,3 +12,4 @@ f none share/man/man1m/conserver.1m 0644 bin bin
 f none share/man/man1m/console.1m 0644 bin bin
 d none share/man/man5 0755 bin bin
 f none share/man/man5/conserver.cf.5 0644 bin bin
+f none share/man/man5/conserver.passwd.5 0644 bin bin

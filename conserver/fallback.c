@@ -1,5 +1,5 @@
 /*
- *  $Id: fallback.c,v 5.46 2002-10-12 20:07:43-07 bryan Exp $
+ *  $Id: fallback.c,v 5.52 2003-03-08 08:38:14-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -37,10 +37,10 @@
  * get a pty for the user (emulate the neato sequent call)		(mm)
  */
 static int
-#if USE_ANSI_PROTO
-getpseudotty(STRING * slave, STRING * master)
+#if PROTOTYPES
+GetPseudoTTY(STRING * slave, STRING * master)
 #else
-getpseudotty(slave, master)
+GetPseudoTTY(slave, master)
     STRING *slave;
     STRING *master;
 #endif
@@ -54,11 +54,11 @@ getpseudotty(slave, master)
     if ((char *)0 == (pcName = ttyname(fd))) {
 	return -1;
     }
-    buildMyString((char *)0, slave);
-    buildMyString(pcName, slave);
+    BuildString((char *)0, slave);
+    BuildString(pcName, slave);
 
-    buildMyString((char *)0, master);
-    buildMyString(pcName, master);
+    BuildString((char *)0, master);
+    BuildString(pcName, master);
     master->string[7] = 'c';
 
     return fd;
@@ -77,10 +77,10 @@ extern int unlockpt();
  * DYNIX/ptx v4.0
  */
 static int
-#if USE_ANSI_PROTO
-getpseudotty(STRING * slave, STRING * master)
+#if PROTOTYPES
+GetPseudoTTY(STRING * slave, STRING * master)
 #else
-getpseudotty(slave, master)
+GetPseudoTTY(slave, master)
     STRING *slave;
     STRING *master;
 #endif
@@ -100,34 +100,36 @@ getpseudotty(slave, master)
     sigemptyset(&newmask);
     sigaddset(&newmask, SIGCHLD);
     if (sigprocmask(SIG_BLOCK, &newmask, &oldmask) < 0)
-	Error("sigprocmask(SIG_BLOCK): %s", strerror(errno));
+	Error("GetPseudoTTY(): sigprocmask(SIG_BLOCK): %s",
+	      strerror(errno));
 #else
-    simpleSignal(SIGCHLD, SIG_DFL);
+    SimpleSignal(SIGCHLD, SIG_DFL);
 #endif
 
     grantpt(fd);		/* change permission of slave */
 
 #if HAVE_SIGACTION
     if (sigprocmask(SIG_SETMASK, &oldmask, NULL) < 0)
-	Error("sigprocmask(SIG_SETMASK): %s", strerror(errno));
+	Error("GetPseudoTTY(): sigprocmask(SIG_SETMASK): %s",
+	      strerror(errno));
 #else
-    simpleSignal(SIGCHLD, FlagReapVirt);
+    SimpleSignal(SIGCHLD, FlagReapVirt);
 #endif
 
     unlockpt(fd);		/* unlock slave */
-    buildMyString((char *)0, master);
+    BuildString((char *)0, master);
     if ((char *)0 == (pcName = ttyname(fd))) {
-	buildMyString("/dev/ptmx", master);
+	BuildString("/dev/ptmx", master);
     } else {
-	buildMyString(pcName, master);
+	BuildString(pcName, master);
     }
 
     if ((char *)0 == (pcName = ptsname(fd))) {
 	return -1;
     }
 
-    buildMyString((char *)0, slave);
-    buildMyString(pcName, slave);
+    BuildString((char *)0, slave);
+    BuildString(pcName, slave);
 
     return fd;
 }
@@ -148,10 +150,10 @@ static char chartwo[] =
  * get a pty for the user (emulate the neato sequent call)		(ksb)
  */
 static int
-#if USE_ANSI_PROTO
-getpseudotty(STRING * slave, STRING * master)
+#if PROTOTYPES
+GetPseudoTTY(STRING * slave, STRING * master)
 #else
-getpseudotty(slave, master)
+GetPseudoTTY(slave, master)
     STRING *slave;
     STRING *master;
 #endif
@@ -195,16 +197,16 @@ getpseudotty(slave, master)
 	acSlave[iIndex] = *pcOne;
 	acSlave[iIndex + 1] = *pcTwo;
 	if (-1 == access(acSlave, F_OK)) {
-	    (void)close(fd);
+	    close(fd);
 	    continue;
 	}
 	break;
     }
 
-    buildMyString((char *)0, master);
-    buildMyString(acMaster, master);
-    buildMyString((char *)0, slave);
-    buildMyString(acSlave, slave);
+    BuildString((char *)0, master);
+    BuildString(acMaster, master);
+    BuildString((char *)0, slave);
+    BuildString(acSlave, slave);
     return fd;
 }
 #endif
@@ -214,7 +216,7 @@ getpseudotty(slave, master)
  * get a Joe pty bacause the daemon is not with us, sadly.		(ksb)
  */
 int
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 FallBack(STRING * pcSlave, STRING * pcMaster)
 #else
 FallBack(pcSlave, pcMaster)
@@ -222,15 +224,20 @@ FallBack(pcSlave, pcMaster)
 #endif
 {
     int fd;
-    static STRING pcTSlave = { (char *)0, 0, 0 };
-    static STRING pcTMaster = { (char *)0, 0, 0 };
+    static STRING *pcTSlave = (STRING *) 0;
+    static STRING *pcTMaster = (STRING *) 0;
 
-    if (-1 == (fd = getpseudotty(&pcTSlave, &pcTMaster))) {
+    if (pcTSlave == (STRING *) 0)
+	pcTSlave = AllocString();
+    if (pcTMaster == (STRING *) 0)
+	pcTMaster = AllocString();
+
+    if (-1 == (fd = GetPseudoTTY(pcTSlave, pcTMaster))) {
 	return -1;
     }
-    buildMyString((char *)0, pcSlave);
-    buildMyString(pcTSlave.string, pcSlave);
-    buildMyString((char *)0, pcMaster);
-    buildMyString(pcTMaster.string, pcMaster);
+    BuildString((char *)0, pcSlave);
+    BuildString(pcTSlave->string, pcSlave);
+    BuildString((char *)0, pcMaster);
+    BuildString(pcTMaster->string, pcMaster);
     return fd;
 }

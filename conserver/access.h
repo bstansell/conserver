@@ -1,5 +1,5 @@
 /*
- *  $Id: access.h,v 5.18 2002-09-29 19:04:32-07 bryan Exp $
+ *  $Id: access.h,v 5.22 2003-03-06 10:13:41-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -52,12 +52,8 @@ typedef struct remote {		/* console at another host              */
     STRING rhost;		/* remote host to call to get it        */
 } REMOTE;
 
-#if USE_ANSI_PROTO
-extern REMOTE *FindUniq(REMOTE *);
-extern char AccType(struct in_addr *, char *);
-extern void SetDefAccess(struct in_addr *, char *);
-#else
-extern REMOTE *FindUniq();
-extern char AccType();
-extern void SetDefAccess();
-#endif
+extern REMOTE *FindUniq PARAMS((REMOTE *));
+extern char AccType PARAMS((struct in_addr *, char *));
+extern void SetDefAccess PARAMS((struct in_addr *, char *));
+extern void DestroyRemoteConsole PARAMS((REMOTE *));
+extern void DestroyAccessList PARAMS((ACCESS *));

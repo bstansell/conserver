@@ -1,5 +1,5 @@
 /*
- *  $Id: access.c,v 5.45 2002-10-12 20:08:07-07 bryan Exp $
+ *  $Id: access.c,v 5.52 2003-03-08 08:37:24-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -74,7 +74,7 @@
  * Returns 0 if the addresses match, else returns 1.
  */
 int
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 AddrCmp(struct in_addr *addr, char *pattern)
 #else
 AddrCmp(addr, pattern)
@@ -84,14 +84,16 @@ AddrCmp(addr, pattern)
 {
     in_addr_t hostaddr, pattern_addr, netmask;
     char *p, *slash_posn;
-    static STRING buf = { (char *)0, 0, 0 };
+    static STRING *buf = (STRING *) 0;
 
+    if (buf == (STRING *) 0)
+	buf = AllocString();
     slash_posn = strchr(pattern, '/');
     if (slash_posn != NULL) {
-	buildMyString((char *)0, &buf);
-	buildMyString(pattern, &buf);
-	buf.string[slash_posn - pattern] = '\0';	/* isolate the address */
-	p = buf.string;
+	BuildString((char *)0, buf);
+	BuildString(pattern, buf);
+	buf->string[slash_posn - pattern] = '\0';	/* isolate the address */
+	p = buf->string;
     } else
 	p = pattern;
 
@@ -121,17 +123,16 @@ AddrCmp(addr, pattern)
 	netmask = 0xffffffff;	/* compare entire addresses */
     hostaddr = addr->s_addr;
 
-    Debug(1, "Access check:       host=%lx(%lx/%lx)", hostaddr & netmask,
-	  hostaddr, netmask);
-    Debug(1, "Access check:        acl=%lx(%lx/%lx)",
-	  pattern_addr & netmask, pattern_addr, netmask);
+    Debug(1, "AddrCmp(): host=%lx(%lx/%lx) acl=%lx(%lx/%lx)",
+	  hostaddr & netmask, hostaddr, netmask, pattern_addr & netmask,
+	  pattern_addr, netmask);
     return (hostaddr & netmask) != (pattern_addr & netmask);
 }
 
 /* return the access type for a given host entry			(ksb)
  */
 char
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 AccType(struct in_addr *addr, char *hname)
 #else
 AccType(addr, hname)
@@ -145,15 +146,15 @@ AccType(addr, hname)
 
     if (fDebug) {
 	if (hname)
-	    Debug(1, "Access check: hostname=%s, ip=%s", hname,
+	    Debug(1, "AccType(): hostname=%s, ip=%s", hname,
 		  inet_ntoa(*addr));
 	else
-	    Debug(1, "Access check: hostname=<unresolvable>, ip=%s",
+	    Debug(1, "AccType(): hostname=<unresolvable>, ip=%s",
 		  inet_ntoa(*addr));
     }
     for (pACtmp = pACList; pACtmp != (ACCESS *) 0;
 	 pACtmp = pACtmp->pACnext) {
-	Debug(1, "Access check:    who=%s, trust=%c", pACtmp->pcwho,
+	Debug(1, "AccType(): who=%s, trust=%c", pACtmp->pcwho,
 	      pACtmp->ctrust);
 	if (pACtmp->isCIDR != 0) {
 	    if (0 == AddrCmp(addr, pACtmp->pcwho)) {
@@ -165,7 +166,7 @@ AccType(addr, hname)
 	    pcName = hname;
 	    len = strlen(pcName);
 	    while (len >= pACtmp->ilen) {
-		Debug(1, "Access check:       name=%s", pcName);
+		Debug(1, "AccType(): name=%s", pcName);
 		if (0 == strcmp(pcName, pACtmp->pcwho)) {
 		    return pACtmp->ctrust;
 		}
@@ -182,7 +183,7 @@ AccType(addr, hname)
 }
 
 void
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 SetDefAccess(struct in_addr *pAddr, char *pHost)
 #else
 SetDefAccess(pAddr, pHost)
@@ -206,7 +207,7 @@ SetDefAccess(pAddr, pHost)
     pACList->ilen = iLen;
     pACList->pcwho = strcpy(pcWho, addr);
 
-    Debug(1, "Access list prime: trust=%c, who=%s", pACList->ctrust,
+    Debug(1, "SetDefAccess(): trust=%c, who=%s", pACList->ctrust,
 	  pACList->pcwho);
 
     if ((char *)0 == (pcDomain = strchr(pHost, '.'))) {
@@ -226,15 +227,15 @@ SetDefAccess(pAddr, pHost)
     pACList->pACnext->ilen = iLen;
     pACList->pACnext->pcwho = strcpy(pcWho, pcDomain);
 
-    Debug(1, "Access list prime: trust=%c, who=%s",
-	  pACList->pACnext->ctrust, pACList->pACnext->pcwho);
+    Debug(1, "SetDefAccess(): trust=%c, who=%s", pACList->pACnext->ctrust,
+	  pACList->pACnext->pcwho);
 }
 
 /* thread ther list of uniq console server machines, aliases for	(ksb)
  * machines will screw us up
  */
 REMOTE *
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 FindUniq(REMOTE * pRCAll)
 #else
 FindUniq(pRCAll)
@@ -261,4 +262,30 @@ FindUniq(pRCAll)
 	}
     }
     return pRCAll;
+}
+
+void
+#if PROTOTYPES
+DestroyRemoteConsole(REMOTE * pRCList)
+#else
+DestroyRemoteConsole(pRCList)
+    REMOTE *pRCList;
+#endif
+{
+    DestroyString(&pRCList->rserver);
+    DestroyString(&pRCList->rhost);
+    free(pRCList);
+}
+
+void
+#if PROTOTYPES
+DestroyAccessList(ACCESS * pACList)
+#else
+DestroyAccessList(pACList)
+    ACCESS *pACList;
+#endif
+{
+    if (pACList->pcwho != (char *)0)
+	free(pACList->pcwho);
+    free(pACList);
 }

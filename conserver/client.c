@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.49 2002-10-12 20:07:43-07 bryan Exp $
+ *  $Id: client.c,v 5.58 2003-03-09 13:53:40-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -59,7 +59,7 @@
 /* find the next guy who wants to write on the console			(ksb)
  */
 CONSCLIENT *
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 FindWrite(CONSCLIENT * pCL)
 #else
 FindWrite(pCL)
@@ -79,52 +79,14 @@ FindWrite(pCL)
 	pCL->fwantwr = 0;
 	pCL->fwr = 1;
 	if (pCL->pCEto->nolog) {
-	    fileWrite(pCL->fd, "\r\n[attached (nologging)]\r\n", -1);
+	    FileWrite(pCL->fd, "\r\n[attached (nologging)]\r\n", -1);
 	} else {
-	    fileWrite(pCL->fd, "\r\n[attached]\r\n", -1);
+	    FileWrite(pCL->fd, "\r\n[attached]\r\n", -1);
 	}
-	tagLogfile(pCL->pCEto, "%s attached", pCL->acid.string);
+	TagLogfile(pCL->pCEto, "%s attached", pCL->acid.string);
 	return pCL;
     }
     return (CONSCLIENT *) 0;
-}
-
-/* show a character as a string so the user cannot mistake it for	(ksb)
- * another
- * 
- * must pass us at least 16 characters to put fill with text
- */
-char *
-#if USE_ANSI_PROTO
-FmtCtl(int ci, STRING * pcIn)
-#else
-FmtCtl(ci, pcIn)
-    int ci;
-    STRING *pcIn;
-#endif
-{
-    unsigned char c;
-
-    buildMyString((char *)0, pcIn);
-    c = ci & 0xff;
-    if (c > 127) {
-	c -= 128;
-	buildMyString("M-", pcIn);
-    }
-
-    if (c < ' ' || c == '\177') {
-	buildMyStringChar('^', pcIn);
-	buildMyStringChar(c ^ 0100, pcIn);
-    } else if (c == ' ') {
-	buildMyString("<space>", pcIn);
-    } else if (c == '^') {
-	buildMyString("<circumflex>", pcIn);
-    } else if (c == '\\') {
-	buildMyString("<backslash>", pcIn);
-    } else {
-	buildMyStringChar(c, pcIn);
-    }
-    return pcIn->string;
 }
 
 /* replay last iBack lines of the log file upon connect to console	(ksb)
@@ -134,7 +96,7 @@ FmtCtl(ci, pcIn)
  * so we don't drop chars...
  */
 void
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 Replay(CONSFILE * fdLog, CONSFILE * fdOut, int iBack)
 #else
 Replay(fdLog, fdOut, iBack)
@@ -164,17 +126,24 @@ Replay(fdLog, fdOut, iBack)
     int u;
     int is_mark;
     char dummy[4];
+#if HAVE_DMALLOC && DMALLOC_MARK_REPLAY
+    unsigned long dmallocMarkReplay = 0;
+#endif
 
     if ((CONSFILE *) 0 == fdLog) {
-	fileWrite(fdOut, "[no log file on this console]\r\n", -1);
+	FileWrite(fdOut, "[no log file on this console]\r\n", -1);
 	return;
     }
 
     /* find the size of the file
      */
-    if (0 != fileStat(fdLog, &stLog)) {
+    if (0 != FileStat(fdLog, &stLog)) {
 	return;
     }
+#if HAVE_DMALLOC && DMALLOC_MARK_REPLAY
+    dmallocMarkReplay = dmalloc_mark();
+#endif
+
     file_pos = stLog.st_size - 1;
     buf_pos = file_pos + 1;
 
@@ -208,15 +177,15 @@ Replay(fdLog, fdOut, iBack)
 #if defined(SEEK_SET)
 	    /* PTX and maybe other Posix systems
 	     */
-	    if (fileSeek(fdLog, buf_pos, SEEK_SET) < 0) {
+	    if (FileSeek(fdLog, buf_pos, SEEK_SET) < 0) {
 		goto common_exit;
 	    }
 #else
-	    if (fileSeek(fdLog, buf_pos, L_SET) < 0) {
+	    if (FileSeek(fdLog, buf_pos, L_SET) < 0) {
 		goto common_exit;
 	    }
 #endif
-	    if ((r = fileRead(fdLog, buf, BUFSIZ)) <= 0) {
+	    if ((r = FileRead(fdLog, buf, BUFSIZ)) <= 0) {
 		goto common_exit;
 	    }
 	    bp = buf + r;
@@ -275,10 +244,10 @@ Replay(fdLog, fdOut, iBack)
 			lines[ln].line.used = 0;
 			lines[ln].line.allocated = 0;
 		    } else {
-			buildMyString((char *)0, &lines[ln - 1].line);
-			buildMyString(lines[ln].line.string,
-				      &lines[ln - 1].line);
-			buildMyString((char *)0, &lines[ln].line);
+			BuildString((char *)0, &lines[ln - 1].line);
+			BuildString(lines[ln].line.string,
+				    &lines[ln - 1].line);
+			BuildString((char *)0, &lines[ln].line);
 		    }
 		    ln--;
 		}
@@ -299,7 +268,7 @@ Replay(fdLog, fdOut, iBack)
 	if (ln < 0) {
 	    ln = 0;
 	}
-	(void)buildMyStringChar(ch, &lines[ln].line);
+	BuildStringChar(ch, &lines[ln].line);
 
 	/* if we've processed "a lot" of data for a line, then bail
 	 * why?  there must be some very long non-newline terminated
@@ -343,8 +312,8 @@ Replay(fdLog, fdOut, iBack)
 	    if ((char *)0 != s) {
 		*s = '\000';
 	    }
-	    (void)fileWrite(fdOut, lines[i].line.string, -1);
-	    (void)fileWrite(fdOut, " .. ", -1);
+	    FileWrite(fdOut, lines[i].line.string, -1);
+	    FileWrite(fdOut, " .. ", -1);
 
 	    /* build the end string by removing the leading "[-- MARK -- "
 	     * and replacing "]\r\n" on the end with " -- MARK --]\r\n"
@@ -355,31 +324,20 @@ Replay(fdLog, fdOut, iBack)
 	    if ((char *)0 != s) {
 		*s = '\000';
 	    }
-	    (void)fileWrite(fdOut, lines[i].mark_end.string + mark_len,
-			    -1);
-	    (void)fileWrite(fdOut, " -- MARK --]\r\n", -1);
+	    FileWrite(fdOut, lines[i].mark_end.string + mark_len, -1);
+	    FileWrite(fdOut, " -- MARK --]\r\n", -1);
 	    u = lines[i].mark_end.used;
 	    s = lines[i].mark_end.string;
 	} else
-	    (void)fileWrite(fdOut, lines[i].line.string, -1);
+	    FileWrite(fdOut, lines[i].line.string, -1);
     }
 
   common_exit:
 
     if ((struct lines *)0 != lines) {
 	for (i = 0; i < n_lines; i++) {
-	    if ((char *)0 != lines[i].mark_end.string) {
-		free(lines[i].mark_end.string);
-		lines[i].mark_end.string = (char *)0;
-		lines[i].mark_end.used = 0;
-		lines[i].mark_end.allocated = 0;
-	    }
-	    if ((char *)0 != lines[i].line.string) {
-		free(lines[i].line.string);
-		lines[i].line.string = (char *)0;
-		lines[i].line.used = 0;
-		lines[i].line.allocated = 0;
-	    }
+	    DestroyString(&lines[i].mark_end);
+	    DestroyString(&lines[i].line);
 	}
 	free(lines);
 	lines = (struct lines *)0;
@@ -388,6 +346,10 @@ Replay(fdLog, fdOut, iBack)
 	free(buf);
 	buf = (char *)0;
     }
+#if HAVE_DMALLOC && DMALLOC_MARK_REPLAY
+    Debug(1, "Replay(): dmalloc / MarkReplay");
+    dmalloc_log_changed(dmallocMarkReplay, 1, 0, 1);
+#endif
 }
 
 
@@ -445,7 +407,7 @@ static HELP aHLTable[] = {
 /* list the commands we know for the user				(ksb)
  */
 void
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 HelpUser(CONSCLIENT * pCL)
 #else
 HelpUser(pCL)
@@ -456,52 +418,55 @@ HelpUser(pCL)
     static char
       acH1[] = "help]\r\n", acH2[] = "help spy mode]\r\n", acEoln[] =
 	"\r\n";
-    static STRING acLine = { (char *)0, 0, 0 };
+    static STRING *acLine = (STRING *) 0;
+
+    if (acLine == (STRING *) 0)
+	acLine = AllocString();
 
     iCmp = WHEN_ALWAYS | WHEN_SPY;
     if (pCL->fwr) {
-	(void)fileWrite(pCL->fd, acH1, sizeof(acH1) - 1);
+	FileWrite(pCL->fd, acH1, sizeof(acH1) - 1);
 	iCmp |= WHEN_ATTACH;
     } else {
-	(void)fileWrite(pCL->fd, acH2, sizeof(acH2) - 1);
+	FileWrite(pCL->fd, acH2, sizeof(acH2) - 1);
     }
     if ('\033' == pCL->ic[0] && 'O' == pCL->ic[1]) {
 	iCmp |= WHEN_VT100;
     }
 
-    buildMyString((char *)0, &acLine);
+    BuildString((char *)0, acLine);
     for (i = 0; i < sizeof(aHLTable) / sizeof(HELP); ++i) {
 	if (0 == (aHLTable[i].iwhen & iCmp)) {
 	    continue;
 	}
-	if (acLine.used != 0) {	/* second part of line */
+	if (acLine->used != 0) {	/* second part of line */
 	    if (strlen(aHLTable[i].actext) < HALFLINE) {
-		for (j = acLine.used; j <= HALFLINE; ++j) {
-		    buildMyStringChar(' ', &acLine);
+		for (j = acLine->used; j <= HALFLINE; ++j) {
+		    BuildStringChar(' ', acLine);
 		}
-		buildMyString(aHLTable[i].actext, &acLine);
-		buildMyString(acEoln, &acLine);
-		(void)fileWrite(pCL->fd, acLine.string, -1);
-		buildMyString((char *)0, &acLine);
+		BuildString(aHLTable[i].actext, acLine);
+		BuildString(acEoln, acLine);
+		FileWrite(pCL->fd, acLine->string, -1);
+		BuildString((char *)0, acLine);
 		continue;
 	    } else {
-		buildMyString(acEoln, &acLine);
-		(void)fileWrite(pCL->fd, acLine.string, -1);
-		buildMyString((char *)0, &acLine);
+		BuildString(acEoln, acLine);
+		FileWrite(pCL->fd, acLine->string, -1);
+		BuildString((char *)0, acLine);
 	    }
 	}
-	if (acLine.used == 0) {	/* at new line */
-	    buildMyStringChar(' ', &acLine);
-	    buildMyString(aHLTable[i].actext, &acLine);
-	    if (acLine.used > HALFLINE) {
-		buildMyString(acEoln, &acLine);
-		(void)fileWrite(pCL->fd, acLine.string, -1);
-		buildMyString((char *)0, &acLine);
+	if (acLine->used == 0) {	/* at new line */
+	    BuildStringChar(' ', acLine);
+	    BuildString(aHLTable[i].actext, acLine);
+	    if (acLine->used > HALFLINE) {
+		BuildString(acEoln, acLine);
+		FileWrite(pCL->fd, acLine->string, -1);
+		BuildString((char *)0, acLine);
 	    }
 	}
     }
-    if (acLine.used != 0) {
-	buildMyString(acEoln, &acLine);
-	(void)fileWrite(pCL->fd, acLine.string, -1);
+    if (acLine->used != 0) {
+	BuildString(acEoln, acLine);
+	FileWrite(pCL->fd, acLine->string, -1);
     }
 }

@@ -1,5 +1,5 @@
 /*
- *  $Id: client.h,v 5.25 2002-02-25 14:00:38-08 bryan Exp $
+ *  $Id: client.h,v 5.27 2003-03-06 10:13:41-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -78,14 +78,6 @@ typedef struct client {		/* Connection Information:              */
       cnct_port;		/* where from                           */
 } CONSCLIENT;
 
-#if USE_ANSI_PROTO
-extern char *FmtCtl(int, STRING *);
-extern void Replay(CONSFILE *, CONSFILE *, int);
-extern void HelpUser(CONSCLIENT *);
-extern CONSCLIENT *FindWrite(CONSCLIENT *);
-#else
-extern char *FmtCtl();
-extern void Replay();
-extern void HelpUser();
-extern CONSCLIENT *FindWrite();
-#endif
+extern void Replay PARAMS((CONSFILE *, CONSFILE *, int));
+extern void HelpUser PARAMS((CONSCLIENT *));
+extern CONSCLIENT *FindWrite PARAMS((CONSCLIENT *));

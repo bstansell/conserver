@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.90 2003-01-08 17:12:21-08 bryan Exp $
+ *  $Id: readcfg.c,v 5.99 2003-03-09 15:20:15-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -67,11 +67,11 @@ static unsigned int groupID = 0;
  * return 0 on invalid spec, non-zero on valid spec
  */
 int
-#if USE_ANSI_PROTO
-parseMark(const char *pcFile, const int iLine, const char *pcMark,
+#if PROTOTYPES
+ParseMark(const char *pcFile, const int iLine, const char *pcMark,
 	  time_t tyme, CONSENT * pCE)
 #else
-parseMark(pcFile, iLine, pcMark, tyme, pCE)
+ParseMark(pcFile, iLine, pcMark, tyme, pCE)
     const char *pcFile;
     const int iLine;
     const char *pcMark;
@@ -79,7 +79,7 @@ parseMark(pcFile, iLine, pcMark, tyme, pCE)
     CONSENT *pCE;
 #endif
 {
-    static STRING mark = { (char *)0, 0, 0 };
+    static STRING *mark = (STRING *) 0;
     char *p, *n = (char *)0;
     int activity = 0, bactivity = 0;
     int factor = 0, pfactor = 0;
@@ -87,10 +87,14 @@ parseMark(pcFile, iLine, pcMark, tyme, pCE)
 
     if ((pcMark == (char *)0) || (*pcMark == '\000'))
 	return 0;
-    buildMyString((char *)0, &mark);
-    buildMyString(pcMark, &mark);
 
-    for (p = mark.string; *p != '\000'; p++) {
+    if (mark == (STRING *) 0)
+	mark = AllocString();
+
+    BuildString((char *)0, mark);
+    BuildString(pcMark, mark);
+
+    for (p = mark->string; *p != '\000'; p++) {
 	if (*p == 'a' || *p == 'A') {
 	    if (n != (char *)0) {
 		Error
@@ -160,7 +164,7 @@ parseMark(pcFile, iLine, pcMark, tyme, pCE)
     }
 
     Debug(1,
-	  "Mark spec of `%s' parsed: factor=%d, value=%d, activity=%d, bactivity=%d",
+	  "ParseMark(): mark spec of `%s' parsed: factor=%d, value=%d, activity=%d, bactivity=%d",
 	  pcMark, factor, value, activity, bactivity);
 
     if (pCE != (CONSENT *) 0) {
@@ -202,10 +206,10 @@ parseMark(pcFile, iLine, pcMark, tyme, pCE)
  * a pointer to the start of the non-space part
  */
 char *
-#if USE_ANSI_PROTO
-pruneSpace(char *string)
+#if PROTOTYPES
+PruneSpace(char *string)
 #else
-pruneSpace(string)
+PruneSpace(string)
     char *string;
 #endif
 {
@@ -238,11 +242,30 @@ pruneSpace(string)
 	return string;
 }
 
+void
+#if PROTOTYPES
+DestroyBreakList(void)
+#else
+DestroyBreakList()
+#endif
+{
+    int i;
+
+    if (breakList == (STRING *) 0)
+	return;
+
+    for (i = 0; i < 9; i++) {
+	DestroyString(&breakList[i]);
+    }
+    free(breakList);
+    breakList = (STRING *) 0;
+}
+
 /* read in the configuration file, fill in all the structs we use	(ksb)
  * to manage the consoles
  */
 void
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 ReadCfg(char *pcFile, FILE * fp)
 #else
 ReadCfg(pcFile, fp, master)
@@ -259,20 +282,23 @@ ReadCfg(pcFile, fp, master)
     GRPENT *pGEstage = (GRPENT *) 0;
     int iLine;
     unsigned char *acIn;
-    static STRING acInSave = { (char *)0, 0, 0 };
+    static STRING *acInSave = (STRING *) 0;
     char *acStart;
     CONSENT *pCE = (CONSENT *) 0;
     CONSENT *pCEtmp = (CONSENT *) 0;
     CONSENT *pCEmatch = (CONSENT *) 0;
     REMOTE **ppRC;
     REMOTE *pRCtmp;
-    static STRING LogDirectory = { (char *)0, 0, 0 };
+    static STRING *logDirectory = (STRING *) 0;
     time_t tyme;
-    static STRING defMark = { (char *)0, 0, 0 };
+    static STRING *defMark = (STRING *) 0;
     int isStartup = (pGroups == (GRPENT *) 0 && pRCList == (REMOTE *) 0);
     REMOTE *pRCListOld = (REMOTE *) 0;
     GRPENT *pGroupsOld = (GRPENT *) 0;
     CONSCLIENT *pCLtmp = (CONSCLIENT *) 0;
+#if HAVE_DMALLOC && DMALLOC_MARK_READCFG
+    unsigned long dmallocMarkReadCfg = 0;
+#endif
 
     /* if we're the master process, this will either be the first time
      * reading the config file (in which case we'll just build the two
@@ -292,6 +318,16 @@ ReadCfg(pcFile, fp, master)
      *
      * yep, slippery little slope we're walking here.  hope we survive!
      */
+#if HAVE_DMALLOC && DMALLOC_MARK_READCFG
+    dmallocMarkReadCfg = dmalloc_mark();
+#endif
+    if (acInSave == (STRING *) 0)
+	acInSave = AllocString();
+    if (logDirectory == (STRING *) 0)
+	logDirectory = AllocString();
+    if (defMark == (STRING *) 0)
+	defMark = AllocString();
+
     if (!isStartup) {
 	pGroupsOld = pGroups;
 	pRCListOld = pRCList;
@@ -300,9 +336,9 @@ ReadCfg(pcFile, fp, master)
     }
 
     tyme = time((time_t *) 0);
-    buildMyString((char *)0, &defMark);
-    buildMyString((char *)0, &LogDirectory);
-    buildMyString((char *)0, &acInSave);
+    BuildString((char *)0, defMark);
+    BuildString((char *)0, logDirectory);
+    BuildString((char *)0, acInSave);
     ppRC = &pRCList;
 
     /* initialize the break lists */
@@ -313,37 +349,35 @@ ReadCfg(pcFile, fp, master)
 	}
     } else {
 	for (iLine = 0; iLine < 9; iLine++) {
-	    buildMyString((char *)0, &breakList[iLine]);
+	    BuildString((char *)0, &breakList[iLine]);
 	}
     }
-    buildMyString("\\z", &breakList[0]);
-    buildMyString("\\r~^b", &breakList[1]);
-    buildMyString("#.reset -x\\r", &breakList[2]);
+    BuildString("\\z", &breakList[0]);
+    BuildString("\\r~^b", &breakList[1]);
+    BuildString("#.reset -x\\r", &breakList[2]);
 
     /* nuke the groups lists (should be a noop, but...) */
     while (pGroups != (GRPENT *) 0) {
 	pGEtmp = pGroups->pGEnext;
-	destroyGroup(pGroups);
+	DestroyGroup(pGroups);
 	pGroups = pGEtmp;
     }
 
     /* nuke the remote consoles */
     while (pRCList != (REMOTE *) 0) {
 	pRCtmp = pRCList->pRCnext;
-	destroyString(&pRCList->rserver);
-	destroyString(&pRCList->rhost);
-	free(pRCList);
+	DestroyRemoteConsole(pRCList);
 	pRCList = pRCtmp;
     }
 
     iLine = 0;
     while ((acIn =
-	    (unsigned char *)readLine(fp, &acInSave,
+	    (unsigned char *)ReadLine(fp, acInSave,
 				      &iLine)) != (unsigned char *)0) {
 	char *pcLine, *pcMode, *pcLog, *pcRem, *pcStart, *pcMark, *pcBreak;
 	char *pcColon;
 
-	acStart = pruneSpace((char *)acIn);
+	acStart = PruneSpace((char *)acIn);
 
 	if ('%' == acStart[0] && '%' == acStart[1] && '\000' == acStart[2]) {
 	    break;
@@ -352,28 +386,29 @@ ReadCfg(pcFile, fp, master)
 	    ((char *)0 == (pcColon = strchr(acStart, ':')) ||
 	     pcColon > pcLine)) {
 	    *pcLine++ = '\000';
-	    acStart = pruneSpace(acStart);
-	    pcLine = pruneSpace(pcLine);
+	    acStart = PruneSpace(acStart);
+	    pcLine = PruneSpace(pcLine);
 	    if (0 == strcmp(acStart, "LOGDIR")) {
-		buildMyString((char *)0, &LogDirectory);
-		buildMyString(pcLine, &LogDirectory);
+		BuildString((char *)0, logDirectory);
+		BuildString(pcLine, logDirectory);
 	    } else if (0 == strcmp(acStart, "TIMESTAMP")) {
-		buildMyString((char *)0, &defMark);
-		if (parseMark(pcFile, iLine, pcLine, tyme, NULL)) {
-		    buildMyString(pcLine, &defMark);
+		BuildString((char *)0, defMark);
+		if (ParseMark(pcFile, iLine, pcLine, tyme, NULL)) {
+		    BuildString(pcLine, defMark);
 		}
 	    } else if (0 == strcmp(acStart, "DOMAINHACK")) {
 		domainHack = 1;
 	    } else if (0 == strncmp(acStart, "BREAK", 5) &&
 		       acStart[5] >= '1' && acStart[5] <= '9' &&
 		       acStart[6] == '\000') {
-		Debug(1, "BREAK%c found with `%s'", acStart[5], pcLine);
+		Debug(1, "ReadCfg(): BREAK%c found with `%s'", acStart[5],
+		      pcLine);
 		if (pcLine[0] == '\000') {
-		    buildMyString((char *)0, &breakList[acStart[5] - '1']);
+		    BuildString((char *)0, &breakList[acStart[5] - '1']);
 		} else {
-		    buildMyString((char *)0, &breakList[acStart[5] - '1']);
-		    buildMyString(pcLine, &breakList[acStart[5] - '1']);
-		    cleanupBreak(acStart[5] - '0');
+		    BuildString((char *)0, &breakList[acStart[5] - '1']);
+		    BuildString(pcLine, &breakList[acStart[5] - '1']);
+		    CleanupBreak(acStart[5] - '0');
 		}
 	    } else {
 		Error("%s(%d) unknown variable `%s'", pcFile, iLine,
@@ -391,7 +426,7 @@ ReadCfg(pcFile, fp, master)
 	*pcMode++ = '\000';
 	*pcLog++ = '\000';
 
-	acStart = pruneSpace(acStart);
+	acStart = PruneSpace(acStart);
 
 	/* before going any further, we might was well check for
 	 * duplicates.  gotta do it somewhere, and we only need
@@ -455,14 +490,14 @@ ReadCfg(pcFile, fp, master)
 	if (pCEtmp != (CONSENT *) 0)
 	    continue;
 
-	pcLine = pruneSpace(pcLine);
-	pcMode = pruneSpace(pcMode);
-	pcLog = pruneSpace(pcLog);
+	pcLine = PruneSpace(pcLine);
+	pcMode = PruneSpace(pcMode);
+	pcLog = PruneSpace(pcLog);
 
 	if ((char *)0 != (pcMark = strchr(pcLog, ':'))) {
 	    *pcMark++ = '\000';
-	    pcLog = pruneSpace(pcLog);
-	    pcMark = pruneSpace(pcMark);
+	    pcLog = PruneSpace(pcLog);
+	    pcMark = PruneSpace(pcMark);
 	    /* Skip null intervals */
 	    if (pcMark[0] == '\000')
 		pcMark = (char *)0;
@@ -473,8 +508,8 @@ ReadCfg(pcFile, fp, master)
 	} else {
 	    if ((char *)0 != (pcBreak = strchr(pcMark, ':'))) {
 		*pcBreak++ = '\000';
-		pcMark = pruneSpace(pcMark);
-		pcBreak = pruneSpace(pcBreak);
+		pcMark = PruneSpace(pcMark);
+		pcBreak = PruneSpace(pcBreak);
 		/* Ignore null specs */
 		if (pcMark[0] == '\000')
 		    pcMark = (char *)0;
@@ -492,16 +527,17 @@ ReadCfg(pcFile, fp, master)
 	    struct hostent *hpMe;
 
 	    *pcRem++ = '\000';
-	    pcLine = pruneSpace(pcLine);
-	    pcRem = pruneSpace(pcRem);
+	    pcLine = PruneSpace(pcLine);
+	    pcRem = PruneSpace(pcRem);
 
 	    if ((struct hostent *)0 == (hpMe = gethostbyname(pcRem))) {
-		Error("gethostbyname(%s): %s", pcRem, hstrerror(h_errno));
+		Error("ReadCfg(): gethostbyname(%s): %s", pcRem,
+		      hstrerror(h_errno));
 		exit(EX_UNAVAILABLE);
 	    }
 	    if (4 != hpMe->h_length || AF_INET != hpMe->h_addrtype) {
 		Error
-		    ("wrong address size (4 != %d) or address family (%d != %d)",
+		    ("ReadCfg(): wrong address size (4 != %d) or address family (%d != %d)",
 		     hpMe->h_length, AF_INET, hpMe->h_addrtype);
 		exit(EX_UNAVAILABLE);
 	    }
@@ -523,15 +559,13 @@ ReadCfg(pcFile, fp, master)
 		    if ((REMOTE *) 0 == pRCTemp) {
 			OutOfMem();
 		    }
-		    buildMyString((char *)0, &pRCTemp->rhost);
-		    buildMyString(pcRem, &pRCTemp->rhost);
-		    buildMyString((char *)0, &pRCTemp->rserver);
-		    buildMyString(acStart, &pRCTemp->rserver);
+		    BuildString((char *)0, &pRCTemp->rhost);
+		    BuildString(pcRem, &pRCTemp->rhost);
+		    BuildString((char *)0, &pRCTemp->rserver);
+		    BuildString(acStart, &pRCTemp->rserver);
 		    *ppRC = pRCTemp;
 		    ppRC = &pRCTemp->pRCnext;
-		    if (fVerbose) {
-			Info("%s remote on %s", acStart, pcRem);
-		    }
+		    Verbose("[%s] remote on %s", acStart, pcRem);
 		}
 		continue;
 	    }
@@ -613,7 +647,7 @@ ReadCfg(pcFile, fp, master)
 	 * everything is calloc()ed, so STRING types are ready to rock
 	 */
 
-	buildMyString(acStart, &pCE->server);
+	BuildString(acStart, &pCE->server);
 
 	/*
 	 *  Here we substitute the console name for any '&' character in the
@@ -623,27 +657,27 @@ ReadCfg(pcFile, fp, master)
 	pcStart = pcLog;
 	while ((char *)0 != (pcRem = strchr(pcStart, '&'))) {
 	    *pcRem = '\000';
-	    buildMyString(pcStart, &pCE->lfile);
-	    buildMyString(acStart, &pCE->lfile);
+	    BuildString(pcStart, &pCE->lfile);
+	    BuildString(acStart, &pCE->lfile);
 	    pcStart = pcRem + 1;
 	}
-	buildMyString(pcStart, &pCE->lfile);
-	if (LogDirectory.used > 1 && pCE->lfile.used > 1 &&
+	BuildString(pcStart, &pCE->lfile);
+	if (logDirectory->used > 1 && pCE->lfile.used > 1 &&
 	    *pCE->lfile.string != '/') {
 	    char *p;
-	    buildString((char *)0);
-	    p = buildString(pCE->lfile.string);
-	    buildMyString((char *)0, &pCE->lfile);
-	    buildMyString(LogDirectory.string, &pCE->lfile);
-	    buildMyStringChar('/', &pCE->lfile);
-	    buildMyString(p, &pCE->lfile);
-	    buildString((char *)0);
+	    BuildTmpString((char *)0);
+	    p = BuildTmpString(pCE->lfile.string);
+	    BuildString((char *)0, &pCE->lfile);
+	    BuildString(logDirectory->string, &pCE->lfile);
+	    BuildStringChar('/', &pCE->lfile);
+	    BuildString(p, &pCE->lfile);
+	    BuildTmpString((char *)0);
 	}
 
 	if (pcMark) {
-	    (void)parseMark(pcFile, iLine, pcMark, tyme, pCE);
+	    ParseMark(pcFile, iLine, pcMark, tyme, pCE);
 	} else {
-	    (void)parseMark(pcFile, iLine, defMark.string, tyme, pCE);
+	    ParseMark(pcFile, iLine, defMark->string, tyme, pCE);
 	}
 
 	pCE->breakType = 1;
@@ -653,8 +687,8 @@ ReadCfg(pcFile, fp, master)
 	    if (bt > 9 || bt < 0) {
 		Error("%s(%d) bad break spec `%d'", pcFile, iLine, bt);
 	    } else {
-		pCE->breakType = (short int)bt;
-		Debug(1, "breakType set to %d", pCE->breakType);
+		pCE->breakType = (short)bt;
+		Debug(1, "ReadCfg(): breakType set to %d", pCE->breakType);
 	    }
 	}
 
@@ -665,64 +699,64 @@ ReadCfg(pcFile, fp, master)
 
 	if (pcLine[0] == '!') {
 	    char acOut[100];
-	    pcLine = pruneSpace(pcLine + 1);
+	    pcLine = PruneSpace(pcLine + 1);
 	    pCE->isNetworkConsole = 1;
 	    pCE->telnetState = 0;
-	    buildMyString((char *)0, &pCE->networkConsoleHost);
-	    buildMyString(pcLine, &pCE->networkConsoleHost);
+	    BuildString((char *)0, &pCE->networkConsoleHost);
+	    BuildString(pcLine, &pCE->networkConsoleHost);
 	    pCE->networkConsolePort = atoi(pcMode);
 	    pCE->fvirtual = 0;
-	    buildMyString((char *)0, &pCE->dfile);
-	    buildMyString(pCE->networkConsoleHost.string, &pCE->dfile);
-	    sprintf(acOut, "/%d", pCE->networkConsolePort);
-	    buildMyString(acOut, &pCE->dfile);
+	    BuildString((char *)0, &pCE->dfile);
+	    BuildString(pCE->networkConsoleHost.string, &pCE->dfile);
+	    sprintf(acOut, "/%hu", pCE->networkConsolePort);
+	    BuildString(acOut, &pCE->dfile);
 	    pCE->pbaud = FindBaud("Netwk");
 	    pCE->pparity = FindParity(" ");
-	    if (isStartup && fVerbose) {
-		Info("%s is network on %s logged to %s", acStart,
-		     pCE->dfile.string, pCE->lfile.string);
+	    if (isStartup) {
+		Verbose("[%s] socket on %s logged to %s", acStart,
+			pCE->dfile.string, pCE->lfile.string);
 	    }
 	} else if ('|' == pcLine[0]) {
-	    pcLine = pruneSpace(pcLine + 1);
+	    pcLine = PruneSpace(pcLine + 1);
 	    pCE->isNetworkConsole = 0;
 	    pCE->telnetState = 0;
 	    pCE->fvirtual = 1;
-	    buildMyString((char *)0, &pCE->pccmd);
-	    buildMyString(pcLine, &pCE->pccmd);
-	    buildMyString((char *)0, &pCE->dfile);
-	    buildMyString("/dev/null", &pCE->dfile);
-	    buildMyString((char *)0, &pCE->acslave);
-	    buildMyString("/dev/null", &pCE->acslave);
+	    BuildString((char *)0, &pCE->pccmd);
+	    BuildString(pcLine, &pCE->pccmd);
+	    BuildString((char *)0, &pCE->dfile);
+	    BuildString("/dev/null", &pCE->dfile);
+	    BuildString((char *)0, &pCE->acslave);
+	    BuildString("/dev/null", &pCE->acslave);
 	    pCE->pbaud = FindBaud("Local");
 	    pCE->pparity = FindParity(" ");
-	    if (isStartup && fVerbose) {
-		Info("%s with command `%s' logged to %s", acStart,
-		     pCE->pccmd.string, pCE->lfile.string);
+	    if (isStartup) {
+		Verbose("[%s] command `%s' logged to %s", acStart,
+			pCE->pccmd.string, pCE->lfile.string);
 	    }
 	} else {
 	    pCE->isNetworkConsole = 0;
 	    pCE->telnetState = 0;
 	    pCE->fvirtual = 0;
-	    buildMyString((char *)0, &pCE->dfile);
-	    buildMyString(pcLine, &pCE->dfile);
+	    BuildString((char *)0, &pCE->dfile);
+	    BuildString(pcLine, &pCE->dfile);
 	    pCE->pbaud = FindBaud(pcMode);
 	    if (pCE->pbaud->irate == 0) {
 		Error("%s(%d) invalid baud rate `%s'", pcFile, iLine,
 		      pcMode);
-		destroyConsent(pGE, pCE);
+		DestroyConsent(pGE, pCE);
 		continue;
 	    }
 	    pCE->pparity = FindParity(pcMode);
-	    if (isStartup && fVerbose) {
-		Info("%s is on %s (%s%c) logged to %s", acStart,
-		     pCE->dfile.string, pCE->pbaud->acrate,
-		     pCE->pparity->ckey, pCE->lfile.string);
+	    if (isStartup) {
+		Verbose("[%s] %s (%s%c) logged to %s", acStart,
+			pCE->dfile.string, pCE->pbaud->acrate,
+			pCE->pparity->ckey, pCE->lfile.string);
 	    }
 	}
 
 	/* ok, now for the hard part of the reread */
 	if (pCEmatch != (CONSENT *) 0) {
-	    short int closeMatch = 1;
+	    short closeMatch = 1;
 	    /* see if the group is already staged */
 	    for (pGEtmp = pGEstage; pGEtmp != (GRPENT *) 0;
 		 pGEtmp = pGEtmp->pGEnext) {
@@ -778,7 +812,7 @@ ReadCfg(pcFile, fp, master)
 			}
 			pGEtmp->pCLall = pCLtmp;
 			/* set file descriptors */
-			FD_SET(fileFDNum(pCLtmp->fd), &pGEtmp->rinit);
+			FD_SET(FileFDNum(pCLtmp->fd), &pGEtmp->rinit);
 		    }
 		}
 	    }
@@ -800,7 +834,7 @@ ReadCfg(pcFile, fp, master)
 		}
 		pGEtmp->pCLall = pCLtmp;
 		/* set file descriptors */
-		FD_SET(fileFDNum(pCLtmp->fd), &pGEtmp->rinit);
+		FD_SET(FileFDNum(pCLtmp->fd), &pGEtmp->rinit);
 	    }
 
 	    /* add the original console to the new group */
@@ -818,28 +852,28 @@ ReadCfg(pcFile, fp, master)
 		closeMatch = 0;
 	    if (pCEmatch->dfile.used && pCE->dfile.used) {
 		if (strcmp(pCEmatch->dfile.string, pCE->dfile.string) != 0) {
-		    buildMyString((char *)0, &pCEmatch->dfile);
-		    buildMyString(pCE->dfile.string, &pCEmatch->dfile);
+		    BuildString((char *)0, &pCEmatch->dfile);
+		    BuildString(pCE->dfile.string, &pCEmatch->dfile);
 		    if (!pCE->fvirtual)
 			closeMatch = 0;
 		}
 	    } else if (pCEmatch->dfile.used || pCE->dfile.used) {
-		buildMyString((char *)0, &pCEmatch->dfile);
-		buildMyString(pCE->dfile.string, &pCEmatch->dfile);
+		BuildString((char *)0, &pCEmatch->dfile);
+		BuildString(pCE->dfile.string, &pCEmatch->dfile);
 		if (!pCE->fvirtual)
 		    closeMatch = 0;
 	    }
 	    if (pCEmatch->lfile.used && pCE->lfile.used) {
 		if (strcmp(pCEmatch->lfile.string, pCE->lfile.string) != 0) {
-		    buildMyString((char *)0, &pCEmatch->lfile);
-		    buildMyString(pCE->lfile.string, &pCEmatch->lfile);
-		    fileClose(&pCEmatch->fdlog);
+		    BuildString((char *)0, &pCEmatch->lfile);
+		    BuildString(pCE->lfile.string, &pCEmatch->lfile);
+		    FileClose(&pCEmatch->fdlog);
 		    closeMatch = 0;
 		}
 	    } else if (pCEmatch->lfile.used || pCE->lfile.used) {
-		buildMyString((char *)0, &pCEmatch->lfile);
-		buildMyString(pCE->lfile.string, &pCEmatch->lfile);
-		fileClose(&pCEmatch->fdlog);
+		BuildString((char *)0, &pCEmatch->lfile);
+		BuildString(pCE->lfile.string, &pCEmatch->lfile);
+		FileClose(&pCEmatch->fdlog);
 		closeMatch = 0;
 	    }
 	    if (pCEmatch->pbaud != pCE->pbaud) {
@@ -864,18 +898,17 @@ ReadCfg(pcFile, fp, master)
 		    if (strcmp
 			(pCEmatch->networkConsoleHost.string,
 			 pCE->networkConsoleHost.string) != 0) {
-			buildMyString((char *)0,
-				      &pCEmatch->networkConsoleHost);
-			buildMyString(pCE->networkConsoleHost.string,
-				      &pCEmatch->networkConsoleHost);
+			BuildString((char *)0,
+				    &pCEmatch->networkConsoleHost);
+			BuildString(pCE->networkConsoleHost.string,
+				    &pCEmatch->networkConsoleHost);
 			closeMatch = 0;
 		    }
 		} else if (pCEmatch->networkConsoleHost.used ||
 			   pCE->networkConsoleHost.used) {
-		    buildMyString((char *)0,
-				  &pCEmatch->networkConsoleHost);
-		    buildMyString(pCE->networkConsoleHost.string,
-				  &pCEmatch->networkConsoleHost);
+		    BuildString((char *)0, &pCEmatch->networkConsoleHost);
+		    BuildString(pCE->networkConsoleHost.string,
+				&pCEmatch->networkConsoleHost);
 		    closeMatch = 0;
 		}
 		if (pCEmatch->networkConsolePort !=
@@ -892,13 +925,13 @@ ReadCfg(pcFile, fp, master)
 		if (pCEmatch->pccmd.used && pCE->pccmd.used) {
 		    if (strcmp(pCEmatch->pccmd.string, pCE->pccmd.string)
 			!= 0) {
-			buildMyString((char *)0, &pCEmatch->pccmd);
-			buildMyString(pCE->pccmd.string, &pCEmatch->pccmd);
+			BuildString((char *)0, &pCEmatch->pccmd);
+			BuildString(pCE->pccmd.string, &pCEmatch->pccmd);
 			closeMatch = 0;
 		    }
 		} else if (pCEmatch->pccmd.used || pCE->pccmd.used) {
-		    buildMyString((char *)0, &pCEmatch->pccmd);
-		    buildMyString(pCE->pccmd.string, &pCEmatch->pccmd);
+		    BuildString((char *)0, &pCEmatch->pccmd);
+		    BuildString(pCE->pccmd.string, &pCEmatch->pccmd);
 		    closeMatch = 0;
 		}
 	    }
@@ -916,7 +949,7 @@ ReadCfg(pcFile, fp, master)
 	    }
 
 	    /* nuke the temp data structure */
-	    destroyConsent(pGE, pCE);
+	    DestroyConsent(pGE, pCE);
 	}
     }
 
@@ -925,7 +958,7 @@ ReadCfg(pcFile, fp, master)
 	if (!isMaster || (*ppGE)->imembers == 0) {
 	    pGEtmp = *ppGE;
 	    *ppGE = (*ppGE)->pGEnext;
-	    destroyGroup(pGEtmp);
+	    DestroyGroup(pGEtmp);
 	} else {
 	    ppGE = &((*ppGE)->pGEnext);
 	}
@@ -936,16 +969,14 @@ ReadCfg(pcFile, fp, master)
     /* nuke the old groups lists */
     while (pGroupsOld != (GRPENT *) 0) {
 	pGEtmp = pGroupsOld->pGEnext;
-	destroyGroup(pGroupsOld);
+	DestroyGroup(pGroupsOld);
 	pGroupsOld = pGEtmp;
     }
 
     /* nuke the old remote consoles */
     while (pRCListOld != (REMOTE *) 0) {
 	pRCtmp = pRCListOld->pRCnext;
-	destroyString(&pRCListOld->rserver);
-	destroyString(&pRCListOld->rhost);
-	free(pRCListOld);
+	DestroyRemoteConsole(pRCListOld);
 	pRCListOld = pRCtmp;
     }
 
@@ -954,23 +985,21 @@ ReadCfg(pcFile, fp, master)
     /* clean out the access restrictions
      */
     while (pACList != (ACCESS *) 0) {
-	if (pACList->pcwho != (char *)0)
-	    free(pACList->pcwho);
 	pACtmp = pACList->pACnext;
-	free(pACList);
+	DestroyAccessList(pACList);
 	pACList = pACtmp;
     }
     pACList = (ACCESS *) 0;
     ppAC = &pACList;
 
     while ((acIn =
-	    (unsigned char *)readLine(fp, &acInSave,
+	    (unsigned char *)ReadLine(fp, acInSave,
 				      &iLine)) != (unsigned char *)0) {
 	char *pcMach, *pcNext, *pcMem;
 	char cType;
 	int iLen;
 
-	acStart = pruneSpace((char *)acIn);
+	acStart = PruneSpace((char *)acIn);
 
 	if ('%' == acStart[0] && '%' == acStart[1] && '\000' == acStart[2]) {
 	    break;
@@ -998,7 +1027,7 @@ ReadCfg(pcFile, fp, master)
 		cType = 't';
 		break;
 	    default:
-		Error("%s(%d) unknown access key `%s\'", pcFile, iLine,
+		Error("%s(%d) unknown access key `%s'", pcFile, iLine,
 		      acStart);
 		exit(EX_UNAVAILABLE);
 	}
@@ -1027,7 +1056,7 @@ ReadCfg(pcFile, fp, master)
 		char *sPtr = (char *)0, *nPtr = (char *)0;
 		char cidr[BUFSIZ];
 
-		(void)strcpy(cidr, pcMach);
+		strcpy(cidr, pcMach);
 		/* Scan for [0-9./], and stop if you find something else */
 		for (j = 0; cidr[j] != '\000'; j++) {
 		    if (isdigit((int)(cidr[j]))) {
@@ -1101,14 +1130,15 @@ ReadCfg(pcFile, fp, master)
 	    ppAC = &pACtmp->pACnext;
 	}
     }
-
-    destroyString(&LogDirectory);
-    destroyString(&defMark);
+#if HAVE_DMALLOC && DMALLOC_MARK_READCFG
+    Debug(1, "ReadCfg(): dmalloc / MarkReadCfg");
+    dmalloc_log_changed(dmallocMarkReadCfg, 1, 0, 1);
+#endif
 }
 
 /* Unless otherwise stated, returns the same values as send(2) */
 void
-#if USE_ANSI_PROTO
+#if PROTOTYPES
 ReReadCfg(void)
 #else
 ReReadCfg()
@@ -1117,7 +1147,7 @@ ReReadCfg()
     FILE *fpConfig;
 
     if ((FILE *) 0 == (fpConfig = fopen(pcConfig, "r"))) {
-	Error("fopen: %s: %s", pcConfig, strerror(errno));
+	Error("ReReadCfg(): fopen(%s): %s", pcConfig, strerror(errno));
 	return;
     }
 
@@ -1127,12 +1157,12 @@ ReReadCfg()
 
     if (pGroups == (GRPENT *) 0 && pRCList == (REMOTE *) 0) {
 	if (isMaster) {
-	    Error("No consoles found in configuration file");
+	    Error("no consoles found in configuration file");
 	    kill(thepid, SIGTERM);	/* shoot myself in the head */
 	    return;
 	} else {
-	    Error("No consoles to manage after reconfiguration - exiting");
-	    exit(EX_OK);
+	    Error("no consoles to manage after reconfiguration - exiting");
+	    Bye(EX_OK);
 	}
     }
 
@@ -1153,14 +1183,12 @@ ReReadCfg()
 
 	    Spawn(pGE);
 
-	    if (fVerbose) {
-		Info("group #%d pid %d on port %u", pGE->id, pGE->pid,
-		     ntohs(pGE->port));
-	    }
+	    Verbose("group #%d pid %lu on port %hu", pGE->id,
+		    (unsigned long)pGE->pid, ntohs(pGE->port));
 	    for (pCE = pGE->pCElist; pCE != (CONSENT *) 0;
 		 pCE = pCE->pCEnext) {
 		if (-1 != pCE->fdtty)
-		    (void)close(pCE->fdtty);
+		    close(pCE->fdtty);
 	    }
 	}
 
@@ -1168,8 +1196,8 @@ ReReadCfg()
 	    ACCESS *pACtmp;
 	    for (pACtmp = pACList; pACtmp != (ACCESS *) 0;
 		 pACtmp = pACtmp->pACnext) {
-		Info("access type '%c' for \"%s\"", pACtmp->ctrust,
-		     pACtmp->pcwho);
+		Verbose("access type `%c' for `%s'", pACtmp->ctrust,
+			pACtmp->pcwho);
 	    }
 	}
 
@@ -1180,7 +1208,7 @@ ReReadCfg()
 	if (fVerbose) {
 	    REMOTE *pRC;
 	    for (pRC = pRCUniq; (REMOTE *) 0 != pRC; pRC = pRC->pRCuniq) {
-		Info("peer server on `%s'", pRC->rhost.string);
+		Verbose("peer server on `%s'", pRC->rhost.string);
 	    }
 	}
     }

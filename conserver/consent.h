@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.31 2002-09-29 19:04:43-07 bryan Exp $
+ *  $Id: consent.h,v 5.35 2003-03-09 15:21:49-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -51,8 +51,6 @@ typedef struct parity {		/* a parity bits table                  */
     int iclr;
 } PARITY;
 
-#define ALARMTIME	60	/* time between chimes                  */
-
 typedef struct consent {	/* console information                  */
     STRING server;		/* server name                          */
     STRING dfile;		/* device file                          */
@@ -61,20 +59,20 @@ typedef struct consent {	/* console information                  */
     PARITY *pparity;		/* the parity on this line              */
     int mark;			/* Mark (chime) interval                */
     long nextMark;		/* Next mark (chime) time               */
-    short int breakType;	/* break type [1-9]                     */
+    short breakType;		/* break type [1-9]                     */
     int autoReUp;
 
     /* Used if network console */
     int isNetworkConsole;
     STRING networkConsoleHost;
-    int networkConsolePort;
+    unsigned short networkConsolePort;
     int telnetState;
 
     /* used if virtual console */
     STRING acslave;		/* pseudo-device slave side             */
     int fvirtual;		/* is a pty device we use as a console  */
     STRING pccmd;		/* virtual console command              */
-    int ipid;			/* pid of virtual command               */
+    pid_t ipid;			/* pid of virtual command               */
 
     /* only used in child */
     int nolog;			/* don't log output                     */
@@ -82,12 +80,12 @@ typedef struct consent {	/* console information                  */
     int fdtty;			/* the port to talk to machine on       */
     int activitylog;		/* log attach/detach/bump               */
     int breaklog;		/* log breaks sent                      */
-    short int fup;		/* we setup this line?                  */
-    short int fronly;		/* we can only read this console        */
+    short fup;			/* we setup this line?                  */
+    short fronly;		/* we can only read this console        */
     struct client *pCLon;	/* clients on this console              */
     struct client *pCLwr;	/* client that is writting on console   */
     char acline[132 * 2 + 2];	/* max chars we will call a line        */
-    short int iend;		/* length of data stored in acline      */
+    short iend;			/* length of data stored in acline      */
     struct consent *pCEnext;	/* next console entry                   */
 } CONSENT;
 
@@ -96,20 +94,10 @@ struct hostcache {
     struct hostcache *next;
 };
 
-#if USE_ANSI_PROTO
-extern PARITY *FindParity(char *);
-extern BAUD *FindBaud(char *);
-extern void ConsInit(CONSENT *, fd_set *, int);
-extern void ConsDown(CONSENT *, fd_set *);
-extern int CheckHostCache(const char *);
-extern void AddHostCache(const char *);
-extern void ClearHostCache(void);
-#else
-extern PARITY *FindParity();
-extern BAUD *FindBaud();
-extern void ConsInit();
-extern void ConsDown();
-extern int CheckHostCache();
-extern void AddHostCache();
-extern void ClearHostCache();
-#endif
+extern PARITY *FindParity PARAMS((char *));
+extern BAUD *FindBaud PARAMS((char *));
+extern void ConsInit PARAMS((CONSENT *, fd_set *, int));
+extern void ConsDown PARAMS((CONSENT *, fd_set *));
+extern int CheckHostCache PARAMS((const char *));
+extern void AddHostCache PARAMS((const char *));
+extern void ClearHostCache PARAMS((void));

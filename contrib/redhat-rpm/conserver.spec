@@ -4,7 +4,7 @@
 #
 
 %define pkg  conserver
-%define ver  7.2.5
+%define ver  7.2.6
 
 # define the name of the machine on which the main conserver
 # daemon will be running if you don't want to use the default
@@ -99,4 +99,5 @@ fi
 %{prefix}/share/man/man1/console.1.gz
 %{prefix}/share/man/man8/conserver.8.gz
 %{prefix}/share/man/man5/conserver.cf.5.gz
+%{prefix}/share/man/man5/conserver.passwd.5.gz
 %{prefix}/sbin/conserver

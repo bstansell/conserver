@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.h,v 5.20 2002-09-29 19:05:12-07 bryan Exp $
+ *  $Id: readcfg.h,v 5.23 2003-03-06 10:13:41-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -44,12 +44,7 @@ extern REMOTE *pRCUniq;		/* list of uniq console servers */
 extern ACCESS *pACList;		/* `who do you love' (or trust)         */
 extern STRING *breakList;	/* list of break sequences              */
 
-#if USE_ANSI_PROTO
-extern void ReadCfg(char *, FILE *);
-extern char *pruneSpace(char *);
-extern void ReReadCfg(void);
-#else
-extern void ReadCfg();
-extern char *pruneSpace();
-extern void ReReadCfg();
-#endif
+extern void ReadCfg PARAMS((char *, FILE *));
+extern char *PruneSpace PARAMS((char *));
+extern void ReReadCfg PARAMS((void));
+extern void DestroyBreakList PARAMS((void));

@@ -39,4 +39,5 @@ fakeinstall:
 	$(FIXMANCMD) man_tbl_header $(BUILDDIR)/conserver/conserver.man > $(MAN1MDIR)/conserver.$(MAN1MEXT)
 	$(FIXMANCMD) man_tbl_header $(BUILDDIR)/console/console.man > $(MAN1MDIR)/console.$(MAN1MEXT)
 	$(FIXMANCMD) $(BUILDDIR)/conserver.cf/conserver.cf.man > $(MAN4DIR)/conserver.cf.$(MAN4EXT)
+	$(FIXMANCMD) $(BUILDDIR)/conserver.cf/conserver.passwd.man > $(MAN4DIR)/conserver.passwd.$(MAN4EXT)
 	$(FIXSCRIPTCMD) $(BUILDDIR)/conserver/conserver.rc > $(LIBDIR)/conserver.rc

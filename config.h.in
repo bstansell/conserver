@@ -21,8 +21,8 @@
 /* Define to 1 if you have the <crypt.h> header file. */
 #undef HAVE_CRYPT_H
 
-/* Define to 1 if you have the `flock' function. */
-#undef HAVE_FLOCK
+/* have dmalloc support */
+#undef HAVE_DMALLOC
 
 /* Define if libbsm has `getaudit'. */
 #undef HAVE_GETAUDIT
@@ -261,6 +261,9 @@
 /* pidfile to write to */
 #undef PIDFILE
 
+/* Define to 1 if the C compiler supports function prototypes. */
+#undef PROTOTYPES
+
 /* Define as the return type of signal handlers (`int' or `void'). */
 #undef RETSIGTYPE
 
@@ -276,9 +279,6 @@
 /* Define to 1 if you can safely include both <sys/time.h> and <time.h>. */
 #undef TIME_WITH_SYS_TIME
 
-/* use ansi prototypes/decls */
-#undef USE_ANSI_PROTO
-
 /* use tcp_wrappers libwrap */
 #undef USE_LIBWRAP
 
@@ -289,11 +289,17 @@
 # undef _ALL_SOURCE
 #endif
 
+/* Define like PROTOTYPES; this can be used by system headers. */
+#undef __PROTOTYPES
+
 /* Define to empty if `const' does not conform to ANSI C. */
 #undef const
 
 /* Define to `int' if <sys/types.h> does not define. */
 #undef mode_t
+
+/* Define to `int' if <sys/types.h> does not define. */
+#undef pid_t
 
 /* Define if <signal.h> does not define sig_atomic_t */
 #undef sig_atomic_t
