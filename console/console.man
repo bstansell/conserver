@@ -1,5 +1,5 @@
-.\" $Id: console.man,v 1.44 2004/03/11 16:23:29 bryan Exp $
-.TH CONSOLE 1 "2004/03/11" "conserver-8.1.2" "conserver"
+.\" $Id: console.man,v 1.45 2004/03/20 14:40:42 bryan Exp $
+.TH CONSOLE 1 "2004/03/20" "conserver-8.1.3" "conserver"
 .SH NAME
 console \- console server client program
 .SH SYNOPSIS
@@ -391,7 +391,7 @@ Commands are:
 disconnect
 .TP
 .B ;
-disconnect and login to another console
+move to another console
 .TP
 .B a
 attach read-write if nobody already is

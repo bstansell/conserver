@@ -102,10 +102,10 @@ Bryan Stansell
 - strict file permission checks on conserver.passwd/conserver.cf : Erik
   Sjolund <erik.sjolund@sbc.su.se>
 
-- imbedded startup delays per remote host...or "group" of consoles in
+- embedded startup delays per remote host...or "group" of consoles in
   some way 'cause some ssh connections to console servers need
   significant throttling : Jay McCanta <mccantaj@amgen.com>
 
 #
-#  $Id: TODO,v 1.46 2004/03/11 16:45:57 bryan Exp $
+#  $Id: TODO,v 1.47 2004/03/12 17:34:49 bryan Exp $
 #

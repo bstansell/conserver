@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.157 2004/03/10 02:55:47 bryan Exp $
+ *  $Id: console.c,v 5.161 2004/03/20 14:40:42 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -57,7 +57,10 @@ int disconnectCount = 0;
 STRING *execCmd = (STRING *)0;
 CONSFILE *execCmdFile = (CONSFILE *)0;
 pid_t execCmdPid = 0;
-int gotoConsole = 0;
+CONSFILE *gotoConsole = (CONSFILE *)0;
+CONSFILE *prevConsole = (CONSFILE *)0;
+char *gotoName = (char *)0;
+char *prevName = (char *)0;
 
 #if HAVE_OPENSSL
 SSL_CTX *ctx = (SSL_CTX *)0;
@@ -553,6 +556,9 @@ DestroyDataStructures()
 #endif
 {
     C2Cooked();
+    if (cfstdout != (CONSFILE *)0)
+	FileUnopen(cfstdout);
+    DestroyStrings();
 }
 
 char *
@@ -888,9 +894,217 @@ DoExec(pcf)
     }
 }
 
+void
+#if PROTOTYPES
+Interact(CONSFILE *pcf, char *pcMach)
+#else
+Interact(pcf, pcMach)
+    CONSFILE *pcf;
+    char *pcMach;
+#endif
+{
+    int i;
+    int nc;
+    fd_set rmask, wmask;
+    int justSuspended = 0;
+    static char acMesg[8192];
+
+    /* if this is true, it means we successfully moved to a new console
+     * so we need to close the old one.
+     */
+    if (prevConsole != (CONSFILE *)0)
+	FileClose(&prevConsole);
+    if (prevName != (char *)0) {
+	free(prevName);
+	prevName = (char *)0;
+    }
+
+    /* this is only true in other parts of the code iff pcf == gotoConsole */
+    if (gotoConsole != (CONSFILE *)0) {
+	gotoConsole = (CONSFILE *)0;
+	FilePrint(cfstdout, FLAGFALSE, "[returning to `%s'", pcMach);
+	FileWrite(pcf, FLAGFALSE, "\n", 1);
+    }
+
+    C2Raw();
+
+    /* set socket to non-blocking */
+    SetFlags(FileFDNum(pcf), O_NONBLOCK, 0);
+
+    /* read from stdin and the socket (non-blocking!).
+     * rmask indicates which descriptors to read from,
+     * the others are not used, nor is the result from
+     * select, read, or write.
+     */
+    FD_ZERO(&rinit);
+    FD_ZERO(&winit);
+    FD_SET(FileFDNum(pcf), &rinit);
+    FD_SET(0, &rinit);
+    if (maxfd < FileFDNum(pcf) + 1)
+	maxfd = FileFDNum(pcf) + 1;
+    for (;;) {
+	justSuspended = 0;
+	if (fSawReapVirt) {
+	    fSawReapVirt = 0;
+	    ReapVirt();
+	}
+	/* reset read mask and select on it
+	 */
+	rmask = rinit;
+	wmask = winit;
+	if (-1 ==
+	    select(maxfd, &rmask, &wmask, (fd_set *)0,
+		   (struct timeval *)0)) {
+	    if (errno != EINTR) {
+		Error("Master(): select(): %s", strerror(errno));
+		break;
+	    }
+	    continue;
+	}
+
+	/* anything from execCmd */
+	if (execCmdFile != (CONSFILE *)0) {
+	    if (FileCanRead(execCmdFile, &rmask, &wmask)) {
+		if ((nc =
+		     FileRead(execCmdFile, acMesg, sizeof(acMesg))) < 0) {
+		    FD_CLR(FileFDNum(execCmdFile), &rinit);
+		    FD_CLR(FileFDOutNum(execCmdFile), &winit);
+		    FileClose(&execCmdFile);
+		    FileSetQuoteIAC(pcf, FLAGFALSE);
+		    FilePrint(pcf, FLAGFALSE, "%c%c", OB_IAC, OB_ABRT);
+		    FileSetQuoteIAC(pcf, FLAGTRUE);
+		} else {
+		    if (fStrip) {
+			for (i = 0; i < nc; ++i)
+			    acMesg[i] &= 127;
+		    }
+		    FileWrite(pcf, FLAGFALSE, acMesg, nc);
+		}
+	    } else if (!FileBufEmpty(execCmdFile) &&
+		       FileCanWrite(execCmdFile, &rmask, &wmask)) {
+		CONDDEBUG((1, "Interact(): flushing fd %d",
+			   FileFDNum(execCmdFile)));
+		if (FileWrite(execCmdFile, FLAGFALSE, (char *)0, 0) < 0) {
+		    /* -bryan */
+		    break;
+		}
+	    }
+	}
+
+	/* anything from socket? */
+	if (FileCanRead(pcf, &rmask, &wmask)) {
+	    int l;
+	    if ((nc = FileRead(pcf, acMesg, sizeof(acMesg))) < 0) {
+		/* if we got an error/eof after returning from suspend */
+		if (justSuspended) {
+		    fprintf(stderr, "\n");
+		    Error("lost connection");
+		}
+		break;
+	    }
+	    while ((l = ParseIACBuf(pcf, acMesg, &nc)) >= 0) {
+		if (l == 0) {
+		    if (execCmdFile == (CONSFILE *)0) {
+			if (FileSawQuoteExec(pcf) == FLAGTRUE)
+			    DoExec(pcf);
+			else if (FileSawQuoteSusp(pcf) == FLAGTRUE) {
+			    justSuspended = 1;
+#if defined(SIGSTOP)
+			    FileWrite(cfstdout, FLAGFALSE, "stop]", 5);
+			    C2Cooked();
+			    kill(thepid, SIGSTOP);
+			    C2Raw();
+			    FileWrite(cfstdout, FLAGFALSE,
+				      "[press any character to continue",
+				      32);
+#else
+			    FileWrite(cfstdout, FLAGFALSE,
+				      "stop not supported -- press any character to continue",
+				      53);
+#endif
+			} else if (FileSawQuoteGoto(pcf) == FLAGTRUE) {
+			    gotoConsole = pcf;
+			    if (gotoName != (char *)0)
+				free(gotoName);
+			    if ((gotoName = StrDup(pcMach)) == (char *)0)
+				OutOfMem();
+			    C2Cooked();
+			    return;
+			}
+		    } else {
+			if (FileSawQuoteAbrt(pcf) == FLAGTRUE) {
+			    FD_CLR(FileFDNum(execCmdFile), &rinit);
+			    FD_CLR(FileFDOutNum(execCmdFile), &winit);
+			    FileClose(&execCmdFile);
+			    kill(execCmdPid, SIGHUP);
+			}
+		    }
+		    continue;
+		}
+		if (fStrip) {
+		    for (i = 0; i < l; ++i)
+			acMesg[i] &= 127;
+		}
+		FileWrite(cfstdout, FLAGFALSE, acMesg, l);
+		if (execCmdFile != (CONSFILE *)0) {
+		    FileWrite(execCmdFile, FLAGFALSE, acMesg, l);
+		}
+		nc -= l;
+		MemMove(acMesg, acMesg + l, nc);
+	    }
+	} else if (!FileBufEmpty(pcf) && FileCanWrite(pcf, &rmask, &wmask)) {
+	    CONDDEBUG((1, "Interact(): flushing fd %d", FileFDNum(pcf)));
+	    if (FileWrite(pcf, FLAGFALSE, (char *)0, 0) < 0) {
+		/* -bryan */
+		break;
+	    }
+	}
+
+	/* anything from stdin? */
+	if (FD_ISSET(0, &rmask)) {
+	    if ((nc = read(0, acMesg, sizeof(acMesg))) == 0) {
+		if (screwy)
+		    break;
+		else {
+		    FD_SET(0, &rinit);
+		    continue;
+		}
+	    }
+	    if (execCmdFile == (CONSFILE *)0) {
+		if (fStrip) {
+		    for (i = 0; i < nc; ++i)
+			acMesg[i] &= 127;
+		}
+		FileWrite(pcf, FLAGFALSE, acMesg, nc);
+	    } else {
+		for (i = 0; i < nc; ++i) {
+		    if (acMesg[i] == '\n' || acMesg[i] == '\r')
+			FilePrint(cfstdout, FLAGFALSE,
+				  "[local command running - pid %lu]\r\n",
+				  execCmdPid);
+		    else if (acMesg[i] == 0x03) {	/* ctrl-c */
+			kill(execCmdPid, SIGHUP);
+			FilePrint(cfstdout, FLAGFALSE,
+				  "[local command sent SIGHUP - pid %lu]\r\n",
+				  execCmdPid);
+		    } else if (acMesg[i] == 0x1c) {	/* ctrl-\ */
+			kill(execCmdPid, SIGKILL);
+			FilePrint(cfstdout, FLAGFALSE,
+				  "[local command sent SIGKILL - pid %lu]\r\n",
+				  execCmdPid);
+		    }
+		}
+	    }
+	}
+    }
+    C2Cooked();
+    if (fVerbose)
+	printf("Console %s closed.\n", pcMach);
+}
+
 /* interact with a group server					(ksb)
  */
-static int
+void
 #if PROTOTYPES
 CallUp(CONSFILE *pcf, char *pcMaster, char *pcMach, char *pcHow,
        char *result)
@@ -900,15 +1114,9 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
     char *pcMaster, *pcMach, *pcHow, *result;
 #endif
 {
-    int nc;
     int fIn = '-';
-    fd_set rmask, wmask;
-    int i;
-    int justSuspended = 0;
     char *r = (char *)0;
-    static char acMesg[8192];
 
-    gotoConsole = 0;
     if (fVerbose) {
 	Msg("%s to %s (on %s)", pcHow, pcMach, pcMaster);
     }
@@ -1027,176 +1235,7 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
     fflush(stdout);
     fflush(stderr);
 
-    C2Raw();
-
-    /* set socket to non-blocking */
-    SetFlags(FileFDNum(pcf), O_NONBLOCK, 0);
-
-    /* read from stdin and the socket (non-blocking!).
-     * rmask indicates which descriptors to read from,
-     * the others are not used, nor is the result from
-     * select, read, or write.
-     */
-    FD_ZERO(&rinit);
-    FD_ZERO(&winit);
-    FD_SET(FileFDNum(pcf), &rinit);
-    FD_SET(0, &rinit);
-    if (maxfd < FileFDNum(pcf) + 1)
-	maxfd = FileFDNum(pcf) + 1;
-    for (;;) {
-	justSuspended = 0;
-	if (fSawReapVirt) {
-	    fSawReapVirt = 0;
-	    ReapVirt();
-	}
-	/* reset read mask and select on it
-	 */
-	rmask = rinit;
-	wmask = winit;
-	if (-1 ==
-	    select(maxfd, &rmask, &wmask, (fd_set *)0,
-		   (struct timeval *)0)) {
-	    if (errno != EINTR) {
-		Error("Master(): select(): %s", strerror(errno));
-		break;
-	    }
-	    continue;
-	}
-
-	/* anything from execCmd */
-	if (execCmdFile != (CONSFILE *)0) {
-	    if (FileCanRead(execCmdFile, &rmask, &wmask)) {
-		if ((nc =
-		     FileRead(execCmdFile, acMesg, sizeof(acMesg))) < 0) {
-		    FD_CLR(FileFDNum(execCmdFile), &rinit);
-		    FD_CLR(FileFDOutNum(execCmdFile), &winit);
-		    FileClose(&execCmdFile);
-		    FileSetQuoteIAC(pcf, FLAGFALSE);
-		    FilePrint(pcf, FLAGFALSE, "%c%c", OB_IAC, OB_ABRT);
-		    FileSetQuoteIAC(pcf, FLAGTRUE);
-		} else {
-		    if (fStrip) {
-			for (i = 0; i < nc; ++i)
-			    acMesg[i] &= 127;
-		    }
-		    FileWrite(pcf, FLAGFALSE, acMesg, nc);
-		}
-	    } else if (!FileBufEmpty(execCmdFile) &&
-		       FileCanWrite(execCmdFile, &rmask, &wmask)) {
-		CONDDEBUG((1, "CallUp(): flushing fd %d",
-			   FileFDNum(execCmdFile)));
-		if (FileWrite(execCmdFile, FLAGFALSE, (char *)0, 0) < 0) {
-		    /* -bryan */
-		    break;
-		}
-	    }
-	}
-
-	/* anything from socket? */
-	if (FileCanRead(pcf, &rmask, &wmask)) {
-	    int l;
-	    if ((nc = FileRead(pcf, acMesg, sizeof(acMesg))) < 0) {
-		/* if we got an error/eof after returning from suspend */
-		if (justSuspended) {
-		    fprintf(stderr, "\n");
-		    Error("lost connection");
-		}
-		break;
-	    }
-	    while ((l = ParseIACBuf(pcf, acMesg, &nc)) >= 0) {
-		if (l == 0) {
-		    if (execCmdFile == (CONSFILE *)0) {
-			if (FileSawQuoteExec(pcf) == FLAGTRUE)
-			    DoExec(pcf);
-			else if (FileSawQuoteSusp(pcf) == FLAGTRUE) {
-			    justSuspended = 1;
-#if defined(SIGSTOP)
-			    FileWrite(cfstdout, FLAGFALSE, "stop]", 5);
-			    C2Cooked();
-			    kill(thepid, SIGSTOP);
-			    C2Raw();
-			    FileWrite(cfstdout, FLAGFALSE,
-				      "[press any character to continue",
-				      32);
-#else
-			    FileWrite(cfstdout, FLAGFALSE,
-				      "stop not supported -- press any character to continue",
-				      53);
-#endif
-			} else if (FileSawQuoteGoto(pcf) == FLAGTRUE) {
-			    gotoConsole = 1;
-			    break;
-			}
-		    } else {
-			if (FileSawQuoteAbrt(pcf) == FLAGTRUE) {
-			    FD_CLR(FileFDNum(execCmdFile), &rinit);
-			    FD_CLR(FileFDOutNum(execCmdFile), &winit);
-			    FileClose(&execCmdFile);
-			    kill(execCmdPid, SIGHUP);
-			}
-		    }
-		    continue;
-		}
-		if (fStrip) {
-		    for (i = 0; i < l; ++i)
-			acMesg[i] &= 127;
-		}
-		FileWrite(cfstdout, FLAGFALSE, acMesg, l);
-		if (execCmdFile != (CONSFILE *)0) {
-		    FileWrite(execCmdFile, FLAGFALSE, acMesg, l);
-		}
-		nc -= l;
-		MemMove(acMesg, acMesg + l, nc);
-	    }
-	} else if (!FileBufEmpty(pcf) && FileCanWrite(pcf, &rmask, &wmask)) {
-	    CONDDEBUG((1, "CallUp(): flushing fd %d", FileFDNum(pcf)));
-	    if (FileWrite(pcf, FLAGFALSE, (char *)0, 0) < 0) {
-		/* -bryan */
-		break;
-	    }
-	}
-
-	/* anything from stdin? */
-	if (FD_ISSET(0, &rmask)) {
-	    if ((nc = read(0, acMesg, sizeof(acMesg))) == 0) {
-		if (screwy)
-		    break;
-		else {
-		    FD_SET(0, &rinit);
-		    continue;
-		}
-	    }
-	    if (execCmdFile == (CONSFILE *)0) {
-		if (fStrip) {
-		    for (i = 0; i < nc; ++i)
-			acMesg[i] &= 127;
-		}
-		FileWrite(pcf, FLAGFALSE, acMesg, nc);
-	    } else {
-		for (i = 0; i < nc; ++i) {
-		    if (acMesg[i] == '\n' || acMesg[i] == '\r')
-			FilePrint(cfstdout, FLAGFALSE,
-				  "[local command running - pid %lu]\r\n",
-				  execCmdPid);
-		    else if (acMesg[i] == 0x03) {	/* ctrl-c */
-			kill(execCmdPid, SIGHUP);
-			FilePrint(cfstdout, FLAGFALSE,
-				  "[local command sent SIGHUP - pid %lu]\r\n",
-				  execCmdPid);
-		    } else if (acMesg[i] == 0x1c) {	/* ctrl-\ */
-			kill(execCmdPid, SIGKILL);
-			FilePrint(cfstdout, FLAGFALSE,
-				  "[local command sent SIGKILL - pid %lu]\r\n",
-				  execCmdPid);
-		    }
-		}
-	    }
-	}
-    }
-    C2Cooked();
-    if (fVerbose)
-	printf("Console %s closed.\n", pcMach);
-    return 0;
+    Interact(pcf, pcMach);
 }
 
 /* shouldn't need more than 3 levels of commands (but alloc 4 just 'cause)
@@ -1214,11 +1253,11 @@ char *cmdarg = (char *)0;
  */
 int
 #if PROTOTYPES
-DoCmds(char *master, char *ports, int cmdi)
+DoCmds(char *master, char *pports, int cmdi)
 #else
-DoCmds(master, ports, cmdi)
+DoCmds(master, pports, cmdi)
     char *master;
-    char *ports;
+    char *pports;
     int cmdi;
 #endif
 {
@@ -1229,6 +1268,11 @@ DoCmds(master, ports, cmdi)
     unsigned short port;
     char *result = (char *)0;
     int len;
+    char *ports;
+    char *pcopy;
+
+    if ((pcopy = ports = StrDup(pports)) == (char *)0)
+	OutOfMem();
 
     len = strlen(ports);
     while (len > 0 && (ports[len - 1] == '\r' || ports[len - 1] == '\n'))
@@ -1352,6 +1396,8 @@ DoCmds(master, ports, cmdi)
 	if (cmdi != 0) {
 	    t = ReadReply(pcf, 0);
 	    /* save the result */
+	    if (result != (char *)0)
+		free(result);
 	    if ((result = StrDup(t)) == (char *)0)
 		OutOfMem();
 	}
@@ -1371,7 +1417,9 @@ DoCmds(master, ports, cmdi)
 		continue;
 	    } else {
 		CallUp(pcf, server, cmdarg, cmds[0], result);
-		return 0;
+		if (pcf != gotoConsole)
+		    FileClose(&pcf);
+		break;
 	    }
 	} else if (cmds[cmdi][0] == 'q') {
 	    t = ReadReply(pcf, 0);
@@ -1388,6 +1436,8 @@ DoCmds(master, ports, cmdi)
 	    if (cmdi == 0) {
 		int len;
 		/* if we hit bottom, this is where we get our results */
+		if (result != (char *)0)
+		    free(result);
 		if ((result = StrDup(t)) == (char *)0)
 		    OutOfMem();
 		len = strlen(result);
@@ -1427,9 +1477,14 @@ DoCmds(master, ports, cmdi)
 	    DoCmds(server, result, cmdi);
 	else if (cmdi > 0)
 	    DoCmds(server, result, cmdi - 1);
-	free(result);
+	if (result != (char *)0)
+	    free(result);
+	result = (char *)0;
     }
 
+    if (result != (char *)0)
+	free(result);
+    free(pcopy);
     return 0;
 }
 
@@ -1462,7 +1517,6 @@ main(argc, argv)
     int i;
     static STRING *textMsg = (STRING *)0;
     int cmdi;
-    int retval;
     static STRING *consoleName = (STRING *)0;
 
     isMultiProc = 0;		/* make sure stuff DOESN'T have the pid */
@@ -1648,7 +1702,8 @@ main(argc, argv)
 	    Error("missing console name");
 	    Bye(EX_UNAVAILABLE);
 	}
-	cmdarg = argv[optind++];
+	if ((cmdarg = StrDup(argv[optind++])) == (char *)0)
+	    OutOfMem();
     } else if (*pcCmd == 't') {
 	if (optind >= argc) {
 	    Error("missing message text");
@@ -1737,35 +1792,53 @@ main(argc, argv)
     }
 
     for (;;) {
-	char *ports;
-	if ((ports = StrDup(acPorts->string)) == (char *)0)
-	    OutOfMem();
-	retval = DoCmds(pcInMaster, ports, cmdi);
-	free(ports);
-	/* if we didn't "call" or we didn't ask for another console, abort */
-	if (cmds[cmdi][0] != 'c' || gotoConsole == 0)
+	if (gotoConsole == (CONSFILE *)0)
+	    DoCmds(pcInMaster, acPorts->string, cmdi);
+	else
+	    Interact(gotoConsole, gotoName);
+
+	/* if we didn't ask for another console, done */
+	if (gotoConsole == (CONSFILE *)0 && prevConsole == (CONSFILE *)0)
 	    break;
 
 	if (consoleName == (STRING *)0)
 	    consoleName = AllocString();
 	C2Raw();
-	if (gotoConsole == -1)
-	    FileWrite(cfstdout, FLAGFALSE, "[console: ", 10);
-	else
+	if (prevConsole == (CONSFILE *)0)
 	    FileWrite(cfstdout, FLAGFALSE, "console: ", 9);
+	else
+	    FileWrite(cfstdout, FLAGFALSE, "[console: ", 10);
 	GetUserInput(consoleName);
 	FileWrite(cfstdout, FLAGFALSE, "]\r\n", 3);
 	C2Cooked();
-	if (consoleName->used <= 1)
-	    break;
-	cmdarg = consoleName->string;
-	gotoConsole = -1;
+	if (consoleName->used > 1) {
+	    if (cmdarg != (char *)0)
+		free(cmdarg);
+	    if ((cmdarg = StrDup(consoleName->string)) == (char *)0)
+		OutOfMem();
+	    if (prevConsole == (CONSFILE *)0) {
+		prevConsole = gotoConsole;
+		gotoConsole = (CONSFILE *)0;
+		prevName = gotoName;
+		gotoName = (char *)0;
+	    }
+	} else {
+	    if (prevConsole != (CONSFILE *)0) {
+		gotoConsole = prevConsole;
+		prevConsole = (CONSFILE *)0;
+		gotoName = prevName;
+		prevName = (char *)0;
+	    }
+	}
     }
+
+    if (cmdarg != (char *)0)
+	free(cmdarg);
 
     if (*pcCmd == 'd')
 	FilePrint(cfstdout, FLAGFALSE, "Disconnected %d users\n",
 		  disconnectCount);
 
-    Bye(retval);
+    Bye(0);
     return 0;			/* noop - Bye() terminates us */
 }

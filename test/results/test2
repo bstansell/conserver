@@ -1,6 +1,6 @@
 [Enter `^Ec?' for help]
 [help]
- .    disconnect                        ;    switch to another console
+ .    disconnect                        ;    move to another console
  a    attach read/write                 b    send broadcast message
  c    toggle flow control               d    down a console
  e    change escape sequence            f    force attach read/write

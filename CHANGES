@@ -1,6 +1,14 @@
 				CHANGES
 				=======
 
+version 8.1.3 (Mar 22, 2004):
+	- fixed small memory and file descriptor leak in client when
+	  using '^Ec;'
+	- '^Ec;' now only disconnects from the previous console only
+	  after a successfully move to a new console, allowing you to
+	  abort the move - suggested by Christopher T. Beers
+	  <ctbeers@syr.edu>
+
 version 8.1.2 (Mar 11, 2004):
 	- better handling of client command (^Ec|) when user is bumped,
 	  conserver is reconfigured, etc
@@ -15,7 +23,7 @@ version 8.1.2 (Mar 11, 2004):
 	  patch by Bill Sommerfeld <sommerfeld@east.sun.com>
 	- added --with-extmsgs configure switch to enable entertaining
 	  messages
-	- marked various undocumented client commands as depreciated so
+	- marked various undocumented client commands as deprecated so
 	  that they can be removed in a future version
 	- added ability to "move" to a new console via '^Ec;' -
 	  suggested by Christopher T. Beers <ctbeers@syr.edu>
@@ -690,5 +698,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.158 2004/03/11 16:31:27 bryan Exp $
+#  $Id: CHANGES,v 1.162 2004/03/23 00:55:04 bryan Exp $
 #

@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.80 2004/03/10 02:55:45 bryan Exp $
+ *  $Id: client.c,v 5.81 2004/03/20 14:40:40 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -379,7 +379,7 @@ typedef struct HLnode {
 
 static HELP aHLTable[] = {
     {WHEN_ALWAYS, ".    disconnect"},
-    {WHEN_ALWAYS, ";    switch to another console"},
+    {WHEN_ALWAYS, ";    move to another console"},
     {WHEN_ALWAYS, "a    attach read/write"},
     {WHEN_ALWAYS, "b    send broadcast message"},
     {WHEN_ATTACH, "c    toggle flow control"},

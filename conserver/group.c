@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.289 2004/03/10 02:55:45 bryan Exp $
+ *  $Id: group.c,v 5.291 2004/03/16 04:17:31 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -3264,8 +3264,7 @@ DoClientRead(pGE, pCLServing)
 					      "%c%c", OB_IAC, OB_GOTO);
 				    FileSetQuoteIAC(pCLServing->fd,
 						    FLAGTRUE);
-				    DisconnectClient(pGE, pCLServing,
-						     (char *)0, FLAGFALSE);
+				    goto bottomSuspend;
 				} else {
 				    FileWrite(pCLServing->fd, FLAGFALSE,
 					      "connected]\r\n", -1);
@@ -3283,9 +3282,9 @@ DoClientRead(pGE, pCLServing)
 					      "no drop line]\r\n", -1);
 				break;
 
-#define DEPRECIATED FileWrite(pCLServing->fd, FLAGFALSE, "<use of DEPRECIATED (and undocumented) key> ", -1)
+#define DEPRECATED FileWrite(pCLServing->fd, FLAGFALSE, "<use of DEPRECATED (and undocumented) key> ", -1)
 			    case 'B':
-				DEPRECIATED;
+				DEPRECATED;
 			    case 'b':	/* broadcast message */
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "Enter message: ", -1);
@@ -3293,28 +3292,28 @@ DoClientRead(pGE, pCLServing)
 				break;
 
 			    case 'A':
-				DEPRECIATED;
+				DEPRECATED;
 			    case 'a':	/* attach */
 				CommandAttach(pGE, pCLServing, pCEServing,
 					      tyme);
 				break;
 
 			    case 'C':
-				DEPRECIATED;
+				DEPRECATED;
 			    case 'c':
 				CommandChangeFlow(pGE, pCLServing,
 						  pCEServing, tyme);
 				break;
 
 			    case 'D':
-				DEPRECIATED;
+				DEPRECATED;
 			    case 'd':	/* down a console       */
 				CommandDown(pGE, pCLServing, pCEServing,
 					    tyme);
 				break;
 
 			    case 'E':
-				DEPRECIATED;
+				DEPRECATED;
 			    case 'e':	/* redefine escape keys */
 				pCLServing->iState = S_CATTN;
 				FileWrite(pCLServing->fd, FLAGFALSE,
@@ -3322,14 +3321,14 @@ DoClientRead(pGE, pCLServing)
 				break;
 
 			    case 'F':
-				DEPRECIATED;
+				DEPRECATED;
 			    case 'f':	/* force attach */
 				CommandForce(pGE, pCLServing, pCEServing,
 					     tyme);
 				break;
 
 			    case 'G':
-				DEPRECIATED;
+				DEPRECATED;
 			    case 'g':	/* group info */
 				FilePrint(pCLServing->fd, FLAGFALSE,
 					  "group %s]\r\n",
@@ -3340,14 +3339,14 @@ DoClientRead(pGE, pCLServing)
 
 			    case 'H':
 			    case 'P':	/* DEC vt100 pf1 */
-				DEPRECIATED;
+				DEPRECATED;
 			    case 'h':	/* help                 */
 			    case '?':
 				HelpUser(pCLServing);
 				break;
 
 			    case 'I':
-				DEPRECIATED;
+				DEPRECATED;
 			    case 'i':
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "info]\r\n", -1);
@@ -3383,7 +3382,7 @@ DoClientRead(pGE, pCLServing)
 				break;
 
 			    case 'O':
-				DEPRECIATED;
+				DEPRECATED;
 			    case 'o':	/* close and re-open line */
 				CommandOpen(pGE, pCLServing, pCEServing,
 					    tyme);
@@ -3396,7 +3395,7 @@ DoClientRead(pGE, pCLServing)
 				break;
 
 			    case 'R':	/* DEC vt100 pf3 */
-				DEPRECIATED;
+				DEPRECATED;
 			    case 'r':	/* replay 20 lines */
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "replay]\r\n", -1);
@@ -3410,7 +3409,7 @@ DoClientRead(pGE, pCLServing)
 				break;
 
 			    case 'S':	/* DEC vt100 pf4 */
-				DEPRECIATED;
+				DEPRECATED;
 			    case 's':	/* spy mode */
 				pCLServing->fwantwr = 0;
 				if (!pCLServing->fwr) {
@@ -3428,7 +3427,7 @@ DoClientRead(pGE, pCLServing)
 				break;
 
 			    case 'U':
-				DEPRECIATED;
+				DEPRECATED;
 			    case 'u':	/* hosts on server this */
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "hosts]\r\n", -1);
@@ -3437,7 +3436,7 @@ DoClientRead(pGE, pCLServing)
 				break;
 
 			    case 'V':
-				DEPRECIATED;
+				DEPRECATED;
 			    case 'v':	/* version */
 				FilePrint(pCLServing->fd, FLAGFALSE,
 					  "version `%s']\r\n",
@@ -3445,7 +3444,7 @@ DoClientRead(pGE, pCLServing)
 				break;
 
 			    case 'W':
-				DEPRECIATED;
+				DEPRECATED;
 			    case 'w':	/* who */
 				FilePrint(pCLServing->fd, FLAGFALSE,
 					  "who %s]\r\n",
@@ -3455,7 +3454,7 @@ DoClientRead(pGE, pCLServing)
 				break;
 
 			    case 'X':
-				DEPRECIATED;
+				DEPRECATED;
 			    case 'x':
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "examine]\r\n", -1);
@@ -3479,13 +3478,14 @@ DoClientRead(pGE, pCLServing)
 				break;
 
 			    case 'Z':
-				DEPRECIATED;
+				DEPRECATED;
 			    case 'z':	/* suspend the client */
 			    case '\032':
 				FileSetQuoteIAC(pCLServing->fd, FLAGFALSE);
 				FilePrint(pCLServing->fd, FLAGFALSE,
 					  "%c%c", OB_IAC, OB_SUSP);
 				FileSetQuoteIAC(pCLServing->fd, FLAGTRUE);
+			      bottomSuspend:
 				pCLServing->fcon = 0;
 				pCLServing->iState = S_SUSP;
 				if (pCEServing->pCLwr == pCLServing) {
@@ -3547,7 +3547,7 @@ DoClientRead(pGE, pCLServing)
 				break;
 
 			    case 'Q':	/* DEC vt100 PF2 */
-				DEPRECIATED;
+				DEPRECATED;
 			    case '.':	/* disconnect */
 			    case '\004':
 			    case '\003':

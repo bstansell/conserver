@@ -1,5 +1,5 @@
 .\" $Id: conserver.cf.man,v 1.58 2004/02/24 02:59:36 bryan Exp $
-.TH CONSERVER.CF 5 "2004/02/24" "conserver-8.1.2" "conserver"
+.TH CONSERVER.CF 5 "2004/02/24" "conserver-8.1.3" "conserver"
 .SH NAME
 conserver.cf \- console configuration file for
 .BR conserver (8)

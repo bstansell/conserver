@@ -1,5 +1,5 @@
 /*
- *  $Id: cutil.c,v 1.115 2004/03/11 16:23:59 bryan Exp $
+ *  $Id: cutil.c,v 1.116 2004/03/19 05:23:21 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -838,6 +838,9 @@ FileUnopen(cfp)
 #endif
 {
     int retval = 0;
+
+    if (cfp == (CONSFILE *)0)
+	return 0;
 
     switch (cfp->ftype) {
 	case simpleFile:

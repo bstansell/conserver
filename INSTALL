@@ -10,6 +10,10 @@ Upgrading?
     new features added to the client if you're considering *not*
     upgrading.
 
+    Version 8.1.3
+	- The '^Ec;' sequence won't work correctly with 8.1.2 (where it
+	  was introduced).
+
     Version 8.1.2
 	- The 'devicesubst' and 'execsubst' formats have changed from
 	  8.1.1.  It's fairly simple to update your config file to the
@@ -270,5 +274,5 @@ Other Information And Gotchas
 
 
 #
-#  $Id: INSTALL,v 1.36 2004/02/22 21:04:06 bryan Exp $
+#  $Id: INSTALL,v 1.37 2004/03/23 00:55:04 bryan Exp $
 #
