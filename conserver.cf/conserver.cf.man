@@ -1,4 +1,4 @@
-.\" $Id: conserver.cf.man,v 1.25 2002-06-05 11:14:35-07 bryan Exp $
+.\" $Id: conserver.cf.man,v 1.26 2003-01-08 17:11:55-08 bryan Exp $
 .\" @(#)constab.5 01/06/91 OSU CIS; Thomas A. Fine
 .TH CONSERVER.CF 5 "Local"
 .SH NAME
@@ -34,7 +34,7 @@ previous line.  This allows you to span one logical line over
 many physical lines and insert comments wherever appropriate.
 .PP
 The first section of the file has logical lines that are separated into
-five colon-separated fields.  Leading and trailing white space in each
+six colon-separated fields.  Leading and trailing white space in each
 field is ignored.
 .TP
 .I name
@@ -77,7 +77,7 @@ this host is logged.  Any occurrence of `&' will be replaced with
 \fIname\fP.  Any path that doesn't begin with a `/' will
 have \fIlogdirectory\fP (as specified in the nearest preceding
 \fB\s-1LOGDIR=\s0\fP
-line) prepended to it.
+line) prepended to it.  If the field is empty, no logging will occur.
 .TP
 .I timestamp-spec
 specifies the time between

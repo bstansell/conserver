@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.81 2002-10-12 20:07:43-07 bryan Exp $
+ *  $Id: master.c,v 5.82 2003-01-08 17:18:44-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -61,7 +61,8 @@ int deny_severity = LOG_WARNING;
 
 
 
-static sig_atomic_t fSawQuit, fSawHUP, fSawUSR1, fSawCHLD;
+static sig_atomic_t fSawQuit = 0, fSawHUP = 0, fSawUSR2 = 0, fSawUSR1 =
+    0, fSawCHLD = 0;
 
 
 static RETSIGTYPE
@@ -197,6 +198,20 @@ FlagSawHUP(arg)
 
 static RETSIGTYPE
 #if USE_ANSI_PROTO
+FlagSawUSR2(int arg)
+#else
+FlagSawUSR2(arg)
+    int arg;
+#endif
+{
+    fSawUSR2 = 1;
+#if !HAVE_SIGACTION
+    simpleSignal(SIGUSR2, FlagSawUSR2);
+#endif
+}
+
+static RETSIGTYPE
+#if USE_ANSI_PROTO
 FlagSawUSR1(int arg)
 #else
 FlagSawUSR1(arg)
@@ -277,6 +292,7 @@ Master()
     simpleSignal(SIGTERM, FlagQuitIt);
     simpleSignal(SIGUSR1, FlagSawUSR1);
     simpleSignal(SIGHUP, FlagSawHUP);
+    simpleSignal(SIGUSR2, FlagSawUSR2);
     simpleSignal(SIGINT, FlagSawINT);
 
     /* set up port for master to listen on
@@ -339,6 +355,12 @@ Master()
 	    fSawUSR1 = 0;
 	    Info("Processing SIGUSR1 at %s", strtime(NULL));
 	    SignalKids(SIGUSR1);
+	}
+	if (fSawUSR2) {
+	    fSawUSR2 = 0;
+	    Info("Processing SIGUSR2 at %s", strtime(NULL));
+	    reopenLogfile();
+	    SignalKids(SIGUSR2);
 	}
 	if (fSawQuit) {		/* Something above set the quit flag */
 	    break;
@@ -535,9 +557,12 @@ Master()
 		filePrint(csocket, "@%s", inet_ntoa(lcl.sin_addr));
 		iSep = 0;
 	    }
-	    for (pRC = pRCUniq; (REMOTE *) 0 != pRC; pRC = pRC->pRCuniq) {
-		filePrint(csocket, ":@%s" + iSep, pRC->rhost.string);
-		iSep = 0;
+	    if (!fNoredir) {
+		for (pRC = pRCUniq; (REMOTE *) 0 != pRC;
+		     pRC = pRC->pRCuniq) {
+		    filePrint(csocket, ":@%s" + iSep, pRC->rhost.string);
+		    iSep = 0;
+		}
 	    }
 	    fileWrite(csocket, "\r\n", -1);
 	    fileClose(&csocket);
@@ -628,7 +653,14 @@ Master()
 		break;
 	    case 1:
 		if ((REMOTE *) 0 != pRCFound) {
-		    filePrint(csocket, "@%s\r\n", pRCFound->rhost.string);
+		    if (fNoredir) {
+			filePrint(csocket,
+				  "automatic redirection disabled - console on master `%s'\r\n",
+				  pRCFound->rhost.string);
+		    } else {
+			filePrint(csocket, "@%s\r\n",
+				  pRCFound->rhost.string);
+		    }
 		} else {
 		    filePrint(csocket, "%u\r\n", prnum);
 		}

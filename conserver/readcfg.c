@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.89 2002-10-12 20:07:43-07 bryan Exp $
+ *  $Id: readcfg.c,v 5.90 2003-01-08 17:12:21-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -628,7 +628,7 @@ ReadCfg(pcFile, fp, master)
 	    pcStart = pcRem + 1;
 	}
 	buildMyString(pcStart, &pCE->lfile);
-	if (LogDirectory.used && pCE->lfile.used &&
+	if (LogDirectory.used > 1 && pCE->lfile.used > 1 &&
 	    *pCE->lfile.string != '/') {
 	    char *p;
 	    buildString((char *)0);

@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.195 2002-10-12 20:07:43-07 bryan Exp $
+ *  $Id: group.c,v 5.196 2003-01-08 17:18:03-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -97,8 +97,8 @@
 
 
 /* flags that a signal has occurred */
-static sig_atomic_t fSawReOpen = 0, fSawReUp = 0, fSawMark =
-    0, fSawGoAway = 0, fSawReapVirt = 0;
+static sig_atomic_t fSawChldHUP = 0, fSawReUp = 0, fSawMark =
+    0, fSawGoAway = 0, fSawReapVirt = 0, fSawChldUSR2 = 0;
 
 void
 #if USE_ANSI_PROTO
@@ -552,19 +552,37 @@ strtime(ltime)
 }
 
 /* on an HUP close and re-open log files so lop can trim them		(ksb)
+ * and reread the configuration file
  * lucky for us: log file fd's can change async from the group driver!
  */
 static RETSIGTYPE
 #if USE_ANSI_PROTO
-FlagReOpen(int sig)
+FlagSawChldHUP(int sig)
 #else
-FlagReOpen(sig)
+FlagSawChldHUP(sig)
     int sig;
 #endif
 {
-    fSawReOpen = 1;
+    fSawChldHUP = 1;
 #if !HAVE_SIGACTION
-    simpleSignal(SIGHUP, FlagReOpen);
+    simpleSignal(SIGHUP, FlagSawChldHUP);
+#endif
+}
+
+/* on an USR2 close and re-open log files so lop can trim them		(ksb)
+ * lucky for us: log file fd's can change async from the group driver!
+ */
+static RETSIGTYPE
+#if USE_ANSI_PROTO
+FlagSawChldUSR2(int sig)
+#else
+FlagSawChldUSR2(sig)
+    int sig;
+#endif
+{
+    fSawChldUSR2 = 1;
+#if !HAVE_SIGACTION
+    simpleSignal(SIGUSR2, FlagSawChldUSR2);
 #endif
 }
 
@@ -1607,9 +1625,14 @@ Kiddie(pGE, sfd)
 	pGE->pCLfree[i].pCLnext = &pGE->pCLfree[i + 1];
     }
 
-    /* on a SIGHUP we should close and reopen our log files
+    /* on a SIGHUP we should close and reopen our log files and
+     * reread the config file
      */
-    simpleSignal(SIGHUP, FlagReOpen);
+    simpleSignal(SIGHUP, FlagSawChldHUP);
+
+    /* on a SIGUSR2 we should close and reopen our log files
+     */
+    simpleSignal(SIGUSR2, FlagSawChldUSR2);
 
     /* on a SIGUSR1 we try to bring up all downed consoles */
     simpleSignal(SIGUSR1, FlagReUp);
@@ -1630,8 +1653,23 @@ Kiddie(pGE, sfd)
 	    fSawReapVirt = 0;
 	    ReapVirt(pGE);
 	}
-	if (fSawReOpen) {
-	    fSawReOpen = 0;
+	if (fSawChldHUP) {
+	    fSawChldHUP = 0;
+	    reopenLogfile();
+	    ReReadCfg();
+	    pGE = pGroups;
+	    FD_SET(fileFDNum(sfd), &pGE->rinit);
+	    ReOpen(pGE);
+	    ReUp(pGE, 0);
+	}
+	if (fSawChldUSR2) {
+	    fSawChldUSR2 = 0;
+	    reopenLogfile();
+	    ReOpen(pGE);
+	    ReUp(pGE, 0);
+	}
+	if (fSawChldHUP) {
+	    fSawChldHUP = 0;
 	    reopenLogfile();
 	    ReReadCfg();
 	    pGE = pGroups;

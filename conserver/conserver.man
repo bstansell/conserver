@@ -1,10 +1,10 @@
 .\" @(#)conserver.8 01/06/91 OSU CIS; Thomas A. Fine
-.\" $Id: conserver.man,v 1.28 2002-10-09 13:26:31-07 bryan Exp $
+.\" $Id: conserver.man,v 1.29 2003-01-08 17:17:25-08 bryan Exp $
 .TH CONSERVER 8 "Local"
 .SH NAME
 conserver \- console server daemon
 .SH SYNOPSIS
-\fBconserver\fP [\fB\-7dDEFhinouvV\fP] [\fB\-a\fP \fItype\fP]
+\fBconserver\fP [\fB\-7dDEFhinoRuvV\fP] [\fB\-a\fP \fItype\fP]
 [\fB\-m\fP \fImax\fP]
 [\fB\-M\fP \fIaddr\fP] [\fB\-p\fP \fIport\fP] [\fB\-b\fP \fIport\fP]
 [\fB\-c\fP \fIcred\fP] [\fB\-C\fP \fIconfig\fP] [\fB\-P\fP \fIpasswd\fP]
@@ -79,15 +79,19 @@ forking off new childen, deleted consoles (and their clients) are dropped,
 and changes to consoles are done "in place", resetting the console
 port (bringing it down and up) only when necessary.  the console name is
 used to determine when consoles have been added/removed/changed.  all 
-console logfiles are closed and reopened
-and, if in daemon mode (\fB\-d\fP option),
-the error logfile (see the \fB\-L\fP option).
+actions performed by SIGUSR2 are also performed.
 .TP
 SIGUSR1
 try to connect to any consoles marked as
 down.  This can come in handy if you had a terminal server (or more)
 that wasn't accepting connections at startup and you want
 \fBconserver\fP to try to reconnect to all those downed ports.
+.TP
+SIGUSR2
+all console logfiles are closed and reopened
+and, if in daemon mode (\fB\-d\fP option),
+the error logfile (see the \fB\-L\fP option).  all actions performed by
+SIGUSR1 are also performed.
 .PP
 Slave hosts which have no current
 .BR console (1)
@@ -197,6 +201,12 @@ Obsolete (now a no-op); see \fB\-u\fP.
 Normally, a client connecting to a ``downed'' console does just that.
 Using this option, the server will automatically attempt to open
 (``bring up'') the console when the client connects.
+.TP
+.B \-R
+Disable automatic client redirection to other conserver hosts.  This
+means informational commands like \fB-w\fP and \fB-i\fP will only show
+the status of the local conserver host and attempts to connect to
+remote consoles will result in an informative message to the user.
 .TP
 .BI \-O min
 Enable periodic attempts (every \fImin\fP minutes) to open (``bring up'')

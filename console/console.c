@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.99 2002-10-12 20:06:57-07 bryan Exp $
+ *  $Id: console.c,v 5.101 2003-01-27 17:46:05-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -196,7 +196,7 @@ static char *apcLong[] = {
 #endif
     "f(F)    force read/write connection (and replay)",
     "G       connect to the console group only",
-    "i       display information in machine-parseable form",
+    "i(I)    display information in machine-parseable form (on master)",
     "h       output this message",
     "l user  use username instead of current username",
     "M mach  master server to poll first",
@@ -1424,14 +1424,14 @@ main(argc, argv)
 #endif
 {
     char *pcCmd, *pcTo;
-    struct passwd *pwdMe;
+    struct passwd *pwdMe = (struct passwd *)0;
     int opt;
     int fLocal;
     STRING acPorts = { (char *)0, 0, 0 };
     char *pcUser = (char *)0;
     char *pcMsg = (char *)0;
     int (*pfiCall) ();
-    static char acOpts[] = "7aAb:c:De:EfFGhil:M:p:PqQrRsSuvVwWx";
+    static char acOpts[] = "7aAb:c:De:EfFGhiIl:M:p:PqQrRsSuvVwWx";
     extern int optind;
     extern int optopt;
     extern char *optarg;
@@ -1501,6 +1501,9 @@ main(argc, argv)
 		}
 		break;
 
+	    case 'I':
+		fLocal = 1;
+		/* fall through */
 	    case 'i':
 		pcCmd = "info";
 		break;
@@ -1569,7 +1572,7 @@ main(argc, argv)
 		Error
 		    ("usage [-aAEfFGsS] [-7Dv] [-c cred] [-M mach] [-p port] [-e esc] [-l username] console");
 		Error
-		    ("usage [-hPrRuVwWx] [-7Dv] [-M mach] [-p port] [-b message]");
+		    ("usage [-hiIPrRuVwWx] [-7Dv] [-M mach] [-p port] [-b message]");
 		Error("usage [-qQ] [-7Dv] [-M mach] [-p port]");
 		Usage(apcLong);
 		exit(EX_OK);
@@ -1678,7 +1681,7 @@ main(argc, argv)
     } else if ('a' == *pcCmd || 'f' == *pcCmd || 's' == *pcCmd) {
 	ValidateEsc();
 	pfiCall = Indir;
-    } else if ('g' == *pcCmd) {
+    } else if ('g' == *pcCmd || 'i' == *pcCmd) {
 	pfiCall = fLocal ? CmdGroup : CmdMaster;
     } else {
 	pfiCall = CmdMaster;

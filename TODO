@@ -10,6 +10,10 @@ Bryan Stansell
 
 ---------------------------------------------------------------------------
 
+- usleep() statements, can they be removed and mimiced with some sort
+  of console state thing and a timer?  Aaron Burt <aaron@osdl.org>
+  users email.
+
 - OpenSSL sockets have been make blocking instead of keeping the
   underlying socket non-blocking.  Why?  It requires much more work to
   deal with non-blocking sockets and OpenSSL.  Not impossible, just have
@@ -117,5 +121,5 @@ Bryan Stansell
 
 
 #
-#  $Id: TODO,v 1.26 2002-10-09 15:55:24-07 bryan Exp $
+#  $Id: TODO,v 1.27 2003-01-27 17:47:27-08 bryan Exp $
 #

@@ -1,5 +1,5 @@
 /*
- *  $Id: main.h,v 5.38 2002-09-29 19:04:57-07 bryan Exp $
+ *  $Id: main.h,v 5.39 2003-01-08 17:12:38-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -38,7 +38,7 @@
  */
 extern char rcsid[];
 extern int fAll, fVerbose, fSoftcar, fNoinit, fInteractive, fStrip,
-    fDaemon, fReopen, fReopenall, fNoautoreup;
+    fDaemon, fReopen, fReopenall, fNoautoreup, fNoredir;
 extern char chDefAcc;
 extern in_addr_t bindAddr;
 extern unsigned int bindPort, bindBasePort;

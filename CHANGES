@@ -1,6 +1,20 @@
 				CHANGES
 				=======
 
+version 7.2.5 (Jan 27, 2003):
+	- fixed many documentation bugs - reported by Dave Stuit
+	  <djs@tellme.com>
+	- added -I option to client which operates like -i, but on the
+	  primary conserver only - suggested by Dave Stuit
+	  <djs@tellme.com>
+	- added SIGUSR2, which does not reread the configuration file,
+	  but does everything else SIGHUP does - suggested at LISA 2002
+	- fixed bug where LOGDIR setting gets used even if no logfile
+	  is wanted
+	- added -R option to server to prevent client redirection to
+	  other conserver hosts - suggested by Todd Stansell
+	  <todd@stansell.org>
+
 version 7.2.4 (Oct 14, 2002):
 	- added --with-openssl for some client/server encryption
 	- added -E option to client and server to allow for non-encrypted
@@ -363,5 +377,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.74 2002-10-14 12:18:54-07 bryan Exp $
+#  $Id: CHANGES,v 1.75 2003-01-27 17:47:59-08 bryan Exp $
 #

@@ -1,4 +1,4 @@
-.\" $Id: console.man,v 1.23 2002-10-09 13:26:31-07 bryan Exp $
+.\" $Id: console.man,v 1.24 2003-01-08 17:07:51-08 bryan Exp $
 .TH CONSOLE 1 "Local"
 .SH NAME
 console \- console server client program
@@ -8,7 +8,7 @@ console \- console server client program
 [\fB\-p\fP \fIport\fP] [\fB\-e\fP \fIesc\fP] [\fB\-l\fP \fIuser\fP]
 \fIconsole\fP
 .br
-\fBconsole\fP [\fB\-hPrRuVwx\fP] [\fB\-7Dv\fP] [\fB\-M\fP \fImach\fP]
+\fBconsole\fP [\fB\-hiIPrRuVwWx\fP] [\fB\-7Dv\fP] [\fB\-M\fP \fImach\fP]
 [\fB\-p\fP \fIport\fP] [\fB\-b\fP \fImessage\fP]
 .br
 \fBconsole\fP [\fB\-qQ\fP] [\fB\-7Dv\fP] [\fB\-M\fP \fImach\fP]
@@ -106,6 +106,9 @@ Display a brief help message.
 .B \-i
 Display information in a machine-parseable format (see below for the details).
 .TP
+.B \-I
+Same as \fB\-i\fP but just acts on the primary server.
+.TP
 .BI \-l user
 Set the login name used for authentication to \fIuser\fP.
 By default, \fBconsole\fP uses $USER if its uid matches the user's real uid,
@@ -168,6 +171,9 @@ including the hostnames where the \fBconsole\fP connections originate
 and the idle times.  This is useful to see if anybody is actively
 using the console system if it becomes necessary to shut down
 \fBconserver\fP.
+.TP
+.B \-W
+Same as \fB\-w\fP but just acts on the primary server.
 .TP
 .B \-x
 Show a list of consoles and devices.

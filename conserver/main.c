@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.105 2002-10-12 20:07:43-07 bryan Exp $
+ *  $Id: main.c,v 5.106 2003-01-08 17:18:59-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -55,7 +55,7 @@
 
 int fAll = 0, fVerbose = 0, fSoftcar = 0, fNoinit = 0, fVersion =
     0, fStrip = 0, fDaemon = 0, fUseLogfile = 0, fReopen = 0, fReopenall =
-    0, fNoautoreup = 0;
+    0, fNoautoreup = 0, fNoredir = 0;
 
 char chDefAcc = 'r';
 
@@ -439,7 +439,7 @@ daemonize()
 
 
 static char u_terse[] =
-    " [-7dDEFhinouvV] [-a type] [-m max] [-M addr] [-p port] [-b port] [-c cred] [-C config] [-P passwd] [-L logfile] [-O min]";
+    " [-7dDEFhinRouvV] [-a type] [-m max] [-M addr] [-p port] [-b port] [-c cred] [-C config] [-P passwd] [-L logfile] [-O min]";
 static char *apcLong[] = {
     "7          strip the high bit of all console data",
     "a type     set the default access type",
@@ -468,6 +468,7 @@ static char *apcLong[] = {
     "O min      reopen all downed consoles every <min> minutes",
     "p port     port to listen on",
     "P passwd   give a new passwd file to the server process",
+    "R          disable automatic client redirection",
     "u          copy \"unloved\" console data to stdout",
     "v          be verbose on startup",
     "V          output version info",
@@ -678,7 +679,7 @@ main(argc, argv)
     int i;
     FILE *fpConfig;
     struct hostent *hpMe;
-    static char acOpts[] = "7a:b:c:C:dDEFhiL:m:M:noO:p:P:suVv";
+    static char acOpts[] = "7a:b:c:C:dDEFhiL:m:M:noO:p:P:RsuVv";
     extern int optopt;
     extern char *optarg;
     struct passwd *pwd;
@@ -803,6 +804,9 @@ main(argc, argv)
 		break;
 	    case 'P':
 		pcPasswd = optarg;
+		break;
+	    case 'R':
+		fNoredir = 1;
 		break;
 	    case 's':
 		fSoftcar ^= 1;
