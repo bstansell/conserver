@@ -1,5 +1,5 @@
 /*
- *  $Id: main.h,v 5.11 1999-12-01 11:55:13-08 bryan Exp $
+ *  $Id: main.h,v 5.12 2000-01-05 14:39:39-08 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -41,6 +41,7 @@ extern char chDefAcc;
 extern char *pcConfig;
 extern struct sockaddr_in in_port;
 extern char acMyHost[];
+extern char acMyAddr[];
 extern int domainHack;
 
 #if defined(SERVICE)

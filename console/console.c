@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.27 1999-08-23 17:32:35-07 bryan Exp $
+ *  $Id: console.c,v 5.28 2000-01-06 14:00:13-08 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -77,7 +77,7 @@ extern char *sys_errlist[];
 #endif
 
 static char rcsid[] =
-	"$Id: console.c,v 5.27 1999-08-23 17:32:35-07 bryan Exp $";
+	"$Id: console.c,v 5.28 2000-01-06 14:00:13-08 bryan Exp $";
 static char *progname =
 	rcsid;
 int fVerbose = 0, fReplay = 0, fRaw = 0;
@@ -1159,6 +1159,7 @@ char **argv;
 	static char acOpts[] = "b:aAdDsSfFe:hl:M:pvVwWUqQrux";
 	extern long atol();
 	extern int optind;
+	extern int optopt;
 	extern char *optarg;
 
 	if ((char *)0 == (progname = strrchr(argv[0], '/'))) {
@@ -1284,14 +1285,6 @@ char **argv;
 			pcCmd = "quit";
 			break;
 
-		case 'h':
-			printf("%s: usage [-aAfFsS] [-rv] [-e esc] [-M mach] [-l username] machine\n", progname);
-			printf("%s: usage [-v] [-hdDuVwx] [-b message]\n", progname);
-			printf("%s: usage [-qQ] [-M mach]\n", progname);
-			Usage(stdout, apcLong);
-			exit(0);
-			/*NOTREACHED*/
-
 		case 'v':
 			fVerbose = 1;
 			break;
@@ -1301,9 +1294,15 @@ char **argv;
 			exit(0);
 
 		default:	/* huh? */
-			fprintf(stderr, "%s: unknown option `%c\', try -h\n", progname, opt);
-			exit(1);
+			if ( opt != 'h' )
+			    fprintf(stderr, "%s: unknown option `%c\'\n", progname, optopt);
+			printf("%s: usage [-aAfFsS] [-rv] [-e esc] [-M mach] [-l username] machine\n", progname);
+			printf("%s: usage [-v] [-hdDuVwx] [-b message]\n", progname);
+			printf("%s: usage [-qQ] [-M mach]\n", progname);
+			Usage(stdout, apcLong);
+			exit(0);
 			/*NOTREACHED*/
+
 		}
 	}
 

@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.32 1999-12-01 11:55:13-08 bryan Exp $
+ *  $Id: main.c,v 5.33 2000-01-05 14:39:39-08 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -58,7 +58,7 @@
 #endif
 
 char rcsid[] =
-	"$Id: main.c,v 5.32 1999-12-01 11:55:13-08 bryan Exp $";
+	"$Id: main.c,v 5.33 2000-01-05 14:39:39-08 bryan Exp $";
 char *progname =
 	rcsid;
 int fAll = 1, fVerbose = 0, fSoftcar = 0, fNoinit = 0;
@@ -230,8 +230,8 @@ char **argv;
 		fprintf(stderr, "%s: gethostbyname: %s\n", progname, hstrerror(h_errno));
 		exit(1);
 	}
-	if (sizeof(acMyAddr) != hpMe->h_length || AF_INET != hpMe->h_addrtype) {
-		fprintf(stderr, "%s: wrong address size (%d != %d) or adress family (%d != %d)\n", progname, sizeof(acMyAddr), hpMe->h_length, AF_INET, hpMe->h_addrtype);
+	if (4 != hpMe->h_length || AF_INET != hpMe->h_addrtype) {
+		fprintf(stderr, "%s: wrong address size (4 != %d) or adress family (%d != %d)\n", progname, hpMe->h_length, AF_INET, hpMe->h_addrtype);
 		exit(1);
 	}
 #if USE_STRINGS

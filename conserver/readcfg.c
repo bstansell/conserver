@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.26 1999-08-24 14:37:55-07 bryan Exp $
+ *  $Id: readcfg.c,v 5.27 2000-01-05 14:39:39-08 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -153,22 +153,45 @@ register FILE *fp;
 		 * if so just add it to a linked list of remote hosts
 		 * I'm sure most sites will never use this code (ksb)
 		 */
-		if ((char *)0 != (pcRem = strchr(pcLine, '@')) &&
-		   ((*pcRem++ = '\000'), 0 != strcmp(acMyHost, pcRem))) {
-			register REMOTE *pRCTemp;
-			pRCTemp = (REMOTE *)calloc(1, sizeof(REMOTE));
-			if ((REMOTE *)0 == pRCTemp) {
-				CSTROUT(2, "out of memory!\n");
-				exit(32);
+		if ((char *)0 != (pcRem = strchr(pcLine, '@'))) {
+			auto struct hostent *hpMe;
+
+			*pcRem++ = '\000';
+
+			if ((struct hostent *)0 ==
+			    (hpMe = gethostbyname(pcRem))) {
+				fprintf(stderr, "%s: gethostbyname: %s\n", progname, hstrerror(h_errno));
+				exit(1);
 			}
-			(void)strcpy(pRCTemp->rhost, pcRem);
-			(void)strcpy(pRCTemp->rserver, acIn);
-			*ppRC = pRCTemp;
-			ppRC = & pRCTemp->pRCnext;
-			if (fVerbose) {
-				printf("%s: %s remote on %s\n", progname, acIn, pcRem);
+			if (4 != hpMe->h_length ||
+			    AF_INET != hpMe->h_addrtype) {
+				fprintf(stderr, "%s: wrong address size (4 != %d) or address family (%d != %d)\n", progname, hpMe->h_length, AF_INET, hpMe->h_addrtype);
+				exit(1);
 			}
-			continue;
+
+			if ( 0 !=
+#if USE_STRINGS
+			    bcmp(&acMyAddr[0], hpMe->h_addr, hpMe->h_length)
+#else
+			    memcmp(&acMyAddr[0], hpMe->h_addr, hpMe->h_length)
+#endif
+			    ) {
+
+				register REMOTE *pRCTemp;
+				pRCTemp = (REMOTE *)calloc(1, sizeof(REMOTE));
+				if ((REMOTE *)0 == pRCTemp) {
+					CSTROUT(2, "out of memory!\n");
+					exit(32);
+				}
+				(void)strcpy(pRCTemp->rhost, pcRem);
+				(void)strcpy(pRCTemp->rserver, acIn);
+				*ppRC = pRCTemp;
+				ppRC = & pRCTemp->pRCnext;
+				if (fVerbose) {
+					printf("%s: %s remote on %s\n", progname, acIn, pcRem);
+				}
+				continue;
+			}
 		}
 
 		/* take the same group as the last line, by default
