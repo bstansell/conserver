@@ -1,9 +1,11 @@
 /*
- *  $Id: main.h,v 5.13 2000-03-02 02:42:17-08 bryan Exp $
+ *  $Id: main.h,v 5.15 2000-12-13 12:31:07-08 bryan Exp $
+ *
+ *  Copyright conserver.com, 2000
+ *
+ *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
  *  Copyright GNAC, Inc., 1998
- *
- *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
  */
 
 /*
@@ -39,6 +41,7 @@ extern char *progname;
 extern int fAll, fVerbose, fSoftcar, fNoinit, fInteractive, fDebug;
 extern char chDefAcc;
 extern char *pcConfig;
+extern char *pcPasswd;
 extern struct sockaddr_in in_port;
 extern char acMyHost[];
 extern char acMyAddr[];

@@ -1,9 +1,11 @@
 /*
- *  $Id: access.c,v 5.14 2000-03-02 02:47:04-08 bryan Exp $
+ *  $Id: access.c,v 5.15 2000-12-13 12:31:07-08 bryan Exp $
+ *
+ *  Copyright conserver.com, 2000
+ *
+ *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
  *  Copyright GNAC, Inc., 1998
- *
- *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
  */
 
 /*

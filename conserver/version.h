@@ -1,9 +1,11 @@
 /*
- *  $Id: version.h,v 1.16 2000-09-08 16:12:59-07 bryan Exp $
+ *  $Id: version.h,v 1.19 2000-12-14 16:21:18-08 bryan Exp $
+ *
+ *  Copyright conserver.com, 2000
+ *
+ *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
  *  Copyright GNAC, Inc., 1998
- *
- *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
  */
 
-#define GNAC_VERSION "Certainty Solutions version 6.16"
+#define THIS_VERSION "conserver.com version 6.1.7"

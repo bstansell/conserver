@@ -1,9 +1,11 @@
 /*
- *  $Id: consent.c,v 5.35 2000-03-06 17:26:16-08 bryan Exp $
+ *  $Id: consent.c,v 5.36 2000-12-13 12:31:07-08 bryan Exp $
+ *
+ *  Copyright conserver.com, 2000
+ *
+ *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
  *  Copyright GNAC, Inc., 1998
- *
- *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
  */
 
 /*

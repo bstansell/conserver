@@ -1,9 +1,11 @@
 /*
- *  $Id: master.c,v 5.25 2000-03-06 17:12:43-08 bryan Exp $
+ *  $Id: master.c,v 5.27 2000-12-13 12:31:07-08 bryan Exp $
+ *
+ *  Copyright conserver.com, 2000
+ *
+ *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
  *  Copyright GNAC, Inc., 1998
- *
- *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
  */
 
 /*
@@ -446,7 +448,7 @@ REMOTE
 #endif
 		}
 		if (0 == strcmp(acIn, "version")) {
-			sprintf(acOut, "version `%s\'\r\n", GNAC_VERSION);
+			sprintf(acOut, "version `%s\'\r\n", THIS_VERSION);
 			(void)write(cfd, acOut, strlen(acOut));
 #if TEST_FORK
 			exit(0);

@@ -1,9 +1,11 @@
 /*
- *  $Id: main.c,v 5.34 2000-03-02 02:40:42-08 bryan Exp $
+ *  $Id: main.c,v 5.37 2000-12-13 12:31:07-08 bryan Exp $
+ *
+ *  Copyright conserver.com, 2000
+ *
+ *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
  *  Copyright GNAC, Inc., 1998
- *
- *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
  */
 
 /*
@@ -58,13 +60,14 @@
 #endif
 
 char rcsid[] =
-	"$Id: main.c,v 5.34 2000-03-02 02:40:42-08 bryan Exp $";
+	"$Id: main.c,v 5.37 2000-12-13 12:31:07-08 bryan Exp $";
 char *progname =
 	rcsid;
-int fAll = 1, fVerbose = 0, fSoftcar = 0, fNoinit = 0, fDebug = 0;
+int fAll = 1, fVerbose = 0, fSoftcar = 0, fNoinit = 0, fDebug = 0, fVersion = 0;
 int fDaemon = 0;
 char chDefAcc = 'r';
 char *pcConfig = CONFIG;
+char *pcPasswd = PASSWD_FILE;
 int domainHack = 0;
 
 #if defined(SERVICE)
@@ -137,6 +140,7 @@ static char *apcLong[] = {
 	"h         output this message",
 	"i         init console connections on demand",
 	"n         do not output summary stream to stdout",
+	"C passwd  give a new passwd file to the server process",
 	"v         be verbose on startup",
 	"V         output version info",
 	(char *)0
@@ -160,12 +164,17 @@ Version()
 {
 	auto char acA1[16], acA2[16];
 
-	printf("%s: %s\n", progname, GNAC_VERSION);
+	printf("%s: %s\n", progname, THIS_VERSION);
 	printf("%s: default access type `%c\'\n", progname, chDefAcc);
 	printf("%s: default escape sequence `%s%s\'\n", progname, FmtCtl(DEFATTN, acA1), FmtCtl(DEFESC, acA2));
 	printf("%s: configuration in `%s\'\n", progname, pcConfig);
-	printf("%s: password in `%s\'\n", progname, PASSWD_FILE);
+	printf("%s: password in `%s\'\n", progname, pcPasswd);
 	printf("%s: limited to %d group%s with %d member%s\n", progname, MAXGRP, MAXGRP == 1 ? "" : "s", MAXMEMB, MAXMEMB == 1 ? "" : "s");
+#if CPARITY
+	printf("%s: high-bit of data stripped (7-bit clean)\n", progname);
+#else
+	printf("%s: high-bit of data *not* stripped (8-bit clean)\n", progname);
+#endif
 #if defined(SERVICE)
 	{
 		struct servent *pSE;
@@ -205,8 +214,8 @@ char **argv;
 	register int i, j;
 	register FILE *fpConfig;
 	auto struct hostent *hpMe;
-	static char acOpts[] = "a:C:dDhinsVv",
-		u_terse[] = " [-dDhinsvV] [-a type] [-C config]";
+	static char acOpts[] = "a:C:dDhinP:sVv",
+		u_terse[] = " [-dDhinsvV] [-a type] [-C config] [-P passwd]";
 	extern int optopt;
 	extern char *optarg;
 	auto REMOTE
@@ -261,6 +270,9 @@ char **argv;
 		case 'C':
 			pcConfig = optarg;
 			break;
+		case 'P':
+			pcPasswd = optarg;
+			break;
 		case 'd':
 			fDaemon = 1;
 			break;
@@ -281,8 +293,8 @@ char **argv;
 			fSoftcar ^= 1;
 			break;
 		case 'V':
-			Version();
-			exit(0);
+			fVersion = 1;
+			break;
 		case 'v':
 			fVerbose = 1;
 			break;
@@ -293,6 +305,11 @@ char **argv;
 			fprintf(stderr, "%s: option %c needs a parameter\n", progname, optopt);
 			exit(1);
 		}
+	}
+
+	if (fVersion) {
+		Version();
+		exit(0);
 	}
 
 #if HAVE_SHADOW

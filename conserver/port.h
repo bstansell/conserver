@@ -1,9 +1,11 @@
 /*
- *  $Id: port.h,v 1.15 2000-03-06 18:16:24-08 bryan Exp $
+ *  $Id: port.h,v 1.17 2000-12-13 12:31:07-08 bryan Exp $
+ *
+ *  Copyright conserver.com, 2000
+ *
+ *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
  *  Copyright GNAC, Inc., 1998
- *
- *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
  */
 
 /*
@@ -89,10 +91,10 @@
 #endif
 
 /* How long should we wait for a TCP socket to be created when talking
- * to network terminal servers?  30 second default
+ * to network terminal servers?  10 second default
  */
 #if !defined(CONNECTTIMEOUT)
-#define CONNECTTIMEOUT	30
+#define CONNECTTIMEOUT	10
 #endif
 
 /* the default escape sequence used to give meta commands

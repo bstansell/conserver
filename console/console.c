@@ -1,9 +1,11 @@
 /*
- *  $Id: console.c,v 5.29 2000-03-06 18:16:44-08 bryan Exp $
+ *  $Id: console.c,v 5.31 2000-12-13 12:31:56-08 bryan Exp $
+ *
+ *  Copyright conserver.com, 2000
+ *
+ *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
  *  Copyright GNAC, Inc., 1998
- *
- *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
  */
 
 /*
@@ -74,7 +76,7 @@ extern char *sys_errlist[];
 #endif
 
 static char rcsid[] =
-	"$Id: console.c,v 5.29 2000-03-06 18:16:44-08 bryan Exp $";
+	"$Id: console.c,v 5.31 2000-12-13 12:31:56-08 bryan Exp $";
 static char *progname =
 	rcsid;
 int fVerbose = 0, fReplay = 0, fRaw = 0;
@@ -187,7 +189,7 @@ Version()
 {
 	register unsigned char *puc;
 
-	printf("%s: %s\n", progname, GNAC_VERSION);
+	printf("%s: %s\n", progname, THIS_VERSION);
 	printf("%s: initial master server `%s\'\n", progname, pcInMaster);
 	printf("%s: default escape sequence `", progname);
 	putCtlc(DEFATTN, stdout);

@@ -1,6 +1,16 @@
 				CHANGES
 				=======
 
+version 6.1.7 (Dec 14, 2000):
+	- Documented no parity option in conserver.cf.man
+	- Lowered default CONNECTTIMEOUT to 10 seconds
+	- Changed more internal references to GNAC
+	- Shell command support just plain broken (tracked down and
+	  slain by Rob Joyce <robjoyce@ee.princeton.edu>)
+	- Added a -P option for specifying the password file
+	- CPARITY setting reflected in -V output
+	- New version numbering scheme and packaging
+
 version 6.16 (Sep 8, 2000):
 	- Changed the main GNAC references to Certainty Solutions
 	- Made the comment blocks in conserver/cons.h a little less
@@ -81,5 +91,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.17 2000-09-08 16:12:37-07 bryan Exp $
+#  $Id: CHANGES,v 1.20 2000-12-14 16:32:46-08 bryan Exp $
 #

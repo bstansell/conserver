@@ -1,9 +1,11 @@
 /*
- *  $Id: group.c,v 5.59 2000-03-06 17:23:55-08 bryan Exp $
+ *  $Id: group.c,v 5.63 2000-12-13 12:31:07-08 bryan Exp $
+ *
+ *  Copyright conserver.com, 2000
+ *
+ *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
  *  Copyright GNAC, Inc., 1998
- *
- *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
  */
 
 /*
@@ -390,9 +392,9 @@ char *pw_string;
     if ( user = strchr(username, '@') )
 	*user = '\000';
 
-    if ((fp = fopen(PASSWD_FILE, "r")) == NULL) {
+    if ((fp = fopen(pcPasswd, "r")) == NULL) {
 	printf("%s: Cannot open passwd file %s: %s\n",
-	       progname, PASSWD_FILE, strerror(errno));
+	       progname, pcPasswd, strerror(errno));
 
 	if ((struct passwd *)0 == (pwd = getpwuid(0))) {
 	    CSTROUT(pCLServing->fd, "no root passwd?\r\n");
@@ -406,7 +408,7 @@ char *pw_string;
 		return 1;
 	}
     } else {
-/*        printf("Opened passwd file %s\n", PASSWD_FILE);*/
+/*        printf("Opened passwd file %s\n", pcPasswd);*/
 
 	while (fgets(buf, sizeof(buf), fp) != NULL)
 	{
@@ -596,7 +598,7 @@ int sfd;
 		pCE[iConsole].pCLon = pCE[iConsole].pCLwr = (CLIENT *)0;
 #if DO_VIRTUAL
 		pCE[iConsole].fdlog = -1;
-		if (0 == pCE->fvirtual) {
+		if (0 == pCE[iConsole].fvirtual) {
 			pCE[iConsole].fdtty = -1;
 			continue;
 		}
@@ -1255,6 +1257,15 @@ drop:
 
 				case 'c':
 				case 'C':
+					if (pCEServing->isNetworkConsole) {
+						continue;
+					}
+#if DO_VIRTUAL
+					if (pCEServing->fvirtual) {
+						continue;
+					}
+#endif
+
 #if USE_TERMIOS
 					if (-1 == tcgetattr(pCEServing->fdtty, & sbuf)) {
 						CSTROUT(pCLServing->fd, "failed]\r\n");
@@ -1509,7 +1520,7 @@ drop:
 
 				case 'v':	/* version */
 				case 'V':
-					sprintf(acOut, "version `%s\']\r\n", GNAC_VERSION);
+					sprintf(acOut, "version `%s\']\r\n", THIS_VERSION);
 					(void)write(pCLServing->fd, acOut, strlen(acOut));
 					break;
 
@@ -1589,9 +1600,15 @@ drop:
 					if (pCEServing->isNetworkConsole) {
 						goto drop;
 					}
+#if DO_VIRTUAL
+					if (pCEServing->fvirtual) {
+						goto drop;
+					}
+#endif
+
 #if USE_TERMIOS
 					if (-1 == tcgetattr(pCEServing->fdtty, & sbuf)) {
-						CSTROUT(pCLServing->fd, "failed]\r\n");
+						CSTROUT(pCLServing->fd, "[failed]\r\n");
 						continue;
 					}
 					if (0 == (sbuf.c_iflag & IXOFF)) {

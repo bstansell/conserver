@@ -1,9 +1,11 @@
 /*
- *  $Id: client.h,v 5.13 1999-02-02 11:36:26-08 bryan Exp $
+ *  $Id: client.h,v 5.14 2000-12-13 12:31:07-08 bryan Exp $
+ *
+ *  Copyright conserver.com, 2000
+ *
+ *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
  *  Copyright GNAC, Inc., 1998
- *
- *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
  */
 
 /*

@@ -1,0 +1,64 @@
+		
+				Conserver FAQ
+				=============
+
+This is the Conserver FAQ.  Any suggestions/corrections/etc should be
+directed to faq@conserver.com.  The FAQ answers the following questions:
+
+    1) Where can I find the software?
+    2) How do I deal with these serial ports?
+    3) How can I tell what compile-time defaults were used?
+    4) What does "conserver: getservbyname: conserver: No such file or
+       directory" mean (or something close to that)?
+    5) What does "console: gethostbyname: console: host lookup error"
+       mean (or something close to that)?
+    6) How do I set up a serial port for no parity?
+
+
+ 1) Where can I find the software?
+
+    The latest version can be found at http://www.conserver.com/
+
+ 2) How do I wire/hook up serial ports?
+
+    David "Zonker" Harris has a wonderful set of pages that talk about
+    hooking up many types of terminal servers, equipment, etc.  It also
+    provides links to other serial port references.  You can find his
+    pages at http://www.conserver.com/consoles/.
+
+    Celeste Stokely also has a wealth of references at
+    http://www.stokely.com/.  Just look around and be amazed at what
+    you'll find!
+
+ 3) How can I tell what compile-time defaults were used?
+
+    The compile-time defaults can be found by running conserver and
+    console with the -V flag.  Simple as that.
+
+ 4) What does "conserver: getservbyname: conserver: No such file or
+    directory" mean (or something close to that)?
+
+    When conserver was compiled, it was told to use the /etc/services
+    entry of "conserver" (what came after getservbyname:).  You'll need
+    to either recompile conserver and hard-code a port number (using
+    PORT instead of SERVICE in conserver/cons.h) or enter "conserver"
+    in /etc/services.
+
+ 5) What does "console: gethostbyname: console: host lookup error"
+    mean (or something close to that)?
+
+    When the console command was compiled, it was told to use the
+    hostname "console" (what came after gethostbyname:) as the master
+    conserver host.  You'll need to either recompile console with the
+    appropriate name of your conserver host or add an alias of "console".
+    In most cases, adding an alias is my suggestion.
+
+ 6) How do I set up a local serial port for no parity?
+
+    The conserver.cf man page will have this in the 6.17 release,
+    but the answer is to use a 'p' after the baud rate.  So, '9600p'
+    is 9600 baud, no parity.
+
+#
+#  $Id: FAQ,v 1.2 2000-12-13 12:20:03-08 bryan Exp $
+#

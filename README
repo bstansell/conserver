@@ -7,37 +7,50 @@ Maintainer/Enhancer
     formerly Global Networking and Computing (GNAC)
 
 
-Announcement Mailing List?
+Mailing Lists
 
-    Is anyone out there interested in being on an announcement
-    mailing list for conserver? If so, drop me a line
-    (bryan@conserver.com) and let me know. I'll start by sending
-    messages when a new version is posted, and perhaps it will grow into
-    something more.
+    There are currently two mailing lists available at conserver.com.
+    announce@conserver.com is an announcement-only mailing list for
+    informing of new versions, major developments, etc.
+    users@conserver.com is for general Q&A, discussions, ideas, etc for
+    conserver users.  See http://www.conserver.com/ for pointers to
+    these and possibly future lists.
+
 
 Origin
 
-    The console server software found here is a heavily modified version
-    originally written by Tom Fine (fine@cis.ohio-state.edu) and then
-    Kevin S Braunsdorf (ksb@cc.purdue.edu).  Patches from Robert Olson
-    (olson@mcs.anl.gov) were then applied to get network console support.
+    The console server software found here is a heavily modified
+    version originally written by Tom Fine (fine@cis.ohio-state.edu)
+    and then Kevin S Braunsdorf (ksb+conserver@sa.fedex.com).  Patches
+    from Robert Olson (olson@mcs.anl.gov) were then applied to get
+    network console support.
 
     Arnold de Leon (arnold@corp.webtv.net) then fixed various bugs and
     added enhancements while at Synopsys.  I then took the result and
     continued fixing things and adding features we found useful.
+    Certainty Solutions has been supporting my coding efforts (in too
+    many ways to list) since 1996.
 
 
-The Certainty Solutions Version
+The conserver.com Distribution
 
-    The result is a combination of many people's work.  We (Certainty
-    Solutions) are releasing this combination in hopes that it will help
-    others.  There is no warranty or support implied by our distribution
-    of the software.
+    The result is a combination of many people's work.  This version is
+    being released in hopes that it will help others.  There is no
+    warranty or support implied by the distribution of the software.
+
+    As of version 6.1.7, the packaging and numbering sheme has
+    changed.  I used to package conserver as conserver-GNAC-v.vv.
+    Since GNAC (now Certainty Solutions) has changed it's name I've
+    decided to drop the GNAC portion and use a 3 digit version number
+    (conserver-v.v.v).  Why change the version numbering?  I need to
+    differenciate this thread of the code from the original authors and
+    I couldn't come up with a good replacement for the GNAC name - sad,
+    but true.
 
 
 Downloading
 
-    The latest version can be found at ftp://ftp.conserver.com/conserver/.
+    The latest version can be found at http://www.conserver.com/.
 
 
 Other Good Information
@@ -45,8 +58,8 @@ Other Good Information
     Zonker Harris has fabulous documents regarding the hookup
     of consoles to terminal servers and other such devices.  His
     Greater Scroll of Console Knowledge is a great place to start
-    (http://www.gnac.com/consoles/).
+    (http://www.conserver.com/consoles/).
 
 #
-#  $Id: README,v 1.9 2000-09-08 16:14:23-07 bryan Exp $
+#  $Id: README,v 1.12 2000-12-14 16:31:04-08 bryan Exp $
 #

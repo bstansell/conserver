@@ -1,9 +1,11 @@
 /*
- *  $Id: cons-default.h,v 1.5 2000-09-08 16:09:04-07 bryan Exp $
+ *  $Id: cons-default.h,v 1.7 2000-12-13 12:31:07-08 bryan Exp $
+ *
+ *  Copyright conserver.com, 2000
+ *
+ *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
  *  Copyright GNAC, Inc., 1998
- *
- *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
  */
 
 /*
@@ -46,4 +48,4 @@
 /*
  * TCP connection timeout
  */
-#define CONNECTTIMEOUT	60
+#define CONNECTTIMEOUT	10
