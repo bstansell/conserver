@@ -1,6 +1,13 @@
 				CHANGES
 				=======
 
+version 6.16 (Sep 8, 2000):
+	- Changed the main GNAC references to Certainty Solutions
+	- Made the comment blocks in conserver/cons.h a little less
+	  confusing
+	- There are *NO* code changes to this version.  If you have
+	  version 6.15, you're good to go.
+
 version 6.15 (Mar 6, 2000):
 	- Added debug flag (-D) and the beginning of debug output
 	- A timeout can now be set for TCP connect() calls.  The
@@ -74,5 +81,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.16 2000-03-06 19:50:18-08 bryan Exp $
+#  $Id: CHANGES,v 1.17 2000-09-08 16:12:37-07 bryan Exp $
 #

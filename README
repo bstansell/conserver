@@ -3,15 +3,17 @@
 
 Maintainer/Enhancer
 
-    Bryan Stansell (bryan@gnac.com) of GNAC, Inc.
+    Bryan Stansell (bryan@conserver.com) of Certainty Solutions, Inc. -
+    formerly Global Networking and Computing (GNAC)
 
 
 Announcement Mailing List?
 
-    Is anyone out there interested in being on an announcement mailing
-    list for conserver? If so, drop me a line (bryan@gnac.com) and
-    let me know. I'll start by sending messages when a new version is
-    posted, and perhaps it will grow into something more.
+    Is anyone out there interested in being on an announcement
+    mailing list for conserver? If so, drop me a line
+    (bryan@conserver.com) and let me know. I'll start by sending
+    messages when a new version is posted, and perhaps it will grow into
+    something more.
 
 Origin
 
@@ -25,17 +27,17 @@ Origin
     continued fixing things and adding features we found useful.
 
 
-The GNAC Version
+The Certainty Solutions Version
 
-    The result is a combination of many people's work.  We (GNAC)
-    are releasing this combination in hopes that it will help others.
-    There is no warranty or support implied by our distribution of
-    the software.
+    The result is a combination of many people's work.  We (Certainty
+    Solutions) are releasing this combination in hopes that it will help
+    others.  There is no warranty or support implied by our distribution
+    of the software.
 
 
 Downloading
 
-    The latest version can be found at ftp://ftp.gnac.com/pub/conserver/.
+    The latest version can be found at ftp://ftp.conserver.com/conserver/.
 
 
 Other Good Information
@@ -46,5 +48,5 @@ Other Good Information
     (http://www.gnac.com/consoles/).
 
 #
-#  $Id: README,v 1.8 2000-03-06 19:47:06-08 bryan Exp $
+#  $Id: README,v 1.9 2000-09-08 16:14:23-07 bryan Exp $
 #
