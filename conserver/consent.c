@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.34 1999-01-26 20:35:17-08 bryan Exp $
+ *  $Id: consent.c,v 5.35 2000-03-06 17:26:16-08 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -87,6 +87,8 @@ static char copyright[] =
 #include <string.h>
 #endif
 
+
+struct hostcache *hostcachelist=NULL;
 
 BAUD baud [] = {
 	{ "Netwk", 0 },
@@ -590,15 +592,60 @@ fd_set *pfdSet;
 	pCE->nolog = 0;
 }
 
+int
+CheckHostCache(hostname)
+const char *hostname;
+{
+    struct hostcache *p;
+    p = hostcachelist;
+    while (p != NULL) {
+	if ( 0 == strncmp( hostname, p->hostname, MAXSERVLEN ) ) {
+	    return 1;
+	}
+	p = p->next;
+    }
+    return 0;
+}
+
+void
+AddHostCache(hostname)
+const char *hostname;
+{
+    struct hostcache *n;
+    if ((struct hostcache *)0 == (n = (struct hostcache *)malloc(sizeof(struct hostcache)))) {
+	fprintf(stderr, "%s: malloc failure: %s\n", progname, strerror(errno));
+	return;
+    }
+    (void)strncpy(n->hostname, hostname, MAXSERVLEN);
+    n->next = hostcachelist;
+    hostcachelist = n;
+}
+
+void
+ClearHostCache()
+{
+    struct hostcache *p, *n;
+    p = hostcachelist;
+    while (p != NULL) {
+	n = p->next;
+	free(p);
+	p = n;
+    }
+    hostcachelist = NULL;
+}
+
 /* set up a console the way it should be for use to work with it	(ksb)
  * also, recover from silo over runs by dropping the line and re-opening
  * We also maintian the select set for the caller.
  */
 void
-ConsInit(pCE, pfdSet)
+ConsInit(pCE, pfdSet, useHostCache)
 CONSENT *pCE;
 fd_set *pfdSet;
+int useHostCache;
 {
+	if ( ! useHostCache ) ClearHostCache();
+
 	/* clean up old stuff
 	 */
 	ConsDown(pCE, pfdSet);
@@ -634,7 +681,18 @@ fd_set *pfdSet;
 	    struct sockaddr_in port;
 	    struct hostent *hp;
 	    int one = 1;
+	    int flags;
+	    fd_set fds;
+	    struct timeval tv;
 	    
+	    if ( CheckHostCache( pCE->networkConsoleHost ) ) {
+		  fprintf(stderr, "%s: cached previous timeout: %s (%d@%s): forcing down\n",
+			    progname, pCE->server, ntohs(port.sin_port),
+			    pCE->networkConsoleHost);
+		  ConsDown(pCE, pfdSet);
+		  return;
+	    }
+
 #if USLEEP_FOR_SLOW_PORTS
 	    usleep( USLEEP_FOR_SLOW_PORTS );  /* Sleep for slow network ports */
 #endif
@@ -663,14 +721,77 @@ fd_set *pfdSet;
 		fprintf(stderr, "%s: setsockopt SO_KEEPALIVE: %s\n",
 			progname, strerror(errno));
 	    }
+
+	    if ( (flags = fcntl(pCE->fdtty, F_GETFL)) >= 0 )
+	    {
+		flags |= O_NONBLOCK;
+		if ( fcntl(pCE->fdtty, F_SETFL, flags) < 0 ) {
+		    fprintf( stderr, "%s: fcntl O_NONBLOCK: %s\n",
+			progname, strerror(errno));
+		}
+	    } else {
+		fprintf( stderr, "%s: fcntl: %s\n", progname, strerror(errno));
+	    }
+
 	    if (connect(pCE->fdtty,
 			(struct sockaddr *)&port, sizeof(port)) < 0)
 	    {
-              fprintf(stderr, "%s: connect: %s (%d@%s): %s: forcing down\n",
+		if (errno != EINPROGRESS ) {
+		  fprintf(stderr, "%s: connect: %s (%d@%s): %s: forcing down\n",
+			    progname, pCE->server, ntohs(port.sin_port),
+			    pCE->networkConsoleHost, strerror(errno));
+		  ConsDown(pCE, pfdSet);
+		  return;
+		}
+	    }
+
+	    tv.tv_sec = CONNECTTIMEOUT;
+	    tv.tv_usec = 0;
+	    FD_ZERO(&fds);
+	    FD_SET(pCE->fdtty, &fds);
+
+	    if ( (one=select( pCE->fdtty+1, NULL, &fds, NULL, &tv )) < 0 ) {
+		fprintf(stderr, "%s: select: %s (%d@%s): %s: forcing down\n",
 			progname, pCE->server, ntohs(port.sin_port),
 			pCE->networkConsoleHost, strerror(errno));
-              ConsDown(pCE, pfdSet);
-              return;
+		ConsDown(pCE, pfdSet);
+		return;
+	    }
+
+	    if (one == 0) {	/* Timeout */
+		AddHostCache(pCE->networkConsoleHost);
+		fprintf(stderr, "%s: timeout: %s (%d@%s): forcing down\n",
+			progname, pCE->server, ntohs(port.sin_port),
+			pCE->networkConsoleHost);
+		ConsDown(pCE, pfdSet);
+		return;
+	    } else {		/* Response */
+		flags = 0;
+		one = sizeof(flags);
+		/* So, getsockopt seems to return -1 if there is something
+		   interesting in SO_ERROR under solaris...sheesh.  So,
+		   the error message has the small change it's not accurate. */
+		if (getsockopt(pCE->fdtty, SOL_SOCKET, SO_ERROR,
+		    (char*)&flags, &one) < 0)
+		{
+#if defined(SUN5)
+		    fprintf(stderr, "%s: connect: %s (%d@%s): %s: forcing down\n",
+#else
+		    fprintf(stderr, "%s: getsockopt SO_ERROR: %s (%d@%s): %s: forcing down\n",
+#endif
+			    progname, pCE->server, ntohs(port.sin_port),
+			    pCE->networkConsoleHost, strerror(errno));
+		    ConsDown(pCE, pfdSet);
+		    return;
+		}
+		if (flags != 0)
+		{
+		    fprintf(stderr, "%s: connect: %s (%d@%s): %s: forcing down\n",
+			    progname, pCE->server, ntohs(port.sin_port),
+			    pCE->networkConsoleHost, strerror(errno));
+		    ConsDown(pCE, pfdSet);
+		    return;
+		}
 	    }
 
 	    /*

@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.58 1999-12-01 11:55:13-08 bryan Exp $
+ *  $Id: group.c,v 5.59 2000-03-06 17:23:55-08 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -221,7 +221,7 @@ ReUp()
 		}
 		if (fNoinit)
 			continue;
-		ConsInit(pCE, rinitUsr1);
+		ConsInit(pCE, rinitUsr1, 1);
 	}
 }
 
@@ -646,7 +646,7 @@ int sfd;
 	 */
 	if (!fNoinit)
 		for (iConsole = 0; iConsole< pGE->imembers; ++iConsole) {
-			ConsInit(& pCE[iConsole], &rinit);
+			ConsInit(& pCE[iConsole], &rinit, 1);
 		}
 
 	/* set up the list of free connection slots, we could just calloc
@@ -722,10 +722,10 @@ int sfd;
 					pCEServing->ipid = -1;
 					pCEServing->fup = 0;
 				} else {
-					ConsInit(pCEServing, &rinit);
+					ConsInit(pCEServing, &rinit, 0);
 				}
 #else
-				ConsInit(pCEServing, &rinit);
+				ConsInit(pCEServing, &rinit, 0);
 #endif
 				continue;
 			}
@@ -1020,7 +1020,7 @@ drop:
 				pCEServing->pCLon = pCLServing;
 
 				if (fNoinit && !pCEServing->fup)
-					ConsInit(pCEServing, &rinit);
+					ConsInit(pCEServing, &rinit, 0);
 
 				/* try for attach on new console
 				 */
@@ -1449,7 +1449,7 @@ drop:
 					/* with a close/re-open we might
 					 * change fd's
 					 */
-					ConsInit(pCEServing, &rinit);
+					ConsInit(pCEServing, &rinit, 0);
 					if (!pCEServing->fup) {
 						sprintf(acOut, "line to host is still down]\r\n");
 					} else if (pCEServing->fronly) {

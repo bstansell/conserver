@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.33 2000-01-05 14:39:39-08 bryan Exp $
+ *  $Id: main.c,v 5.34 2000-03-02 02:40:42-08 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -58,10 +58,10 @@
 #endif
 
 char rcsid[] =
-	"$Id: main.c,v 5.33 2000-01-05 14:39:39-08 bryan Exp $";
+	"$Id: main.c,v 5.34 2000-03-02 02:40:42-08 bryan Exp $";
 char *progname =
 	rcsid;
-int fAll = 1, fVerbose = 0, fSoftcar = 0, fNoinit = 0;
+int fAll = 1, fVerbose = 0, fSoftcar = 0, fNoinit = 0, fDebug = 0;
 int fDaemon = 0;
 char chDefAcc = 'r';
 char *pcConfig = CONFIG;
@@ -133,6 +133,7 @@ static char *apcLong[] = {
 	"a type    set the default access type",
 	"C config  give a new config file to the server process",
 	"d         become a daemon, output to /dev/null",
+	"D         enable debug output, sent to stderr",
 	"h         output this message",
 	"i         init console connections on demand",
 	"n         do not output summary stream to stdout",
@@ -204,8 +205,8 @@ char **argv;
 	register int i, j;
 	register FILE *fpConfig;
 	auto struct hostent *hpMe;
-	static char acOpts[] = "a:C:dhinsVv",
-		u_terse[] = " [-dhinsvV] [-a type] [-C config]";
+	static char acOpts[] = "a:C:dDhinsVv",
+		u_terse[] = " [-dDhinsvV] [-a type] [-C config]";
 	extern int optopt;
 	extern char *optarg;
 	auto REMOTE
@@ -262,6 +263,9 @@ char **argv;
 			break;
 		case 'd':
 			fDaemon = 1;
+			break;
+		case 'D':
+			fDebug = 1;
 			break;
 		case 'h':
 			fprintf(stderr, "%s: usage%s\n", progname, u_terse);

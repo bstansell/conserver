@@ -1,5 +1,5 @@
 /*
- *  $Id: port.h,v 1.10 1999-12-01 11:55:13-08 bryan Exp $
+ *  $Id: port.h,v 1.15 2000-03-06 18:16:24-08 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -86,6 +86,13 @@
  */
 #if !defined(HOST)
 #define HOST		"console"
+#endif
+
+/* How long should we wait for a TCP socket to be created when talking
+ * to network terminal servers?  30 second default
+ */
+#if !defined(CONNECTTIMEOUT)
+#define CONNECTTIMEOUT	30
 #endif
 
 /* the default escape sequence used to give meta commands
@@ -211,7 +218,7 @@
 #define USE_TERMIO	(defined(ETA10)||defined(V386))
 #endif
 #if !defined(USE_TERMIOS)
-#define USE_TERMIOS	(defined(HPUX7)||defined(HPUX8)||defined(HPUX9)||defined(SUN5)||defined(PTX)||defined(IRIX5)||defined(LINUX2)||defined(IRIX6)||defined(SUN4)||defined(BSDOS3))
+#define USE_TERMIOS	(defined(HPUX7)||defined(HPUX8)||defined(HPUX9)||defined(SUN5)||defined(PTX)||defined(IRIX5)||defined(LINUX2)||defined(IRIX6)||defined(SUN4))
 #endif
 #if !defined(USE_TCBREAK)
 #define USE_TCBREAK	(defined(PTX)||defined(BSDOS3)||defined(LINUX2)||defined(SUN5))
@@ -220,7 +227,7 @@
 /* if we have <strings.h> define this to 1, else define to 0
  */
 #if !defined(USE_STRINGS)
-#define USE_STRINGS	(defined(SUN4)||defined(DYNIX)||defined(EPIX)||defined(IRIX5)||defined(LINUX2)||defined(IRIX6)||defined(BSDOS3))
+#define USE_STRINGS	(defined(SUN4)||defined(DYNIX)||defined(EPIX)||defined(IRIX5)||defined(IRIX6)||defined(BSDOS3))
 #endif
 
 #if !defined(NEED_UNISTD_H)
@@ -232,8 +239,12 @@
 #endif
 
 #if USE_STRINGS
+#if !defined(strchr)
 #define	strchr	index
+#endif
+#if !defined(strrchr)
 #define strrchr	rindex
+#endif
 #endif
 
 /* used to force the server process to clear parity, which is for farmers

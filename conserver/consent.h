@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.13 1999-01-26 20:35:17-08 bryan Exp $
+ *  $Id: consent.h,v 5.14 2000-03-06 17:11:34-08 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -93,3 +93,12 @@ extern PARITY *FindParity();
 extern BAUD *FindBaud();
 extern void ConsInit();
 extern void ConsDown();
+
+struct hostcache {
+	char hostname[MAXSERVLEN];
+	struct hostcache *next;
+};
+
+extern int CheckHostCache();
+extern void AddHostCache();
+extern void ClearHostCache();

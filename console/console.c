@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.28 2000-01-06 14:00:13-08 bryan Exp $
+ *  $Id: console.c,v 5.29 2000-03-06 18:16:44-08 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -62,9 +62,6 @@
 #endif
 #endif
 
-#if !defined IBMR2
-extern char *strrchr(), *strchr();
-#endif
 extern char *getenv();
 extern char *getpass();
 extern char *calloc(), *realloc();
@@ -77,7 +74,7 @@ extern char *sys_errlist[];
 #endif
 
 static char rcsid[] =
-	"$Id: console.c,v 5.28 2000-01-06 14:00:13-08 bryan Exp $";
+	"$Id: console.c,v 5.29 2000-03-06 18:16:44-08 bryan Exp $";
 static char *progname =
 	rcsid;
 int fVerbose = 0, fReplay = 0, fRaw = 0;

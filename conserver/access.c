@@ -1,5 +1,5 @@
 /*
- *  $Id: access.c,v 5.13 1999-08-24 14:39:26-07 bryan Exp $
+ *  $Id: access.c,v 5.14 2000-03-02 02:47:04-08 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -150,20 +150,24 @@ AccType(hp)
 struct hostent *hp;
 {
 	register int i;
-#if ORIGINAL_CODE
 	register unsigned char *puc;
-#endif
 	register char *pcName;
-#if ORIGINAL_CODE
-	auto char acAddr[4*3+2];
-#endif
+	auto char acAddr[4*4];
 	register int len;
 
+	if ( fDebug ) {
+	    puc = (unsigned char *)hp->h_addr;
+	    sprintf(acAddr, "%d.%d.%d.%d", puc[0], puc[1], puc[2], puc[3]);
+	    fprintf( stderr, "%s: Access check: hostname=%s, ip=%s\n", progname, hp->h_name, acAddr );
+	}
 #if ORIGINAL_CODE
 	puc = (unsigned char *)hp->h_addr;
 	sprintf(acAddr, "%d.%d.%d.%d", puc[0], puc[1], puc[2], puc[3]);
 #endif
 	for (i = 0; i < iAccess; ++i) {
+		if ( fDebug ) {
+		    fprintf( stderr, "%s: Access check:    who=%s, trust=%c\n", progname, pACList[i].pcwho, pACList[i].ctrust );
+		}
 		if (isdigit(pACList[i].pcwho[0])) {
 #if ORIGINAL_CODE
 			/* we could allow 128.210.7 to match all on that subnet

@@ -6,6 +6,13 @@ Maintainer/Enhancer
     Bryan Stansell (bryan@gnac.com) of GNAC, Inc.
 
 
+Announcement Mailing List?
+
+    Is anyone out there interested in being on an announcement mailing
+    list for conserver? If so, drop me a line (bryan@gnac.com) and
+    let me know. I'll start by sending messages when a new version is
+    posted, and perhaps it will grow into something more.
+
 Origin
 
     The console server software found here is a heavily modified version
@@ -36,8 +43,8 @@ Other Good Information
     Zonker Harris has fabulous documents regarding the hookup
     of consoles to terminal servers and other such devices.  His
     Greater Scroll of Console Knowledge is a great place to start
-    (http://www.jeffk.com/~zonker/consoles/).
+    (http://www.gnac.com/consoles/).
 
 #
-#  $Id: README,v 1.6 1999-05-14 10:09:07-07 bryan Exp $
+#  $Id: README,v 1.8 2000-03-06 19:47:06-08 bryan Exp $
 #

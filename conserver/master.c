@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.24 1999-08-24 14:38:26-07 bryan Exp $
+ *  $Id: master.c,v 5.25 2000-03-06 17:12:43-08 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -186,6 +186,9 @@ REMOTE
 	int true = 1;
 
 	/* set up signal handler */
+#if defined(SIGPOLL)
+	signal(SIGPOLL, SIG_IGN);
+#endif
 	Set_signal(SIGCHLD, FlagSawCHLD);
 	Set_signal(SIGTERM, QuitIt);
 	Set_signal(SIGUSR1, FlagSawUSR1);

@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.6 1999-02-01 15:42:42-08 bryan Exp $
+#	$Id: Makefile,v 1.8 2000-03-06 18:08:31-08 bryan Exp $
 #
 #	Master Makefile
 #
@@ -6,6 +6,10 @@
 SUBDIRS=conserver console conserver.cf
 
 all clean install install.man: FRC
+	@if [ ! -f .settings ]; then \
+	    echo "Running a 'make config' for you"; \
+	    ${MAKE} config; \
+	fi
 	@if [ -f .settings ]; then \
     	    s=`cat .settings | grep -v '^#'`; \
 	    settings=`echo $$s`; \
@@ -14,9 +18,13 @@ all clean install install.man: FRC
 		( cd $$s; eval ${MAKE} $$settings $@ ) \
 	    done; \
 	else \
-	    echo "Please run 'make config' to set up platform type"; \
+	    echo; \
+	    echo "There is a problem with your platform type.  Try running"; \
+	    echo "'make config' and look into the errors"; \
+	    echo; \
 	    exit; \
 	fi
+	@if [ "$@" = "clean" ]; then rm .settings; fi
 
 config:
 	@p=`port/system 2>/dev/null`; \

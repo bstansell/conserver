@@ -1,6 +1,14 @@
 				CHANGES
 				=======
 
+version 6.15 (Mar 6, 2000):
+	- Added debug flag (-D) and the beginning of debug output
+	- A timeout can now be set for TCP connect() calls.  The
+	  default is 30 seconds.  Hosts not responding are only
+	  tried once at startup (per child), lessening the impact
+	  of a down terminal server.  See CONNECTTIMEOUT in
+	  conserver/cons.h.
+
 version 6.14 (Jan 5, 2000):
 	- Determining if the local conserver controls a port (with
 	  @conserver spec) we now compare ip addresses instead of
@@ -66,5 +74,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.12 2000-01-06 14:01:07-08 bryan Exp $
+#  $Id: CHANGES,v 1.16 2000-03-06 19:50:18-08 bryan Exp $
 #

@@ -5,8 +5,6 @@ Quickie Instructions
 
 	- Edit 'conserver/cons.h' (if necessary)
 
-	- Run 'make config'
-
 	- Run 'make'
 
 	- If all is well, run 'make install install.man'
@@ -31,16 +29,16 @@ Detailed Instructions
 	MAXMEMB			- Number of consoles per child process
 	MAXGRP			- Number of child processes
 
-    - Now it's time to run 'make config'.  If you're platform is supported
-      you'll get a nice message about "Configuring for ...".  Otherwise,
-      you'll have to port the software - follow the instructions you
+    - Now run 'make'.  If you're platform is supported you'll get a nice
+      message about "Configuring for ..." and the programs should compile.
+      If not, you'll have to adjust the settings, or slightly worse,
+      port the software.  For adjusting the settings (like using a
+      different compiler or something), check out the .settings file.
+      'make config', which is done for you, symlinks it to port/<ostype>.
+      If you have to port the software, follow the instructions you
       received.
 
-    - Now run 'make'.  If you run into problems (like needing a different
-      compiler or something), check out the .settings file ('make config'
-      symlinks it to port/<ostype>).
-
-    - If things built fine, you can run 'make install install.man'.
+    - Once things build, you can run 'make install install.man'.
       This will put things into the /usr/local tree.  If you'd like
       things deposited elsewhere, you can use 'make PREFIX=/your/path
       install install.man'.  We like to use something like 'make
@@ -71,5 +69,5 @@ Detailed Instructions
     - That's it!  Just start up the console server and enjoy!
 
 #
-#  $Id: INSTALL,v 1.5 1999-01-26 11:45:04-08 bryan Exp $
+#  $Id: INSTALL,v 1.6 2000-03-02 02:26:50-08 bryan Exp $
 #

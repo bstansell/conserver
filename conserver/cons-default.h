@@ -1,5 +1,5 @@
 /*
- *  $Id: cons-default.h,v 1.3 1999-12-01 00:19:34-08 bryan Exp $
+ *  $Id: cons-default.h,v 1.4 2000-03-06 17:10:56-08 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -29,4 +29,7 @@
 
 --- Clear parity (high-bit) [true/false setting]
 #define CPARITY		1
+
+--- TCP connection timeout
+#define CONNECTTIMEOUT	60
 */

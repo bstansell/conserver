@@ -1,5 +1,5 @@
 /*
- *  $Id: main.h,v 5.12 2000-01-05 14:39:39-08 bryan Exp $
+ *  $Id: main.h,v 5.13 2000-03-02 02:42:17-08 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -36,7 +36,7 @@
  */
 extern char rcsid[];
 extern char *progname;
-extern int fAll, fVerbose, fSoftcar, fNoinit, fInteractive;
+extern int fAll, fVerbose, fSoftcar, fNoinit, fInteractive, fDebug;
 extern char chDefAcc;
 extern char *pcConfig;
 extern struct sockaddr_in in_port;
