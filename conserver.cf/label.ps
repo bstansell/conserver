@@ -1,0 +1,188 @@
+%!PS-Adobe-2.0 EPSF-1.2
+%%$Id: label.ps,v 1.8 94/01/21 09:37:42 ksb Exp $
+%%Title: RJ-11
+%%Creator: A Braunsdorf
+%%CreationDate: 
+%%For: ab
+%%BoundingBox: 0 0 243 148.5
+%%EndComments
+
+% Add new hosts in the parens that match the port number
+/hosts
+[
+        (icd96)			% C0
+        (fleet)
+        (mentor)
+        (icd84)
+
+        (icd92)			% C4
+        (pop.stat)
+        (rapid)
+        (tyro)
+
+        (mace)			% C8
+        (sage)
+        (lively)
+        (sentinel)
+
+        (speedy)		% C12
+        (nis35)
+        (expert)
+        (quick)
+
+        (feserve)		% C16
+        (curator)
+        (franklin)
+        (icd82)
+
+        (icd94)			% C20
+        (oasis)
+        (staff)
+        (swift)
+
+        (flash)			% C24
+        (labwatch)
+        (ipscgate)
+        (snap.stat)
+
+        (_28)			% C28
+        (keep)
+        (tag)
+        (assist)
+] def
+
+% The relative co-ords of the various RJ11 jacks
+/coords
+[
+	% j# x   y		jack number, +x, +y
+        [ 13 0.5 1.25 ]
+        [ 11 1.0 1.25 ]
+        [  8 1.5 1.25 ]
+        [ 14 0.5 0.625 ]
+        [ 10 1.0 0.625 ]
+        [  9 1.5 0.625 ]
+        [ 15 0.5 0 ]
+        [ 12 1.0 0 ]
+        [  7 2.1875 1.25 ]
+        [  5 2.6875 1.25 ]
+        [  3 3.1875 1.25 ]
+        [  6 2.1875 0.625 ]
+        [  4 2.6875 0.625 ]
+        [  0 3.1875 0.625 ]
+        [  2 2.6875 0 ]
+        [  1 3.1875 0 ]
+] def
+
+/str 20 string def
+
+% how to build an RJ11 connector diagram
+/rj11
+{
+	gsave
+	1 150 div setlinewidth
+	0 0 moveto
+	1 2 div 0 lineto
+	0 1 2 div rlineto
+	1 2 div neg 0 rlineto
+	closepath
+	stroke
+
+	1 16 div 1 8 div moveto
+
+	0 1 4 div rlineto
+	1 16 div 0 rlineto
+	0 1 16 div rlineto
+	3 16 div 0 rlineto
+	0 2 32 div neg rlineto
+	1 16 div 0 rlineto
+	0 1 16 div neg rlineto
+	1 16 div 0 rlineto
+
+	0 2 16 div neg rlineto
+
+	1 16 div neg 0 rlineto
+	0 1 16 div neg rlineto
+	1 16 div neg 0 rlineto
+	0 1 16 div neg rlineto
+	3 16 div neg 0 rlineto
+	0 1 16 div rlineto
+	closepath
+	stroke
+
+	0 1 7
+	{
+		36 div 9 64 div add 1 16 div exch moveto
+		0 1 72 div rlineto
+		1 72 div 0 rlineto
+		0 1 72 div neg rlineto
+		closepath
+		fill
+	} for
+	grestore
+	/Courier findfont 1.5 8 div scalefont setfont
+	2 16 div 3 16 div moveto
+	str cvs
+	dup length 1 eq { ( )show } if show
+} def
+
+
+% Page layout stuff
+72 72 scale
+-90 rotate
+-11 0 translate
+/jack 28 def
+/fudge 1 32 div def
+/Courier findfont 10 72 div scalefont
+setfont
+0 setlinewidth
+
+% label the lines on the left
+1 1 8
+{
+        9 div 6 mul 0.25 exch moveto
+        gsave fudge dup rmoveto jack str cvs show ( ) show hosts jack  
+get show grestore
+        /jack jack 1 add def
+        gsave 15 16 div 0 rlineto stroke grestore
+        1 0 rmoveto
+        gsave fudge dup rmoveto jack str cvs show ( ) show hosts jack  
+get show grestore
+        /jack jack 1 add def
+        gsave 15 16 div 0 rlineto stroke grestore
+        1 0 rmoveto
+        gsave fudge dup rmoveto jack str cvs show ( ) show hosts jack  
+get show grestore
+        /jack jack 1 add def
+        gsave 15 16 div 0 rlineto stroke grestore
+        1 0 rmoveto
+        gsave fudge dup rmoveto jack str cvs show ( ) show hosts jack  
+get show grestore
+        /jack jack 1 add def
+        gsave 15 16 div 0 rlineto stroke grestore
+        1 0 rmoveto
+        /jack jack 8 sub def
+} for
+
+% Diddle the page and layout the RJ11s
+4.5 0.75 translate
+9 8 div dup scale
+0 1 coords length 1 sub
+{
+        gsave
+        coords exch get
+        aload pop
+        translate
+        rj11
+        grestore
+} for
+0 1 coords length 1 sub
+{
+        gsave
+        coords exch get
+        aload pop
+        2.5 add			% for the second back up 2.5 inches
+        translate
+        16 add rj11		% ... add 16 to the RJ11 number
+        grestore
+} for
+showpage

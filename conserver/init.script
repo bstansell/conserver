@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# Startup for conserver
+#
+
+PATH=/usr/bin:/usr/local/bin
+
+case "$1" in
+	'start')
+		LF=/var/log/conserver.log
+		echo "Starting console server daemon"
+		[ -f $LF ] && mv $LF $LF.old
+		conserver -n -d > $LF 2>&1
+		;;
+
+	'stop')
+		master=`ps -ef | grep conserver | awk '$3 == "1"{print $2}'`
+		[ "$master" ] && kill -TERM $master
+		;;
+
+	*)
+		echo "Usage: $0 { start | stop }"
+		;;
+
+esac
+exit 0

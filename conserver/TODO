@@ -1,0 +1,8 @@
+# $Id: TODO,v 5.7 92/02/18 09:52:33 ksb Exp $
+
+Just finish some #if's for TERMIO/TERMIOS/V7 ttys.
+
+kayessbee
+--
+"This may be a new sense of the word `robust' for you."
+kayessbee, Kevin Braunsdorf, ksb@cc.purdue.edu, pur-ee!ksb, purdue!ksb

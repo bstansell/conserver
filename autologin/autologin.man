@@ -1,0 +1,141 @@
+.\" $Id: autologin.man,v 1.3 93/03/16 16:41:45 ksb Exp $
+.TH AUTOLOGIN 8L PUCC
+.SH NAME
+autologin \- create an automatic login session from /etc/inittab
+.SH SYNOPSIS
+.B /usr/local/etc/autologin
+[
+.B \-u
+] [
+.B \-c
+.I command
+] [
+.B \-e
+.IB env = val
+] [
+.B \-g
+.I group
+] [
+.B \-l
+.I login
+] [
+.B \-t
+.I tty
+]
+.SH DESCRIPTION
+.I Autologin
+creates a login session for
+.I login
+by running an
+.RB ` "su \- 
+.IR login '
+on the specified device
+.RI ( tty ).
+If a
+.I command
+is given, that command is executed via 
+.RB ` "su \-
+.IB login " \-c
+.IR command .'
+.PP
+.I Autologin
+also changes the ownership of the tty port to the user and sets the
+mode to 0600.
+.PP
+On AIX,
+.I autologin
+uses
+.IR getuserattr ( 3 )
+to determine which groups are required to su to
+.I login
+and sets those groups for the process before executing the
+.IR su ( 1 )
+command.
+.SH OPTIONS
+.TP \w'command'u+4
+.BI \-c command
+Execute the command
+.IR command .
+The default action is to create a login shell.
+.TP
+.BI \-e env = val
+Add the evironment variable assignment 
+.IB env = val
+to the environment.
+.TP
+.BI \-g group
+Add
+.I group
+to current process group set before running
+.IR su ( 1 ).
+This option probably isn't necessary since the group set should be
+properly handled through the use of
+.IR getuserattr ( 3 ).
+.TP
+.BI \-l login
+Create the login process for the user
+.IR login .
+If none is given the effective uid is used.
+.TP
+.BI \-t tty
+.I tty
+is the name of the character-special file that corresponds to the terminal
+to be logged in.
+If none is given the current controlling terminal is used.
+.TP
+.B \-u
+Don't create a utmp entry.  Normally, an entry is written to
+.I /etc/utmp
+to maintain a record of users logged into the system.
+.SH EXAMPLES
+Adding the following line to
+.I /etc/inittab
+on an AIX machine establishes a root login on the console terminal
+.RI ( /dev/tty0 )
+with any error messages directed to
+.IR /dev/console :
+.br
+.na
+	cons2:2:respawn:/usr/local/etc/autologin \-t/dev/tty0 \-lroot > /dev/console 2>&1
+.ad
+.PP
+Adding the following line to
+.I /etc/inittab
+on an AIX machine causes ssinfo to be logged in on
+.I /dev/tty10
+with the
+.B TERM
+environment variable set to 
+.IR reg20 :
+.br
+.na
+	ss10:2:respawn:/usr/local/etc/autologin \-e TERM=reg20 \-t/dev/tty10 \-lssinfo
+.ad
+.PP
+Adding the following line to \fI/etc/ttytab\fP on a Sun 4.1.\fIx\fP
+machine establishes a root login on the console device:
+.na
+	console "/usr/local/etc/autologin \-lroot \-t"    xterm   on local secure
+.ad
+Note that \fIinit\fP provides the \fItty\fP argument on the end of the command.
+.SH FILES
+/bin/su
+.br
+/etc/inittab
+.br
+/etc/passwd
+.br
+/etc/utmp
+.SH "SEE ALSO"
+su(1),
+getuserattr(3),
+inittab(5),
+init(8).
+.SH AUTHOR
+Jeff W\. Stewart \- Purdue University Computing Center
+.SH BUGS
+Doesn't add entries to /usr/adm/wtmp??
+.br
+Doesn't add utmp entry unless it's been setup by init(8).
+.br
+Only runs on SUN4, EPIX, SUN3, IBMR2 (currently).

@@ -1,0 +1,44 @@
+# $Id: Sun-serial,v 2.1 93/02/09 11:45:12 ldv Exp $
+
+If you are going to be hooking Sun consoles to your console server, you
+will run into a problem:  The sun will halt whenever the cable is unplugged.
+It will also halt when the the console server is powered off and on.  To
+prevent this we modified the wiring of our serial cables at the end that
+attaches to the suns.
+
+The server can still be halted by generating a software line break, which
+is can be done by sending an escape sequence to the console server.
+
+WE WILL NOT BE HELD RESPONSIBLE FOR ANY DAMAGES CAUSED BY ATTEMPTING A
+PARTIAL OR COMPLETE IMPLEMENTATION OF THIS MODIFICATION.
+"WE" refers to The Ohio State University and
+specifically, the employees of CIS Department of Ohio State.
+
+This is a diagram of the cable we use.
+
+Sun file                                                     Console
+Server                                                       Server
+Side                                                         Side
+
+
+   2  Tx  -------------------------  ------------------------- 2 Tx
+                                   \/
+                                   /\
+   3  Rx  ------+------------------  ------------------------- 3 Rx
+                |
+                Z    4.7K resistor
+                |
+  25  -5v ------+                                             25 -5v
+
+   7  GND ---------------------------------------------------- 7 GND
+
+   4  RTS --+                                                  4 RTS
+            |
+   5  CTS --+                                                  5 CTS
+
+   6  DSR --+                                                  6 DSR
+            |
+  20  DTR --+                                                 20 DTR
+
+I'm not a hardware person, but I think the important part is adding the
+resistor.  The rest is icing, more or less.

@@ -1,0 +1,16 @@
+# $Id: README,v 4.1 91/06/19 14:21:06 ksb Exp $
+
+This configuration file has been extended from the Ohio State version.  We
+allow parity and baud to be set, as well as more than one console server
+machine to be in play at a time.  We have too many console servers to use
+just a single Sun3... :-).
+
+
+We also allow another section for trusted hosts.  We allow our operators root
+access by physical access to a workstation.
+
+
+--
+"So I try to say `Goodbye, my friend.'
+ I'd like to leave you with something more..."
+kayessbee, Kevin Braunsdorf, ksb@cc.purdue.edu, pur-ee!ksb, purdue!ksb

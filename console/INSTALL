@@ -1,0 +1,35 @@
+# $Id: INSTALL,v 4.1 91/06/19 15:27:49 ksb Exp $
+#
+
+Prep:
+
+ Did you do the prep work in ../conserver yet?  If not please start there.
+
+
+Compiling:
+
+ Try a
+	make
+ in this directory.  If cons.h is correct this should just compile.
+
+
+First test:
+
+ Run a version command:
+	./console -V
+ and see something like:
+	console: $Id: INSTALL,v 4.1 91/06/19 15:27:49 ksb Exp $
+	console: initial master server `staff.cc.purdue.edu'
+	console: default escape sequence `^Ec'
+	console: loopback address for mentor.cc.purdue.edu is 127.0.0.1
+
+
+ Finish the INSTALL in conserver now.
+
+
+Connect to the conserver on your dumb port,
+
+ Try all the commands.  Especially ^Ecz and ^Ecd/^Eco.
+
+ Try two connections to the same console, note the cool way you can force
+ the other guy off (^Ecf).

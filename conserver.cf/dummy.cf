@@ -1,0 +1,22 @@
+# dummy conserver config file
+#
+# $Id: dummy.cf,v 4.3 92/07/27 12:23:59 ksb Exp $
+#
+# 1. change the `/dev/ttya' to any tty device you can put a serial device on
+#    that you could talk to with kermit/cu.  Put in the baud rate and parity.
+#
+# 2. change the `cc.purdue.edu' to your local domain.
+#
+# 3. !! do not leave this up, as it can give local users a root shell (login)
+#    !! for extended testing change the `|' to `|su - tst' where tst is a
+#    !! vanilla test acount, or comment out the `login' console.
+#
+# list of consoles we serve
+# name : tty[@host] : baud[parity] : device : group
+dumb:/dev/ttya:9600p:/tmp/dummy.log:1
+login:|:9600p:/tmp/login.log:1
+%%
+# list of clients we allow
+# type machines
+trusted: 127.0.0.1
+allowed: cc.purdue.edu

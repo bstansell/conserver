@@ -1,0 +1,73 @@
+# $Id: README,v 4.1 91/06/19 15:23:03 ksb Exp $
+#
+
+The general idea...
+
+ The idea is you have a big network.  You have several machines whose consoles
+ you want to access remotely.  You connect the console lines of these machines
+ to serial ports on another machine, which runs the server half of this
+ software.  Then you can use the client program to get at the consoles from
+ anywhere in the network.  It also provides log file of the consoles and
+ an operator stream.
+
+
+Who will help me?
+
+ Send questions, comments, and bug reports to:
+	ksb@cc.purdue.edu  (Kevin S Braunsdorf)
+	fine@cis.ohio-state.edu (Tom Fine)
+
+Permissions needed to run this?
+
+ The console server does not need to be run as root.  As long as it
+ has permission to write to all the log files, any id will be fine.
+ Keep in mind, though, that log files occasionally end up with
+ sensitive data in them (like root passwords when people don't watch
+ for the pasword prompt).
+
+
+Console server process management.
+
+ The conserver (usually) ends up running several process: one master and
+ several children.  Each of the children is responsible for some of the
+ consoles.  Occasionally, we've had problems with one of the children becoming
+ "stuck" in one sense or another.  To make dealing with this easier here
+ is the plan:
+
+ 1.  If you need to restart everything, run
+	console -q
+     which will terminate the console server on all master hosts.
+
+ 2.  If you need to restart on one host, killing the master process (on
+     that host) with a SIGTERM (the default for kill) will tell the master
+     process to kill everything (including itself).
+
+ 3.  If any child dies, the master process will start another one to replace
+     it.  So if you have a process which is "stuck" it is easy to restart.
+     {Send it a TERM and let conserver respawn it.}
+
+ 4.  If a console is spewing trash use the down (`d') command to make the
+     server ignore it.  Use the reopen (`o') command to restore it to
+     working order.
+
+ 5.  If all else fails get a real tty on a cart and push it to the poor
+     machine :-).  [Keep one handy -- we don't claim this software is
+     any better than any other *FREE* product.]
+
+
+Log file time stamping
+
+ We use a simple script like stamper.sh, which we start from rc.local, to
+ time-stamp the files from all the machines that don't do this already.
+ Using this script has the advantage over crontab entries that it doesn't
+ interrupt what is happening on the console, if someone is using it.
+
+ Use
+	stamper /usr/adm/target.console /usr/adm/other.console
+ to add time stamps to the log file for the `target' and `other' machines.
+
+ [ This stamper script will go away someday soon. -- ksb]
+
+--
+"When the head an heart of it finally alope!"
+kayessbee, Kevin Braunsdorf, ksb@cc.purdue.edu, pur-ee!ksb, purdue!ksb
