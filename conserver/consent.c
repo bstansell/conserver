@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.132 2003/12/02 16:21:42 bryan Exp $
+ *  $Id: consent.c,v 5.133 2003/12/10 18:33:47 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -842,7 +842,13 @@ ConsInit(pCE)
 	    break;
     }
 
-    FD_SET(cofile, &rinit);
+    /* if we're waiting for connect() to finish, watch the
+     * write bit, otherwise watch for the read bit
+     */
+    if (pCE->ioState == INCONNECT)
+	FD_SET(cofile, &winit);
+    else
+	FD_SET(cofile, &rinit);
     if (maxfd < cofile + 1)
 	maxfd = cofile + 1;
 

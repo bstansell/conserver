@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.279 2003/12/02 16:21:43 bryan Exp $
+ *  $Id: group.c,v 5.280 2003/12/10 18:33:47 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -3942,7 +3942,7 @@ Kiddie(pGE, sfd)
 	    switch (pCEServing->ioState) {
 		case INCONNECT:
 		    /* deal with this state above as well */
-		    if (FileCanRead(pCEServing->cofile, &rmask, &wmask)) {
+		    if (FileCanWrite(pCEServing->cofile, &rmask, &wmask)) {
 			socklen_t slen;
 			int flags = 0;
 			int cofile = FileFDNum(pCEServing->cofile);
@@ -3973,6 +3973,12 @@ Kiddie(pGE, sfd)
 			}
 			pCEServing->ioState = ISNORMAL;
 			pCEServing->lastWrite = time((time_t *)0);
+			/* waiting for a connect(), we watch the write bit,
+			 * so switch around and now watch for the read and
+			 * start gathering data
+			 */
+			FD_SET(cofile, &rinit);
+			FD_CLR(cofile, &winit);
 			if (pCEServing->idletimeout != (time_t)0 &&
 			    (timers[T_IDLE] == (time_t)0 ||
 			     timers[T_IDLE] >

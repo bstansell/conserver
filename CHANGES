@@ -1,6 +1,12 @@
 				CHANGES
 				=======
 
+version 8.0.9 (Dec 10, 2003):
+	- fixed major bug in connect() handling which causes most
+	  socket-based consoles to timeout after 10 seconds - reported
+	  by Tom Rataski <trataski@intlsteel.com> 
+	- added a couple details to the 'logfilemax' manpage entry
+
 version 8.0.8 (Dec 2, 2003):
 	- added client ^Ec| sequence for running a command on the client
 	  and having it's I/O directed to the console - inspired by
@@ -637,5 +643,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.140 2003/12/02 16:26:59 bryan Exp $
+#  $Id: CHANGES,v 1.141 2003/12/10 18:33:40 bryan Exp $
 #

@@ -1,5 +1,5 @@
-.\" $Id: conserver.cf.man,v 1.53 2003/12/01 02:15:39 bryan Exp $
-.TH CONSERVER.CF 5 "2003/12/01" "conserver-8.0.8" "conserver"
+.\" $Id: conserver.cf.man,v 1.54 2003/12/10 18:33:56 bryan Exp $
+.TH CONSERVER.CF 5 "2003/12/10" "conserver-8.0.9" "conserver"
 .SH NAME
 conserver.cf \- console configuration file for
 .BR conserver (8)
@@ -593,6 +593,10 @@ minute, and second (to prevent issues with clock rollbacks).
 File sizes are checked every 5 minutes with an additional initial
 pseudo-random delay of up to one minute (to help prevent all processes
 checking all consoles simultaneously).
+2.5% (minimum 100 bytes, maximum 4000 bytes) of the old
+logfile is read from the end of the file.
+All data past the first newline is moved (not copied) to the new logfile
+so that a replay of the console works and starts on a line boundary.
 .TP
 .B master
 .RI [ " hostname " | " ipaddr " ]
