@@ -1,5 +1,5 @@
 /*
- *  $Id: util.c,v 1.46 2002-03-11 18:26:51-08 bryan Exp $
+ *  $Id: util.c,v 1.57 2002-10-14 13:53:48-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -16,8 +16,11 @@
 #include <ctype.h>
 
 #include <compat.h>
-#include <port.h>
 #include <util.h>
+
+#if HAVE_OPENSSL
+#include <openssl/ssl.h>
+#endif
 
 int outputPid = 0;
 char *progname = "conserver package";
@@ -38,6 +41,26 @@ OutOfMem()
     write(2, progname, strlen(progname));
     write(2, acNoMem, sizeof(acNoMem) - 1);
     exit(EX_UNAVAILABLE);
+}
+
+void
+#if USE_ANSI_PROTO
+checkRW(int fd, int *r, int *w)
+#else
+checkRW(fd, r, w)
+    int fd, int *r, int *w;
+#endif
+{
+    fd_set rfd, wfd;
+    struct timeval t = { 0, 0 };
+
+    FD_ZERO(&rfd);
+    FD_ZERO(&wfd);
+    FD_SET(fd, &rfd);
+    FD_SET(fd, &wfd);
+    select(fd, &rfd, &wfd, (fd_set *) 0, &t);
+    *r = FD_ISSET(fd, &rfd);
+    *w = FD_ISSET(fd, &wfd);
 }
 
 char *
@@ -265,17 +288,21 @@ readLine(fp, save, iLine)
 
 void
 #if USE_ANSI_PROTO
-FmtCtlStr(char *pcIn, STRING * pcOut)
+FmtCtlStr(char *pcIn, int len, STRING * pcOut)
 #else
-FmtCtlStr(pcIn, pcOut)
+FmtCtlStr(pcIn, len, pcOut)
     char *pcIn;
+    int len;
     STRING *pcOut;
 #endif
 {
     unsigned char c;
 
+    if (len < 0)
+	len = strlen(pcIn);
+
     buildMyString((char *)0, pcOut);
-    for (; *pcIn != '\000'; pcIn++) {
+    for (; len; len--, pcIn++) {
 	c = *pcIn & 0xff;
 	if (c > 127) {
 	    c -= 128;
@@ -395,16 +422,16 @@ cmaxfiles()
 #endif
 {
     int mf;
-#ifdef HAVE_SYSCONF
+#if HAVE_SYSCONF
     mf = sysconf(_SC_OPEN_MAX);
 #else
-# ifdef HAVE_GETRLIMIT
+# if HAVE_GETRLIMIT
     struct rlimit rl;
 
     (void)getrlimit(RLIMIT_NOFILE, &rl);
     mf = rl.rlim_cur;
 # else
-#  ifdef HAVE_GETDTABLESIZE
+#  if HAVE_GETDTABLESIZE
     mf = getdtablesize();
 #  else
 #   ifndef OPEN_MAX
@@ -446,6 +473,10 @@ fileOpenFD(fd, type)
 	OutOfMem();
     cfp->ftype = type;
     cfp->fd = fd;
+#if HAVE_OPENSSL
+    cfp->ssl = (SSL *) 0;
+    cfp->waitonWrite = cfp->waitonRead = 0;
+#endif
 
     Debug(1, "File I/O: Encapsulated fd %d type %d", fd, type);
     return cfp;
@@ -469,11 +500,14 @@ fileUnopen(cfp)
 	case simpleSocket:
 	    retval = cfp->fd;
 	    break;
-#ifdef TLS_SUPPORT
-	case TLSSocket:
-	    retval = cfp->sslfd;
+#if HAVE_OPENSSL
+	case SSLSocket:
+	    retval = -1;
 	    break;
 #endif
+	default:
+	    retval = -1;
+	    break;
     }
     Debug(1, "File I/O: Unopened fd %d", cfp->fd);
     free(cfp);
@@ -506,6 +540,10 @@ fileOpen(path, flag, mode)
 	OutOfMem();
     cfp->ftype = simpleFile;
     cfp->fd = fd;
+#if HAVE_OPENSSL
+    cfp->ssl = (SSL *) 0;
+    cfp->waitonWrite = cfp->waitonRead = 0;
+#endif
 
     Debug(1, "File I/O: Opened `%s' as fd %d", path, fd);
     return cfp;
@@ -528,6 +566,9 @@ fileClose(cfp)
 #if defined(__CYGWIN__)
     int client_sock_flags;
     struct linger lingeropt;
+#endif
+#if HAVE_OPENSSL
+    int sflags;
 #endif
 
     cfp = *pcfp;
@@ -567,11 +608,36 @@ fileClose(cfp)
 
 
 	    break;
-#ifdef TLS_SUPPORT
-	case TLSSocket:
-	    retval = SSL_close(cfp->sslfd);
-	    break;
+#if HAVE_OPENSSL
+	case SSLSocket:
+	    sflags = fcntl(cfp->fd, F_GETFL, 0);
+	    if (sflags != -1) {
+		Debug(1, "File I/O: Setting socket to BLOCKING on fd %d",
+		      cfp->fd);
+		fcntl(cfp->fd, F_SETFL, sflags & ~O_NONBLOCK);
+	    }
+	    Debug(1, "File I/O: Performing a SSL_shutdown() on fd %d",
+		  cfp->fd);
+	    SSL_shutdown(cfp->ssl);
+	    Debug(1, "File I/O: Performing a SSL_free() on fd %d",
+		  cfp->fd);
+	    SSL_free(cfp->ssl);
+	    if (sflags != -1) {
+		Debug(1,
+		      "File I/O: Restoring socket blocking mode on fd %d",
+		      cfp->fd);
+		fcntl(cfp->fd, F_SETFL, sflags);
+	    }
+	    /* set the sucker back to a simpleSocket and recall so we
+	     * do all that special stuff we oh so love...and make sure
+	     * we return so we don't try and free(0).  -bryan
+	     */
+	    cfp->ftype = simpleSocket;
+	    return fileClose(pcfp);
 #endif
+	default:
+	    retval = -1;
+	    break;
     }
     Debug(1, "File I/O: Closed fd %d", cfp->fd);
     free(cfp);
@@ -592,17 +658,59 @@ fileRead(cfp, buf, len)
 #endif
 {
     int retval = 0;
+#if HAVE_OPENSSL
+    /*int r, w; */
+    int sflags;
+#endif
 
     switch (cfp->ftype) {
 	case simpleFile:
 	case simpleSocket:
 	    retval = read(cfp->fd, buf, len);
 	    break;
-#ifdef TLS_SUPPORT
-	case TLSSocket:
-	    retval = SSL_read(cfp->sslfd, buf, len);
+#if HAVE_OPENSSL
+	case SSLSocket:
+	    /*checkRW(cfp->fd, &r, &w); */
+	    sflags = fcntl(cfp->fd, F_GETFL, 0);
+	    if (sflags != -1) {
+		Debug(1, "File I/O: Setting socket to BLOCKING on fd %d",
+		      cfp->fd);
+		fcntl(cfp->fd, F_SETFL, sflags & ~O_NONBLOCK);
+	    }
+	    retval = SSL_read(cfp->ssl, buf, len);
+	    switch (SSL_get_error(cfp->ssl, retval)) {
+		case SSL_ERROR_NONE:
+		    break;
+		case SSL_ERROR_WANT_READ:	/* these two shouldn't */
+		case SSL_ERROR_WANT_WRITE:	/* happen (yet) */
+		    Error
+			("Ugh, ok..an SSL_ERROR_WANT_* happened and I didn't think it ever would.  Code needs serious work!");
+		    exit(EX_UNAVAILABLE);
+		case SSL_ERROR_ZERO_RETURN:
+		default:
+		    Debug(1,
+			  "File I/O: Performing a SSL_shutdown() on fd %d",
+			  cfp->fd);
+		    SSL_shutdown(cfp->ssl);
+		    Debug(1, "File I/O: Performing a SSL_free() on fd %d",
+			  cfp->fd);
+		    SSL_free(cfp->ssl);
+		    cfp->ssl = (SSL *) 0;
+		    cfp->ftype = simpleSocket;
+		    retval = 0;
+		    break;
+	    }
+	    if (sflags != -1) {
+		Debug(1,
+		      "File I/O: Restoring socket blocking mode on fd %d",
+		      cfp->fd);
+		fcntl(cfp->fd, F_SETFL, sflags);
+	    }
 	    break;
 #endif
+	default:
+	    retval = 0;
+	    break;
     }
 
     if (retval >= 0) {
@@ -629,6 +737,10 @@ fileWrite(cfp, buf, len)
     int len_orig = len;
     int len_out = 0;
     int retval = 0;
+#if HAVE_OPENSSL
+    /*int r, w; */
+    int sflags;
+#endif
 
     if (buf == (char *)0)
 	return 0;
@@ -651,11 +763,59 @@ fileWrite(cfp, buf, len)
 		len_out += retval;
 	    }
 	    break;
-#ifdef TLS_SUPPORT
-	case TLSSocket:
-	    len_out = retval = SSL_write(cfp->sslfd, buf, len);
+#if HAVE_OPENSSL
+	case SSLSocket:
+	    /*checkRW(cfp->fd, &r, &w); */
+	    sflags = fcntl(cfp->fd, F_GETFL, 0);
+	    if (sflags != -1) {
+		Debug(1, "File I/O: Setting socket to BLOCKING on fd %d",
+		      cfp->fd);
+		fcntl(cfp->fd, F_SETFL, sflags & ~O_NONBLOCK);
+	    }
+	    while (len > 0) {
+		retval = SSL_write(cfp->ssl, buf, len);
+		switch (SSL_get_error(cfp->ssl, retval)) {
+		    case SSL_ERROR_NONE:
+			break;
+		    case SSL_ERROR_WANT_READ:	/* these two shouldn't */
+		    case SSL_ERROR_WANT_WRITE:	/* happen (yet) */
+			Error
+			    ("Ugh, ok..an SSL_ERROR_WANT_* happened and I didn't think it ever would.  Code needs serious work!");
+			exit(EX_UNAVAILABLE);
+		    case SSL_ERROR_ZERO_RETURN:
+		    default:
+			Debug(1,
+			      "File I/O: Performing a SSL_shutdown() on fd %d",
+			      cfp->fd);
+			SSL_shutdown(cfp->ssl);
+			Debug(1,
+			      "File I/O: Performing a SSL_free() on fd %d",
+			      cfp->fd);
+			SSL_free(cfp->ssl);
+			cfp->ssl = (SSL *) 0;
+			cfp->ftype = simpleSocket;
+			retval = -1;
+			break;
+		}
+		if (retval == -1) {
+		    len_out = -1;
+		    break;
+		}
+		buf += retval;
+		len -= retval;
+		len_out += retval;
+	    }
+	    if (sflags != -1) {
+		Debug(1,
+		      "File I/O: Restoring socket blocking mode on fd %d",
+		      cfp->fd);
+		fcntl(cfp->fd, F_SETFL, sflags);
+	    }
 	    break;
 #endif
+	default:
+	    retval = -1;
+	    break;
     }
 
     if (len_out >= 0) {
@@ -804,11 +964,14 @@ fileStat(cfp, buf)
 	case simpleSocket:
 	    retval = fstat(cfp->fd, buf);
 	    break;
-#ifdef TLS_SUPPORT
-	case TLSSocket:
+#if HAVE_OPENSSL
+	case SSLSocket:
 	    retval = -1;
 	    break;
 #endif
+	default:
+	    retval = -1;
+	    break;
     }
 
     return retval;
@@ -834,17 +997,20 @@ fileSeek(cfp, offset, whence)
 	case simpleSocket:
 	    retval = lseek(cfp->fd, offset, whence);
 	    break;
-#ifdef TLS_SUPPORT
-	case TLSSocket:
+#if HAVE_OPENSSL
+	case SSLSocket:
 	    retval = -1;
 	    break;
 #endif
+	default:
+	    retval = -1;
+	    break;
     }
 
     return retval;
 }
 
-/* Unless otherwise stated, returns the same values as lseek(2) */
+/* Returns the file descriptor number of the underlying file */
 int
 #if USE_ANSI_PROTO
 fileFDNum(CONSFILE * cfp)
@@ -862,15 +1028,81 @@ fileFDNum(cfp)
 	case simpleSocket:
 	    retval = cfp->fd;
 	    break;
-#ifdef TLS_SUPPORT
-	case TLSSocket:
-	    retval = -1;
+#if HAVE_OPENSSL
+	case SSLSocket:
+	    retval = cfp->fd;
 	    break;
 #endif
+	default:
+	    retval = cfp->fd;
+	    break;
     }
 
     return retval;
 }
+
+/* Returns the file type */
+enum consFileType
+#if USE_ANSI_PROTO
+fileGetType(CONSFILE * cfp)
+#else
+fileGetType(cfp)
+    CONSFILE *cfp;
+#endif
+{
+    switch (cfp->ftype) {
+	case simpleFile:
+	    return simpleFile;
+	case simpleSocket:
+	    return simpleSocket;
+#if HAVE_OPENSSL
+	case SSLSocket:
+	    return SSLSocket;
+#endif
+	default:
+	    return nothing;
+    }
+}
+
+/* Sets the file type */
+void
+#if USE_ANSI_PROTO
+fileSetType(CONSFILE * cfp, enum consFileType type)
+#else
+fileSetType(cfp, type)
+    CONSFILE *cfp;
+    enum consFileType type;
+#endif
+{
+    cfp->ftype = type;
+}
+
+#if HAVE_OPENSSL
+/* Get the SSL instance */
+SSL *
+#if USE_ANSI_PROTO
+fileGetSSL(CONSFILE * cfp)
+#else
+fileGetSSL(cfp)
+    CONSFILE *cfp;
+#endif
+{
+    return cfp->ssl;
+}
+
+/* Sets the SSL instance */
+void
+#if USE_ANSI_PROTO
+fileSetSSL(CONSFILE * cfp, SSL * ssl)
+#else
+fileSetSSL(cfp, ssl)
+    CONSFILE *cfp;
+    SSL *ssl;
+#endif
+{
+    cfp->ssl = ssl;
+}
+#endif
 
 /* Unless otherwise stated, returns the same values as send(2) */
 int
@@ -893,12 +1125,54 @@ fileSend(cfp, msg, len, flags)
 	case simpleSocket:
 	    retval = send(cfp->fd, msg, len, flags);
 	    break;
-#ifdef TLS_SUPPORT
-	case TLSSocket:
-	    retval = -1;
+#if HAVE_OPENSSL
+	case SSLSocket:
+	    retval = send(cfp->fd, msg, len, flags);
 	    break;
 #endif
+	default:
+	    retval = -1;
+	    break;
     }
 
     return retval;
 }
+
+#if HAVE_OPENSSL
+/* Unless otherwise stated, returns the same values as send(2) */
+int
+#if USE_ANSI_PROTO
+ssl_verify_callback(int ok, X509_STORE_CTX * store)
+#else
+ssl_verify_callback(ok, store)
+    int ok;
+    X509_STORE_CTX *store;
+#endif
+{
+    char data[256];
+    if (ok) {
+	if (fDebug) {
+	    X509 *cert = X509_STORE_CTX_get_current_cert(store);
+	    int depth = X509_STORE_CTX_get_error_depth(store);
+
+	    Debug(1, "Info of SSL certificate at depth: %d", depth);
+	    X509_NAME_oneline(X509_get_issuer_name(cert), data, 256);
+	    Debug(1, "  Issuer  = %s", data);
+	    X509_NAME_oneline(X509_get_subject_name(cert), data, 256);
+	    Debug(1, "  Subject = %s", data);
+	}
+    } else {
+	X509 *cert = X509_STORE_CTX_get_current_cert(store);
+	int depth = X509_STORE_CTX_get_error_depth(store);
+	int err = X509_STORE_CTX_get_error(store);
+
+	Error("Error with SSL certificate at depth: %d", depth);
+	X509_NAME_oneline(X509_get_issuer_name(cert), data, 256);
+	Error("  Issuer  = %s", data);
+	X509_NAME_oneline(X509_get_subject_name(cert), data, 256);
+	Error("  Subject = %s", data);
+	Error("  Error #%d: %s", err, X509_verify_cert_error_string(err));
+    }
+    return ok;
+}
+#endif

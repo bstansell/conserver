@@ -1,5 +1,5 @@
 /*
- *  $Id: fallback.c,v 5.45 2002-06-05 11:12:24-07 bryan Exp $
+ *  $Id: fallback.c,v 5.46 2002-10-12 20:07:43-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -30,7 +30,6 @@
 #include <ctype.h>
 
 #include <compat.h>
-#include <port.h>
 #include <util.h>
 
 #if defined(_AIX)

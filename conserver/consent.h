@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.30 2002-03-25 17:07:04-08 bryan Exp $
+ *  $Id: consent.h,v 5.31 2002-09-29 19:04:43-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -103,7 +103,7 @@ extern void ConsInit(CONSENT *, fd_set *, int);
 extern void ConsDown(CONSENT *, fd_set *);
 extern int CheckHostCache(const char *);
 extern void AddHostCache(const char *);
-extern void ClearHostCache();
+extern void ClearHostCache(void);
 #else
 extern PARITY *FindParity();
 extern BAUD *FindBaud();

@@ -10,6 +10,12 @@ Bryan Stansell
 
 ---------------------------------------------------------------------------
 
+- OpenSSL sockets have been make blocking instead of keeping the
+  underlying socket non-blocking.  Why?  It requires much more work to
+  deal with non-blocking sockets and OpenSSL.  Not impossible, just have
+  to rewrite a lot of the code to handle the extra special cases.  Perhaps
+  by ignoring renegotiations this can be ignored, but I'm not sure.
+
 - checks for EPIPE during write() should really be done, but, for the
   most part, consoles and clients will come around and we'll see
   problems on the read().
@@ -23,8 +29,7 @@ Bryan Stansell
     - Others?
 
 - better shadow file support
-
-- PAM support
+    - what does this mean?  i've forgotten.
 
 - syslog?
     Daniel E. Singer <des@cs.duke.edu> would like to see it - especially
@@ -71,8 +76,6 @@ Bryan Stansell
 
 - 9600baud log replay?
 
-- SSH/SSL/Encryption of some type between client/server
-
 - server -M flag should accept multiple addresses (comma separated)
     - should client as well?
 
@@ -114,5 +117,5 @@ Bryan Stansell
 
 
 #
-#  $Id: TODO,v 1.24 2002-06-05 12:00:35-07 bryan Exp $
+#  $Id: TODO,v 1.26 2002-10-09 15:55:24-07 bryan Exp $
 #

@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.48 2002-03-11 18:27:04-08 bryan Exp $
+ *  $Id: client.c,v 5.49 2002-10-12 20:07:43-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -49,7 +49,6 @@
 #include <pwd.h>
 
 #include <compat.h>
-#include <port.h>
 #include <util.h>
 
 #include <consent.h>

@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.186 2002-09-23 11:40:35-07 bryan Exp $
+ *  $Id: group.c,v 5.195 2002-10-12 20:07:43-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -85,7 +85,6 @@
 #endif
 
 #include <compat.h>
-#include <port.h>
 #include <util.h>
 
 #include <consent.h>
@@ -142,6 +141,100 @@ SendAllClientsMsg(pGE, message)
 	if (pCL->fcon) {
 	    (void)fileWrite(pCL->fd, message, -1);
 	}
+    }
+}
+
+void
+#if USE_ANSI_PROTO
+DisconnectClient(GRPENT * pGE, CONSCLIENT * pCL, char *message)
+#else
+DisconnectClient(pGE, pCL, message)
+    GRPENT *pGE;
+    CONSCLIENT *pCL;
+    char *message;
+#endif
+{
+    CONSENT *pCEServing;
+
+    if (pGE == (GRPENT *) 0 || pCL == (CONSCLIENT *) 0) {
+	return;
+    }
+
+    if (pCL->fcon) {
+	(void)fileWrite(pCL->fd, message, -1);
+    }
+
+    /* log it, drop from select list,
+     * close gap in table, etc, etc...
+     */
+    pCEServing = pCL->pCEto;
+
+    if (pGE->pCEctl != pCEServing) {
+	Info("%s: logout %s [%s]", pCEServing->server.string,
+	     pCL->acid.string, strtime(NULL));
+    }
+
+    if (fNoinit && pCEServing->pCLon->pCLnext == (CONSCLIENT *) 0)
+	ConsDown(pCEServing, &pGE->rinit);
+
+    FD_CLR(fileFDNum(pCL->fd), &pGE->rinit);
+    fileClose(&pCL->fd);
+
+    /* mark as not writer, if he is
+     * and turn logging back on...
+     */
+    if (pCL->fwr) {
+	pCL->fwr = 0;
+	pCL->fwantwr = 0;
+	tagLogfile(pCEServing, "%s detached", pCL->acid.string);
+	if (pCEServing->nolog) {
+	    pCEServing->nolog = 0;
+	    filePrint(pCEServing->fdlog,
+		      "[-- Console logging restored (logout) -- %s]\r\n",
+		      strtime(NULL));
+	}
+	pCEServing->pCLwr = FindWrite(pCEServing->pCLon);
+    }
+
+    /* mark as unconnected and remove from both
+     * lists (all clients, and this console)
+     */
+    pCL->fcon = 0;
+    if ((CONSCLIENT *) 0 != pCL->pCLnext) {
+	pCL->pCLnext->ppCLbnext = pCL->ppCLbnext;
+    }
+    *(pCL->ppCLbnext) = pCL->pCLnext;
+    if ((CONSCLIENT *) 0 != pCL->pCLscan) {
+	pCL->pCLscan->ppCLbscan = pCL->ppCLbscan;
+    }
+    *(pCL->ppCLbscan) = pCL->pCLscan;
+
+    /* the continue below will advance to a (ksb)
+     * legal client, even though we are now closed
+     * and in the fre list becasue pCLscan is used
+     * for the free list
+     */
+    pCL->pCLnext = pGE->pCLfree;
+    pGE->pCLfree = pCL;
+}
+
+void
+#if USE_ANSI_PROTO
+DisconnectAllClients(GRPENT * pGE, char *message)
+#else
+DisconnectAllClients(pGE, message)
+    GRPENT *pGE;
+    char *message;
+#endif
+{
+    CONSCLIENT *pCL;
+
+    if ((GRPENT *) 0 == pGE) {
+	return;
+    }
+
+    for (pCL = pGE->pCLall; (CONSCLIENT *) 0 != pCL; pCL = pCL->pCLscan) {
+	DisconnectClient(pGE, pCL, message);
     }
 }
 
@@ -398,10 +491,10 @@ CheckPass(pcUser, pcWord)
 	return AUTH_NOUSER;
     return AUTH_INVALID;
 #else /* getpw*() */
-#if HAVE_GETSPNAM
     struct passwd *pwd;
-    struct spwd *spwd;
     int retval = AUTH_SUCCESS;
+#if HAVE_GETSPNAM
+    struct spwd *spwd;
 #endif
 
     if (pcWord == (char *)0) {
@@ -744,7 +837,8 @@ DeUtmp(pGE)
     CONSENT *pCE;
 
     if ((GRPENT *) 0 != pGE) {
-	SendAllClientsMsg(pGE, "[-- Console server shutting down --]\r\n");
+	DisconnectAllClients(pGE,
+			     "[-- Console server shutting down --]\r\n");
 
 	for (pCE = pGE->pCElist; pCE != (CONSENT *) 0; pCE = pCE->pCEnext) {
 	    ConsDown(pCE, &pGE->rinit);
@@ -1309,6 +1403,60 @@ cleanupBreak(bt)
     doBreakWork((CONSCLIENT *) 0, (CONSENT *) 0, bt, 1);
 }
 
+#if HAVE_OPENSSL
+int
+#if USE_ANSI_PROTO
+attemptSSL(CONSCLIENT * pCL)
+#else
+attemptSSL(pCL)
+    CONSCLIENT *pCL;
+#endif
+{
+    int sflags, fdnum;
+    SSL *ssl;
+
+    fdnum = fileFDNum(pCL->fd);
+    if (ctx == (SSL_CTX *) 0) {
+	Error("WTF?  The SSL context disappeared?!?!? [%s]",
+	      strtime(NULL));
+	exit(EX_UNAVAILABLE);
+    }
+    if (!(ssl = SSL_new(ctx))) {
+	Error("Couldn't create new SSL context for client `%s' [%s]",
+	      pCL->peername.string, strtime(NULL));
+	return 0;
+    }
+    fileSetSSL(pCL->fd, ssl);
+    SSL_set_accept_state(ssl);
+    SSL_set_fd(ssl, fdnum);
+    Debug(1, "Setting socket to blocking for client `%s' (fd %d)",
+	  pCL->peername.string, fdnum);
+    sflags = fcntl(fdnum, F_GETFL, 0);
+    if (sflags != -1)
+	fcntl(fdnum, F_SETFL, sflags & ~O_NONBLOCK);
+    Debug(1, "About to SSL_accept() for client `%s' (fd %d)",
+	  pCL->peername.string, fdnum);
+    if (SSL_accept(ssl) <= 0) {
+	Error("SSL negotiation failed for client `%s' [%s]",
+	      pCL->peername.string, strtime(NULL));
+	ERR_print_errors_fp(stderr);
+	SSL_free(ssl);
+	if (sflags != -1)
+	    fcntl(fdnum, F_SETFL, sflags);
+	return 0;
+    }
+    Debug(1, "Returning socket to non-blocking for client `%s' (fd %d)",
+	  pCL->peername.string, fdnum);
+    if (sflags != -1)
+	fcntl(fdnum, F_SETFL, sflags);
+    fileSetType(pCL->fd, SSLSocket);
+    if (fDebug)
+	Debug(1, "SSL Connection: %s :: %s", SSL_get_cipher_version(ssl),
+	      SSL_get_cipher_name(ssl));
+    return 1;
+}
+#endif
+
 
 /* routine used by the child processes.				   (ksb/fine)
  * Most of it is escape sequence parsing.
@@ -1682,57 +1830,8 @@ Kiddie(pGE, sfd)
 	      drop:
 		/* re-entry point to drop a connection
 		 * (for any other reason)
-		 * log it, drop from select list,
-		 * close gap in table, restart loop
 		 */
-		if (pGE->pCEctl != pCEServing) {
-		    Info("%s: logout %s [%s]", pCEServing->server.string,
-			 pCLServing->acid.string, strtime(NULL));
-		}
-		if (fNoinit &&
-		    (CONSCLIENT *) 0 == pCEServing->pCLon->pCLnext)
-		    ConsDown(pCEServing, &pGE->rinit);
-
-		FD_CLR(fileFDNum(pCLServing->fd), &pGE->rinit);
-		fileClose(&pCLServing->fd);
-
-		/* mark as not writer, if he is
-		 * and turn logging back on...
-		 */
-		if (pCLServing->fwr) {
-		    pCLServing->fwr = 0;
-		    pCLServing->fwantwr = 0;
-		    tagLogfile(pCEServing, "%s detached",
-			       pCLServing->acid.string);
-		    if (pCEServing->nolog) {
-			pCEServing->nolog = 0;
-			filePrint(pCEServing->fdlog,
-				  "[-- Console logging restored (logout) -- %s]\r\n",
-				  strtime(NULL));
-		    }
-		    pCEServing->pCLwr = FindWrite(pCEServing->pCLon);
-		}
-
-		/* mark as unconnected and remove from both
-		 * lists (all clients, and this console)
-		 */
-		pCLServing->fcon = 0;
-		if ((CONSCLIENT *) 0 != pCLServing->pCLnext) {
-		    pCLServing->pCLnext->ppCLbnext = pCLServing->ppCLbnext;
-		}
-		*(pCLServing->ppCLbnext) = pCLServing->pCLnext;
-		if ((CONSCLIENT *) 0 != pCLServing->pCLscan) {
-		    pCLServing->pCLscan->ppCLbscan = pCLServing->ppCLbscan;
-		}
-		*(pCLServing->ppCLbscan) = pCLServing->pCLscan;
-
-		/* the continue below will advance to a (ksb)
-		 * legal client, even though we are now closed
-		 * and in the fre list becasue pCLscan is used
-		 * for the free list
-		 */
-		pCLServing->pCLnext = pGE->pCLfree;
-		pGE->pCLfree = pCLServing;
+		DisconnectClient(pGE, pCLServing, (char *)0);
 		continue;
 	    }
 
@@ -2172,10 +2271,34 @@ Kiddie(pGE, sfd)
 					      "no drop line]\r\n", -1);
 				break;
 
+#if HAVE_OPENSSL
+			    case '*':	/* SSL encryption */
+				if (pGE->pCEctl != pCLServing->pCEto) {
+				    goto unknown;
+				}
+				fileWrite(pCLServing->fd, "ssl:\r\n", -1);
+				if (!attemptSSL(pCLServing))
+				    goto drop;
+				Debug(1,
+				      "SSL connection a success for client `%s'!",
+				      pCLServing->peername.string);
+				break;
+#endif
+
 			    case ';':	/* ;login: */
 				if (pGE->pCEctl != pCLServing->pCEto) {
 				    goto unknown;
 				}
+#if HAVE_OPENSSL
+				if (fReqEncryption &&
+				    fileGetType(pCLServing->fd) !=
+				    SSLSocket) {
+				    fileWrite(pCLServing->fd,
+					      "Encryption required\r\n",
+					      -1);
+				    goto drop;
+				}
+#endif
 				fileWrite(pCLServing->fd, "login:\r\n",
 					  -1);
 				buildMyString((char *)0,

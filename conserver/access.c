@@ -1,5 +1,5 @@
 /*
- *  $Id: access.c,v 5.44 2002-02-26 16:12:49-08 bryan Exp $
+ *  $Id: access.c,v 5.45 2002-10-12 20:08:07-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -50,7 +50,6 @@
 #include <pwd.h>
 
 #include <compat.h>
-#include <port.h>
 #include <util.h>
 
 #include <access.h>

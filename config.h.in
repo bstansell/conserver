@@ -84,7 +84,10 @@
 /* Define to 1 if you have the `memset' function. */
 #undef HAVE_MEMSET
 
-/* have PAM */
+/* have openssl support */
+#undef HAVE_OPENSSL
+
+/* have PAM support */
 #undef HAVE_PAM
 
 /* have POSIX regcomp */

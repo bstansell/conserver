@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.87 2002-09-23 13:42:25-07 bryan Exp $
+ *  $Id: readcfg.c,v 5.89 2002-10-12 20:07:43-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -45,7 +45,6 @@
 #include <pwd.h>
 
 #include <compat.h>
-#include <port.h>
 #include <util.h>
 
 #include <consent.h>
@@ -1110,7 +1109,7 @@ ReadCfg(pcFile, fp, master)
 /* Unless otherwise stated, returns the same values as send(2) */
 void
 #if USE_ANSI_PROTO
-ReReadCfg()
+ReReadCfg(void)
 #else
 ReReadCfg()
 #endif

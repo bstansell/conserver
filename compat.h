@@ -1,5 +1,39 @@
 #include <config.h>
 
+/* If, when processing a logfile for replaying the last N lines,
+ * we end up seeing more than MAXREPLAYLINELEN characters in a line,
+ * abort processing and display the data.  Why?  There could be some
+ * very large logfiles and very long lines and we'd chew up lots of
+ * memory and send a LOT of data down to the client - all potentially
+ * bad.  If there's a line over this in size, would you really want to
+ * see the whole thing (and possibly others)?
+ */
+#if !defined(MAXREPLAYLINELEN)
+# define MAXREPLAYLINELEN 10000
+#endif
+
+/* the default escape sequence used to give meta commands
+ */
+#if !defined(DEFATTN)
+# define DEFATTN	'\005'
+#endif
+#if !defined(DEFESC)
+# define DEFESC		'c'
+#endif
+
+/* For legacy compile-time setting of the port...
+ */
+#if ! defined(DEFPORT)
+#  if defined(SERVICENAME)
+#    define DEFPORT SERVICENAME
+#  else
+#    if defined(PORTNUMBER)
+#      define DEFPORT PORTNUMBER
+#    else
+#      define DEFPORT "conserver"
+#    endif
+#  endif
+#endif
 
 #if STDC_HEADERS
 # include <string.h>

@@ -1,0 +1,52 @@
+#!/bin/sh
+
+#
+# This is a "simple" script that I've used to create test certificates
+# for conserver and it's OpenSSL bits.  It's far from perfect...or useful
+# outside of my own purposes.  If this helps, cool.  In the end I put
+# the rootcert.pem file in my global certs directory, point the server to
+# server.pem and point the client at client.pem.  Ugly, yeah, but it's an
+# ok test.
+#
+
+[ -f rootreq.pem -a -f rootkey.pem ] || cat <<EOD | openssl req -newkey rsa:1024 -sha1 -keyout rootkey.pem -out rootreq.pem -passin pass:pass -passout pass:pass
+US
+California
+Folsom
+conserver.com
+Conserver CA
+conserver.com
+
+
+
+EOD
+[ -f rootcert.pem ] || openssl x509 -req -in rootreq.pem -sha1 -extensions v3_ca -signkey rootkey.pem -out rootcert.pem
+[ -f root.pem ] || cat rootcert.pem rootkey.pem > root.pem
+
+[ -f serverreq.pem -a -f serverkey.pem ] || cat <<EOD | openssl req -newkey rsa:1024 -sha1 -keyout serverkey.pem -out serverreq.pem -passin pass:pass -passout pass:pass
+US
+California
+Folsom
+conserver.com
+conserver
+conserver
+
+
+
+EOD
+[ -f servercert.pem ] || openssl x509 -req -in serverreq.pem -sha1 -extensions usr_cert -CA root.pem -CAkey root.pem -CAcreateserial -out servercert.pem
+[ -f server.pem ] || cat servercert.pem serverkey.pem rootcert.pem > server.pem
+
+[ -f clientreq.pem -a -f clientkey.pem ] || cat <<EOD | openssl req -newkey rsa:1024 -sha1 -keyout clientkey.pem -out clientreq.pem -passin pass:pass -passout pass:pass
+US
+California
+Folsom
+conserver.com
+console
+console
+
+
+
+EOD
+[ -f clientcert.pem ] || openssl x509 -req -in clientreq.pem -sha1 -extensions usr_cert -CA root.pem -CAkey root.pem -CAcreateserial -out clientcert.pem
+[ -f client.pem ] || cat clientcert.pem clientkey.pem rootcert.pem > client.pem

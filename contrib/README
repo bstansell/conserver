@@ -8,11 +8,15 @@ Various contributions by folks....
 	Author:   Paul Heinlein <heinlein@measurecast.com>
 	Synopsis: Files for a Redhat-tuned RPM
 
+    maketestcerts
+	Author:   Bryan Stansell <bryan@conserver.com>
+	Synopsis: Silly script I used to create test SSL certs
+
 I can't verify that these scripts will work for everyone.  Hopefully they
 will be helpful.
 
 Bryan Stansell
 
 #
-#  $Id: README,v 1.2 2001-06-15 06:02:59-07 bryan Exp $
+#  $Id: README,v 1.3 2002-10-13 19:57:44-07 bryan Exp $
 #

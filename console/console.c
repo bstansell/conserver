@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.85 2002-09-23 11:40:51-07 bryan Exp $
+ *  $Id: console.c,v 5.99 2002-10-12 20:06:57-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -40,22 +40,115 @@
 #include <pwd.h>
 #include <ctype.h>
 #include <sys/stat.h>
+#if HAVE_OPENSSL
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#endif
 
 #include <compat.h>
-#include <port.h>
 #include <util.h>
 
 #include <version.h>
 
 
 int fVerbose = 0, fReplay = 0, fRaw = 0, fVersion = 0, fStrip = 0;
+#if HAVE_OPENSSL
+int fReqEncryption = 1;
+char *pcCredFile = (char *)0;
+#endif
 int chAttn = -1, chEsc = -1;
 char *pcInMaster =		/* which machine is current */
     MASTERHOST;
 char *pcPort = DEFPORT;
 unsigned short bindPort;
+CONSFILE *cfstdout;
 
 static char acMesg[8192];	/* the buffer for startup negotiation   */
+
+#if HAVE_OPENSSL
+SSL_CTX *ctx = (SSL_CTX *) 0;
+
+void
+#if USE_ANSI_PROTO
+setupSSL(void)
+#else
+setupSSL()
+#endif
+{
+    if (ctx == (SSL_CTX *) 0) {
+	SSL_load_error_strings();
+	if (!SSL_library_init()) {
+	    Error("SSL library initialization failed");
+	    exit(EX_UNAVAILABLE);
+	}
+	if ((ctx = SSL_CTX_new(SSLv23_method())) == (SSL_CTX *) 0) {
+	    Error("Creating SSL context failed");
+	    exit(EX_UNAVAILABLE);
+	}
+	if (SSL_CTX_set_default_verify_paths(ctx) != 1) {
+	    Error("Could not load SSL default CA file and/or directory");
+	    exit(EX_UNAVAILABLE);
+	}
+	if (pcCredFile != (char *)0) {
+	    if (SSL_CTX_use_certificate_chain_file(ctx, pcCredFile) != 1) {
+		Error("Could not load SSL certificate from '%s'",
+		      pcCredFile);
+		exit(EX_UNAVAILABLE);
+	    }
+	    if (SSL_CTX_use_PrivateKey_file
+		(ctx, pcCredFile, SSL_FILETYPE_PEM) != 1) {
+		Error("Could not SSL private key from '%s'", pcCredFile);
+		exit(EX_UNAVAILABLE);
+	    }
+	}
+	SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, ssl_verify_callback);
+	SSL_CTX_set_options(ctx,
+			    SSL_OP_ALL | SSL_OP_NO_SSLv2 |
+			    SSL_OP_SINGLE_DH_USE);
+	SSL_CTX_set_mode(ctx,
+			 SSL_MODE_ENABLE_PARTIAL_WRITE |
+			 SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |
+			 SSL_MODE_AUTO_RETRY);
+	if (SSL_CTX_set_cipher_list(ctx, "ALL:!LOW:!EXP:!MD5:@STRENGTH") !=
+	    1) {
+	    Error("Setting SSL cipher list failed");
+	    exit(EX_UNAVAILABLE);
+	}
+    }
+}
+
+void
+#if USE_ANSI_PROTO
+attemptSSL(CONSFILE * pcf)
+#else
+attemptSSL(pcf)
+    CONSFILE *pcf;
+#endif
+{
+    SSL *ssl;
+
+    if (ctx == (SSL_CTX *) 0) {
+	Error("WTF?  The SSL context disappeared?!?!?");
+	exit(EX_UNAVAILABLE);
+    }
+    if (!(ssl = SSL_new(ctx))) {
+	Error("Couldn't create new SSL context");
+	exit(EX_UNAVAILABLE);
+    }
+    fileSetSSL(pcf, ssl);
+    SSL_set_fd(ssl, fileFDNum(pcf));
+    Debug(1, "About to SSL_connect() on fd %d", fileFDNum(pcf));
+    if (SSL_connect(ssl) <= 0) {
+	Error("SSL negotiation failed");
+	ERR_print_errors_fp(stderr);
+	exit(EX_UNAVAILABLE);
+    }
+    fileSetType(pcf, SSLSocket);
+    if (fDebug)
+	Debug(1, "SSL Connection: %s :: %s", SSL_get_cipher_version(ssl),
+	      SSL_get_cipher_name(ssl));
+}
+#endif
 
 /* output a control (or plain) character as a UNIX user would expect it	(ksb)
  */
@@ -89,8 +182,18 @@ static char *apcLong[] = {
     "7       strip the high bit of all console data",
     "a(A)    attach politely (and replay last 20 lines)",
     "b       send broadcast message",
+#if HAVE_OPENSSL
+    "c cred  load an SSL certificate and key from the PEM encoded file",
+#else
+    "c cred  ignored - encryption not compiled into code",
+#endif
     "D       enable debug output, sent to stderr",
     "e esc   set the initial escape characters",
+#if HAVE_OPENSSL
+    "E       don't require encrypted connections",
+#else
+    "E       ignored - encryption not compiled into code",
+#endif
     "f(F)    force read/write connection (and replay)",
     "G       connect to the console group only",
     "i       display information in machine-parseable form",
@@ -134,6 +237,22 @@ Version()
 #endif
 {
     int i;
+    static STRING acA1 = { (char *)0, 0, 0 };
+    char *optionlist[] = {
+#if USE_LIBWRAP
+	"libwrap",
+#endif
+#if HAVE_OPENSSL
+	"openssl",
+#endif
+#if HAVE_PAM
+	"pam",
+#endif
+#if HAVE_POSIX_REGCOMP
+	"regex",
+#endif
+	(char *)0
+    };
 
     Info("%s", THIS_VERSION);
     Info("initial master server `%s\'", pcInMaster);
@@ -160,6 +279,18 @@ Version()
 	    Info("on port %u (referenced as `%s')", bindPort, pcPort);
 	}
     }
+    buildMyString((char *)0, &acA1);
+    if (optionlist[0] == (char *)0)
+	buildMyString("none", &acA1);
+    for (i = 0; optionlist[i] != (char *)0; i++) {
+	if (i == 0)
+	    buildMyString(optionlist[i], &acA1);
+	else {
+	    buildMyString(", ", &acA1);
+	    buildMyString(optionlist[i], &acA1);
+	}
+    }
+    Info("options: %s", acA1.string);
     Info("built with `%s'", CONFIGINVOCATION);
     if (fVerbose)
 	printf(COPYRIGHT);
@@ -277,7 +408,7 @@ ParseEsc(pcText)
  * return the fd for the new connection; if we can use the loopback, do
  * as a side effect we set ThisHost to a short name for this host
  */
-int
+CONSFILE *
 #if USE_ANSI_PROTO
 GetPort(char *pcToHost, struct sockaddr_in *pPort, unsigned short sPort)
 #else
@@ -337,7 +468,7 @@ GetPort(pcToHost, pPort, sPort)
 	exit(EX_UNAVAILABLE);
     }
 
-    return s;
+    return fileOpenFD(s, simpleSocket);
 }
 
 
@@ -510,10 +641,11 @@ c2cooked()
  */
 static void
 #if USE_ANSI_PROTO
-SendOut(int fd, char *pcBuf, int iLen)
+SendOut(CONSFILE * fd, char *pcBuf, int iLen)
 #else
 SendOut(fd, pcBuf, iLen)
-    int fd, iLen;
+    CONSFILE *fd;
+    int iLen;
     char *pcBuf;
 #endif
 {
@@ -521,11 +653,11 @@ SendOut(fd, pcBuf, iLen)
 
     if (fDebug) {
 	static STRING buf = { (char *)0, 0, 0 };
-	FmtCtlStr(pcBuf, &buf);
+	FmtCtlStr(pcBuf, iLen, &buf);
 	Debug(1, "SendOut: `%s'", buf.string);
     }
     while (0 != iLen) {
-	if (-1 == (nr = write(fd, pcBuf, iLen))) {
+	if (-1 == (nr = fileWrite(fd, pcBuf, iLen))) {
 	    c2cooked();
 	    Error("lost connection");
 	    exit(EX_UNAVAILABLE);
@@ -540,10 +672,11 @@ SendOut(fd, pcBuf, iLen)
  */
 static int
 #if USE_ANSI_PROTO
-ReadReply(int fd, char *pcBuf, int iLen, char *pcWant)
+ReadReply(CONSFILE * fd, char *pcBuf, int iLen, char *pcWant)
 #else
 ReadReply(fd, pcBuf, iLen, pcWant)
-    int fd, iLen;
+    CONSFILE *fd;
+    int iLen;
     char *pcBuf, *pcWant;
 #endif
 {
@@ -551,7 +684,7 @@ ReadReply(fd, pcBuf, iLen, pcWant)
 
     iKeep = iLen;
     for (j = 0; j < iLen; /* j+=nr */ ) {
-	switch (nr = read(fd, &pcBuf[j], iLen - 1)) {
+	switch (nr = fileRead(fd, &pcBuf[j], iLen - 1)) {
 	    case 0:
 		if (iKeep != iLen) {
 		    break;
@@ -590,7 +723,7 @@ ReadReply(fd, pcBuf, iLen, pcWant)
     }
     if (fDebug) {
 	static STRING buf = { (char *)0, 0, 0 };
-	FmtCtlStr(pcWant, &buf);
+	FmtCtlStr(pcWant, -1, &buf);
 	if (strcmp(pcBuf, pcWant))
 	    Debug(1, "ReadReply: didn't match `%s'", buf.string);
 	else
@@ -615,16 +748,12 @@ Gather(pfi, pcPorts, pcMaster, pcTo, pcCmd, pcWho)
     char *pcPorts, *pcMaster, *pcTo, *pcCmd, *pcWho;
 #endif
 {
-    int s;
+    CONSFILE *pcf;
     unsigned short j;
     char *pcNext, *pcServer;
     STRING acExcg = { (char *)0, 0, 0 };
     struct sockaddr_in client_port;
     int iRet = 0;
-#if defined(__CYGWIN__)
-    int client_sock_flags;
-    struct linger lingeropt;
-#endif
 
     for ( /* param */ ; '\000' != *pcPorts; pcPorts = pcNext) {
 	if ((char *)0 == (pcNext = strchr(pcPorts, ':')))
@@ -651,9 +780,9 @@ Gather(pfi, pcPorts, pcMaster, pcTo, pcCmd, pcWho)
 	    j = htons((short)atoi(pcPorts));
 	}
 
-	s = GetPort(acExcg.string, &client_port, j);
+	pcf = GetPort(acExcg.string, &client_port, j);
 
-	if (0 != ReadReply(s, acMesg, sizeof(acMesg), "ok\r\n")) {
+	if (0 != ReadReply(pcf, acMesg, sizeof(acMesg), "ok\r\n")) {
 	    int s = strlen(acMesg);
 	    if ((s > 0) && ('\n' == acMesg[s - 1]))
 		acMesg[s - 1] = '\000';
@@ -661,35 +790,10 @@ Gather(pfi, pcPorts, pcMaster, pcTo, pcCmd, pcWho)
 	    exit(EX_UNAVAILABLE);
 	}
 
-	iRet += (*pfi) (s, acExcg.string, pcTo, pcCmd, pcWho);
+	iRet += (*pfi) (pcf, acExcg.string, pcTo, pcCmd, pcWho);
 
-#if defined(__CYGWIN__)
-	/* flush out the client socket - set it to blocking,
-	 * then write to it
-	 */
-	client_sock_flags = fcntl(s, F_GETFL, 0);
-	if (client_sock_flags != -1)
-	    /* enable blocking */
-	    fcntl(s, F_SETFL, client_sock_flags & ~O_NONBLOCK);
+	fileClose(&pcf);
 
-	/* sent it a byte - guaranteed to block - ensure delivery of
-	 * prior data yeah - this is a bit paranoid - try without this
-	 * at first
-	 */
-	/* write(s, "\n", 1); */
-
-	/* this is the guts of the workaround for Winsock close bug */
-	shutdown(s, 1);
-
-	/* enable lingering */
-	lingeropt.l_onoff = 1;
-	lingeropt.l_linger = 15;
-	setsockopt(s, SOL_SOCKET, SO_LINGER, &lingeropt,
-		   sizeof(lingeropt));
-	/* Winsock bug averted - now we're safe to close the socket */
-#endif
-
-	(void)close(s);
 	if ((char *)0 != pcServer) {
 	    *pcServer = '@';
 	}
@@ -778,10 +882,11 @@ processUrgentData(s)
  */
 static int
 #if USE_ANSI_PROTO
-CallUp(int s, char *pcMaster, char *pcMach, char *pcHow, char *pcUser)
+CallUp(CONSFILE * pcf, char *pcMaster, char *pcMach, char *pcHow,
+       char *pcUser)
 #else
-CallUp(s, pcMaster, pcMach, pcHow, pcUser)
-    int s;
+CallUp(pcf, pcMaster, pcMach, pcHow, pcUser)
+    CONSFILE *pcf;
     char *pcMaster, *pcMach, *pcHow, *pcUser;
 #endif
 {
@@ -797,8 +902,9 @@ CallUp(s, pcMaster, pcMach, pcHow, pcUser)
     }
 #if !defined(__CYGWIN__)
 # if defined(F_SETOWN)
-    if (-1 == fcntl(s, F_SETOWN, getpid())) {
-	Error("fcntl(F_SETOWN,%d): %d: %s", getpid(), s, strerror(errno));
+    if (-1 == fcntl(fileFDNum(pcf), F_SETOWN, getpid())) {
+	Error("fcntl(F_SETOWN,%d): %d: %s", getpid(), fileFDNum(pcf),
+	      strerror(errno));
     }
 # else
 #  if defined(SIOCSPGRP)
@@ -807,8 +913,8 @@ CallUp(s, pcMaster, pcMach, pcHow, pcUser)
 	/* on the HP-UX systems if different
 	 */
 	iTemp = -getpid();
-	if (-1 == ioctl(s, SIOCSPGRP, &iTemp)) {
-	    Error("ioctl: %d: %s", s, strerror(errno));
+	if (-1 == ioctl(fileFDNum(pcf), SIOCSPGRP, &iTemp)) {
+	    Error("ioctl: %d: %s", fileFDNum(pcf), strerror(errno));
 	}
     }
 #  endif
@@ -829,8 +935,8 @@ CallUp(s, pcMaster, pcMach, pcHow, pcUser)
 	 * (we'll find out soon enough)
 	 */
 	(void)sprintf(acMesg, "%c%ce%c%c", DEFATTN, DEFESC, chAttn, chEsc);
-	SendOut(s, acMesg, 5);
-	if (0 == ReadReply(s, acMesg, sizeof(acMesg), (char *)0)) {
+	SendOut(pcf, acMesg, 5);
+	if (0 == ReadReply(pcf, acMesg, sizeof(acMesg), (char *)0)) {
 	    Error("protocol botch on redef of escape sequence");
 	    exit(EX_UNAVAILABLE);
 	}
@@ -849,22 +955,37 @@ CallUp(s, pcMaster, pcMach, pcHow, pcUser)
      * access by default, which is fine for most people).
      */
     if (!fRaw) {
+#if HAVE_OPENSSL
+	(void)sprintf(acMesg, "%c%c*", chAttn, chEsc);
+	SendOut(pcf, acMesg, 3);
+	if (0 == ReadReply(pcf, acMesg, sizeof(acMesg), "[ssl:\r\n")) {
+	    attemptSSL(pcf);
+	}
+	if (fReqEncryption && fileGetType(pcf) != SSLSocket) {
+	    Error("Encryption not supported by server");
+	    exit(EX_UNAVAILABLE);
+	}
+#endif
 	/* begin connect with who we are
 	 */
 	(void)sprintf(acMesg, "%c%c;", chAttn, chEsc);
-	SendOut(s, acMesg, 3);
-	if (0 != ReadReply(s, acMesg, sizeof(acMesg), "[login:\r\n") &&
+	SendOut(pcf, acMesg, 3);
+	if (0 != ReadReply(pcf, acMesg, sizeof(acMesg), "[login:\r\n") &&
 	    0 != strcmp(acMesg, "\r\n[login:\r\n")) {
 	    int s = strlen(acMesg);
-	    if ((s > 0) && ('\n' == acMesg[s - 1]))
-		acMesg[s - 1] = '\000';
-	    Error("call: %s", acMesg);
+	    if (0 != strcmp(acMesg, "[Encryption required\r\n")) {
+		if ((s > 0) && ('\n' == acMesg[s - 1]))
+		    acMesg[s - 1] = '\000';
+		Error("call: %s", acMesg);
+	    } else {
+		Error("Encryption required by server for login");
+	    }
 	    exit(EX_UNAVAILABLE);
 	}
 
 	(void)sprintf(acMesg, "%s\r\n", pcUser);
-	SendOut(s, acMesg, strlen(acMesg));
-	if (0 != ReadReply(s, acMesg, sizeof(acMesg), "host:\r\n")) {
+	SendOut(pcf, acMesg, strlen(acMesg));
+	if (0 != ReadReply(pcf, acMesg, sizeof(acMesg), "host:\r\n")) {
 	    int s = strlen(acMesg);
 	    if ((s > 0) && ('\n' == acMesg[s - 1]))
 		acMesg[s - 1] = '\000';
@@ -875,8 +996,8 @@ CallUp(s, pcMaster, pcMach, pcHow, pcUser)
 	/* which host we want, and a passwd if asked for one
 	 */
 	(void)sprintf(acMesg, "%s\r\n", pcMach);
-	SendOut(s, acMesg, strlen(acMesg));
-	(void)ReadReply(s, acMesg, sizeof(acMesg), (char *)0);
+	SendOut(pcf, acMesg, strlen(acMesg));
+	(void)ReadReply(pcf, acMesg, sizeof(acMesg), (char *)0);
 	if (0 == strcmp(acMesg, "passwd:")) {
 	    static STRING pass = { (char *)0, 0, 0 };
 	    buildMyString((char *)0, &pass);
@@ -888,8 +1009,8 @@ CallUp(s, pcMaster, pcMach, pcHow, pcUser)
 	    buildMyString(getpass(acMesg), &pass);
 #endif
 	    buildMyString("\r\n", &pass);
-	    SendOut(s, pass.string, strlen(pass.string));
-	    (void)ReadReply(s, acMesg, sizeof(acMesg), (char *)0);
+	    SendOut(pcf, pass.string, strlen(pass.string));
+	    (void)ReadReply(pcf, acMesg, sizeof(acMesg), (char *)0);
 	}
 
 	/* how did we do, did we get a read-only or read-write?
@@ -945,14 +1066,14 @@ CallUp(s, pcMaster, pcMach, pcHow, pcUser)
 	    }
 	} else if (fIn != ('f' == *pcHow ? 'a' : *pcHow)) {
 	    (void)sprintf(acMesg, "%c%c%c", chAttn, chEsc, *pcHow);
-	    SendOut(s, acMesg, 3);
+	    SendOut(pcf, acMesg, 3);
 	}
 	if (fReplay) {
 	    (void)sprintf(acMesg, "%c%cr", chAttn, chEsc);
-	    SendOut(s, acMesg, 3);
+	    SendOut(pcf, acMesg, 3);
 	} else if (fVerbose) {
 	    (void)sprintf(acMesg, "%c%c\022", chAttn, chEsc);
-	    SendOut(s, acMesg, 3);
+	    SendOut(pcf, acMesg, 3);
 	}
     }
     (void)fflush(stdout);
@@ -966,12 +1087,12 @@ CallUp(s, pcMaster, pcMach, pcHow, pcUser)
      * select, read, or write.
      */
     FD_ZERO(&rinit);
-    FD_SET(s, &rinit);
+    FD_SET(fileFDNum(pcf), &rinit);
     FD_SET(0, &rinit);
     for (;;) {
 	justProcessedUrg = 0;
 	if (SawUrg) {
-	    processUrgentData(s);
+	    processUrgentData(fileFDNum(pcf));
 	    justProcessedUrg = 1;
 	}
 	/* reset read mask and select on it
@@ -982,14 +1103,14 @@ CallUp(s, pcMaster, pcMach, pcHow, pcUser)
 		      (fd_set *) 0, (struct timeval *)0)) {
 	    rmask = rinit;
 	    if (SawUrg) {
-		processUrgentData(s);
+		processUrgentData(fileFDNum(pcf));
 		justProcessedUrg = 1;
 	    }
 	}
 
 	/* anything from socket? */
-	if (FD_ISSET(s, &rmask)) {
-	    if ((nc = read(s, acMesg, sizeof(acMesg))) == 0) {
+	if (FD_ISSET(fileFDNum(pcf), &rmask)) {
+	    if ((nc = fileRead(pcf, acMesg, sizeof(acMesg))) == 0) {
 		if (justProcessedUrg) {
 		    printf("\n");
 		    Error("lost connection");
@@ -1000,7 +1121,7 @@ CallUp(s, pcMaster, pcMach, pcHow, pcUser)
 		for (i = 0; i < nc; ++i)
 		    acMesg[i] &= 127;
 	    }
-	    SendOut(1, acMesg, nc);
+	    SendOut(cfstdout, acMesg, nc);
 	}
 
 	/* anything from stdin? */
@@ -1011,7 +1132,7 @@ CallUp(s, pcMaster, pcMach, pcHow, pcUser)
 		for (i = 0; i < nc; ++i)
 		    acMesg[i] &= 127;
 	    }
-	    SendOut(s, acMesg, nc);
+	    SendOut(pcf, acMesg, nc);
 	}
     }
     c2cooked();
@@ -1026,10 +1147,11 @@ CallUp(s, pcMaster, pcMach, pcHow, pcUser)
  */
 static int
 #if USE_ANSI_PROTO
-Indir(int s, char *pcMaster, char *pcMach, char *pcCmd, char *pcWho)
+Indir(CONSFILE * pcf, char *pcMaster, char *pcMach, char *pcCmd,
+      char *pcWho)
 #else
-Indir(s, pcMaster, pcMach, pcCmd, pcWho)
-    int s;
+Indir(pcf, pcMaster, pcMach, pcCmd, pcWho)
+    CONSFILE *pcf;
     char *pcMaster, *pcMach, *pcCmd, *pcWho;
 #endif
 {
@@ -1038,10 +1160,10 @@ Indir(s, pcMaster, pcMach, pcCmd, pcWho)
     /* send request for master list
      */
     (void)sprintf(acPorts, "call:%s\r\n", pcMach);
-    SendOut(s, acPorts, strlen(acPorts));
+    SendOut(pcf, acPorts, strlen(acPorts));
 
     /* get the ports number */
-    if (0 >= ReadReply(s, acPorts, sizeof(acPorts), (char *)0)) {
+    if (0 >= ReadReply(pcf, acPorts, sizeof(acPorts), (char *)0)) {
 	Error("master forward broken");
 	exit(EX_UNAVAILABLE);
     }
@@ -1070,10 +1192,10 @@ Indir(s, pcMaster, pcMach, pcCmd, pcWho)
  */
 static int
 #if USE_ANSI_PROTO
-Cmd(int s, char *pcMaster, char *pcMach, char *pcCmd, char *pcWho)
+Cmd(CONSFILE * pcf, char *pcMaster, char *pcMach, char *pcCmd, char *pcWho)
 #else
-Cmd(s, pcMaster, pcMach, pcCmd, pcWho)
-    int s;
+Cmd(pcf, pcMaster, pcMach, pcCmd, pcWho)
+    CONSFILE *pcf;
     char *pcMaster, *pcMach, *pcCmd, *pcWho;
 #endif
 {
@@ -1096,11 +1218,11 @@ Cmd(s, pcMaster, pcMach, pcCmd, pcWho)
     if (*pcCmd == 'b') {
 	(void)sprintf(acMesg, "%c%c%c%s:%s\r%c%c.", DEFATTN, DEFESC,
 		      *pcCmd, pcWho, pcMach, DEFATTN, DEFESC);
-	SendOut(s, acMesg, strlen(acMesg));
+	SendOut(pcf, acMesg, strlen(acMesg));
     } else {
 	(void)sprintf(acMesg, "%c%c%c%c%c.", DEFATTN, DEFESC, *pcCmd,
 		      DEFATTN, DEFESC);
-	SendOut(s, acMesg, 6);
+	SendOut(pcf, acMesg, 6);
     }
 
     /* read the server's reply,
@@ -1110,7 +1232,7 @@ Cmd(s, pcMaster, pcMach, pcCmd, pcWho)
      */
     iRem = iMax;
     i = 0;
-    while (0 < (nr = read(s, pcBuf + i, iRem))) {
+    while (0 < (nr = fileRead(pcf, pcBuf + i, iRem))) {
 	i += nr;
 	iRem -= nr;
 	if (iRem >= BUF_MIN) {
@@ -1160,10 +1282,11 @@ Cmd(s, pcMaster, pcMach, pcCmd, pcWho)
  */
 static int
 #if USE_ANSI_PROTO
-CmdGroup(int s, char *pcMaster, char *pcMach, char *pcCmd, char *pcWho)
+CmdGroup(CONSFILE * pcf, char *pcMaster, char *pcMach, char *pcCmd,
+	 char *pcWho)
 #else
-CmdGroup(s, pcMaster, pcMach, pcCmd, pcWho)
-    int s;
+CmdGroup(pcf, pcMaster, pcMach, pcCmd, pcWho)
+    CONSFILE *pcf;
     char *pcMaster, *pcMach, *pcCmd, *pcWho;
 #endif
 {
@@ -1172,10 +1295,10 @@ CmdGroup(s, pcMaster, pcMach, pcCmd, pcWho)
     /* send request for master list
      */
     (void)sprintf(acPorts, "groups\r\n");
-    SendOut(s, acPorts, strlen(acPorts));
+    SendOut(pcf, acPorts, strlen(acPorts));
 
     /* get the ports number */
-    if (0 >= ReadReply(s, acPorts, sizeof(acPorts), (char *)0)) {
+    if (0 >= ReadReply(pcf, acPorts, sizeof(acPorts), (char *)0)) {
 	Error("master forward broken");
 	exit(EX_UNAVAILABLE);
     }
@@ -1193,10 +1316,11 @@ CmdGroup(s, pcMaster, pcMach, pcCmd, pcWho)
  */
 static int
 #if USE_ANSI_PROTO
-CmdMaster(int s, char *pcMaster, char *pcMach, char *pcCmd, char *pcWho)
+CmdMaster(CONSFILE * pcf, char *pcMaster, char *pcMach, char *pcCmd,
+	  char *pcWho)
 #else
-CmdMaster(s, pcMaster, pcMach, pcCmd, pcWho)
-    int s;
+CmdMaster(pcf, pcMaster, pcMach, pcCmd, pcWho)
+    CONSFILE *pcf;
     char *pcMaster, *pcMach, *pcCmd, *pcWho;
 #endif
 {
@@ -1204,10 +1328,10 @@ CmdMaster(s, pcMaster, pcMach, pcCmd, pcWho)
 
     /* send request for master list
      */
-    SendOut(s, "master\r\n", 8);
+    SendOut(pcf, "master\r\n", 8);
 
     /* get the ports number */
-    if (0 >= ReadReply(s, acPorts, sizeof(acPorts), (char *)0)) {
+    if (0 >= ReadReply(pcf, acPorts, sizeof(acPorts), (char *)0)) {
 	Error("master forward broken");
 	exit(EX_UNAVAILABLE);
     }
@@ -1223,10 +1347,10 @@ CmdMaster(s, pcMaster, pcMach, pcCmd, pcWho)
  */
 static int
 #if USE_ANSI_PROTO
-Ctl(int s, char *pcMaster, char *pcMach, char *pcCmd, char *pcWho)
+Ctl(CONSFILE * pcf, char *pcMaster, char *pcMach, char *pcCmd, char *pcWho)
 #else
-Ctl(s, pcMaster, pcMach, pcCmd, pcWho)
-    int s;
+Ctl(pcf, pcMaster, pcMach, pcCmd, pcWho)
+    CONSFILE *pcf;
     char *pcMaster, *pcMach, *pcCmd, *pcWho;
 #endif
 {
@@ -1235,10 +1359,10 @@ Ctl(s, pcMaster, pcMach, pcCmd, pcWho)
     /* send request for master list
      */
     (void)sprintf(acPorts, "%s:%s\r\n", pcCmd, pcMach);
-    SendOut(s, acPorts, strlen(acPorts));
+    SendOut(pcf, acPorts, strlen(acPorts));
 
     /* get the ports number */
-    if (0 >= ReadReply(s, acPorts, sizeof(acPorts), (char *)0)) {
+    if (0 >= ReadReply(pcf, acPorts, sizeof(acPorts), (char *)0)) {
 	Error("group leader died?");
 	return 1;
     }
@@ -1258,10 +1382,11 @@ Ctl(s, pcMaster, pcMach, pcCmd, pcWho)
  */
 static int
 #if USE_ANSI_PROTO
-CtlMaster(int s, char *pcMaster, char *pcMach, char *pcCmd, char *pcWho)
+CtlMaster(CONSFILE * pcf, char *pcMaster, char *pcMach, char *pcCmd,
+	  char *pcWho)
 #else
-CtlMaster(s, pcMaster, pcMach, pcCmd, pcWho)
-    int s;
+CtlMaster(pcf, pcMaster, pcMach, pcCmd, pcWho)
+    CONSFILE *pcf;
     char *pcMaster, *pcMach, *pcCmd, *pcWho;
 #endif
 {
@@ -1269,10 +1394,10 @@ CtlMaster(s, pcMaster, pcMach, pcCmd, pcWho)
 
     /* send request for master list
      */
-    SendOut(s, "master\r\n", 8);
+    SendOut(pcf, "master\r\n", 8);
 
     /* get the ports number */
-    if (0 >= ReadReply(s, acPorts, sizeof(acPorts), (char *)0)) {
+    if (0 >= ReadReply(pcf, acPorts, sizeof(acPorts), (char *)0)) {
 	Error("master forward broken");
 	exit(EX_UNAVAILABLE);
     }
@@ -1298,7 +1423,7 @@ main(argc, argv)
     char **argv;
 #endif
 {
-    char *ptr, *pcCmd, *pcTo;
+    char *pcCmd, *pcTo;
     struct passwd *pwdMe;
     int opt;
     int fLocal;
@@ -1306,7 +1431,7 @@ main(argc, argv)
     char *pcUser = (char *)0;
     char *pcMsg = (char *)0;
     int (*pfiCall) ();
-    static char acOpts[] = "7aAb:De:fFGhil:M:p:PqQrRsSuvVwWx";
+    static char acOpts[] = "7aAb:c:De:EfFGhil:M:p:PqQrRsSuvVwWx";
     extern int optind;
     extern int optopt;
     extern char *optarg;
@@ -1342,8 +1467,20 @@ main(argc, argv)
 		pcMsg = optarg;
 		break;
 
+	    case 'c':
+#if HAVE_OPENSSL
+		pcCredFile = optarg;
+#endif
+		break;
+
 	    case 'D':
 		fDebug++;
+		break;
+
+	    case 'E':
+#if HAVE_OPENSSL
+		fReqEncryption = 0;
+#endif
 		break;
 
 	    case 'e':		/* set escape chars */
@@ -1430,7 +1567,7 @@ main(argc, argv)
 
 	    default:		/* huh? */
 		Error
-		    ("usage [-aAfFGsS] [-7Dv] [-M mach] [-p port] [-e esc] [-l username] console");
+		    ("usage [-aAEfFGsS] [-7Dv] [-c cred] [-M mach] [-p port] [-e esc] [-l username] console");
 		Error
 		    ("usage [-hPrRuVwWx] [-7Dv] [-M mach] [-p port] [-b message]");
 		Error("usage [-qQ] [-7Dv] [-M mach] [-p port]");
@@ -1468,17 +1605,24 @@ main(argc, argv)
 	}
     }
 
-    if ((char *)0 == pcUser) {
-	if (((char *)0 != (ptr = getenv("USER")) ||
-	     (char *)0 != (ptr = getenv("LOGNAME"))) &&
-	    (struct passwd *)0 != (pwdMe = getpwnam(ptr)) &&
-	    getuid() == pwdMe->pw_uid) {
-	    /* use the login $USER is set to, if it is our (real) uid */ ;
-	} else if ((struct passwd *)0 == (pwdMe = getpwuid(getuid()))) {
-	    Error("getpwuid: %d: %s", (int)(getuid()), strerror(errno));
+    if (pcUser == (char *)0 || pcUser[0] == '\000') {
+	if (((pcUser = getenv("LOGNAME")) == (char *)0) &&
+	    ((pcUser = getenv("USER")) == (char *)0) &&
+	    ((pwdMe = getpwuid(getuid())) == (struct passwd *)0)) {
+	    Error
+		("$LOGNAME and $USER do not exist and getpwuid fails: %d: %s",
+		 (int)(getuid()), strerror(errno));
 	    exit(EX_UNAVAILABLE);
 	}
-	pcUser = pwdMe->pw_name;
+	if (pcUser == (char *)0) {
+	    if (pwdMe->pw_name == (char *)0 || pwdMe->pw_name[0] == '\000') {
+		Error("Username for uid %d does not exist",
+		      (int)(getuid()));
+		exit(EX_UNAVAILABLE);
+	    } else {
+		pcUser = pwdMe->pw_name;
+	    }
+	}
     }
 
     /* finish resolving the command to do, call Gather
@@ -1504,9 +1648,15 @@ main(argc, argv)
 	exit(EX_UNAVAILABLE);
     }
 
+    cfstdout = fileOpenFD(1, simpleFile);
+
     buildMyString((char *)0, &acPorts);
     buildMyStringChar('@', &acPorts);
     buildMyString(pcInMaster, &acPorts);
+
+#if HAVE_OPENSSL
+    setupSSL();			/* should only do if we want ssl - provide flag! */
+#endif
 
     if ('q' == *pcCmd) {
 	static STRING acPass = { (char *)0, 0, 0 };

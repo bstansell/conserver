@@ -1,13 +1,13 @@
 .\" @(#)conserver.8 01/06/91 OSU CIS; Thomas A. Fine
-.\" $Id: conserver.man,v 1.26 2002-09-22 10:41:51-07 bryan Exp $
+.\" $Id: conserver.man,v 1.28 2002-10-09 13:26:31-07 bryan Exp $
 .TH CONSERVER 8 "Local"
 .SH NAME
 conserver \- console server daemon
 .SH SYNOPSIS
-\fBconserver\fP [\fB\-7dDFhinouvV\fP] [\fB\-a\fP \fItype\fP]
+\fBconserver\fP [\fB\-7dDEFhinouvV\fP] [\fB\-a\fP \fItype\fP]
 [\fB\-m\fP \fImax\fP]
 [\fB\-M\fP \fIaddr\fP] [\fB\-p\fP \fIport\fP] [\fB\-b\fP \fIport\fP]
-[\fB\-C\fP \fIconfig\fP] [\fB\-P\fP \fIpasswd\fP]
+[\fB\-c\fP \fIcred\fP] [\fB\-C\fP \fIconfig\fP] [\fB\-P\fP \fIpasswd\fP]
 [\fB\-L\fP \fIlogfile\fP] [\fB\-O\fP \fImin\fP]
 .SH DESCRIPTION
 .B Conserver
@@ -138,6 +138,9 @@ If no free ports are available in that range,
 By default, \fBconserver\fP lets the operating system choose
 a free port.
 .TP
+.BI \-c cred
+Load an SSL certificate and key from the PEM encoded file \fIcred\fP.
+.TP
 .BI \-C config
 Read configuration information from the file \fIconfig\fP.
 The default \fIconfig\fP may be changed at compile time using the
@@ -150,6 +153,11 @@ all output to the logfile (see \fB\-L\fP).
 .B \-D
 Enable debugging output, sent to stderr.  Multiple \fB-D\fP options
 increases debug output.
+.TP
+.B \-E
+If encryption has been built into the code (\fB--with-openssl\fP), encrypted
+client connections are a requirement. This option allows clients to connect
+to consoles over non-encrypted connections.
 .TP
 .B \-F
 Do not automatically reinitialize failed (unexpectedly closed)
@@ -247,9 +255,14 @@ Additionally, output from individual consoles may be logged
 to separate files specified in
 .BR conserver.cf (5).
 .SH BUGS
-All client/server traffic (including root and user passwords) is
-passed ``in the clear''.  Extreme care should be taken to insure no one
-is ``snooping'' this private data.  One day the traffic will be encrypted.
+SSL encryption only occurs when connecting to a single console, not
+on all client/server activity.  The \fB-q\fP/\fB-Q\fP quit command will
+pass the root password in the clear.  Other info-type
+options (like \fB-i\fP, \fB-w\fP, etc)
+are all sent unencrypted as well.  This should be fixed soon.
+.PP
+I'm sure there are more, I just don't know where they are.  Please
+let me know if you find any.
 .SH AUTHORS
 Thomas A. Fine, Ohio State Computer Science
 .br

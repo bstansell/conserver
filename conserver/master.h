@@ -1,5 +1,5 @@
 /*
- *  $Id: master.h,v 5.14 2002-02-25 14:00:38-08 bryan Exp $
+ *  $Id: master.h,v 5.15 2002-09-29 19:05:25-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -38,7 +38,7 @@
  * stuff the master process needs
  */
 #if USE_ANSI_PROTO
-extern void Master();
+extern void Master(void);
 extern void SignalKids(int);
 #else
 extern void Master();

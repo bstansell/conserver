@@ -10,6 +10,14 @@ Upgrading?
     new features added to the client if you're considering *not*
     upgrading.
 
+    Version 7.2.4
+
+	- If SSL support is compiled into the code, older versions of
+	  the client and server are, by default, incompatible because
+	  encrypted connections are a requirement.  Use of the -E flag in
+	  the client and/or server can work around this (but I discourage
+	  this - please upgrade the clients and servers instead).
+
     Version 7.2.0
 
 	- The code related to broadcast messages in the client (-b) has
@@ -61,15 +69,18 @@ Detailed Instructions
 	--with-port=PORT        Specify port number [conserver]
 	--with-base=PORT        Base port for secondary channel [0]
 	--with-master=MASTER    Specify master server hostname [console]
-	--with-cffile=CFFILE    Specify config filename [conserver.cf]
-	--with-pwdfile=PWDFILE  Specify password filename [conserver.passwd]
+	--with-cffile=CFFILE    Specify config filename
+	                        [SYSCONFDIR/conserver.cf]
+	--with-pwdfile=PWDFILE  Specify password filename
+	                        [SYSCONFDIR/conserver.passwd]
 	--with-logfile=LOGFILE  Specify log filename [/var/log/conserver]
 	--with-pidfile=PIDFILE  Specify PID filepath [/var/run/conserver.pid]
 	--with-maxmemb=MAXMEMB  Specify maximum consoles per process [16]
 	--with-timeout=TIMEOUT  Specify connect() timeout in seconds [10]
 	--with-libwrap[=PATH]   Compile in libwrap (tcp_wrappers) support
+	--with-openssl[=PATH]   Compile in openssl support
 	--with-regex            Use regular expressions in conserver.passwd
-	--with-pam              enable PAM support
+	--with-pam              Enable PAM support
 
       Not surprisingly, some match the old conserver/cons.h items...here
       they are for reference:
@@ -162,5 +173,5 @@ Other Information And Gotchas
 
 
 #
-#  $Id: INSTALL,v 1.23 2002-09-23 14:05:31-07 bryan Exp $
+#  $Id: INSTALL,v 1.25 2002-10-12 20:23:58-07 bryan Exp $
 #

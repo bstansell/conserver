@@ -1,5 +1,5 @@
 /*
- *  $Id: access.h,v 5.17 2002-02-25 14:00:38-08 bryan Exp $
+ *  $Id: access.h,v 5.18 2002-09-29 19:04:32-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -55,7 +55,7 @@ typedef struct remote {		/* console at another host              */
 #if USE_ANSI_PROTO
 extern REMOTE *FindUniq(REMOTE *);
 extern char AccType(struct in_addr *, char *);
-extern void SetDefAccess(struct in_addr *pAddr, char *pHost);
+extern void SetDefAccess(struct in_addr *, char *);
 #else
 extern REMOTE *FindUniq();
 extern char AccType();

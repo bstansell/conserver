@@ -1,4 +1,4 @@
-dnl ### autoheader templates. #######################################
+dnl ### autoheader templates ########################################
 AH_TEMPLATE([CONFIGINVOCATION], [./configure invocation])
 AH_TEMPLATE([DEFPORT], [Socket used to communicate])
 AH_TEMPLATE([DEFBASEPORT], [Base socket used for secondary channel])
@@ -12,7 +12,8 @@ AH_TEMPLATE([PIDFILE], [pidfile to write to])
 AH_TEMPLATE([USE_LIBWRAP], [use tcp_wrappers libwrap])
 AH_TEMPLATE([USE_ANSI_PROTO], [use ansi prototypes/decls])
 AH_TEMPLATE([HAVE_POSIX_REGCOMP], [have POSIX regcomp])
-AH_TEMPLATE([HAVE_PAM], [have PAM])
+AH_TEMPLATE([HAVE_PAM], [have PAM support])
+AH_TEMPLATE([HAVE_OPENSSL], [have openssl support])
 
 dnl ### Normal initialization. ######################################
 AC_INIT
@@ -80,28 +81,38 @@ AC_ARG_WITH(master,
 
 AC_MSG_CHECKING(for configuration filename)
 AC_ARG_WITH(cffile,
-	AC_HELP_STRING([--with-cffile=CFFILE],[Specify config filename @<:@conserver.cf@:>@]),
+	AC_HELP_STRING([--with-cffile=CFFILE],[Specify config filename @<:@SYSCONFDIR/conserver.cf@:>@]),
 	[if test "$withval" != yes; then
-		AC_DEFINE_UNQUOTED(CONFIGFILE, "$withval")
-		AC_MSG_RESULT('$sysconfdir/$withval')
+		if expr "x$withval" : "x/" > /dev/null 2>&1; then
+			AC_DEFINE_UNQUOTED(CONFIGFILE, ["$withval"])
+			AC_MSG_RESULT('$withval')
+		else
+			AC_DEFINE_UNQUOTED(CONFIGFILE, [SYSCONFDIR "/$withval"])
+			AC_MSG_RESULT('$sysconfdir/$withval')
+		fi
 	else
-		AC_DEFINE_UNQUOTED(CONFIGFILE, "conserver.cf")
+		AC_DEFINE_UNQUOTED(CONFIGFILE, [SYSCONFDIR "/conserver.cf"])
 		AC_MSG_RESULT('$sysconfdir/conserver.cf')
 	fi],
-	[AC_DEFINE_UNQUOTED(CONFIGFILE, "conserver.cf")
+	[AC_DEFINE_UNQUOTED(CONFIGFILE, [SYSCONFDIR "/conserver.cf"])
 	AC_MSG_RESULT('$sysconfdir/conserver.cf')])
 
 AC_MSG_CHECKING(for password filename)
 AC_ARG_WITH(pwdfile,
-	AC_HELP_STRING([--with-pwdfile=PWDFILE],[Specify password filename @<:@conserver.passwd@:>@]),
+	AC_HELP_STRING([--with-pwdfile=PWDFILE],[Specify password filename @<:@SYSCONFDIR/conserver.passwd@:>@]),
 	[if test "$withval" != yes; then
-		AC_DEFINE_UNQUOTED(PASSWDFILE, "$withval")
-		AC_MSG_RESULT('$sysconfdir/$withval')
+		if expr "x$withval" : "x/" > /dev/null 2>&1; then
+			AC_DEFINE_UNQUOTED(PASSWDFILE, ["$withval"])
+			AC_MSG_RESULT('$withval')
+		else
+			AC_DEFINE_UNQUOTED(PASSWDFILE, [SYSCONFDIR "/$withval"])
+			AC_MSG_RESULT('$sysconfdir/$withval')
+		fi
 	else
-		AC_DEFINE_UNQUOTED(PASSWDFILE, "conserver.passwd")
+		AC_DEFINE_UNQUOTED(PASSWDFILE, [SYSCONFDIR "/conserver.passwd"])
 		AC_MSG_RESULT('$sysconfdir/conserver.passwd')
 	fi],
-	[AC_DEFINE_UNQUOTED(PASSWDFILE, "conserver.passwd")
+	[AC_DEFINE_UNQUOTED(PASSWDFILE, [SYSCONFDIR "/conserver.passwd"])
 	AC_MSG_RESULT('$sysconfdir/conserver.passwd')])
 
 AC_MSG_CHECKING(for log filename)
@@ -215,6 +226,7 @@ AC_CHECK_TYPE([socklen_t],[AC_DEFINE(HAVE_SOCKLEN_T,1,
 	[Defined if socklen_t exists])],,[$ac_includes_default
 #include <sys/socket.h>])
 
+
 dnl ### Check for libraries. #######################################
 AC_SEARCH_LIBS(socket,socket)
 AC_SEARCH_LIBS(gethostbyname,nsl)
@@ -262,6 +274,44 @@ AC_ARG_WITH(libwrap,
     fi]
 )
 
+AC_ARG_WITH(openssl,
+    AC_HELP_STRING([--with-openssl@<:@=PATH@:>@],
+	[Compile in OpenSSL support]),
+    [if test "$withval" != "no"; then
+	if test "$withval" != "yes"; then
+	    OPENSSLCPPFLAGS="-I$withval/include"
+	    OPENSSLLDFLAGS="-L$withval/lib"
+	else
+	    OPENSSLCPPFLAGS=""
+	    OPENSSLLDFLAGS=""
+	fi
+
+	oCPPFLAGS="$CPPFLAGS"
+	oLDFLAGS="$LDFLAGS"
+	oLIBS="$LIBS"
+	have_openssl=no
+
+	CPPFLAGS="$CPPFLAGS $OPENSSLCPPFLAGS"
+	LDFLAGS="$LDFLAGS $OPENSSLLDFLAGS"
+
+	AC_CHECK_HEADER([openssl/ssl.h],
+	    [LIBS="$LIBS -lssl -lcrypto"
+	    AC_MSG_CHECKING(for openssl libraries -lssl and -lcrypto)
+	    AC_TRY_LINK([#include <openssl/ssl.h>
+		],[SSL_library_init()],
+		[AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_OPENSSL)
+		have_openssl=yes],
+		[AC_MSG_RESULT(no)])],)
+
+	if test $have_openssl = no; then
+	    LIBS="$oLIBS"
+	    CPPFLAGS="$oCPPFLAGS"
+	    LDFLAGS="$oLDFLAGS"
+	fi
+    fi]
+)
+
 
 dnl ### Check for needed functions. ################################
 
@@ -300,7 +350,7 @@ AC_ARG_WITH(regex,
 
 AC_ARG_WITH(pam,
     AC_HELP_STRING([--with-pam],
-	[enable PAM support]),
+	[Enable PAM support]),
 	[if test "$withval" = yes; then
 	    oLIBS="$LIBS"
 

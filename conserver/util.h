@@ -1,5 +1,5 @@
 /*
- *  $Id: util.h,v 1.24 2002-09-22 14:13:47-07 bryan Exp $
+ *  $Id: util.h,v 1.32 2002-10-01 20:52:02-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -10,6 +10,10 @@
 #include <stdarg.h>
 #else
 #include <varargs.h>
+#endif
+#if HAVE_OPENSSL
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 #endif
 
 /* communication constants
@@ -23,10 +27,11 @@
  */
 enum consFileType {
     simpleFile,
-    simpleSocket
-#ifdef TLS_SUPPORT
-    ,TLSSocket
+    simpleSocket,
+#if HAVE_OPENSSL
+    SSLSocket,
 #endif
+    nothing
 };
 
 typedef struct dynamicString {
@@ -39,12 +44,11 @@ typedef struct consFile {
     /* Standard socket type stuff */
     enum consFileType ftype;
     int fd;
-#ifdef TLS_SUPPORT
-    /* TLS/SSL stuff */
-    SSL_CTX *ctx;
-    SSL *sslfd;
-    BIO *sbio;
-    int ctx_connections;
+#if HAVE_OPENSSL
+    /* SSL stuff */
+    SSL *ssl;
+    int waitonWrite;
+    int waitonRead;
 #endif
     /* Add crypto stuff to suit */
 } CONSFILE;
@@ -59,7 +63,7 @@ extern void Error(char *, ...);
 extern void Info(char *, ...);
 extern void simpleSignal(int, RETSIGTYPE(*)(int));
 extern int cmaxfiles();
-extern void FmtCtlStr(char *, STRING *);
+extern void FmtCtlStr(char *, int, STRING *);
 extern CONSFILE *fileOpenFD(int, enum consFileType);
 extern CONSFILE *fileOpen(const char *, int, int);
 extern int fileClose(CONSFILE **);
@@ -79,6 +83,13 @@ extern char *buildMyStringChar(const char, STRING *);
 extern void initString(STRING *);
 extern void destroyString(STRING *);
 extern char *readLine(FILE *, STRING *, int *);
+extern enum consFileType fileGetType(CONSFILE *);
+extern void fileSetType(CONSFILE *, enum consFileType);
+#if HAVE_OPENSSL
+extern SSL *fileGetSSL(CONSFILE *);
+extern void fileSetSSL(CONSFILE *, SSL *);
+extern int ssl_verify_callback(int, X509_STORE_CTX *);
+#endif
 #else
 extern void Debug();
 extern void Error();
@@ -105,4 +116,11 @@ extern char *buildMyStringChar();
 extern void initString();
 extern void destroyString();
 extern char *readLine();
+extern enum consFileType fileGetType();
+extern void fileSetType();
+#if HAVE_OPENSSL
+extern SSL *fileGetSSL();
+extern void fileSetSSL();
+extern int ssl_verify_callback();
+#endif
 #endif

@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.79 2002-09-23 11:39:21-07 bryan Exp $
+ *  $Id: master.c,v 5.81 2002-10-12 20:07:43-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -48,7 +48,6 @@ int deny_severity = LOG_WARNING;
 #endif
 
 #include <compat.h>
-#include <port.h>
 #include <util.h>
 
 #include <consent.h>
@@ -237,7 +236,7 @@ SignalKids(arg)
  */
 void
 #if USE_ANSI_PROTO
-Master()
+Master(void)
 #else
 Master()
 #endif

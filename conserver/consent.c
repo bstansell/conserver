@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.90 2002-09-23 11:38:46-07 bryan Exp $
+ *  $Id: consent.c,v 5.92 2002-10-12 20:07:43-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -53,7 +53,6 @@
 #include <pwd.h>
 
 #include <compat.h>
-#include <port.h>
 #include <util.h>
 
 #include <consent.h>
@@ -669,7 +668,7 @@ AddHostCache(hostname)
 
 void
 #if USE_ANSI_PROTO
-ClearHostCache()
+ClearHostCache(void)
 #else
 ClearHostCache()
 #endif

@@ -1,5 +1,5 @@
 /*
- *  $Id: main.h,v 5.34 2002-09-22 09:31:43-07 bryan Exp $
+ *  $Id: main.h,v 5.38 2002-09-29 19:04:57-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -51,9 +51,13 @@ extern char acMyHost[];
 extern struct in_addr acMyAddr;
 extern int domainHack;
 extern int isMaster;
+#if HAVE_OPENSSL
+extern SSL_CTX *ctx;
+extern int fReqEncryption;
+#endif
 #if USE_ANSI_PROTO
-extern void reopenLogfile();
-extern void dumpDataStructures();
+extern void reopenLogfile(void);
+extern void dumpDataStructures(void);
 #else
 extern void reopenLogfile();
 extern void dumpDataStructures();

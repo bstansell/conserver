@@ -1,9 +1,10 @@
-.\" $Id: console.man,v 1.21 2002-09-22 10:20:43-07 bryan Exp $
+.\" $Id: console.man,v 1.23 2002-10-09 13:26:31-07 bryan Exp $
 .TH CONSOLE 1 "Local"
 .SH NAME
 console \- console server client program
 .SH SYNOPSIS
-\fBconsole\fP [\fB\-aAfFGsS\fP] [\fB\-7Dv\fP] [\fB\-M\fP \fImach\fP]
+\fBconsole\fP [\fB\-aAEfFGsS\fP] [\fB\-7Dv\fP]
+[\fB\-c\fP \fIcred\fP] [\fB\-M\fP \fImach\fP]
 [\fB\-p\fP \fIport\fP] [\fB\-e\fP \fIesc\fP] [\fB\-l\fP \fIuser\fP]
 \fIconsole\fP
 .br
@@ -74,6 +75,9 @@ The connection is dropped to spy mode if someone else is attached read-write.
 .BI \-b message
 Broadcast a \fImessage\fP to all users connected to the console server.
 .TP
+.BI \-c cred
+Load an SSL certificate and key from the PEM encoded file \fIcred\fP.
+.TP
 .B \-D
 Enable debugging output.
 .TP
@@ -82,6 +86,11 @@ Set the initial two-character escape sequence to
 those represented by \fIesc\fP.
 Any of the forms output by \fBcat\fP(1)'s \-\fBv\fP option
 are accepted.  The default value is ``\fB^Ec\fP''.
+.TP
+.B \-E
+If encryption has been built into the code (\fB--with-openssl\fP), encrypted
+client connections are a requirement. This option allows the client to
+connect to a console over a non-encrypted connection.
 .TP
 .B \-f
 Same as \fB\-a\fP except it will force any existing connection into spy mode.
@@ -342,15 +351,20 @@ console \-e \*(lq^[1\*(rq lv426
 Requests a connection to the host ``lv426'' with the escape characters
 set to ``escape one''.
 .SH BUGS
-All client/server traffic (including root and user passwords) is
-passed ``in the clear''.  Extreme care should be taken to insure no one
-is ``snooping'' this private data.  One day the traffic will be encrypted.
+SSL encryption only occurs when connecting to a single console, not
+on all client/server activity.  The \fB-q\fP/\fB-Q\fP quit command will
+pass the root password in the clear.  Other info-type
+options (like \fB-i\fP, \fB-w\fP, etc)
+are all sent unencrypted as well.  This should be fixed soon.
 .PP
 It is possible to create a loop of console connections, with ugly results.
 Never run \fBconsole\fP from within a console connection (unless you set each
 escape sequence differently).
 .PP
 The \fB\-G\fP option doesn't help to explain how connections get built.
+.PP
+I'm sure there are more, I just don't know where they are.  Please
+let me know if you find any.
 .SH AUTHORS
 Thomas A. Fine, Ohio State Computer Science
 .br
