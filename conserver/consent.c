@@ -1,7 +1,7 @@
 /*
- *  $Id: consent.c,v 5.39 2001-02-17 08:36:13-08 bryan Exp $
+ *  $Id: consent.c,v 5.41 2001-05-03 06:31:33-07 bryan Exp $
  *
- *  Copyright conserver.com, 2000
+ *  Copyright conserver.com, 2000-2001
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
@@ -779,7 +779,7 @@ int useHostCache;
 		{
 		    fprintf(stderr, "%s: connect: %s (%d@%s): %s: forcing down\n",
 			    progname, pCE->server, ntohs(port.sin_port),
-			    pCE->networkConsoleHost, strerror(errno));
+			    pCE->networkConsoleHost, strerror(flags));
 		    ConsDown(pCE, pfdSet);
 		    return;
 		}

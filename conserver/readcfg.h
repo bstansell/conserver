@@ -1,7 +1,7 @@
 /*
- *  $Id: readcfg.h,v 5.9 2000-12-13 12:31:07-08 bryan Exp $
+ *  $Id: readcfg.h,v 5.10 2001-02-21 17:26:06-08 bryan Exp $
  *
- *  Copyright conserver.com, 2000
+ *  Copyright conserver.com, 2000-2001
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *

@@ -1,7 +1,7 @@
 /*
- *  $Id: main.c,v 5.39 2001-02-08 15:31:58-08 bryan Exp $
+ *  $Id: main.c,v 5.42 2001-05-03 06:39:43-07 bryan Exp $
  *
- *  Copyright conserver.com, 2000
+ *  Copyright conserver.com, 2000-2001
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
@@ -54,7 +54,7 @@
 #include <version.h>
 
 char rcsid[] =
-	"$Id: main.c,v 5.39 2001-02-08 15:31:58-08 bryan Exp $";
+	"$Id: main.c,v 5.42 2001-05-03 06:39:43-07 bryan Exp $";
 char *progname =
 	rcsid;
 int fAll = 1, fVerbose = 0, fSoftcar = 0, fNoinit = 0, fDebug = 0, fVersion = 0;
@@ -82,6 +82,7 @@ static void
 daemonize()
 {
 	int res, td;
+	FILE *fp;
 
 	(void) signal(SIGQUIT, SIG_IGN);
 	(void) signal(SIGINT,  SIG_IGN);
@@ -127,6 +128,14 @@ daemonize()
 		close(td);
 	}
 #endif
+
+	fp = fopen(PIDFILE, "w");
+	if ( fp ) {
+		fprintf(fp, "%d\n", (int) getpid());
+		fclose(fp);
+	} else {
+		fprintf(stderr,"%s: can't write pid to %s\n", progname, PIDFILE);
+	}
 }
 
 
@@ -167,6 +176,7 @@ Version()
 	printf("%s: default escape sequence `%s%s\'\n", progname, FmtCtl(DEFATTN, acA1), FmtCtl(DEFESC, acA2));
 	printf("%s: configuration in `%s\'\n", progname, pcConfig);
 	printf("%s: password in `%s\'\n", progname, pcPasswd);
+	printf("%s: pidfile in `%s\'\n", progname, PIDFILE);
 	printf("%s: limited to %d group%s with %d member%s\n", progname, MAXGRP, MAXGRP == 1 ? "" : "s", MAXMEMB, MAXMEMB == 1 ? "" : "s");
 #if CPARITY
 	printf("%s: high-bit of data stripped (7-bit clean)\n", progname);

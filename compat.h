@@ -183,3 +183,32 @@ extern char *h_errlist[];
 # define setgroups(x, y)	0
 #endif
 
+/*
+ * IUCLC, OLCUC and XCASE were removed from IEEE Std 1003.1-200x
+ *  as legacy definitions.
+ */
+#ifndef IUCLC
+#define IUCLC 0
+#endif
+#ifndef OLCUC
+#define OLCUC 0
+#endif
+#ifndef XCASE
+#define XCASE 0
+#endif
+/* Some systems don't have OFILL or *DLY. */
+#ifndef OFILL
+#define OFILL 0
+#endif
+#ifndef NLDLY
+#define NLDLY 0
+#endif
+#ifndef CRDLY
+#define CRDLY 0
+#endif
+#ifndef TABDLY
+#define TABDLY 0
+#endif
+#ifndef BSDLY
+#define BSDLY 0
+#endif

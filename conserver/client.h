@@ -1,7 +1,7 @@
 /*
- *  $Id: client.h,v 5.15 2001-02-03 20:17:02-08 bryan Exp $
+ *  $Id: client.h,v 5.16 2001-02-21 17:26:06-08 bryan Exp $
  *
- *  Copyright conserver.com, 2000
+ *  Copyright conserver.com, 2000-2001
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *

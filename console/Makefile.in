@@ -50,5 +50,5 @@ install:
 	$(MKDIR) $(DESTDIR)$(bindir)
 	$(INSTALL_PROGRAM) console $(DESTDIR)$(bindir)
 	$(MKDIR) $(DESTDIR)$(mandir)/man1
-	$(INSTALL) console.man $(DESTDIR)$(mandir)/man8/console.1
+	$(INSTALL) console.man $(DESTDIR)$(mandir)/man1/console.1
 

@@ -1,7 +1,7 @@
 /*
- *  $Id: console.c,v 5.35 2001-02-18 22:00:47-08 bryan Exp $
+ *  $Id: console.c,v 5.37 2001-05-03 06:04:11-07 bryan Exp $
  *
- *  Copyright conserver.com, 2000
+ *  Copyright conserver.com, 2000-2001
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
@@ -30,6 +30,7 @@
 #include <config.h>
 
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <fcntl.h>
@@ -46,7 +47,7 @@
 
 
 static char rcsid[] =
-	"$Id: console.c,v 5.35 2001-02-18 22:00:47-08 bryan Exp $";
+	"$Id: console.c,v 5.37 2001-05-03 06:04:11-07 bryan Exp $";
 static char *progname =
 	rcsid;
 int fVerbose = 0, fReplay = 0, fRaw = 0;

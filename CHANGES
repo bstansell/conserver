@@ -1,6 +1,14 @@
 				CHANGES
 				=======
 
+version 7.0.1 (May 3, 2001):
+	- 8bit on by default now (use --disable-8bit for old behavior)
+	- FreeBSD patches by Bill Fenner <fenner@research.att.com>
+	  (hopefully *BSD systems will compile cleaner now)
+	- Bad error reporting on getsockopt() found by Bill Fenner
+	  <fenner@research.att.com>
+	- PID file patch by Martin Andrews <mandrews@netgenics.com>
+
 version 7.0.0 (Feb 18, 2001):
 	- GNU configure-based packaging!!!
 	  All work done by Mark D. Roth <roth@feep.net>.
@@ -101,5 +109,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.23 2001-02-18 22:36:45-08 bryan Exp $
+#  $Id: CHANGES,v 1.25 2001-05-03 06:44:01-07 bryan Exp $
 #

@@ -43,8 +43,8 @@ Mailing Lists
     informing of new versions, major developments, etc.
     [4]users@conserver.com is for general Q&A, discussions, ideas, etc
     for conserver users. You can sign up my sending a message to
-    list-request@conserver.com with a subject of "subscribe" or head
-    over to the online [5]web pages.
+    listname-request@conserver.com with a subject of "subscribe" or
+    head over to the online [5]web pages.
 
 
 Origin
@@ -100,5 +100,5 @@ References
    6. http://www.certaintysolutions.com/
 
 #
-#  $Id: README,v 1.14 2001-02-18 22:49:41-08 bryan Exp $
+#  $Id: README,v 1.15 2001-03-05 02:41:56-08 bryan Exp $
 #

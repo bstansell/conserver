@@ -1,7 +1,7 @@
 /*
- *  $Id: group.c,v 5.65 2001-02-08 15:31:40-08 bryan Exp $
+ *  $Id: group.c,v 5.66 2001-02-21 17:26:06-08 bryan Exp $
  *
- *  Copyright conserver.com, 2000
+ *  Copyright conserver.com, 2000-2001
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *

@@ -1,7 +1,7 @@
 /*
- *  $Id: port.h,v 1.20 2001-02-08 15:32:49-08 bryan Exp $
+ *  $Id: port.h,v 1.21 2001-02-21 17:26:06-08 bryan Exp $
  *
- *  Copyright conserver.com, 2000
+ *  Copyright conserver.com, 2000-2001
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
