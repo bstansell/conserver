@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.134 2003/12/20 06:11:53 bryan Exp $
+ *  $Id: consent.c,v 5.135 2004/01/28 14:47:52 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -877,7 +877,7 @@ ConsInit(pCE)
 	if (pCE->ioState == ISNORMAL)
 	    Msg("[%s] console up", pCE->server);
 	else
-	    Msg("[%s] console inititalizing", pCE->server);
+	    Msg("[%s] console initializing", pCE->server);
 	pCE->downHard = FLAGFALSE;
     }
 

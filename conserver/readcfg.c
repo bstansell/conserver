@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.162 2003/12/21 16:23:02 bryan Exp $
+ *  $Id: readcfg.c,v 5.163 2004/01/28 14:47:53 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -4570,7 +4570,7 @@ ReadCfg(filename, fp)
 #endif
     isStartup = (pGroups == (GRPENT *)0 && pRCList == (REMOTE *)0);
 
-    /* inititalize local things */
+    /* initialize local things */
     if (word == (STRING *)0)
 	word = AllocString();
     line = 1;

@@ -11,12 +11,9 @@ Bryan Stansell
 ---------------------------------------------------------------------------
 
 - Telnet protocol should be improved
-    - Not even RFC 854 compliant
-    - Option negotiation ignored - should we negotiate anything?
+    - Not even RFC 854 compliant...or maybe it is (as of 8.1.0)
+    - Option negotiation semi-ignored - should we negotiate anything more?
     - Others?
-
-- better shadow file support
-    - what does this mean?  i've forgotten.
 
 - syslog?
     Daniel E. Singer <des@cs.duke.edu> would like to see it - especially
@@ -27,6 +24,7 @@ Bryan Stansell
     - hpux has bigcrypt() also, which we support, so maybe we're covered
 
 - config file examples for various configurations
+    - sample conserver.cf has some...but it's not explained well
 
 - per-line timestamps
     - only when not connected?
@@ -34,8 +32,12 @@ Bryan Stansell
 - pipe input/output (console <-> program) via 'console'
     - some apps (net-ups thing, gdb) might need to talk to user
     - ^Ec| does this, but the interact with user bits might not work
+    - actually, ^Ec| does work right with 8.1.0...one change that might
+      be nice is the ability to NOT watch the i/o pass to the local
+      command - try sending a big file to the local host with xmodem.
 
 - autologout?  setting per console?  gack, would have to interpret data.
+    - this will never happen...i don't want to interpret data
 
 - "listen" capability (watch all/multiple consoles)
 
@@ -48,6 +50,7 @@ Bryan Stansell
     - passphrase...hmmm..could really use some sort of send/expect
       thing here.  you could write a wrapper script of sorts, but it
       really would be nice to have a raw socket and do the right thing.
+    - this does work, using the 'initcmd' option, so, all done?
 
 - cyclades ts1000/2000 port : "Moses, Joel" <jmoses@deloitte.com>
 
@@ -59,6 +62,7 @@ Bryan Stansell
 
 - server -M flag should accept multiple addresses (comma separated)
     - should client as well?
+    - this may never happen...does anyone really need it?
 
 - automatic log rotation in general : Egan Ford <egan@us.ibm.com>
 
@@ -69,6 +73,7 @@ Bryan Stansell
 
 - suggestions by Trevor Fiatal <trevor@seven.com>
     - include server hostname on 'console -x' output
+	- i think the -i output covers it, but maybe not
 
 - ability to configure strings to be sent to a console periodically :
   Greg A. Woods <woods@planix.com>
@@ -78,13 +83,17 @@ Bryan Stansell
 
 - redefine client escape sequence in conserver.cf : Toby Gerhart
   <toby.gerhart@eds.com>
+    - not even sure if this is possible w/o confusing the client,
+      but maybe with the new 8.1.0 client-server protocol, we can!
 
 - send a string when connected to a console, so you can set the
   xterm title, for example : Richard Threadgill <richardt@tellme.com>
+    - this probably requires a client config file, so could play well
+      with the client config file requirement above
 
 - allow for very long replays (hundres of lines) : John Stoffel
   <stoffel@lucent.com>
 
 #
-#  $Id: TODO,v 1.44 2003/11/29 14:10:47 bryan Exp $
+#  $Id: TODO,v 1.45 2004/01/28 14:57:39 bryan Exp $
 #

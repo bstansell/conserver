@@ -1,6 +1,12 @@
 				CHANGES
 				=======
 
+version 8.1.1 (Feb 10, 2004):
+	- fixed mistake in Makefiles where rpmbuild fails - reported by
+	  Martin Evans <m.d.t.evans@qmul.ac.uk>
+	- fixed a couple typos - reported by Matt Selsky
+	  <selsky@columbia.edu>
+
 version 8.1.0 (Jan 18, 2004):
 	- fixes for HP-UX compilation - patch by Petter Reinholdtsen
 	  <pere@hungry.com>
@@ -663,5 +669,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.148 2004/01/18 17:28:31 bryan Exp $
+#  $Id: CHANGES,v 1.150 2004/02/10 15:24:48 bryan Exp $
 #
