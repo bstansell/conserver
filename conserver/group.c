@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.56 1999-08-24 14:39:12-07 bryan Exp $
+ *  $Id: group.c,v 5.58 1999-12-01 11:55:13-08 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -219,6 +219,8 @@ ReUp()
 		if (pCE->fup) {
 			continue;
 		}
+		if (fNoinit)
+			continue;
 		ConsInit(pCE, rinitUsr1);
 	}
 }
@@ -642,9 +644,10 @@ int sfd;
 	/* open all the files we need for the consoles in our group
 	 * if we can't get one (bitch and) flag as down
 	 */
-	for (iConsole = 0; iConsole< pGE->imembers; ++iConsole) {
-		ConsInit(& pCE[iConsole], &rinit);
-	}
+	if (!fNoinit)
+		for (iConsole = 0; iConsole< pGE->imembers; ++iConsole) {
+			ConsInit(& pCE[iConsole], &rinit);
+		}
 
 	/* set up the list of free connection slots, we could just calloc
 	 * them, but the stack pages are already in core...
@@ -795,6 +798,9 @@ drop:
 					stymee[24] = '\000';
 					printf("%s: %s: logout %s [%s]\n", progname, pCEServing->server, pCLServing->acid, stymee);
 				}
+				if (fNoinit && (CLIENT *)0 ==
+				    pCLServing->pCEto->pCLon->pCLnext)
+					ConsDown(pCLServing->pCEto, &rinit);
 
 				FD_CLR(pCLServing->fd, &rinit);
 				(void)close(pCLServing->fd);
@@ -841,11 +847,13 @@ drop:
 	     */
 	    pCLServing->typetym = tyme = time((long *)0);
 
-			/* always clear parity from the network
+#if CPARITY
+			/* clear parity from the network
 			 */
 			for (i = 0; i < nr; ++i) {
 				acIn[i] &= 127;
 			}
+#endif
 
 			for (i = 0; i < nr; ++i) switch (pCLServing->iState) {
 			case S_BCAST:
@@ -1011,6 +1019,9 @@ drop:
 				}
 				pCEServing->pCLon = pCLServing;
 
+				if (fNoinit && !pCEServing->fup)
+					ConsInit(pCEServing, &rinit);
+
 				/* try for attach on new console
 				 */
 				if (!pCEServing->fup) {
@@ -1120,7 +1131,7 @@ drop:
 				}
 #else
 #if USE_TCBREAK
-				if (-1 == tcsendbreak(pCEServing->fdtty, 9)) {
+				if (-1 == tcsendbreak(pCEServing->fdtty, 0)) {
 					CSTROUT(pCLServing->fd, "failed]\r\n");
 					continue;
 				}

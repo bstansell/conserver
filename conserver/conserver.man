@@ -1,10 +1,10 @@
 .\" @(#)conserver.8 01/06/91 OSU CIS; Thomas A. Fine
-.\" $Id: conserver.man,v 1.5 1999-04-12 22:40:55-07 bryan Exp $
+.\" $Id: conserver.man,v 1.6 1999-12-01 11:55:13-08 bryan Exp $
 .TH CONSERVER 8 "Local"
 .SH NAME
 conserver \- console server daemon
 .SH SYNOPSIS
-.B conserver [\-\fBdnv\fP] [\-\fBC\fP \fIconfig\fP]
+.B conserver [\-\fBdinv\fP] [\-\fBC\fP \fIconfig\fP]
 .br
 .B conserver [\-\fBhV\fP]
 .SH DESCRIPTION
@@ -45,6 +45,9 @@ Become a daemon.
 .TP
 .B \-h
 Output a brief help message.
+.TP
+.B \-i
+Initiate console connections on demand (and close them when not used)
 .TP
 .B \-n
 The \fIconserver\fP will \fBnot\fP output unloved console output to

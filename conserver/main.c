@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.31 1999-01-26 20:35:17-08 bryan Exp $
+ *  $Id: main.c,v 5.32 1999-12-01 11:55:13-08 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -58,10 +58,10 @@
 #endif
 
 char rcsid[] =
-	"$Id: main.c,v 5.31 1999-01-26 20:35:17-08 bryan Exp $";
+	"$Id: main.c,v 5.32 1999-12-01 11:55:13-08 bryan Exp $";
 char *progname =
 	rcsid;
-int fAll = 1, fVerbose = 0, fSoftcar = 0;
+int fAll = 1, fVerbose = 0, fSoftcar = 0, fNoinit = 0;
 int fDaemon = 0;
 char chDefAcc = 'r';
 char *pcConfig = CONFIG;
@@ -134,6 +134,7 @@ static char *apcLong[] = {
 	"C config  give a new config file to the server process",
 	"d         become a daemon, output to /dev/null",
 	"h         output this message",
+	"i         init console connections on demand",
 	"n         do not output summary stream to stdout",
 	"v         be verbose on startup",
 	"V         output version info",
@@ -203,8 +204,8 @@ char **argv;
 	register int i, j;
 	register FILE *fpConfig;
 	auto struct hostent *hpMe;
-	static char acOpts[] = "a:C:dhnsVv",
-		u_terse[] = " [-dhnsvV] [-a type] [-C config]";
+	static char acOpts[] = "a:C:dhinsVv",
+		u_terse[] = " [-dhinsvV] [-a type] [-C config]";
 	extern int optopt;
 	extern char *optarg;
 	auto REMOTE
@@ -266,6 +267,9 @@ char **argv;
 			fprintf(stderr, "%s: usage%s\n", progname, u_terse);
 			Usage(stdout, apcLong);
 			exit(0);
+		case 'i':
+			fNoinit = 1;
+			break;
 		case 'n':
 			fAll = 0;
 			break;

@@ -1,5 +1,5 @@
 /*
- *  $Id: cons-default.h,v 1.2 1999-01-26 20:35:17-08 bryan Exp $
+ *  $Id: cons-default.h,v 1.3 1999-12-01 00:19:34-08 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -26,4 +26,7 @@
 
 --- Number of child processes
 #define MAXGRP		32
+
+--- Clear parity (high-bit) [true/false setting]
+#define CPARITY		1
 */

@@ -1,5 +1,5 @@
 /*
- *  $Id: port.h,v 1.8 1999-08-24 14:37:29-07 bryan Exp $
+ *  $Id: port.h,v 1.10 1999-12-01 11:55:13-08 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -214,7 +214,7 @@
 #define USE_TERMIOS	(defined(HPUX7)||defined(HPUX8)||defined(HPUX9)||defined(SUN5)||defined(PTX)||defined(IRIX5)||defined(LINUX2)||defined(IRIX6)||defined(SUN4)||defined(BSDOS3))
 #endif
 #if !defined(USE_TCBREAK)
-#define USE_TCBREAK	(defined(PTX))
+#define USE_TCBREAK	(defined(PTX)||defined(BSDOS3)||defined(LINUX2)||defined(SUN5))
 #endif
 
 /* if we have <strings.h> define this to 1, else define to 0
@@ -238,7 +238,9 @@
 
 /* used to force the server process to clear parity, which is for farmers
  */
+#if !defined(CPARITY)
 #define CPARITY		1
+#endif
 
 
 /* if you do not have fd_set's here is a possible emulation

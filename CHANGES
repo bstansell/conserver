@@ -1,7 +1,16 @@
 				CHANGES
 				=======
 
-version 6.12:
+version 6.13 (Dec 1, 1999):
+	- high-bit always stripped from network - now follows
+	  CPARITY setting in cons.h (found by Daniel Andersson
+	  <daniel@sto.sema.se>)
+	- New conserver -i flag for on-demand connects/disconnects
+	  to console ports (contributed by Thomas E. Knowles
+	  <tek@CS.Princeton.EDU>)
+	- Solaris, Linux, and others now use tcsendbreak()
+
+version 6.12 (Aug 24, 1999):
 	- Blank line bug after '%%' in .cf file (found by Miss
 	  Himali Patel <cpate03@dcs.bbk.ac.uk>)
      Special thanks to Michael Sullivan <mike@trdlnk.com> for
@@ -9,17 +18,17 @@ version 6.12:
 	- Read result bug in group.c caused lock up
 	- Signal handling fixes and cleanup
 	- Several minor spelling errors in strings and comments
-	- Solaris package creation scripts
+	- Solaris package creation scripts (contrib/solaris-package)
 	- Extended syntax of the access restrictions to understand
 	  network numbers with optional netmasks
 
-version 6.11:
+version 6.11 (May 14, 1999):
 	- Added broadcast capability in client (-b option)
 	- Protected certain escape sequences from end-user use
 	- Added "console server shutting down" broadcast
 	- Improved local tty break code (thanks Craig and Brian!)
 
-version 6.10:
+version 6.10 (Jan 26, 1999):
 	- Documentation fixes
 	- Web page up and running
 
@@ -51,5 +60,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.8 1999-08-24 14:37:09-07 bryan Exp $
+#  $Id: CHANGES,v 1.10 1999-12-01 13:29:14-08 bryan Exp $
 #
