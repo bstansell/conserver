@@ -80,7 +80,7 @@ char **nargv, *ostr;
 #endif /* ! HAVE_GETOPT */
 
 char
-	*progname = "$Id$",
+	*progname = "$Id: main.c,v 1.1 2003/11/04 02:36:24 bryan Exp $",
 	*au_terse[] = {
 		" [-u] [-c cmd] [-e env=value] [-g group] [-l login] [-t tty]",
 		" -h",
@@ -111,7 +111,7 @@ int
 #endif
 
 static char *rcsid =
-        "$Id: autologin.m,v 1.2 92/07/28 13:18:34 ksb Exp $";
+        "$Id: main.c,v 1.1 2003/11/04 02:36:24 bryan Exp $";
 
 /*
  * parser

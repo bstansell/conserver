@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.265 2003-10-31 09:54:35-08 bryan Exp $
+ *  $Id: group.c,v 5.274 2003/11/16 19:29:20 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -80,9 +80,10 @@
 /* flags that a signal has occurred */
 static sig_atomic_t fSawChldHUP = 0, fSawReUp = 0, fSawGoAway =
     0, fSawReapVirt = 0, fSawChldUSR2 = 0;
-static time_t nextMarkTime = (time_t)0;
-static time_t nextReInitCheckTime = (time_t)0;
-static time_t nextAutoUpTime = (time_t)0;
+
+/* timers */
+time_t timers[T_MAX];
+
 #if HAVE_DMALLOC && DMALLOC_MARK_CLIENT_CONNECTION
 static unsigned long dmallocMarkClientConnection = 0;
 #endif
@@ -382,6 +383,24 @@ ConsentFindUser(pCU, id)
     return pCU;
 }
 
+int
+#if PROTOTYPES
+ConsentUserOk(CONSENTUSERS *pCU, char *id)
+#else
+ConsentUserOk(pCU, id)
+    CONSENTUSERS *pCU;
+    char *id;
+#endif
+{
+    CONSENTUSERS *c;
+
+    if ((c = ConsentFindUser(pCU, id)) != (CONSENTUSERS *)0)
+	return !c->not;
+    if ((c = ConsentFindUser(pCU, "*")) != (CONSENTUSERS *)0)
+	return !c->not;
+    return -1;
+}
+
 /* check user permissions.  return 0 for r/w, 1 for r/o, -1 for none */
 int
 #if PROTOTYPES
@@ -392,14 +411,10 @@ ClientAccess(pCE, user)
     char *user;
 #endif
 {
-    if (ConsentFindUser(pCE->rw, user) != (CONSENTUSERS *)0 ||
-	ConsentFindUser(pCE->rw, "*") != (CONSENTUSERS *)0) {
+    if (ConsentUserOk(pCE->rw, user) == 1)
 	return 0;
-    } else {
-	if (ConsentFindUser(pCE->ro, user) != (CONSENTUSERS *)0 ||
-	    ConsentFindUser(pCE->ro, "*") != (CONSENTUSERS *)0)
-	    return 1;
-    }
+    if (ConsentUserOk(pCE->ro, user) == 1)
+	return 1;
     return -1;
 }
 
@@ -483,12 +498,18 @@ DestroyConsent(pGE, pCE)
 	free(pCE->exec);
     if (pCE->device != (char *)0)
 	free(pCE->device);
+    if (pCE->devicesubst != (char *)0)
+	free(pCE->devicesubst);
+    if (pCE->execsubst != (char *)0)
+	free(pCE->execsubst);
     if (pCE->logfile != (char *)0)
 	free(pCE->logfile);
     if (pCE->initcmd != (char *)0)
 	free(pCE->initcmd);
     if (pCE->motd != (char *)0)
 	free(pCE->motd);
+    if (pCE->idlestring != (char *)0)
+	free(pCE->idlestring);
     if (pCE->execSlave != (char *)0)
 	free(pCE->execSlave);
     while (pCE->aliases != (NAMES *)0) {
@@ -836,7 +857,7 @@ ReOpen(pGE)
 	FileClose(&pCE->fdlog);
 	if ((CONSFILE *)0 ==
 	    (pCE->fdlog =
-	     FileOpen(pCE->logfile, O_RDWR | O_CREAT | O_APPEND, 0666))) {
+	     FileOpen(pCE->logfile, O_RDWR | O_CREAT | O_APPEND, 0644))) {
 	    Error("[%s] FileOpen(%s): %s: forcing down", pCE->server,
 		  pCE->logfile, strerror(errno));
 	    ConsoleError(pCE);
@@ -876,10 +897,10 @@ ReUp(pGE, automatic)
 	return;
 
     tyme = time((time_t *)0);
-    if ((automatic == 1) && (tyme < nextAutoUpTime))
+    if ((automatic == 1) && (tyme < timers[T_AUTOUP]))
 	return;
     if ((automatic == 2) &&
-	(!config->reinitcheck || (tyme < nextReInitCheckTime)))
+	(!config->reinitcheck || (tyme < timers[T_REINIT])))
 	return;
 
     for (pCE = pGE->pCElist; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
@@ -899,10 +920,10 @@ ReUp(pGE, automatic)
     /* update all the timers */
     if (automatic == 0 || automatic == 2) {
 	if (config->reinitcheck)
-	    nextReInitCheckTime = tyme + (config->reinitcheck * 60);
+	    timers[T_REINIT] = tyme + (config->reinitcheck * 60);
     }
     if (!fNoautoreup)
-	nextAutoUpTime = tyme + 60;
+	timers[T_AUTOUP] = tyme + 60;
 }
 
 void
@@ -966,18 +987,22 @@ Mark(pGE)
     GRPENT *pGE;
 #endif
 {
-    char acOut[100];		/* MARK spec ~ 40 chars */
     time_t tyme;
     CONSENT *pCE;
+    static STRING *out = (STRING *)0;
 
-    if ((GRPENT *)0 == pGE) {
+    if ((GRPENT *)0 == pGE)
 	return;
-    }
+
+    if (out == (STRING *)0)
+	out = AllocString();
+
+    BuildString((char *)0, out);
 
     /* [-- MARK -- `date`] */
-    sprintf(acOut, "[-- MARK -- %s]\r\n", StrTime(&tyme));
+    BuildStringPrint(out, "[-- MARK -- %s]\r\n", StrTime(&tyme));
 
-    nextMarkTime = (time_t)0;
+    timers[T_MARK] = (time_t)0;
 
     for (pCE = pGE->pCElist; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
 	if (pCE->nextMark > 0) {
@@ -985,7 +1010,8 @@ Mark(pGE)
 		if ((CONSFILE *)0 != pCE->fdlog) {
 		    CONDDEBUG((1, "Mark(): [-- MARK --] stamp added to %s",
 			       pCE->logfile));
-		    FileWrite(pCE->fdlog, FLAGFALSE, acOut, -1);
+		    FileWrite(pCE->fdlog, FLAGFALSE, out->string,
+			      out->used - 1);
 		}
 		/* Add as many pCE->mark values as necessary so that we move
 		 * beyond the current time.
@@ -993,8 +1019,9 @@ Mark(pGE)
 		pCE->nextMark +=
 		    (((tyme - pCE->nextMark) / pCE->mark) + 1) * pCE->mark;
 	    }
-	    if (nextMarkTime == (time_t)0 || nextMarkTime > pCE->nextMark)
-		nextMarkTime = pCE->nextMark;
+	    if (timers[T_MARK] == (time_t)0 ||
+		timers[T_MARK] > pCE->nextMark)
+		timers[T_MARK] = pCE->nextMark;
 	}
     }
 }
@@ -1009,9 +1036,9 @@ WriteLog(pCE, s, len)
     int len;
 #endif
 {
-    char buf[100];		/* [%s], time ~ 30 chars */
     int i = 0;
     int j;
+    STRING *buf = (STRING *)0;
 
     if ((CONSFILE *)0 == pCE->fdlog) {
 	return;
@@ -1020,15 +1047,20 @@ WriteLog(pCE, s, len)
 	FileWrite(pCE->fdlog, FLAGFALSE, s, len);
 	return;
     }
-    buf[0] = '\000';
+
+    if (buf == (STRING *)0)
+	buf = AllocString();
+    BuildString((char *)0, buf);
+
     for (j = 0; j < len; j++) {
 	if (pCE->nextMark == 0) {
 	    FileWrite(pCE->fdlog, FLAGTRUE, s + i, j - i);
 	    i = j;
-	    if (buf[0] == '\000') {
-		sprintf(buf, "[%s]", StrTime((time_t *)0));
-	    }
-	    FileWrite(pCE->fdlog, FLAGTRUE, buf, -1);
+
+	    if (buf->used <= 1)
+		BuildStringPrint(buf, "[%s]", StrTime((time_t *)0));
+
+	    FileWrite(pCE->fdlog, FLAGTRUE, buf->string, buf->used - 1);
 	    pCE->nextMark = pCE->mark;
 	}
 	if (s[j] == '\n') {
@@ -1115,6 +1147,9 @@ DeUtmp(pGE, sfd)
 	    ConsDown(pCE, FLAGFALSE, FLAGTRUE);
 	}
     }
+
+    if (unifiedlog != (CONSFILE *)0)
+	FileClose(&unifiedlog);
 
     DumpDataStructures();
 
@@ -1283,23 +1318,27 @@ IdleTyme(tyme)
     long tyme;
 #endif
 {
-    static char timestr[100];	/* Don't want to overrun the array... */
     long hours, minutes;
+    static STRING *timestr = (STRING *)0;
+
+    if (timestr == (STRING *)0)
+	timestr = AllocString();
 
     minutes = tyme / 60;
     hours = minutes / 60;
     minutes = minutes % 60;
 
+    BuildString((char *)0, timestr);
     if (hours < 24)
-	sprintf(timestr, " %2ld:%02ld", hours, minutes);
+	BuildStringPrint(timestr, " %2ld:%02ld", hours, minutes);
     else if (hours < 24 * 2)
-	sprintf(timestr, " 1 day");
+	BuildStringPrint(timestr, " 1 day");
     else if (hours < 24 * 10)
-	sprintf(timestr, "%1ld days", hours / 24);
+	BuildStringPrint(timestr, "%1ld days", hours / 24);
     else
-	sprintf(timestr, "%2lddays", hours / 24);
+	BuildStringPrint(timestr, "%2lddays", hours / 24);
 
-    return timestr;
+    return timestr->string;
 }
 
 void
@@ -1348,91 +1387,38 @@ PutConsole(pCEServing, c, quote)
 
 void
 #if PROTOTYPES
-DoBreakWork(CONSCLIENT *pCLServing, CONSENT *pCEServing, short bt,
-	    short cleanup)
+ExpandString(char *str, CONSENT *pCE, short breaknum)
 #else
-DoBreakWork(pCLServing, pCEServing, bt, cleanup)
-    CONSCLIENT *pCLServing;
-    CONSENT *pCEServing;
-    short bt;
-    short cleanup;
+ExpandString(str, pCE, breaknum)
+    char *str;
+    CONSENT *pCE;
+    short breaknum;
 #endif
 {
-    char *p, s;
-    short backslash = 0, waszero = 0;
-    short cntrl;
-    char oct[3];
-    short octs = -1;
-    static STRING *cleaned = (STRING *)0;
+    char s;
+    short backslash = 0;
+    short cntrl = 0;
+    char oct = '\000';
+    short octs = 0;
 
-    if (cleaned == (STRING *)0)
-	cleaned = AllocString();
-
-    BuildString((char *)0, cleaned);
-
-    if (cleanup && (bt < 1 || bt > 9))
+    if (str == (char *)0 || pCE == (CONSENT *)0)
 	return;
-    if (bt < 0 || bt > 9) {
-	if (!cleanup)
-	    FileWrite(pCLServing->fd, FLAGFALSE, "aborted]\r\n", -1);
-	return;
-    }
-    if (bt == 0) {
-	bt = pCEServing->breakNum;
-	waszero = 1;
-    }
-    if (bt == 0 || breakList[bt - 1].seq->used <= 1) {
-	if (!cleanup)
-	    FileWrite(pCLServing->fd, FLAGFALSE, "undefined]\r\n", -1);
-	return;
-    }
 
-    p = breakList[bt - 1].seq->string;
     backslash = 0;
     cntrl = 0;
-    while ((s = (*p++)) != '\000') {
-	if (octs != -1) {
-	    if (s >= '0' && s <= '7') {
-		if (++octs < 3) {
-		    oct[octs] = s;
-		}
-		continue;
-	    } else {
-		int i;
-		if (octs > 2) {
-		    Error("octal number too large in BREAK%d sequence",
-			  bt);
-		} else {
-		    if (cleanup) {
-			BuildStringChar('\\', cleaned);
-			for (i = 0; i <= 1 - octs; i++)
-			    BuildStringChar('0', cleaned);
-			for (i = 0; i <= octs; i++)
-			    BuildStringChar(oct[i], cleaned);
-		    } else {
-			char c = '\000';
-			c = oct[0] - '0';
-			for (i = 1; i <= octs; i++)
-			    c = c * 8 + (oct[i] - '0');
-			PutConsole(pCEServing, c, 1);
-		    }
-		}
-		octs = -1;
-	    }
-	}
-	if (s == '\\' && !cntrl) {
-	    if (backslash) {
-		if (cleanup)
-		    BuildString("\\\\", cleaned);
-		else
-		    PutConsole(pCEServing, s, 1);
-		backslash = 0;
-	    } else
-		backslash = 1;
+    while ((s = (*str++)) != '\000') {
+	if (octs > 0 && octs < 3 && s >= '0' && s <= '7') {
+	    ++octs;
+	    oct = oct * 8 + (s - '0');
 	    continue;
 	}
+	if (octs != 0) {
+	    PutConsole(pCE, oct, 1);
+	    octs = 0;
+	    oct = '\000';
+	}
 	if (backslash) {
-	    char o = s;
+	    backslash = 0;
 	    if (s == 'a')
 		s = '\a';
 	    else if (s == 'b')
@@ -1449,142 +1435,50 @@ DoBreakWork(pCLServing, pCEServing, bt, cleanup)
 		s = '\v';
 	    else if (s == '^')
 		s = '^';
-	    else if (s == 'd') {
-		if (cleanup)
-		    BuildString("\\d", cleaned);
-		else {
-		    PutConsole(pCEServing, IAC, 0);
-		    PutConsole(pCEServing, '0' + bt, 0);
-		}
-		s = '\000';
-	    } else if (s == 'z') {
-		if (cleanup)
-		    BuildString("\\z", cleaned);
-		else {
-		    PutConsole(pCEServing, IAC, 0);
-		    PutConsole(pCEServing, BREAK, 0);
-		}
-		s = '\000';
-	    } else if (s >= '0' && s <= '7') {
-		if (++octs < 3) {
-		    oct[octs] = s;
-		}
-		s = '\000';
-	    } else {
-		if (octs < 0) {
-		    if (cleanup)
-			BuildStringChar(o, cleaned);
-		    else
-			PutConsole(pCEServing, s, 1);
-		    s = '\000';
-		} else if (octs > 2) {
-		    Error("octal number too large in BREAK%d sequence",
-			  bt);
-		    octs = -1;
-		} else {
-		    int i;
-		    if (cleanup) {
-			BuildStringChar('\\', cleaned);
-			for (i = 0; i <= octs; i++)
-			    BuildStringChar(oct[i], cleaned);
-		    } else {
-			char c = '\000';
-			c = oct[0] - '0';
-			for (i = 1; i <= octs; i++)
-			    c = c * 8 + (oct[i] - '0');
-			PutConsole(pCEServing, c, 1);
-		    }
-		    octs = -1;
-		}
+	    else if (s >= '0' && s <= '7') {
+		++octs;
+		oct = oct * 8 + (s - '0');
+		continue;
+	    } else if (s == 'd' && pCE != (CONSENT *)0) {
+		PutConsole(pCE, IAC, 0);
+		PutConsole(pCE, '0' + breaknum, 0);
+		continue;
+	    } else if (s == 'z' && pCE != (CONSENT *)0) {
+		PutConsole(pCE, IAC, 0);
+		PutConsole(pCE, BREAK, 0);
+		continue;
 	    }
-	    if (s != '\000') {
-		if (cleanup) {
-		    BuildStringChar('\\', cleaned);
-		    BuildStringChar(o, cleaned);
-		} else
-		    PutConsole(pCEServing, s, 1);
-	    }
-	    backslash = 0;
-	    continue;
-	}
-	if (s == '^') {
-	    if (cntrl) {
-		if (cleanup)
-		    BuildString("^^", cleaned);
-		else {
-		    s = s & 0x1f;
-		    PutConsole(pCEServing, s, 1);
-		}
-		cntrl = 0;
-	    } else
-		cntrl = 1;
+	    PutConsole(pCE, s, 1);
 	    continue;
 	}
 	if (cntrl) {
-	    if (s == '?') {
-		if (cleanup)
-		    BuildString("^?", cleaned);
-		else {
-		    s = 0x7f;	/* delete */
-		    PutConsole(pCEServing, s, 1);
-		}
-		continue;
-	    }
-	    if (cleanup) {
-		BuildStringChar('^', cleaned);
-		BuildStringChar(s, cleaned);
-	    } else {
-		s = s & 0x1f;
-		PutConsole(pCEServing, s, 1);
-	    }
 	    cntrl = 0;
+	    if (s == '?')
+		s = 0x7f;	/* delete */
+	    else
+		s = s & 0x1f;
+	    PutConsole(pCE, s, 1);
 	    continue;
 	}
-	if (cleanup)
-	    BuildStringChar(s, cleaned);
-	else
-	    PutConsole(pCEServing, s, 1);
+	if (s == '\\') {
+	    backslash = 1;
+	    continue;
+	}
+	if (s == '^') {
+	    cntrl = 1;
+	    continue;
+	}
+	PutConsole(pCE, s, 1);
     }
 
-    if (octs > 2) {
-	Error("octal number too large in BREAK%d sequence", bt);
-    } else if (octs != -1) {
-	int i;
-	if (cleanup) {
-	    BuildStringChar('\\', cleaned);
-	    for (i = 0; i <= 1 - octs; i++)
-		BuildStringChar('0', cleaned);
-	    for (i = 0; i <= octs; i++)
-		BuildStringChar(oct[i], cleaned);
-	} else {
-	    char c = '\000';
-	    c = oct[0] - '0';
-	    for (i = 1; i <= octs; i++)
-		c = c * 8 + (oct[i] - '0');
-	    PutConsole(pCEServing, c, 1);
-	}
-    }
+    if (octs != 0)
+	PutConsole(pCE, oct, 1);
 
     if (backslash)
-	Error("trailing backslash ignored in BREAK%d sequence", bt);
-    if (cntrl)
-	Error("trailing circumflex ignored in BREAK%d sequence", bt);
+	PutConsole(pCE, '\\', 1);
 
-    if (cleanup) {
-	BuildString((char *)0, breakList[bt - 1].seq);
-	BuildString(cleaned->string, breakList[bt - 1].seq);
-    } else {
-	FileWrite(pCLServing->fd, FLAGFALSE, "sent]\r\n", -1);
-	if (pCEServing->breaklog == FLAGTRUE) {
-	    if (waszero) {
-		TagLogfile(pCEServing, "break #0(%d) sent -- `%s'", bt,
-			   breakList[bt - 1].seq->string);
-	    } else {
-		TagLogfile(pCEServing, "break #%d sent -- `%s'", bt,
-			   breakList[bt - 1].seq->string);
-	    }
-	}
-    }
+    if (cntrl)
+	PutConsole(pCE, '^', 1);
 }
 
 void
@@ -1597,18 +1491,32 @@ SendBreak(pCLServing, pCEServing, bt)
     short bt;
 #endif
 {
-    DoBreakWork(pCLServing, pCEServing, bt, 0);
-}
+    short waszero = 0;
+    if (bt < 0 || bt > 9) {
+	FileWrite(pCLServing->fd, FLAGFALSE, "aborted]\r\n", -1);
+	return;
+    }
+    if (bt == 0) {
+	bt = pCEServing->breakNum;
+	waszero = 1;
+    }
+    if (bt == 0 || breakList[bt - 1].seq->used <= 1) {
+	FileWrite(pCLServing->fd, FLAGFALSE, "undefined]\r\n", -1);
+	return;
+    }
 
-void
-#if PROTOTYPES
-CleanupBreak(short bt)
-#else
-CleanupBreak(bt)
-    short bt;
-#endif
-{
-    DoBreakWork((CONSCLIENT *)0, (CONSENT *)0, bt, 1);
+    ExpandString(breakList[bt - 1].seq->string, pCEServing, bt);
+
+    FileWrite(pCLServing->fd, FLAGFALSE, "sent]\r\n", -1);
+    if (pCEServing->breaklog == FLAGTRUE) {
+	if (waszero) {
+	    TagLogfile(pCEServing, "break #0(%d) sent -- `%s'", bt,
+		       breakList[bt - 1].seq->string);
+	} else {
+	    TagLogfile(pCEServing, "break #%d sent -- `%s'", bt,
+		       breakList[bt - 1].seq->string);
+	}
+    }
 }
 
 #if HAVE_OPENSSL
@@ -1805,7 +1713,6 @@ CommandExamine(pGE, pCLServing, pCEServing, tyme)
 #endif
 {
     CONSENT *pCE;
-    unsigned char buf[BUFSIZ];
 
     for (pCE = pGE->pCElist; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
 	char *d = (char *)0;
@@ -1824,19 +1731,16 @@ CommandExamine(pGE, pCLServing, pCEServing, tyme)
 		break;
 	    case HOST:
 		BuildTmpString((char *)0);
-		BuildTmpString(pCE->host);
-		sprintf((char *)buf, "/%hu", pCE->port);
-		d = BuildTmpString((char *)
-				   buf);
+		d = BuildTmpStringPrint("%s/%hu", pCE->host, pCE->port);
 		b = "Netwk";
 		p = ' ';
 		break;
 	    case UNKNOWN:	/* shut up gcc */
 		break;
 	}
-	sprintf((char *)buf, " %-24.24s on %-32.32s at %6.6s%c\r\n",
-		pCE->server, d, b, p);
-	FileWrite(pCLServing->fd, FLAGFALSE, (char *)buf, -1);
+	FilePrint(pCLServing->fd, FLAGFALSE,
+		  " %-24.24s on %-32.32s at %6.6s%c\r\n", pCE->server, d,
+		  b, p);
     }
 }
 
@@ -1891,9 +1795,9 @@ CommandForce(pGE, pCLServing, pCEServing, tyme)
 	    FilePrint(pCLServing->fd, FLAGFALSE, "bumped %s]\r\n",
 		      pCL->acid->string);
 	}
-	FileWrite(pCL->fd, FLAGTRUE, "\r\n[forced to `spy' mode by ", -1);
-	FileWrite(pCL->fd, FLAGTRUE, pCLServing->acid->string, -1);
-	FileWrite(pCL->fd, FLAGFALSE, "]\r\n", -1);
+	FilePrint(pCL->fd, FLAGFALSE,
+		  "\r\n[forced to `spy' mode by %s]\r\n",
+		  pCLServing->acid->string);
 	TagLogfileAct(pCEServing, "%s bumped %s", pCLServing->acid->string,
 		      pCL->acid->string);
     } else {
@@ -1922,7 +1826,6 @@ CommandGroup(pGE, pCLServing, pCEServing, tyme)
 #endif
 {
     CONSCLIENT *pCL;
-    unsigned char buf[BUFSIZ];
 
     /* we do not show the ctl console
      * else we'd get the client always
@@ -1930,12 +1833,11 @@ CommandGroup(pGE, pCLServing, pCEServing, tyme)
     for (pCL = pGE->pCLall; (CONSCLIENT *)0 != pCL; pCL = pCL->pCLscan) {
 	if (pGE->pCEctl == pCL->pCEto)
 	    continue;
-	sprintf((char *)buf, " %-32.32s %c %-7.7s %6s ", pCL->acid->string,
-		pCL == pCLServing ? '*' : ' ',
-		pCL->fcon ? (pCL->fwr ? "attach" : "spy") : "stopped",
-		IdleTyme(tyme - pCL->typetym));
-	FilePrint(pCLServing->fd, FLAGFALSE, "%s%s\r\n", buf,
-		  pCL->pCEto->server);
+	FilePrint(pCLServing->fd, FLAGFALSE,
+		  " %-32.32s %c %-7.7s %6s %s\r\n", pCL->acid->string,
+		  pCL == pCLServing ? '*' : ' ',
+		  pCL->fcon ? (pCL->fwr ? "attach" : "spy") : "stopped",
+		  IdleTyme(tyme - pCL->typetym), pCL->pCEto->server);
     }
 }
 
@@ -1952,21 +1854,20 @@ CommandHosts(pGE, pCLServing, pCEServing, tyme)
 #endif
 {
     CONSENT *pCE;
-    unsigned char buf[BUFSIZ];
 
     for (pCE = pGE->pCElist; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
-	sprintf((char *)buf, " %-24.24s %c %-4.4s %-.40s\r\n", pCE->server,
-		pCE == pCEServing ? '*' : ' ', (pCE->fup &&
-						pCE->ioState ==
-						ISNORMAL) ? (pCE->
-							     initfile ==
-							     (CONSFILE *)0
-							     ? "up" :
-							     "init") :
-		"down",
-		pCE->pCLwr ? pCE->pCLwr->acid->string : pCE->
-		pCLon ? "<spies>" : "<none>");
-	FileWrite(pCLServing->fd, FLAGFALSE, (char *)buf, -1);
+	FilePrint(pCLServing->fd, FLAGFALSE,
+		  " %-24.24s %c %-4.4s %-.40s\r\n", pCE->server,
+		  pCE == pCEServing ? '*' : ' ', (pCE->fup &&
+						  pCE->ioState ==
+						  ISNORMAL) ? (pCE->
+							       initfile ==
+							       (CONSFILE *)
+							       0 ? "up" :
+							       "init") :
+		  "down",
+		  pCE->pCLwr ? pCE->pCLwr->acid->string : pCE->
+		  pCLon ? "<spies>" : "<none>");
     }
 }
 
@@ -2081,9 +1982,11 @@ CommandInfo(pGE, pCLServing, pCEServing, tyme)
 	    s = BuildTmpString(",autoreinit");
 	if (pCE->unloved == FLAGTRUE)
 	    s = BuildTmpString(",unloved");
-	FilePrint(pCLServing->fd, FLAGFALSE, ":%s:%s\r\n",
+	FilePrint(pCLServing->fd, FLAGFALSE, ":%s:%s:%d:%s\r\n",
 		  (s == (char *)0 ? "" : s + 1),
-		  (pCE->initcmd == (char *)0 ? "" : pCE->initcmd));
+		  (pCE->initcmd == (char *)0 ? "" : pCE->initcmd),
+		  pCE->idletimeout,
+		  (pCE->idlestring == (char *)0 ? "" : pCE->idlestring));
 	BuildTmpString((char *)0);
     }
 }
@@ -2183,15 +2086,14 @@ CommandWho(pGE, pCLServing, pCEServing, tyme)
 #endif
 {
     CONSCLIENT *pCL;
-    unsigned char buf[BUFSIZ];
 
     for (pCL = pCEServing->pCLon; (CONSCLIENT *)0 != pCL;
 	 pCL = pCL->pCLnext) {
-	sprintf((char *)buf, " %-32.32s %c %-7.7s %6s %s\r\n",
-		pCL->acid->string, pCL == pCLServing ? '*' : ' ',
-		pCL->fcon ? (pCL->fwr ? "attach" : "spy") : "stopped",
-		IdleTyme(tyme - pCL->typetym), pCL->actym);
-	FileWrite(pCLServing->fd, FLAGFALSE, (char *)buf, -1);
+	FilePrint(pCLServing->fd, FLAGFALSE,
+		  " %-32.32s %c %-7.7s %6s %s\r\n", pCL->acid->string,
+		  pCL == pCLServing ? '*' : ' ',
+		  pCL->fcon ? (pCL->fwr ? "attach" : "spy") : "stopped",
+		  IdleTyme(tyme - pCL->typetym), pCL->actym);
     }
 }
 
@@ -2295,9 +2197,11 @@ DoConsoleRead(pCEServing)
 	FileWrite(pCEServing->initfile, FLAGFALSE, (char *)acIn, nr);
 
     /* output all console info nobody is attached
+     * or output to unifiedlog if it's open
      */
-    if (pCEServing->pCLwr == (CONSCLIENT *)0 &&
-	pCEServing->unloved == FLAGTRUE) {
+    if (unifiedlog != (CONSFILE *)0 ||
+	(pCEServing->pCLwr == (CONSCLIENT *)0 &&
+	 pCEServing->unloved == FLAGTRUE)) {
 	/* run through the console ouptut,
 	 * add each character to the output line
 	 * drop and reset if we have too much
@@ -2306,12 +2210,28 @@ DoConsoleRead(pCEServing)
 	for (i = 0; i < nr; ++i) {
 	    pCEServing->acline[pCEServing->iend++] = acIn[i];
 	    if (pCEServing->iend < sizeof(pCEServing->acline) &&
-		'\n' != acIn[i]) {
+		'\n' != acIn[i])
 		continue;
+
+	    /* unloved */
+	    if (pCEServing->pCLwr == (CONSCLIENT *)0 &&
+		pCEServing->unloved == FLAGTRUE) {
+		write(1, pCEServing->server, strlen(pCEServing->server));
+		write(1, ": ", 2);
+		write(1, pCEServing->acline, pCEServing->iend);
 	    }
-	    write(1, pCEServing->server, strlen(pCEServing->server));
-	    write(1, ": ", 2);
-	    write(1, pCEServing->acline, pCEServing->iend);
+
+	    /* unified */
+	    if (unifiedlog != (CONSFILE *)0) {
+		FileWrite(unifiedlog, FLAGTRUE, pCEServing->server, -1);
+		if (pCEServing->pCLwr == (CONSCLIENT *)0)
+		    FileWrite(unifiedlog, FLAGTRUE, ": ", 2);
+		else
+		    FileWrite(unifiedlog, FLAGTRUE, "*: ", 3);
+		FileWrite(unifiedlog, FLAGFALSE, pCEServing->acline,
+			  pCEServing->iend);
+	    }
+
 	    pCEServing->iend = 0;
 	}
     }
@@ -2735,11 +2655,8 @@ DoClientRead(pGE, pCLServing)
 		    FileWrite(pCLServing->fd, FLAGFALSE,
 			      "disconnect requires argument\r\n", -1);
 		} else {
-		    if (ConsentFindUser
-			(pADList,
-			 pCLServing->username->string) != (CONSENTUSERS *)0
-			|| ConsentFindUser(pADList,
-					   "*") != (CONSENTUSERS *)0) {
+		    if (ConsentUserOk
+			(pADList, pCLServing->username->string) == 1) {
 			int num;
 			Verbose("disconnect command (of `%s') by %s",
 				pcArgs, pCLServing->acid->string);
@@ -2896,7 +2813,6 @@ DoClientRead(pGE, pCLServing)
 
 		    if (acIn[i] == '?') {
 			int i;
-			char ms[4];
 			FileWrite(pCLServing->fd, FLAGFALSE, "list]\r\n",
 				  -1);
 			i = pCEServing->breakNum;
@@ -2904,23 +2820,23 @@ DoClientRead(pGE, pCLServing)
 			    FileWrite(pCLServing->fd, FLAGTRUE,
 				      " 0 -   0ms, <undefined>\r\n", -1);
 			else {
-			    sprintf(ms, "%3d", breakList[i - 1].delay);
 			    FmtCtlStr(breakList[i - 1].seq->string,
 				      breakList[i - 1].seq->used - 1,
 				      acA1);
 			    FilePrint(pCLServing->fd, FLAGTRUE,
-				      " 0 - %sms, `%s'\r\n", ms,
+				      " 0 - %3dms, `%s'\r\n",
+				      breakList[i - 1].delay,
 				      acA1->string);
 			}
 			for (i = 0; i < 9; i++) {
 			    if (breakList[i].seq->used > 1) {
-				sprintf(ms, "%3d", breakList[i].delay);
 				FmtCtlStr(breakList[i].seq->string,
 					  breakList[i].seq->used - 1,
 					  acA1);
 				FilePrint(pCLServing->fd, FLAGTRUE,
-					  " %d - %sms, `%s'\r\n", i + 1,
-					  ms, acA1->string);
+					  " %d - %3dms, `%s'\r\n", i + 1,
+					  breakList[i].delay,
+					  acA1->string);
 			    }
 			}
 			FileWrite(pCLServing->fd, FLAGFALSE, (char *)0, 0);
@@ -2954,9 +2870,9 @@ DoClientRead(pGE, pCLServing)
 		    if (acInOrig[i] == pCLServing->ic[1]) {
 			if (pCLServing->fecho)
 			    FileWrite(pCLServing->fd, FLAGFALSE, "\r\n[",
-				      -1);
+				      3);
 			else
-			    FileWrite(pCLServing->fd, FLAGFALSE, "[", -1);
+			    FileWrite(pCLServing->fd, FLAGFALSE, "[", 1);
 			pCLServing->iState = S_CMD;
 			continue;
 		    }
@@ -3289,6 +3205,266 @@ DoClientRead(pGE, pCLServing)
     }
 }
 
+void
+#if PROTOTYPES
+FlushConsole(CONSENT *pCEServing)
+#else
+FlushConsole(pCEServing)
+    CONSENT *pCEServing;
+#endif
+{
+    /* we buffered console data in PutConsole() so that we can
+     * send more than 1-byte payloads, if we get more than 1-byte
+     * of data from a client connection.  here we flush that buffer,
+     * possibly putting it into the write buffer (but we don't really
+     * need to worry about that here.
+     */
+    int justHadDelay = 0;
+    if (pCEServing->wbuf->used <= 1) {
+	return;
+    }
+    if (!(pCEServing->fup && pCEServing->ioState == ISNORMAL)) {
+	/* if we have data but aren't up, drop it */
+	BuildString((char *)0, pCEServing->wbuf);
+	pCEServing->wbufIAC = 0;
+	return;
+    }
+    while (!justHadDelay && pCEServing->wbuf->used > 1) {
+	if (pCEServing->wbufIAC == 0) {
+	    CONDDEBUG((1, "Kiddie(): flushing %d non-IAC bytes to fd %d",
+		       pCEServing->wbuf->used - 1,
+		       FileFDNum(pCEServing->cofile)));
+	    if (FileWrite
+		(pCEServing->cofile, FLAGFALSE, pCEServing->wbuf->string,
+		 pCEServing->wbuf->used - 1) < 0) {
+		ConsoleError(pCEServing);
+		break;
+	    }
+	    BuildString((char *)0, pCEServing->wbuf);
+	} else {
+	    unsigned char next;
+
+	    /* this should never really happen...but in case it
+	     * does, just reset wbufIAC and try again.
+	     */
+	    if (pCEServing->wbuf->used < pCEServing->wbufIAC) {
+		CONDDEBUG((1,
+			   "Kiddie(): invalid wbufIAC setting for fd %d",
+			   FileFDNum(pCEServing->cofile)));
+	    } else {
+		if ((((next =
+		       (unsigned char)pCEServing->wbuf->string[pCEServing->
+							       wbufIAC -
+							       1]) >= '0'
+		      && next <= '9') || (next == BREAK &&
+					  pCEServing->type != HOST))) {
+		    CONDDEBUG((1, "Kiddie(): heavy IAC for fd %d",
+			       FileFDNum(pCEServing->cofile)));
+		    /* if we have data before the IAC, send it */
+		    if (pCEServing->wbufIAC > 2) {
+			CONDDEBUG((1,
+				   "Kiddie(): heavy IAC flushing %d leading bytes for fd %d",
+				   pCEServing->wbufIAC - 2,
+				   FileFDNum(pCEServing->cofile)));
+			if (FileWrite
+			    (pCEServing->cofile, FLAGFALSE,
+			     pCEServing->wbuf->string,
+			     pCEServing->wbufIAC - 2) < 0) {
+			    ConsoleError(pCEServing);
+			    break;
+			}
+		    }
+		    /* if we didn't flush everything, bail and get
+		     * it the next time around (hopefully it'll have
+		     * cleared...or will soon.
+		     */
+		    if (!FileBufEmpty(pCEServing->cofile)) {
+			/* if we wrote something, shift it out */
+			if (pCEServing->wbufIAC > 2) {
+			    ShiftString(pCEServing->wbuf,
+					pCEServing->wbufIAC - 2);
+			    pCEServing->wbufIAC = 2;
+			}
+			CONDDEBUG((1,
+				   "Kiddie(): heavy IAC (wait for flush) for fd %d",
+				   FileFDNum(pCEServing->cofile)));
+			break;
+		    }
+
+		    /* Do the operation */
+		    if (next >= '0' && next <= '9') {
+			int delay = BREAKDELAYDEFAULT;
+			if (next != '0')
+			    delay = breakList[next - '1'].delay;
+			/* in theory this sets the break length to whatever
+			 * the "default" break sequence is for the console.
+			 * but, i think it would be better to just use the
+			 * global default (250ms right now) so that you
+			 * don't have to change things or get anything
+			 * unexpected.  remember, this is really just for
+			 * idle strings...
+			 else {
+			 if (pCEServing->breakNum != 0 &&
+			 breakList[pCEServbing->breakNum -
+			 1].seq->used <= 1)
+			 delay =
+			 breakList[pCEServbing->breakNum -
+			 1].delay;
+			 }
+			 */
+			CONDDEBUG((1,
+				   "Kiddie(): heavy IAC - doing usleep() for fd %d (break #%c - delay %dms)",
+				   FileFDNum(pCEServing->cofile), next,
+				   delay));
+			if (delay != 0)
+			    usleep(delay * 1000);
+		    } else if (next == BREAK) {
+			CONDDEBUG((1,
+				   "Kiddie(): heavy IAC - doing tcsendbreak() for fd %d",
+				   FileFDNum(pCEServing->cofile)));
+			if (tcsendbreak(FileFDNum(pCEServing->cofile), 0)
+			    == -1) {
+			    if (pCEServing->pCLwr != (CONSCLIENT *)0)
+				FileWrite(pCEServing->pCLwr->fd, FLAGFALSE,
+					  "[tcsendbreak() failed]\r\n",
+					  -1);
+			}
+		    }
+
+		    /* shift things off and trigger completion */
+		    ShiftString(pCEServing->wbuf, pCEServing->wbufIAC);
+		    justHadDelay = 1;
+		    /* we do this 'cause we just potentially paused for
+		     * a half-second doing a break...or even the
+		     * intentional usleep().  we could take out the
+		     * justHadDelay bits and continue with the stream,
+		     * but this allows us to process other consoles and
+		     * then come around and do more on this one.  you
+		     * see, someone could have a '\d\z\d\z\d\z' sequence
+		     * as a break string and we'd have about a 2 second
+		     * delay added up if we process it all at once.
+		     * we're just trying to be nice here.
+		     */
+		} else {
+		    char *iac;
+		    int offset = 0;
+		    static STRING *buf = (STRING *)0;
+
+		    if (buf == (STRING *)0)
+			buf = AllocString();
+		    BuildString((char *)0, buf);
+
+		    do {
+			CONDDEBUG((1, "Kiddie(): soft IAC for fd %d",
+				   FileFDNum(pCEServing->cofile)));
+			if (pCEServing->wbufIAC == 0) {
+			    /* if no more IAC chars, just throw the rest
+			     * into the buffer, clear things, and stop
+			     */
+			    CONDDEBUG((1,
+				       "Kiddie(): soft IAC buffering to EOS for fd %d",
+				       FileFDNum(pCEServing->cofile)));
+			    BuildString(pCEServing->wbuf->string + offset,
+					buf);
+			    offset = pCEServing->wbuf->used - 1;
+			    break;
+			}
+			/* buffer everything up to the IAC */
+			CONDDEBUG((1,
+				   "Kiddie(): soft IAC buffering to IAC for fd %d",
+				   FileFDNum(pCEServing->cofile)));
+			BuildStringN(pCEServing->wbuf->string + offset,
+				     pCEServing->wbufIAC - 2, buf);
+			/* process allowed sequences */
+			if (next == IAC) {
+			    CONDDEBUG((1,
+				       "Kiddie(): soft IAC processing IAC for fd %d",
+				       FileFDNum(pCEServing->cofile)));
+			    BuildStringChar((char)IAC, buf);
+			} else if (next == BREAK &&
+				   pCEServing->type == HOST) {
+			    CONDDEBUG((1,
+				       "Kiddie(): soft IAC processing HOST BREAK for fd %d",
+				       FileFDNum(pCEServing->cofile)));
+			    BuildStringChar((char)IAC, buf);
+			    BuildStringChar((char)BREAK, buf);
+			} else {
+			    CONDDEBUG((1,
+				       "Kiddie(): soft IAC unprocessable IAC for fd %d",
+				       FileFDNum(pCEServing->cofile)));
+			    /* move offset up to right before IAC */
+			    offset += pCEServing->wbufIAC - 2;
+			    break;
+			}
+			/* bring offset past char after IAC */
+			CONDDEBUG((1,
+				   "Kiddie(): soft IAC looking for new IAC for fd %d",
+				   FileFDNum(pCEServing->cofile)));
+			offset += pCEServing->wbufIAC;
+			iac =
+			    strchr(pCEServing->wbuf->string + offset, IAC);
+			if (iac == (char *)0)
+			    pCEServing->wbufIAC = 0;
+			else
+			    pCEServing->wbufIAC =
+				iac - (pCEServing->wbuf->string + offset) +
+				2;
+		    } while (offset < pCEServing->wbuf->used - 1);
+
+		    /* shift off the buffered data */
+		    CONDDEBUG((1,
+			       "Kiddie(): soft IAC shifting off %d chars for fd %d",
+			       offset, FileFDNum(pCEServing->cofile)));
+		    ShiftString(pCEServing->wbuf, offset);
+
+		    /* send the buffered data */
+		    CONDDEBUG((1,
+			       "Kiddie(): soft IAC writing %d chars to fd %d",
+			       buf->used - 1,
+			       FileFDNum(pCEServing->cofile)));
+		    if (FileWrite
+			(pCEServing->cofile, FLAGFALSE, buf->string,
+			 buf->used - 1) < 0) {
+			ConsoleError(pCEServing);
+			break;
+		    }
+		    BuildString((char *)0, buf);
+		}
+	    }
+	    CONDDEBUG((1, "Kiddie(): hunting for new IAC for fd %d",
+		       FileFDNum(pCEServing->cofile)));
+	    /* hunt for a new IAC position */
+	    if (pCEServing->wbuf->used > 1) {
+		char *iac = strchr(pCEServing->wbuf->string, IAC);
+		if (iac == (char *)0)
+		    pCEServing->wbufIAC = 0;
+		else
+		    pCEServing->wbufIAC =
+			(iac - pCEServing->wbuf->string) + 2;
+	    } else
+		pCEServing->wbufIAC = 0;
+	}
+    }
+    if (pCEServing->wbuf->used > 1) {
+	CONDDEBUG((1,
+		   "Kiddie(): watching writability for fd %d 'cause we have buffered data",
+		   FileFDNum(pCEServing->cofile)));
+	FD_SET(FileFDNum(pCEServing->cofile), &winit);
+    } else {
+	if (FileBufEmpty(pCEServing->cofile)) {
+	    CONDDEBUG((1,
+		       "Kiddie(): removing writability for fd %d 'cause we don't have buffered data",
+		       FileFDNum(pCEServing->cofile)));
+	    FD_CLR(FileFDNum(pCEServing->cofile), &winit);
+	}
+    }
+    pCEServing->lastWrite = time((time_t *)0);
+    if (pCEServing->idletimeout != (time_t)0 &&
+	(timers[T_IDLE] == (time_t)0 ||
+	 timers[T_IDLE] > pCEServing->lastWrite + pCEServing->idletimeout))
+	timers[T_IDLE] = pCEServing->lastWrite + pCEServing->idletimeout;
+}
+
 
 /* routine used by the child processes.				   (ksb/fine)
  * Most of it is escape sequence parsing.
@@ -3339,7 +3515,6 @@ Kiddie(pGE, sfd)
     socklen_t so;
     fd_set rmask;
     fd_set wmask;
-    unsigned char acOut[32];
     struct timeval tv;
     struct timeval *tvp;
 
@@ -3383,8 +3558,9 @@ Kiddie(pGE, sfd)
     SimpleSignal(SIGCHLD, FlagReapVirt);
     SimpleSignal(SIGINT, FlagGoAwayAlso);
 
-    sprintf((char *)acOut, "ctl_%hu", pGE->port);
-    if ((pGE->pCEctl->server = StrDup((char *)acOut))
+    BuildTmpString((char *)0);
+    if ((pGE->pCEctl->server =
+	 StrDup(BuildTmpStringPrint("ctl_%hu", pGE->port)))
 	== (char *)0)
 	OutOfMem();
 
@@ -3447,6 +3623,7 @@ Kiddie(pGE, sfd)
 	if (fSawChldHUP) {
 	    fSawChldHUP = 0;
 	    ReopenLogfile();
+	    ReopenUnifiedlog();
 	    ReReadCfg(sfd);
 	    pGE = pGroups;
 	    ReOpen(pGE);
@@ -3455,14 +3632,7 @@ Kiddie(pGE, sfd)
 	if (fSawChldUSR2) {
 	    fSawChldUSR2 = 0;
 	    ReopenLogfile();
-	    ReOpen(pGE);
-	    ReUp(pGE, 0);
-	}
-	if (fSawChldHUP) {
-	    fSawChldHUP = 0;
-	    ReopenLogfile();
-	    ReReadCfg(sfd);
-	    pGE = pGroups;
+	    ReopenUnifiedlog();
 	    ReOpen(pGE);
 	    ReUp(pGE, 0);
 	}
@@ -3471,55 +3641,102 @@ Kiddie(pGE, sfd)
 	    ReUp(pGE, 0);
 	}
 
-	/* check for timeouts with consoles -bryan */
+	/* check for timeouts with consoles */
 	tymer = (time_t)0;
 	tyme = time((time_t *)0);
-	for (pCEServing = pGE->pCElist; pCEServing != (CONSENT *)0;
-	     pCEServing = pCEServing->pCEnext) {
-	    if (pCEServing->stateTimer != (time_t)0 &&
-		(tymer == (time_t)0 || tymer > pCEServing->stateTimer))
-		tymer = pCEServing->stateTimer;
-	    if (pCEServing->stateTimer > tyme)
-		continue;
-	    pCEServing->stateTimer = (time_t)0;
-	    if (pCEServing->ioState != INCONNECT)
-		continue;
-	    Error("[%s] connect timeout: forcing down",
-		  pCEServing->server);
-	    /* can't use ConsoleError() here otherwise we could reinit
-	     * the console repeatedly (immediately).  we know there are
-	     * no clients attached, so it's basically the same.
-	     */
-	    ConsDown(pCEServing, FLAGTRUE, FLAGTRUE);
+
+	/* check for state timeouts (currently connect() timeouts) */
+	if (timers[T_STATE] != (time_t)0 && tyme >= timers[T_STATE]) {
+	    timers[T_STATE] = (time_t)0;
+	    for (pCEServing = pGE->pCElist; pCEServing != (CONSENT *)0;
+		 pCEServing = pCEServing->pCEnext) {
+		if (pCEServing->stateTimer == (time_t)0)
+		    continue;
+		if (pCEServing->stateTimer > tyme) {
+		    if (timers[T_STATE] == (time_t)0 ||
+			timers[T_STATE] > pCEServing->stateTimer)
+			timers[T_STATE] = pCEServing->stateTimer;
+		    continue;
+		}
+		pCEServing->stateTimer = (time_t)0;
+		if (pCEServing->ioState != INCONNECT)
+		    continue;
+		Error("[%s] connect timeout: forcing down",
+		      pCEServing->server);
+		/* can't use ConsoleError() here otherwise we could reinit
+		 * the console repeatedly (immediately).  we know there are
+		 * no clients attached, so it's basically the same.
+		 */
+		ConsDown(pCEServing, FLAGTRUE, FLAGTRUE);
+	    }
+	}
+
+	/* process any idle timeouts */
+	if (timers[T_IDLE] != (time_t)0 && tyme >= timers[T_IDLE]) {
+	    timers[T_IDLE] = (time_t)0;
+	    for (pCEServing = pGE->pCElist; pCEServing != (CONSENT *)0;
+		 pCEServing = pCEServing->pCEnext) {
+		/* if we aren't in a normal state, skip it */
+		if (!(pCEServing->fup && pCEServing->ioState == ISNORMAL))
+		    continue;
+		/* should we check for a r/w user too and only idle when
+		 * they aren't connected?  right now, i think we want to
+		 * do the idle stuff even if we have users
+		 */
+		if (pCEServing->idletimeout != 0) {
+		    time_t chime =
+			pCEServing->lastWrite + pCEServing->idletimeout;
+		    if (tyme < chime) {
+			if (timers[T_IDLE] == (time_t)0 ||
+			    timers[T_IDLE] > chime)
+			    timers[T_IDLE] = chime;
+			continue;
+		    }
+		    ExpandString(pCEServing->idlestring, pCEServing, 0);
+		    TagLogfileAct(pCEServing, "idle timeout");
+		    FlushConsole(pCEServing);
+		    SendClientsMsg(pCEServing, "[-- idle timeout --]\r\n");
+		    /* we're not technically correct here in saying the write
+		     * happened, but we don't want to accidentally trigger
+		     * another idle action, so we lie...when the buffer gets
+		     * flushed, this will be updated and correct.
+		     */
+		    pCEServing->lastWrite = tyme;
+		    chime = tyme + pCEServing->idletimeout;
+		    if (timers[T_IDLE] == (time_t)0 ||
+			timers[T_IDLE] > chime)
+			timers[T_IDLE] = chime;
+		}
+	    }
 	}
 
 	/* see if we need to bring things back up or mark logfiles
 	 * or do other such events here.  we call time() each time
 	 * in case one of the subroutines actually takes a long time
 	 * to complete */
-	if (nextMarkTime != (time_t)0 && time((time_t *)0) >= nextMarkTime)
+	if (timers[T_MARK] != (time_t)0 &&
+	    time((time_t *)0) >= timers[T_MARK])
 	    Mark(pGE);
-	if (nextReInitCheckTime != (time_t)0 &&
-	    time((time_t *)0) >= nextReInitCheckTime)
+
+	if (timers[T_REINIT] != (time_t)0 &&
+	    time((time_t *)0) >= timers[T_REINIT])
 	    ReUp(pGE, 2);
+
 	/* must do ReUp(,1) last for timers to work right */
-	if (nextAutoUpTime != (time_t)0 &&
-	    time((time_t *)0) >= nextAutoUpTime)
+	if (timers[T_AUTOUP] != (time_t)0 &&
+	    time((time_t *)0) >= timers[T_AUTOUP])
 	    ReUp(pGE, 1);
 
 	/* check on various timers and set the appropriate timeout */
 	/* all this so we don't have to use alarm() any more... */
 
-	/* look for the nearest time */
-	if (nextMarkTime != (time_t)0 &&
-	    (tymer == (time_t)0 || tymer > nextMarkTime))
-	    tymer = nextMarkTime;
-	if (nextReInitCheckTime != (time_t)0 &&
-	    (tymer == (time_t)0 || tymer > nextReInitCheckTime))
-	    tymer = nextReInitCheckTime;
-	if (nextAutoUpTime != (time_t)0 &&
-	    (tymer == (time_t)0 || tymer > nextAutoUpTime))
-	    tymer = nextAutoUpTime;
+	/* look for the next nearest timeout */
+	for (ret = 0; ret < T_MAX; ret++) {
+	    if (timers[ret] != (time_t)0 &&
+		(tymer == (time_t)0 || tymer > timers[ret]))
+		tymer = timers[ret];
+	}
+
 	/* if we have a timer, figure out the delay left */
 	if (tymer != (time_t)0) {
 	    tyme = time((time_t *)0);
@@ -3590,6 +3807,15 @@ Kiddie(pGE, sfd)
 			    break;
 			}
 			pCEServing->ioState = ISNORMAL;
+			pCEServing->lastWrite = time((time_t *)0);
+			if (pCEServing->idletimeout != (time_t)0 &&
+			    (timers[T_IDLE] == (time_t)0 ||
+			     timers[T_IDLE] >
+			     pCEServing->lastWrite +
+			     pCEServing->idletimeout))
+			    timers[T_IDLE] =
+				pCEServing->lastWrite +
+				pCEServing->idletimeout;
 			StartInit(pCEServing);
 		    }
 		    break;
@@ -3712,242 +3938,8 @@ Kiddie(pGE, sfd)
 	 * need to worry about that here.
 	 */
 	for (pCEServing = pGE->pCElist; pCEServing != (CONSENT *)0;
-	     pCEServing = pCEServing->pCEnext) {
-	    int justHadDelay = 0;
-	    if (pCEServing->wbuf->used <= 1)
-		continue;
-	    if (!(pCEServing->fup && pCEServing->ioState == ISNORMAL)) {
-		/* if we have data but aren't up, drop it */
-		BuildString((char *)0, pCEServing->wbuf);
-		pCEServing->wbufIAC = 0;
-		continue;
-	    }
-	    while (!justHadDelay && pCEServing->wbuf->used > 1) {
-		if (pCEServing->wbufIAC == 0) {
-		    CONDDEBUG((1,
-			       "Kiddie(): flushing %d non-IAC bytes to fd %d",
-			       pCEServing->wbuf->used - 1,
-			       FileFDNum(pCEServing->cofile)));
-		    if (FileWrite
-			(pCEServing->cofile, FLAGFALSE,
-			 pCEServing->wbuf->string,
-			 pCEServing->wbuf->used - 1) < 0) {
-			ConsoleError(pCEServing);
-			break;
-		    }
-		    BuildString((char *)0, pCEServing->wbuf);
-		} else {
-		    unsigned char next;
-
-		    /* this should never really happen...but in case it
-		     * does, just reset wbufIAC and try again.
-		     */
-		    if (pCEServing->wbuf->used < pCEServing->wbufIAC) {
-			CONDDEBUG((1,
-				   "Kiddie(): invalid wbufIAC setting for fd %d",
-				   FileFDNum(pCEServing->cofile)));
-		    } else {
-			if ((((next =
-			       (unsigned char)pCEServing->wbuf->
-			       string[pCEServing->wbufIAC - 1]) >= '1' &&
-			      next <= '9') || (next == BREAK &&
-					       pCEServing->type !=
-					       HOST))) {
-			    CONDDEBUG((1, "Kiddie(): heavy IAC for fd %d",
-				       FileFDNum(pCEServing->cofile)));
-			    /* if we have data before the IAC, send it */
-			    if (pCEServing->wbufIAC > 2) {
-				CONDDEBUG((1,
-					   "Kiddie(): heavy IAC flushing %d leading bytes for fd %d",
-					   pCEServing->wbufIAC - 2,
-					   FileFDNum(pCEServing->cofile)));
-				if (FileWrite
-				    (pCEServing->cofile, FLAGFALSE,
-				     pCEServing->wbuf->string,
-				     pCEServing->wbufIAC - 2) < 0) {
-				    ConsoleError(pCEServing);
-				    break;
-				}
-			    }
-			    /* if we didn't flush everything, bail and get
-			     * it the next time around (hopefully it'll have
-			     * cleared...or will soon.
-			     */
-			    if (!FileBufEmpty(pCEServing->cofile)) {
-				/* if we wrote something, shift it out */
-				if (pCEServing->wbufIAC > 2) {
-				    ShiftString(pCEServing->wbuf,
-						pCEServing->wbufIAC - 2);
-				    pCEServing->wbufIAC = 2;
-				}
-				CONDDEBUG((1,
-					   "Kiddie(): heavy IAC (wait for flush) for fd %d",
-					   FileFDNum(pCEServing->cofile)));
-				break;
-			    }
-
-			    /* Do the operation */
-			    if (next >= '1' && next <= '9') {
-				CONDDEBUG((1,
-					   "Kiddie(): heavy IAC - doing usleep() for fd %d (break #%c - delay %dms)",
-					   FileFDNum(pCEServing->cofile),
-					   next,
-					   breakList[next - '1'].delay));
-				if (breakList[next - '1'].delay != 0)
-				    usleep(breakList[next - '1'].delay *
-					   1000);
-			    } else if (next == BREAK) {
-				CONDDEBUG((1,
-					   "Kiddie(): heavy IAC - doing tcsendbreak() for fd %d",
-					   FileFDNum(pCEServing->cofile)));
-				if (tcsendbreak
-				    (FileFDNum(pCEServing->cofile),
-				     0) == -1) {
-				    FileWrite(pCLServing->fd, FLAGFALSE,
-					      "[tcsendbreak() failed]\r\n",
-					      -1);
-				    return;
-				}
-			    }
-
-			    /* shift things off and trigger completion */
-			    ShiftString(pCEServing->wbuf,
-					pCEServing->wbufIAC);
-			    justHadDelay = 1;
-			    /* we do this 'cause we just potentially paused for
-			     * a half-second doing a break...or even the
-			     * intentional usleep().  we could take out the
-			     * justHadDelay bits and continue with the stream,
-			     * but this allows us to process other consoles and
-			     * then come around and do more on this one.  you
-			     * see, someone could have a '\d\z\d\z\d\z' sequence
-			     * as a break string and we'd have about a 2 second
-			     * delay added up if we process it all at once.
-			     * we're just trying to be nice here.
-			     */
-			} else {
-			    char *iac;
-			    int offset = 0;
-			    static STRING *buf = (STRING *)0;
-
-			    if (buf == (STRING *)0)
-				buf = AllocString();
-			    BuildString((char *)0, buf);
-
-			    do {
-				CONDDEBUG((1,
-					   "Kiddie(): soft IAC for fd %d",
-					   FileFDNum(pCEServing->cofile)));
-				if (pCEServing->wbufIAC == 0) {
-				    /* if no more IAC chars, just throw the rest
-				     * into the buffer, clear things, and stop
-				     */
-				    CONDDEBUG((1,
-					       "Kiddie(): soft IAC buffering to EOS for fd %d",
-					       FileFDNum(pCEServing->
-							 cofile)));
-				    BuildString(pCEServing->wbuf->string +
-						offset, buf);
-				    offset = pCEServing->wbuf->used - 1;
-				    break;
-				}
-				/* buffer everything up to the IAC */
-				CONDDEBUG((1,
-					   "Kiddie(): soft IAC buffering to IAC for fd %d",
-					   FileFDNum(pCEServing->cofile)));
-				BuildStringN(pCEServing->wbuf->string +
-					     offset,
-					     pCEServing->wbufIAC - 2, buf);
-				/* process allowed sequences */
-				if (next == IAC) {
-				    CONDDEBUG((1,
-					       "Kiddie(): soft IAC processing IAC for fd %d",
-					       FileFDNum(pCEServing->
-							 cofile)));
-				    BuildStringChar((char)IAC, buf);
-				} else if (next == BREAK &&
-					   pCEServing->type == HOST) {
-				    CONDDEBUG((1,
-					       "Kiddie(): soft IAC processing HOST BREAK for fd %d",
-					       FileFDNum(pCEServing->
-							 cofile)));
-				    BuildStringChar((char)IAC, buf);
-				    BuildStringChar((char)BREAK, buf);
-				} else {
-				    CONDDEBUG((1,
-					       "Kiddie(): soft IAC unprocessable IAC for fd %d",
-					       FileFDNum(pCEServing->
-							 cofile)));
-				    /* move offset up to right before IAC */
-				    offset += pCEServing->wbufIAC - 2;
-				    break;
-				}
-				/* bring offset past char after IAC */
-				CONDDEBUG((1,
-					   "Kiddie(): soft IAC looking for new IAC for fd %d",
-					   FileFDNum(pCEServing->cofile)));
-				offset += pCEServing->wbufIAC;
-				iac =
-				    strchr(pCEServing->wbuf->string +
-					   offset, IAC);
-				if (iac == (char *)0)
-				    pCEServing->wbufIAC = 0;
-				else
-				    pCEServing->wbufIAC =
-					iac - (pCEServing->wbuf->string +
-					       offset) + 2;
-			    } while (offset < pCEServing->wbuf->used - 1);
-
-			    /* shift off the buffered data */
-			    CONDDEBUG((1,
-				       "Kiddie(): soft IAC shifting off %d chars for fd %d",
-				       offset,
-				       FileFDNum(pCEServing->cofile)));
-			    ShiftString(pCEServing->wbuf, offset);
-
-			    /* send the buffered data */
-			    CONDDEBUG((1,
-				       "Kiddie(): soft IAC writing %d chars to fd %d",
-				       buf->used - 1,
-				       FileFDNum(pCEServing->cofile)));
-			    if (FileWrite
-				(pCEServing->cofile, FLAGFALSE,
-				 buf->string, buf->used - 1) < 0) {
-				ConsoleError(pCEServing);
-				break;
-			    }
-			    BuildString((char *)0, buf);
-			}
-		    }
-		    CONDDEBUG((1,
-			       "Kiddie(): hunting for new IAC for fd %d",
-			       FileFDNum(pCEServing->cofile)));
-		    /* hunt for a new IAC position */
-		    if (pCEServing->wbuf->used > 1) {
-			char *iac = strchr(pCEServing->wbuf->string, IAC);
-			if (iac == (char *)0)
-			    pCEServing->wbufIAC = 0;
-			else
-			    pCEServing->wbufIAC =
-				(iac - pCEServing->wbuf->string) + 2;
-		    } else
-			pCEServing->wbufIAC = 0;
-		}
-	    }
-	    if (pCEServing->wbuf->used > 1) {
-		CONDDEBUG((1,
-			   "Kiddie(): watching writability for fd %d 'cause we have buffered data",
-			   FileFDNum(pCEServing->cofile)));
-		FD_SET(FileFDNum(pCEServing->cofile), &winit);
-	    } else {
-		if (FileBufEmpty(pCEServing->cofile)) {
-		    CONDDEBUG((1,
-			       "Kiddie(): removing writability for fd %d 'cause we don't have buffered data",
-			       FileFDNum(pCEServing->cofile)));
-		    FD_CLR(FileFDNum(pCEServing->cofile), &winit);
-		}
-	    }
-	}
+	     pCEServing = pCEServing->pCEnext)
+	    FlushConsole(pCEServing);
 
 	/* if nothing on control line, get more
 	 */

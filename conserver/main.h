@@ -1,5 +1,5 @@
 /*
- *  $Id: main.h,v 5.50 2003-10-19 22:52:37-07 bryan Exp $
+ *  $Id: main.h,v 5.51 2003/11/10 15:37:24 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -48,8 +48,10 @@ extern int isMaster;
 extern CONFIG *optConf;
 extern CONFIG *config;
 extern CONFIG defConfig;
+extern CONSFILE *unifiedlog;
 #if HAVE_OPENSSL
 extern SSL_CTX *ctx;
 #endif
 extern void ReopenLogfile PARAMS((void));
+extern void ReopenUnifiedlog PARAMS((void));
 extern void DumpDataStructures PARAMS((void));

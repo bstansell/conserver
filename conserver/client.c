@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.72 2003-10-02 18:49:13-07 bryan Exp $
+ *  $Id: client.c,v 5.75 2003/11/16 15:35:33 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -246,8 +246,9 @@ Replay(fdLog, fdOut, iBack)
 			InitString(lines[ln].line);
 		    } else {
 			BuildString((char *)0, lines[ln - 1].line);
-			BuildString(lines[ln].line->string,
-				    lines[ln - 1].line);
+			BuildStringN(lines[ln].line->string,
+				     lines[ln].line->used - 1,
+				     lines[ln - 1].line);
 			BuildString((char *)0, lines[ln].line);
 		    }
 		    ln--;
@@ -313,8 +314,9 @@ Replay(fdLog, fdOut, iBack)
 	    if ((char *)0 != s) {
 		*s = '\000';
 	    }
-	    FileWrite(fdOut, FLAGTRUE, lines[i].line->string, -1);
-	    FileWrite(fdOut, FLAGTRUE, " .. ", -1);
+	    FileWrite(fdOut, FLAGTRUE, lines[i].line->string,
+		      lines[i].line->used - 1);
+	    FileWrite(fdOut, FLAGTRUE, " .. ", 4);
 
 	    /* build the end string by removing the leading "[-- MARK -- "
 	     * and replacing "]\r\n" on the end with " -- MARK --]\r\n"
@@ -331,7 +333,8 @@ Replay(fdLog, fdOut, iBack)
 	    u = lines[i].mark_end->used;
 	    s = lines[i].mark_end->string;
 	} else
-	    FileWrite(fdOut, FLAGFALSE, lines[i].line->string, -1);
+	    FileWrite(fdOut, FLAGFALSE, lines[i].line->string,
+		      lines[i].line->used - 1);
     }
 
   common_exit:
@@ -399,7 +402,6 @@ static HELP aHLTable[] = {
     {WHEN_ALWAYS, "^R   replay the last line"},
     {WHEN_ATTACH, "\\ooo send character by octal code"},
     {WHEN_EXPERT, "^I   toggle tab expansion"},
-    {WHEN_EXPERT, ";    change to another console"},
     {WHEN_EXPERT, "+(-) do (not) drop line"},
     {WHEN_VT100, "PF1  print this message"},
     {WHEN_VT100, "PF2  disconnect"},
@@ -449,12 +451,14 @@ HelpUser(pCL)
 		}
 		BuildString(aHLTable[i].actext, acLine);
 		BuildString(acEoln, acLine);
-		FileWrite(pCL->fd, FLAGTRUE, acLine->string, -1);
+		FileWrite(pCL->fd, FLAGTRUE, acLine->string,
+			  acLine->used - 1);
 		BuildString((char *)0, acLine);
 		continue;
 	    } else {
 		BuildString(acEoln, acLine);
-		FileWrite(pCL->fd, FLAGTRUE, acLine->string, -1);
+		FileWrite(pCL->fd, FLAGTRUE, acLine->string,
+			  acLine->used - 1);
 		BuildString((char *)0, acLine);
 	    }
 	}
@@ -463,14 +467,15 @@ HelpUser(pCL)
 	    BuildString(aHLTable[i].actext, acLine);
 	    if (acLine->used > HALFLINE) {
 		BuildString(acEoln, acLine);
-		FileWrite(pCL->fd, FLAGTRUE, acLine->string, -1);
+		FileWrite(pCL->fd, FLAGTRUE, acLine->string,
+			  acLine->used - 1);
 		BuildString((char *)0, acLine);
 	    }
 	}
     }
     if (acLine->used != 0) {
 	BuildString(acEoln, acLine);
-	FileWrite(pCL->fd, FLAGTRUE, acLine->string, -1);
+	FileWrite(pCL->fd, FLAGTRUE, acLine->string, acLine->used - 1);
     }
     FileWrite(pCL->fd, FLAGFALSE, (char *)0, 0);
 }
@@ -530,5 +535,7 @@ ClientAccessOk(pCL)
 	else
 	    BuildString("<unknown>", pCL->peername);
     }
+    if (peername != (char *)0)
+	free(peername);
     return retval;
 }

@@ -1,10 +1,12 @@
 /*
- *  $Id: readcfg.h,v 5.36 2003-10-31 09:54:44-08 bryan Exp $
+ *  $Id: readcfg.h,v 5.38 2003/11/10 15:37:24 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  */
+
+#define BREAKDELAYDEFAULT 250
 
 typedef struct config {
     STRING *name;
@@ -17,6 +19,7 @@ typedef struct config {
     FLAG loghostnames;
     int reinitcheck;
     char *secondaryport;
+    char *unifiedlog;
 #if HAVE_SETPROCTITLE
     FLAG setproctitle;
 #endif

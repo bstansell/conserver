@@ -1,4 +1,4 @@
-# $Id: INSTALL,v 1.3 94/07/11 12:38:19 ksb Exp $
+# $Id: INSTALL.old,v 1.1 2003/11/04 02:36:24 bryan Exp $
 
 To install this program you need root access and access to the physical
 console of the machine (either through the console server or via the physical

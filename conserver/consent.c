@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.128 2003-09-30 13:14:04-07 bryan Exp $
+ *  $Id: consent.c,v 5.130 2003/11/08 05:16:36 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -792,6 +792,9 @@ ConsInit(pCE)
 	    } else {
 		pCE->ioState = INCONNECT;
 		pCE->stateTimer = time((time_t *)0) + CONNECTTIMEOUT;
+		if (timers[T_STATE] == (time_t)0 ||
+		    timers[T_STATE] > pCE->stateTimer)
+		    timers[T_STATE] = pCE->stateTimer;
 		pCE->fup = 1;
 	    }
 	    break;
@@ -843,9 +846,18 @@ ConsInit(pCE)
     if (maxfd < cofile + 1)
 	maxfd = cofile + 1;
 
+    tyme = time((time_t *)0);
+
+    if (pCE->ioState == ISNORMAL) {
+	pCE->lastWrite = tyme;
+	if (pCE->idletimeout != (time_t)0 &&
+	    (timers[T_IDLE] == (time_t)0 ||
+	     timers[T_IDLE] > pCE->lastWrite + pCE->idletimeout))
+	    timers[T_IDLE] = pCE->lastWrite + pCE->idletimeout;
+    }
+
     /* If we have marks, adjust the next one so that it's in the future */
     if (pCE->nextMark > 0) {
-	tyme = time((time_t *)0);
 	if (tyme >= pCE->nextMark) {
 	    /* Add as many pCE->mark values as necessary so that we move
 	     * beyond the current time.
@@ -856,7 +868,10 @@ ConsInit(pCE)
     }
 
     if (pCE->downHard == FLAGTRUE) {
-	Msg("[%s] console up", pCE->server);
+	if (pCE->ioState == ISNORMAL)
+	    Msg("[%s] console up", pCE->server);
+	else
+	    Msg("[%s] console inititalizing", pCE->server);
 	pCE->downHard = FLAGFALSE;
     }
 

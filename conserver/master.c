@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.118 2003-10-10 03:29:21-07 bryan Exp $
+ *  $Id: master.c,v 5.122 2003/11/16 19:29:20 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -466,7 +466,7 @@ DoNormalRead(pCLServing)
 		return;
 	    }
 	    Verbose("<master> login %s", pCLServing->acid->string);
-	    FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", -1);
+	    FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", 4);
 	    pCLServing->iState = S_NORMAL;
 	    BuildString((char *)0, pCLServing->accmd);
 	    continue;
@@ -549,7 +549,7 @@ DoNormalRead(pCLServing)
 			pCLServing->iState = S_NORMAL;
 			Verbose("<master> login %s",
 				pCLServing->acid->string);
-			FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", -1);
+			FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", 4);
 		    } else {
 			FilePrint(pCLServing->fd, FLAGFALSE,
 				  "passwd? %s\r\n", myHostname);
@@ -599,9 +599,7 @@ DoNormalRead(pCLServing)
 		      THIS_VERSION);
 	} else if (pCLServing->iState == S_NORMAL &&
 		   strcmp(pcCmd, "quit") == 0) {
-	    if (ConsentFindUser(pADList, pCLServing->username->string) !=
-		(CONSENTUSERS *)0 ||
-		ConsentFindUser(pADList, "*") != (CONSENTUSERS *)0) {
+	    if (ConsentUserOk(pADList, pCLServing->username->string) == 1) {
 		Verbose("quit command by %s", pCLServing->acid->string);
 		FileWrite(pCLServing->fd, FLAGFALSE,
 			  "ok -- terminated\r\n", -1);
@@ -613,9 +611,7 @@ DoNormalRead(pCLServing)
 			  "unauthorized command\r\n", -1);
 	} else if (pCLServing->iState == S_NORMAL &&
 		   strcmp(pcCmd, "restart") == 0) {
-	    if (ConsentFindUser(pADList, pCLServing->username->string) !=
-		(CONSENTUSERS *)0 ||
-		ConsentFindUser(pADList, "*") != (CONSENTUSERS *)0) {
+	    if (ConsentUserOk(pADList, pCLServing->username->string) == 1) {
 		FileWrite(pCLServing->fd, FLAGFALSE,
 			  "ok -- restarting\r\n", -1);
 		Verbose("restart command by %s", pCLServing->acid->string);
@@ -635,7 +631,7 @@ DoNormalRead(pCLServing)
 			  pGE->port);
 		iSep = 0;
 	    }
-	    FileWrite(pCLServing->fd, FLAGFALSE, "\r\n", -1);
+	    FileWrite(pCLServing->fd, FLAGFALSE, "\r\n", 2);
 	} else if (pCLServing->iState == S_NORMAL &&
 		   strcmp(pcCmd, "call") == 0) {
 	    if (pcArgs == (char *)0)
@@ -762,6 +758,7 @@ Master()
 	    fSawHUP = 0;
 	    Msg("processing SIGHUP");
 	    ReopenLogfile();
+	    ReopenUnifiedlog();
 	    SignalKids(SIGHUP);
 	    ReReadCfg(msfd);
 	    /* fix up the client descriptors since ReReadCfg() doesn't
@@ -783,6 +780,7 @@ Master()
 	    fSawUSR2 = 0;
 	    Msg("processing SIGUSR2");
 	    ReopenLogfile();
+	    ReopenUnifiedlog();
 	    SignalKids(SIGUSR2);
 	}
 	if (fSawQuit) {		/* Something above set the quit flag */
@@ -925,10 +923,12 @@ Master()
 	if (ClientAccessOk(pCL)) {
 	    pCL->ioState = ISNORMAL;
 	    /* say hi to start */
-	    FileWrite(pCL->fd, FLAGFALSE, "ok\r\n", -1);
+	    FileWrite(pCL->fd, FLAGFALSE, "ok\r\n", 4);
 	} else
 	    DropMasterClient(pCL, FLAGFALSE);
     }
+
+    close(msfd);
 
     /* clean up the free list */
     while (pCLmfree != (CONSCLIENT *)0) {

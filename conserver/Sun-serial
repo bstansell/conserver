@@ -1,4 +1,4 @@
-# $Id: Sun-serial,v 2.1 93/02/09 11:45:12 ldv Exp $
+# $Id: Sun-serial,v 1.1 2003/11/04 02:36:25 bryan Exp $
 
 If you are going to be hooking Sun consoles to your console server, you
 will run into a problem:  The sun will halt whenever the cable is unplugged.

@@ -1,5 +1,5 @@
 /*
- *  $Id: access.c,v 5.68 2003-10-19 22:52:21-07 bryan Exp $
+ *  $Id: access.c,v 5.70 2003/11/04 19:41:00 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -137,28 +137,54 @@ AccType(addr, peername)
     socklen_t so;
     struct hostent *he = (struct hostent *)0;
     int a;
+    char ret;
 #if TRUST_REVERSE_DNS
-    char *pcName;
-    int wlen;
-    char *hname;
-    int len;
+    char **revNames = (char **)0;
 #endif
 
     CONDDEBUG((1, "AccType(): ip=%s", inet_ntoa(*addr)));
 
+    ret = config->defaultaccess;
     so = sizeof(*addr);
+
+#if TRUST_REVERSE_DNS
+    /* if we trust reverse dns, we get the names associated with
+     * the address we're checking and then check each of those
+     * against the access list entries (below).
+     */
+    if ((he =
+	 gethostbyaddr((char *)addr, so,
+		       AF_INET)) == (struct hostent *)0) {
+	Error("AccType(): gethostbyaddr(%s): %s", inet_ntoa(*addr),
+	      hstrerror(h_errno));
+    } else {
+	char *hname;
+	if (he->h_name != (char *)0) {
+	    /* count up the number of names */
+	    for (a = 0, hname = he->h_aliases[a]; hname != (char *)0;
+		 hname = he->h_aliases[++a]);
+	    a += 2;		/* h_name + (char *)0 */
+	    /* now duplicate them */
+	    if ((revNames =
+		 (char **)calloc(a, sizeof(char *))) != (char **)0) {
+		for (hname = he->h_name, a = 0; hname != (char *)0;
+		     hname = he->h_aliases[a++]) {
+		    if ((revNames[a] = StrDup(hname)) == (char *)0)
+			break;
+		    CONDDEBUG((1,"AccType(): revNames[%d]='%s'", a, hname));
+		}
+	    }
+	}
+    }
+#endif
+
     for (pACtmp = pACList; pACtmp != (ACCESS *)0; pACtmp = pACtmp->pACnext) {
 	CONDDEBUG((1, "AccType(): who=%s, trust=%c", pACtmp->pcwho,
 		   pACtmp->ctrust));
 	if (pACtmp->isCIDR != 0) {
 	    if (AddrCmp(addr, pACtmp->pcwho) == 0) {
-		if (config->loghostnames == FLAGTRUE &&
-		    (he =
-		     gethostbyaddr((char *)addr, so,
-				   AF_INET)) != (struct hostent *)0) {
-		    *peername = he->h_name;
-		}
-		return pACtmp->ctrust;
+		ret = pACtmp->ctrust;
+		goto common_ret;
 	    }
 	    continue;
 	}
@@ -166,82 +192,83 @@ AccType(addr, peername)
 	if ((he = gethostbyname(pACtmp->pcwho)) == (struct hostent *)0) {
 	    Error("AccType(): gethostbyname(%s): %s", pACtmp->pcwho,
 		  hstrerror(h_errno));
-	    continue;
-	}
-	if (4 != he->h_length || AF_INET != he->h_addrtype) {
+	} else if (4 != he->h_length || AF_INET != he->h_addrtype) {
 	    Error
 		("AccType(): gethostbyname(%s): wrong address size (4 != %d) or address family (%d != %d)",
 		 pACtmp->pcwho, he->h_length, AF_INET, he->h_addrtype);
-	    continue;
-	}
-	for (a = 0; he->h_addr_list[a] != (char *)0; a++) {
-	    CONDDEBUG((1, "AccType(): addr=%s",
-		       inet_ntoa(*(struct in_addr *)
-				 (he->h_addr_list[a]))));
-	    if (
+	} else {
+	    for (a = 0; he->h_addr_list[a] != (char *)0; a++) {
+		CONDDEBUG((1, "AccType(): addr=%s",
+			   inet_ntoa(*(struct in_addr *)
+				     (he->h_addr_list[a]))));
+		if (
 #if HAVE_MEMCMP
-		   memcmp(&(addr->s_addr), he->h_addr_list[a],
-			  he->h_length)
+		       memcmp(&(addr->s_addr), he->h_addr_list[a],
+			      he->h_length)
 #else
-		   bcmp(&(addr->s_addr), he->h_addr_list[a], he->h_length)
+		       bcmp(&(addr->s_addr), he->h_addr_list[a],
+			    he->h_length)
 #endif
-		   == 0) {
-		if (config->loghostnames == FLAGTRUE &&
-		    (he =
-		     gethostbyaddr((char *)addr, so,
-				   AF_INET)) != (struct hostent *)0) {
-		    *peername = he->h_name;
+		       == 0) {
+		    ret = pACtmp->ctrust;
+		    goto common_ret;
 		}
-		return pACtmp->ctrust;
 	    }
 	}
+#if TRUST_REVERSE_DNS
+	/* we chop bits off client names so that we can put domain
+	 * names in access lists or even top-level domains.
+	 *    allowed conserver.com, net;
+	 * this allows anything from conserver.com and anything in
+	 * the .net top-level.  without TRUST_REVERSE_DNS, those names
+	 * better map to ip addresses for them to take effect.
+	 */
+	if (revNames != (char **)0) {
+	    char *pcName;
+	    int wlen;
+	    int len;
+	    wlen = strlen(pACtmp->pcwho);
+	    for (a = 0; revNames[a] != (char *)0; a++) {
+		for (pcName = revNames[a], len = strlen(pcName);
+		     len >= wlen; len = strlen(++pcName)) {
+		    CONDDEBUG((1, "AccType(): name=%s", pcName));
+		    if (strcasecmp(pcName, pACtmp->pcwho) == 0) {
+			if (peername != (char **)0)
+			    *peername = StrDup(revNames[a]);
+			ret = pACtmp->ctrust;
+			goto common_ret2;
+		    }
+		    pcName = strchr(pcName, '.');
+		    if (pcName == (char *)0)
+			break;
+		}
+	    }
+	}
+#endif
     }
 
+  common_ret:
+    if (config->loghostnames == FLAGTRUE && peername != (char **)0) {
 #if TRUST_REVERSE_DNS
-    /* if we trust reverse dns, we get the names associated with
-     * the address we're checking and then check each of those
-     * against the access list entries.
-     * we chop bits off client names so that we can put domain
-     * names in access lists or even top-level domains.
-     *    allowed conserver.com, net;
-     * this allows anything from conserver.com and anything in
-     * the .net top-level.  without TRUST_REVERSE_DNS, those names
-     * better map to ip addresses for them to take effect.
-     */
-    if ((he =
-	 gethostbyaddr((char *)addr, so,
-		       AF_INET)) == (struct hostent *)0) {
-	Error("AccType(): gethostbyaddr(%s): %s", inet_ntoa(*addr),
-	      hstrerror(h_errno));
-	return config->defaultaccess;
-    }
-    for (pACtmp = pACList; pACtmp != (ACCESS *)0; pACtmp = pACtmp->pACnext) {
-	if (pACtmp->isCIDR != 0)
-	    continue;
-	wlen = strlen(pACtmp->pcwho);
-	for (hname = he->h_name, a = 0; hname != (char *)0;
-	     hname = he->h_aliases[a++]) {
-	    for (pcName = hname, len = strlen(pcName); len >= wlen;
-		 len = strlen(++pcName)) {
-		CONDDEBUG((1, "AccType(): name=%s", pcName));
-		if (strcasecmp(pcName, pACtmp->pcwho) == 0) {
-		    *peername = hname;
-		    return pACtmp->ctrust;
-		}
-		pcName = strchr(pcName, '.');
-		if (pcName == (char *)0)
-		    break;
-	    }
+	if (revNames != (char **)0 && revNames[0] != (char *)0)
+	    *peername = StrDup(revNames[0]);
+#else
+	if ((he =
+	     gethostbyaddr((char *)addr, so,
+			   AF_INET)) != (struct hostent *)0) {
+	    *peername = StrDup(he->h_name);
 	}
+#endif
+    }
+#if TRUST_REVERSE_DNS
+  common_ret2:
+    if (revNames != (char **)0) {
+	for (a = 0; revNames[a] != (char *)0; a++)
+	    free(revNames[a]);
+	free(revNames);
     }
 #endif
-    if (config->loghostnames == FLAGTRUE &&
-	(he =
-	 gethostbyaddr((char *)addr, so,
-		       AF_INET)) != (struct hostent *)0) {
-	*peername = he->h_name;
-    }
-    return config->defaultaccess;
+    return ret;
 }
 
 void

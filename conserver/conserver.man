@@ -1,6 +1,6 @@
 .\" @(#)conserver.8 01/06/91 OSU CIS; Thomas A. Fine
-.\" $Id: conserver.man,v 1.38 2003-09-22 08:33:41-07 bryan Exp $
-.TH CONSERVER 8 "2003-09-22" "conserver-8.0.5" "conserver"
+.\" $Id: conserver.man,v 1.40 2003/11/10 15:37:24 bryan Exp $
+.TH CONSERVER 8 "2003/11/10" "conserver-8.0.6" "conserver"
 .SH NAME
 conserver \- console server daemon
 .SH SYNOPSIS
@@ -26,6 +26,8 @@ conserver \- console server daemon
 .IR logfile ]
 .RB [ \-O
 .IR min ]
+.RB [ \-U
+.IR logfile ]
 .SH DESCRIPTION
 .B Conserver
 is the daemon that manages
@@ -93,7 +95,7 @@ Close all connections and exit.
 .TP
 SIGHUP
 Reread the configuration file.
-New consoles are managed by forking off new childen, deleted
+New consoles are managed by forking off new children, deleted
 consoles (and their clients) are dropped,
 and changes to consoles are done "in place", resetting the console
 port (bringing it down and up) only when necessary.
@@ -147,7 +149,7 @@ the signing certificate must be properly trusted, which usually means
 the public portion is in
 .IB OPENSSL_ROOT /ssl/certs
 (on both the client and server sides).
-See the sample self-signing certficate making script
+See the sample self-signing certificate making script
 .B contrib/maketestcerts
 for further clues.
 To allow
@@ -331,6 +333,17 @@ This applies to all consoles to which no user is attached,
 independent of whether logging of individual consoles is enabled via
 .B conserver.cf
 entries.
+.TP
+.BI \-U logfile
+Copy all console data to the ``unified''
+.IR logfile .
+The output is the same as the
+.B \-u
+output, but all consoles, not
+just those without a user, are logged.
+Each line of output is prefixed with the console name.
+If a user is attached read/write, a `*' is appended to the console name,
+to allow log watching utilites to ignore potential user-introduced alarms.
 .TP
 .B \-v
 Echo the configuration as it is being read (be verbose).

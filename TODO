@@ -10,9 +10,6 @@ Bryan Stansell
 
 ---------------------------------------------------------------------------
 
-- Singular logging so that swatch/logsurfer can watch for errors across
-  the board - unloved output comes close
-
 - Telnet protocol should be improved
     - Not even RFC 854 compliant
     - Option negotiation ignored - should we negotiate anything?
@@ -83,6 +80,12 @@ Bryan Stansell
 - redefine client escape sequence in conserver.cf : Toby Gerhart
   <toby.gerhart@eds.com>
 
+- send a string when connected to a console, so you can set the
+  xterm title, for example : Richard Threadgill <richardt@tellme.com>
+
+- allows for very long replays (hundres of lines) : John Stoffel
+  <stoffel@lucent.com>
+
 #
-#  $Id: TODO,v 1.38 2003-10-31 09:53:46-08 bryan Exp $
+#  $Id: TODO,v 1.42 2003/11/15 17:08:15 bryan Exp $
 #

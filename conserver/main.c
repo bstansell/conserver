@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.163 2003-10-31 09:55:04-08 bryan Exp $
+ *  $Id: main.c,v 5.171 2003/11/16 19:29:20 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -65,7 +65,7 @@ char *interface = (char *)0;
 CONFIG defConfig =
     { (STRING *)0, 'r', FLAGFALSE, LOGFILEPATH, PASSWDFILE, DEFPORT,
     FLAGTRUE,
-    FLAGTRUE, 0, DEFBASEPORT
+    FLAGTRUE, 0, DEFBASEPORT, (char *)0
 #if HAVE_SETPROCTITLE
 	, FLAGFALSE
 #endif
@@ -75,6 +75,7 @@ CONFIG defConfig =
 };
 
 struct sockaddr_in in_port;
+CONSFILE *unifiedlog = (CONSFILE *)0;
 
 #if HAVE_DMALLOC && DMALLOC_MARK_MAIN
 unsigned long dmallocMarkMain = 0;
@@ -424,6 +425,31 @@ ReopenLogfile()
     tag = 0;
 }
 
+void
+#if PROTOTYPES
+ReopenUnifiedlog(void)
+#else
+ReopenUnifiedlog()
+#endif
+{
+    /* close any existing */
+    if (unifiedlog != (CONSFILE *)0)
+	FileClose(&unifiedlog);
+
+    /* return if we aren't opening again */
+    if (config->unifiedlog == (char *)0)
+	return;
+
+    /* open a new one */
+    if ((unifiedlog =
+	 FileOpen(config->unifiedlog, O_WRONLY | O_CREAT | O_APPEND,
+		  0644)) == (CONSFILE *)0) {
+	Error("ReopenUnifiedlog(): open(%s): %s", config->unifiedlog,
+	      strerror(errno));
+	return;
+    }
+}
+
 /* become a daemon							(ksb)
  */
 static void
@@ -497,7 +523,7 @@ Usage(wantfull)
 #endif
 {
     static char u_terse[] =
-	"[-7dDEFhinoRSuvV] [-a type] [-m max] [-M addr] [-p port] [-b port] [-c cred] [-C config] [-P passwd] [-L logfile] [-O min]";
+	"[-7dDEFhinoRSuvV] [-a type] [-m max] [-M addr] [-p port] [-b port] [-c cred] [-C config] [-P passwd] [-L logfile] [-O min] [-U logfile]";
     static char *full[] = {
 	"7          strip the high bit off all console data",
 	"a type     set the default access type",
@@ -529,6 +555,7 @@ Usage(wantfull)
 	"R          disable automatic client redirection",
 	"S          syntax check of configuration file",
 	"u          copy \"unloved\" console data to stdout",
+	"U logfile  copy all console data to the \"unified\" logfile",
 	"v          be verbose on startup",
 	"V          output version info",
 	(char *)0
@@ -565,6 +592,9 @@ Version()
 #endif
 #if HAVE_PAM
 	"pam",
+#endif
+#if TRUST_REVERSE_DNS
+	"trustrevdns",
 #endif
 	(char *)0
     };
@@ -727,6 +757,10 @@ SummarizeDataStructures()
 		size += strlen(pCE->initcmd);
 	    if (pCE->execSlave != (char *)0)
 		size += strlen(pCE->execSlave);
+	    if (pCE->motd != (char *)0)
+		size += strlen(pCE->motd);
+	    if (pCE->idlestring != (char *)0)
+		size += strlen(pCE->idlestring);
 	    if (pCE->fdlog != (CONSFILE *)0)
 		size += sizeof(CONSFILE);
 	    if (pCE->cofile != (CONSFILE *)0)
@@ -903,18 +937,22 @@ DumpDataStructures()
 		       "DumpDataStructures():  initpid=%lu, initcmd=%s, initfile=%d",
 		       (unsigned long)pCE->initpid, EMPTYSTR(pCE->initcmd),
 		       FileFDNum(pCE->initfile)));
+	    CONDDEBUG((1,
+		       "DumpDataStructures():  motd=%s, idletimeout=%d, idlestring=%s",
+		       EMPTYSTR(pCE->motd), pCE->idletimeout,
+		       EMPTYSTR(pCE->idlestring)));
 	    if (pCE->ro) {
 		CONSENTUSERS *u;
 		for (u = pCE->ro; u != (CONSENTUSERS *)0; u = u->next) {
-		    CONDDEBUG((1, "DumpDataStructures():  ro=%s",
-			       u->user->name));
+		    CONDDEBUG((1, "DumpDataStructures():  ro=%s%s",
+			       (u->not ? "!" : ""), u->user->name));
 		}
 	    }
 	    if (pCE->rw) {
 		CONSENTUSERS *u;
 		for (u = pCE->rw; u != (CONSENTUSERS *)0; u = u->next) {
-		    CONDDEBUG((1, "DumpDataStructures():  rw=%s",
-			       u->user->name));
+		    CONDDEBUG((1, "DumpDataStructures():  rw=%s%s",
+			       (u->not ? "!" : ""), u->user->name));
 		}
 	    }
 	    CONDDEBUG((1, "DumpDataStructures():  ------"));
@@ -1133,7 +1171,7 @@ main(argc, argv)
 {
     int i;
     FILE *fpConfig = (FILE *)0;
-    static char acOpts[] = "7a:b:c:C:dDEFhiL:m:M:noO:p:P:RSuVv";
+    static char acOpts[] = "7a:b:c:C:dDEFhiL:m:M:noO:p:P:RSuU:Vv";
     extern int optopt;
     extern char *optarg;
     struct passwd *pwd;
@@ -1278,6 +1316,10 @@ main(argc, argv)
 	    case 'u':
 		fAll = 1;
 		break;
+	    case 'U':
+		if ((optConf->unifiedlog = StrDup(optarg)) == (char *)0)
+		    OutOfMem();
+		break;
 	    case 'V':
 		fVersion = 1;
 		break;
@@ -1368,6 +1410,9 @@ main(argc, argv)
     }
     ProbeInterfaces();
 
+    /* initialize the timers */
+    for (i = 0; i < T_MAX; i++)
+	timers[i] = (time_t)0;
 
     /* read the config file */
     if ((FILE *)0 == (fpConfig = fopen(pcConfig, "r"))) {
@@ -1400,8 +1445,7 @@ main(argc, argv)
 	struct servent *pSE;
 	if ((struct servent *)0 ==
 	    (pSE = getservbyname(config->primaryport, "tcp"))) {
-	    Error("getservbyname(%s): %s", config->primaryport,
-		  strerror(errno));
+	    Error("getservbyname(%s) failed", config->primaryport);
 	    Bye(EX_OSERR);
 	} else {
 	    bindPort = ntohs((unsigned short)pSE->s_port);
@@ -1431,8 +1475,7 @@ main(argc, argv)
 	struct servent *pSE;
 	if ((struct servent *)0 ==
 	    (pSE = getservbyname(config->secondaryport, "tcp"))) {
-	    Error("getservbyname(%s): %s", config->secondaryport,
-		  strerror(errno));
+	    Error("getservbyname(%s) failed", config->secondaryport);
 	    Bye(EX_OSERR);
 	} else {
 	    bindBasePort = ntohs((unsigned short)pSE->s_port);
@@ -1492,6 +1535,19 @@ main(argc, argv)
     else
 	config->loghostnames = defConfig.loghostnames;
 
+    if (optConf->unifiedlog != (char *)0) {
+	config->unifiedlog = StrDup(optConf->unifiedlog);
+	if (config->unifiedlog == (char *)0)
+	    OutOfMem();
+    } else if (pConfig->unifiedlog != (char *)0) {
+	config->unifiedlog = StrDup(pConfig->unifiedlog);
+	if (config->unifiedlog == (char *)0)
+	    OutOfMem();
+    } else if (defConfig.unifiedlog != (char *)0) {
+	config->unifiedlog = StrDup(defConfig.unifiedlog);
+	if (config->unifiedlog == (char *)0)
+	    OutOfMem();
+    }
 #if HAVE_OPENSSL
     if (optConf->sslrequired != FLAGUNKNOWN)
 	config->sslrequired = optConf->sslrequired;
@@ -1508,6 +1564,15 @@ main(argc, argv)
 	config->sslcredentials = StrDup(defConfig.sslcredentials);
 #endif
 
+#if HAVE_SETPROCTITLE
+    if (optConf->setproctitle != FLAGUNKNOWN)
+	config->setproctitle = optConf->setproctitle;
+    else if (pConfig->setproctitle != FLAGUNKNOWN)
+	config->setproctitle = pConfig->setproctitle;
+    else
+	config->setproctitle = defConfig.setproctitle;
+#endif
+
 #if HAVE_DMALLOC && DMALLOC_MARK_MAIN
     dmallocMarkMain = dmalloc_mark();
 #endif
@@ -1522,6 +1587,8 @@ main(argc, argv)
 
 	if (config->daemonmode == FLAGTRUE)
 	    Daemonize();
+
+	ReopenUnifiedlog();
 
 	/* if no one can use us we need to come up with a default
 	 */
@@ -1583,6 +1650,9 @@ main(argc, argv)
 	SimpleSignal(SIGCHLD, SIG_DFL);
 	SignalKids(SIGTERM);
     }
+
+    if (unifiedlog != (CONSFILE *)0)
+	FileClose(&unifiedlog);
 
     DumpDataStructures();
 

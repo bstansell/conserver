@@ -4,7 +4,7 @@
 #
 
 %define pkg  conserver
-%define ver  conserver-8.0.5
+%define ver  8.0.6
 
 # define the name of the machine on which the main conserver
 # daemon will be running if you don't want to use the default
@@ -17,7 +17,7 @@
 Summary: Serial console server daemon/client
 Name: %{pkg}
 Version: %{ver}
-Release: 1.%{distver}x
+Release: 1.%{distver}
 Copyright: distributable
 Group: System Environment/Daemons
 URL: http://www.conserver.com/
@@ -100,4 +100,6 @@ fi
 %{prefix}/share/man/man8/conserver.8.gz
 %{prefix}/share/man/man5/conserver.cf.5.gz
 %{prefix}/share/man/man5/conserver.passwd.5.gz
+%{prefix}/share/examples/conserver/conserver.cf
+%{prefix}/share/examples/conserver/conserver.passwd
 %{prefix}/sbin/conserver

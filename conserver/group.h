@@ -1,5 +1,5 @@
 /*
- *  $Id: group.h,v 5.38 2003-09-19 08:58:18-07 bryan Exp $
+ *  $Id: group.h,v 5.41 2003/11/15 20:00:09 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -34,6 +34,14 @@
  * 4. This notice may not be removed or altered.
  */
 
+/* timers used to have various things happen */
+#define T_STATE		0
+#define T_IDLE		1
+#define T_MARK		2
+#define T_REINIT	3
+#define T_AUTOUP	4
+#define T_MAX		5	/* T_MAX *must* be last */
+
 /* return values used by CheckPass()
  */
 #define AUTH_SUCCESS	0	/* ok                                   */
@@ -52,22 +60,25 @@ typedef struct grpent {		/* group info                           */
     struct grpent *pGEnext;	/* next group entry                     */
 } GRPENT;
 
+extern time_t timers[];
+
 extern void Spawn PARAMS((GRPENT *));
 extern int CheckPass PARAMS((char *, char *));
 extern void TagLogfile PARAMS((const CONSENT *, char *, ...));
 extern void TagLogfileAct PARAMS((const CONSENT *, char *, ...));
-extern void CleanupBreak PARAMS((short));
 extern void DestroyGroup PARAMS((GRPENT *));
 extern void DestroyConsent PARAMS((GRPENT *, CONSENT *));
 extern void SendClientsMsg PARAMS((CONSENT *, char *));
 extern void ResetMark PARAMS((void));
 extern void DestroyConsentUsers PARAMS((CONSENTUSERS **));
 extern CONSENTUSERS *ConsentFindUser PARAMS((CONSENTUSERS *, char *));
+extern int ConsentUserOk PARAMS((CONSENTUSERS *, char *));
 extern void DisconnectClient
 PARAMS((GRPENT *, CONSCLIENT *, char *, FLAG));
 extern int ClientAccess PARAMS((CONSENT *, char *));
 extern void DestroyClient PARAMS((CONSCLIENT *));
 extern int CheckPasswd PARAMS((CONSCLIENT *, char *));
+extern void ExpandString PARAMS((char *, CONSENT *, short));
 #if HAVE_OPENSSL
 extern int AttemptSSL PARAMS((CONSCLIENT *));
 #endif

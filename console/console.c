@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.147 2003-10-03 15:21:34-07 bryan Exp $
+ *  $Id: console.c,v 5.150 2003/11/15 16:32:21 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -54,8 +54,6 @@ unsigned short bindPort;
 CONSFILE *cfstdout;
 char *pcUser = (char *)0;
 int disconnectCount = 0;
-
-static char acMesg[8192];	/* the buffer for startup negotiation   */
 
 #if HAVE_OPENSSL
 SSL_CTX *ctx = (SSL_CTX *)0;
@@ -696,6 +694,7 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
     int i;
     int justProcessedUrg = 0;
     char *r = (char *)0;
+    static char acMesg[8192];
 
     if (fVerbose) {
 	Msg("%s to %s (on %s)", pcHow, pcMach, pcMaster);
@@ -770,8 +769,8 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 	/* tell the conserver to change escape sequences, assume OK
 	 * (we'll find out soon enough)
 	 */
-	sprintf(acMesg, "%c%ce%c%c", DEFATTN, DEFESC, chAttn, chEsc);
-	FileWrite(pcf, FLAGFALSE, acMesg, 5);
+	FilePrint(pcf, FLAGFALSE, "%c%ce%c%c", DEFATTN, DEFESC, chAttn,
+		  chEsc);
 	r = ReadReply(pcf, 0);
 	if (strncmp(r, "[redef:", 7) != 0) {
 	    Error("protocol botch on redef of escape sequence");
@@ -806,15 +805,12 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 		Error("%s is read-only", pcMach);
 	    }
 	} else if (fIn != (*pcHow == 'f' ? 'a' : *pcHow)) {
-	    sprintf(acMesg, "%c%c%c", chAttn, chEsc, *pcHow);
-	    FileWrite(pcf, FLAGFALSE, acMesg, 3);
+	    FilePrint(pcf, FLAGFALSE, "%c%c%c", chAttn, chEsc, *pcHow);
 	}
 	if (fReplay) {
-	    sprintf(acMesg, "%c%cr", chAttn, chEsc);
-	    FileWrite(pcf, FLAGFALSE, acMesg, 3);
+	    FilePrint(pcf, FLAGFALSE, "%c%cr", chAttn, chEsc);
 	} else if (fVerbose) {
-	    sprintf(acMesg, "%c%c\022", chAttn, chEsc);
-	    FileWrite(pcf, FLAGFALSE, acMesg, 3);
+	    FilePrint(pcf, FLAGFALSE, "%c%c\022", chAttn, chEsc);
 	}
     }
     fflush(stdout);
@@ -972,11 +968,7 @@ DoCmds(master, ports, cmdi)
 	}
 #endif
 
-	BuildTmpString((char *)0);
-	BuildTmpString("login ");
-	BuildTmpString(pcUser);
-	t = BuildTmpString("\r\n");
-	FileWrite(pcf, FLAGFALSE, t, -1);
+	FilePrint(pcf, FLAGFALSE, "login %s\r\n", pcUser);
 
 	t = ReadReply(pcf, 0);
 	if (strncmp(t, "passwd?", 7) == 0) {
@@ -994,15 +986,16 @@ DoCmds(master, ports, cmdi)
 		tmpString = AllocString();
 	    if (tmpString->used <= 1) {
 		char *pass;
-		sprintf(acMesg, "Enter %s@%s's password: ", pcUser,
-			hostname);
-		pass = GetPassword(acMesg);
+		BuildStringPrint(tmpString, "Enter %s@%s's password: ",
+				 pcUser, hostname);
+		pass = GetPassword(tmpString->string);
 		if (pass == (char *)0) {
 		    Error("could not get password from tty for `%s'",
 			  server);
 		    FileClose(&pcf);
 		    continue;
 		}
+		BuildString((char *)0, tmpString);
 		BuildString(pass, tmpString);
 		BuildString("\r\n", tmpString);
 	    }
@@ -1367,7 +1360,7 @@ main(argc, argv)
 	/* non-numeric only */
 	struct servent *pSE;
 	if ((pSE = getservbyname(pcPort, "tcp")) == (struct servent *)0) {
-	    Error("getservbyname(%s): %s", pcPort, strerror(errno));
+	    Error("getservbyname(%s) failed", pcPort);
 	    Bye(EX_UNAVAILABLE);
 	} else {
 	    bindPort = ntohs((u_short) pSE->s_port);

@@ -1,7 +1,37 @@
 				CHANGES
 				=======
 
-version 8.0.5 (Oct 31,2003):
+version 8.0.6 (Nov 16, 2003):
+	- code was missing regarding the 'setproctitle' option - patch
+	  by Dmitry Morozovsky <marck@rinet.ru>
+	- fixed the order of access list checking when
+	  --with-trustrevdns is used
+	- fixed various spelling errors - patches by Matt Selsky
+	  <selsky@columbia.edu>
+	- added console 'idletimeout' and 'idlestring' options to
+	  trigger the sending of 'idlestring' after a lack of activity
+	  for 'idletimeout' seconds - suggested by Ian Potts
+	  <ian.potts@db.com>
+	- added console 'portbase' and 'portinc' options to allow
+	  specifying a formula for referencing ports - inspired by Todd
+	  Stansell <todd@stansell.org>
+	- fixed problem where console 'port' option didn't take port
+	  names (manpage said it did)
+	- added server -U option and configuration option 'unifiedlog'
+	  to allow a copy of all console activity to go to a single file
+	- removed all sprintf() calls
+	- added 'devicesubst' and 'execsubst' console options for doing
+	  replacements with calculated port numbers on the 'device' and
+	  'exec' values
+	- NULL characters in console data caused data loss because of
+	  strlen() usage - reported by Toby Gerhart <toby.gerhart@eds.com>
+	- fixed a couple errors in contrib/redhat-rpm/conserver.spec -
+	  reported by Martin Evans <m.d.t.evans@qmul.ac.uk>
+	- added capability to use '!' in user access lists to prevent a
+	  user from having access - suggested by Matt Selsky
+	  <selsky@columbia.edu>
+
+version 8.0.5 (Oct 31, 2003):
 	- added 'loghostnames' config option (default is on) to log
 	  client hostnames instead of ip addresses (like pre-8.0.0) -
 	  suggested by Han Pilmeyer <han@zk3.dec.com>
@@ -586,5 +616,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.120 2003-10-31 10:04:12-08 bryan Exp $
+#  $Id: CHANGES,v 1.131 2003/11/15 23:57:18 bryan Exp $
 #

@@ -1,5 +1,5 @@
 /*
- *  $Id: util.c,v 1.102 2003-10-03 06:32:34-07 bryan Exp $
+ *  $Id: util.c,v 1.105 2003/11/15 16:31:51 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -143,7 +143,10 @@ BuildString(str, msg)
 	CONDDEBUG((3, "BuildString(): 0x%lx reset", (void *)msg));
 	return msg->string;
     }
-    len = strlen(str) + 1;
+    if (msg->used)		/* string or string + null? */
+	len = strlen(str);
+    else
+	len = strlen(str) + 1;
     if (msg->used + len >= msg->allocated) {
 	if (0 == msg->allocated) {
 	    msg->allocated =
@@ -161,13 +164,19 @@ BuildString(str, msg)
 	if (msg->string == (char *)0)
 	    OutOfMem();
     }
+    /* if msg->used, then len = strlen(), so we need to copy len + 1 to
+     * get the NULL which we overwrote with the copy */
 #if HAVE_MEMCPY
-    memcpy(msg->string + (msg->used ? msg->used - 1 : 0), str, len);
-#else
-    bcopy(str, msg->string + (msg->used ? msg->used - 1 : 0), len);
-#endif
     if (msg->used)
-	len--;
+	memcpy(msg->string + msg->used - 1, str, len + 1);
+    else
+	memcpy(msg->string, str, len);
+#else
+    if (msg->used)
+	bcopy(str, msg->string + msg->used - 1, len + 1);
+    else
+	bcopy(str, msg->string, len);
+#endif
     msg->used += len;
     CONDDEBUG((3, "BuildString(): 0x%lx added %d chars (%d/%d now)",
 	       (void *)msg, len, msg->used, msg->allocated));
@@ -195,12 +204,10 @@ BuildStringN(str, n, msg)
     }
     if (n <= 0)
 	return msg->string;
-    len = strlen(str) + 1;
-    if (len > n) {		/* if we're a substring */
+    if (msg->used)
 	len = n;
-	if (str[n - 1] != '\000')	/* if we aren't copying a '\000', */
-	    len++;		/* we need to add one at the end */
-    }
+    else
+	len = n + 1;
     if (msg->used + len >= msg->allocated) {
 	if (0 == msg->allocated) {
 	    msg->allocated =
@@ -219,14 +226,12 @@ BuildStringN(str, n, msg)
 	    OutOfMem();
     }
 #if HAVE_MEMCPY
-    memcpy(msg->string + (msg->used ? msg->used - 1 : 0), str, len);
+    memcpy(msg->string + (msg->used ? msg->used - 1 : 0), str, n);
 #else
-    bcopy(str, msg->string + (msg->used ? msg->used - 1 : 0), len);
+    bcopy(str, msg->string + (msg->used ? msg->used - 1 : 0), n);
 #endif
-    if (len > n)		/* we need to terminate the string */
-	msg->string[(msg->used ? msg->used - 1 : 0) + len - 1] = '\000';
-    if (msg->used)
-	len--;
+    /* add a NULL */
+    msg->string[(msg->used ? msg->used - 1 : 0) + n] = '\000';
     msg->used += len;
     CONDDEBUG((3, "BuildStringN(): 0x%lx added %d chars (%d/%d now)",
 	       (void *)msg, len, msg->used, msg->allocated));
@@ -1281,9 +1286,13 @@ VWrite(cfp, bufferonly, str, fmt, ap)
 {
     int s, l, e;
     char c;
+    int fmtlen = 0;
+    int fmtpre = 0;
+    short padzero = 0;
+    short sawdot = 0;
     static STRING *msg = (STRING *)0;
     static STRING *output = (STRING *)0;
-    static short flong, fneg;
+    short flong = 0, fneg = 0, fminus = 0;
 
     if (fmt == (char *)0 || (cfp == (CONSFILE *)0 && str == (STRING *)0))
 	return;
@@ -1295,18 +1304,12 @@ VWrite(cfp, bufferonly, str, fmt, ap)
 
     BuildString((char *)0, output);
 
-    fneg = flong = 0;
     for (e = s = l = 0; (c = fmt[s + l]) != '\000'; l++) {
-	if (c == '%') {
-	    if (e) {
-		e = 0;
-		BuildStringChar('%', output);
-	    } else {
-		e = 1;
-		BuildStringN(fmt + s, l, output);
-		s += l;
-		l = 0;
-	    }
+	if (e == 0 && c == '%') {
+	    e = 1;
+	    BuildStringN(fmt + s, l, output);
+	    s += l;
+	    l = 0;
 	    continue;
 	}
 	if (e) {
@@ -1314,64 +1317,170 @@ VWrite(cfp, bufferonly, str, fmt, ap)
 	    int u;
 	    char *p;
 	    char cc;
-	    switch (c) {
-		case 'h':
-		    /* noop since shorts are promoted to int in va_arg */
-		    continue;
-		case 'l':
-		    flong = 1;
-		    continue;
-		case 'c':
-		    cc = (char)va_arg(ap, int);
-		    BuildStringChar(cc, output);
-		    break;
-		case 's':
-		    p = va_arg(ap, char *);
-		    BuildString(p, output);
-		    break;
-		case 'd':
-		    i = (flong ? va_arg(ap, long) : (long)va_arg(ap, int));
-		    if ((long)i < 0) {
-			fneg = 1;
-			i = -i;
-		    }
-		    goto number;
-		case 'u':
-		    i = (flong ? va_arg(ap, unsigned long)
-			 : (unsigned long)va_arg(ap, unsigned int));
-		  number:
-		    BuildString((char *)0, msg);
-		    while (i >= 10) {
-			BuildStringChar((i % 10) + '0', msg);
-			i /= 10;
-		    }
-		    BuildStringChar(i + '0', msg);
-		    /* reverse the text to put it in forward order
-		     */
-		    u = msg->used - 1;
-		    for (i = 0; i < u / 2; i++) {
-			char temp;
+	    if (c >= '0' && c <= '9') {
+		if (sawdot == 0) {
+		    if (c == '0' && fmtlen == 0)
+			padzero = 1;
+		    fmtlen = fmtlen * 10 + (c - '0');
+		} else {
+		    fmtpre = fmtpre * 10 + (c - '0');
+		}
+	    } else {
+		switch (c) {
+		    case '.':
+			sawdot = 1;
+			continue;
+		    case '-':
+			fminus = 1;
+			continue;
+		    case 'h':
+			/* noop since shorts are promoted to int in va_arg */
+			continue;
+		    case 'l':
+			flong = 1;
+			continue;
+		    case '%':
+			BuildStringChar('%', output);
+			break;
+		    case 'c':
+			cc = (char)va_arg(ap, int);
+			BuildStringChar(cc, output);
+			break;
+		    case 's':
+			p = va_arg(ap, char *);
+			{
+			    int l = strlen(p);
+			    int c;
+			    if (fmtpre > 0 && fmtpre < l)
+				l = fmtpre;
+			    if (fminus != 0)
+				BuildStringN(p, l, output);
+			    for (c = l; c < fmtlen; c++)
+				BuildStringChar(' ', output);
+			    if (fminus == 0)
+				BuildStringN(p, l, output);
+			}
+			break;
+		    case 'd':
+			i = (flong ? va_arg(ap, long) : (long)
+			     va_arg(ap, int));
+			if ((long)i < 0) {
+			    fneg = 1;
+			    i = -i;
+			}
+			goto number;
+		    case 'u':
+			i = (flong ? va_arg(ap, unsigned long)
+			     : (unsigned long)va_arg(ap, unsigned int));
+		      number:
+			BuildString((char *)0, msg);
+			while (i >= 10) {
+			    BuildStringChar((i % 10) + '0', msg);
+			    i /= 10;
+			}
+			BuildStringChar(i + '0', msg);
+			if (fneg)
+			    BuildStringChar('-', msg);
 
-			temp = msg->string[i];
-			msg->string[i]
-			    = msg->string[u - i - 1];
-			msg->string[u - i - 1] = temp;
-		    }
-		    if (fneg) {
-			BuildStringChar('-', output);
-			fneg = 0;
-		    }
-		    BuildString(msg->string, output);
-		    break;
-		default:
-		    Error
-			("VWrite(): unknown conversion character `%c' in `%s'",
-			 c, fmt);
-		    break;
+			if (fmtpre > 0) {
+			    padzero = 0;
+			    if (fmtpre > fmtlen)
+				fmtlen = fmtpre;
+			    while (msg->used - 1 < fmtpre)
+				BuildStringChar('0', msg);
+			}
+
+			/* reverse the text to put it in forward order
+			 */
+			u = msg->used - 1;
+			for (i = 0; i < u / 2; i++) {
+			    char temp;
+
+			    temp = msg->string[i];
+			    msg->string[i]
+				= msg->string[u - i - 1];
+			    msg->string[u - i - 1] = temp;
+			}
+
+			{
+			    int l = msg->used - 1;
+			    if (fminus != 0)
+				BuildString(msg->string, output);
+			    for (; l < fmtlen; l++) {
+				if (padzero == 0 || fminus != 0)
+				    BuildStringChar(' ', output);
+				else
+				    BuildStringChar('0', output);
+			    }
+			    if (fminus == 0)
+				BuildString(msg->string, output);
+			}
+			break;
+		    case 'X':
+		    case 'x':
+			i = (flong ? va_arg(ap, unsigned long)
+			     : (unsigned long)va_arg(ap, unsigned int));
+			BuildString((char *)0, msg);
+			while (i >= 16) {
+			    if (i % 16 >= 10)
+				BuildStringChar((i % 16) - 10 +
+						(c == 'x' ? 'a' : 'A'),
+						msg);
+			    else
+				BuildStringChar((i % 16) + '0', msg);
+			    i /= 16;
+			}
+			if (i >= 10)
+			    BuildStringChar(i - 10 +
+					    (c == 'x' ? 'a' : 'A'), msg);
+			else
+			    BuildStringChar(i + '0', msg);
+
+			if (fmtpre > 0) {
+			    padzero = 0;
+			    if (fmtpre > fmtlen)
+				fmtlen = fmtpre;
+			    while (msg->used - 1 < fmtpre)
+				BuildStringChar('0', msg);
+			}
+
+			/* reverse the text to put it in forward order
+			 */
+			u = msg->used - 1;
+			for (i = 0; i < u / 2; i++) {
+			    char temp;
+
+			    temp = msg->string[i];
+			    msg->string[i]
+				= msg->string[u - i - 1];
+			    msg->string[u - i - 1] = temp;
+			}
+
+			{
+			    int l = msg->used - 1;
+			    if (fminus != 0)
+				BuildString(msg->string, output);
+			    for (; l < fmtlen; l++) {
+				if (padzero == 0 || fminus != 0)
+				    BuildStringChar(' ', output);
+				else
+				    BuildStringChar('0', output);
+			    }
+			    if (fminus == 0)
+				BuildString(msg->string, output);
+			}
+			break;
+		    default:
+			Error
+			    ("VWrite(): unknown conversion character `%c' in `%s'",
+			     c, fmt);
+			break;
+		}
+		s += l + 1;
+		l = -1;
+		e = flong = fneg = fminus = 0;
+		fmtlen = fmtpre = sawdot = padzero = 0;
 	    }
-	    s += l + 1;
-	    l = -1;
-	    e = flong = 0;
 	}
     }
     if (l)
@@ -1410,6 +1519,28 @@ BuildStringPrint(str, fmt, va_alist)
 	return (char *)0;
     else
 	return str->string;
+}
+
+char *
+#if PROTOTYPES
+BuildTmpStringPrint(char *fmt, ...)
+#else
+BuildTmpStringPrint(fmt, va_alist)
+    char *fmt;
+    va_dcl
+#endif
+{
+    va_list ap;
+#if PROTOTYPES
+    va_start(ap, fmt);
+#else
+    va_start(ap);
+#endif
+    if (mymsg == (STRING *)0)
+	mymsg = AllocString();
+    VWrite((CONSFILE *)0, FLAGFALSE, mymsg, fmt, ap);
+    va_end(ap);
+    return mymsg->string;
 }
 
 void

@@ -1,5 +1,5 @@
 /*
- *  $Id: getpassword.c,v 1.7 2003-09-28 12:29:17-07 bryan Exp $
+ *  $Id: getpassword.c,v 1.7 2003/09/28 19:29:17 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *

@@ -1,5 +1,5 @@
 /*
- *  $Id: access.h,v 5.26 2003-08-10 11:11:20-07 bryan Exp $
+ *  $Id: access.h,v 5.26 2003/08/10 18:11:20 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *

@@ -1,5 +1,5 @@
 /*
- *  $Id: master.h,v 5.17 2003-10-03 07:23:37-07 bryan Exp $
+ *  $Id: master.h,v 5.17 2003/10/03 14:23:37 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *

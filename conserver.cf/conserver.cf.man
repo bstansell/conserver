@@ -1,5 +1,5 @@
-.\" $Id: conserver.cf.man,v 1.44 2003-10-31 09:54:19-08 bryan Exp $
-.TH CONSERVER.CF 5 "2003-10-31" "conserver-8.0.5" "conserver"
+.\" $Id: conserver.cf.man,v 1.51 2003/11/15 20:00:11 bryan Exp $
+.TH CONSERVER.CF 5 "2003/11/15" "conserver-8.0.6" "conserver"
 .SH NAME
 conserver.cf \- console configuration file for
 .BR conserver (8)
@@ -65,12 +65,12 @@ The parser has six characters that it considers special.
 These are: ``{'', ``}'', ``;'', ``#'', ``\e'', and ``"''.
 The first three (hereby called tokens) define the format of the
 configuration blocks and are used as word
-seperators, the next is the comment character, and the last two are
+separators, the next is the comment character, and the last two are
 quoting characters.
 .PP
-Word seperation occurs when the parser encounters an unquoted token
+Word separation occurs when the parser encounters an unquoted token
 and, in certain cases, whitespace.
-Whitespace is only used as a word seperator when the parser is
+Whitespace is only used as a word separator when the parser is
 looking for a block-type or keyword.
 When it's looking for a block-name or value, whitespace is like any
 other character, which allows you to embed whitespace in a block-name
@@ -123,14 +123,16 @@ fashion (top down), so order is important.
 .RS
 .TP 15
 .B admin
-.RI [ " username" ,...
+.RI "[ [\fB!\fP]" username ,...
 | "" ]
 .br
 Define a list of users making up the admin list for the console server.
 If
 .I username
 matches a previously defined group name, all members of the previous
-group are added to the admin list.
+group are applied to the admin list (with access reversed if prefixed
+with a `!').
+Otherwise, users will be granted (or denied if prefixed with `!') access.
 If the null string (``""'') is used, any
 users previously defined for the console servers's admin list are removed.
 .TP
@@ -202,7 +204,9 @@ alert
 backspace
 .TP
 .B \ed
-0.33 second delay
+delay specified by the
+.B delay
+option.
 .TP
 .B \ef
 form-feed
@@ -341,6 +345,15 @@ command-line flag).
 Set whether or not encryption is required when talking to clients (see the
 .B \-E
 command-line flag).
+.TP
+.B unifiedlog
+.I filename
+.br
+Set the location of the unified log to
+.IR filename .
+See the
+.B \-U
+command-line flag for details.
 .RE
 .TP 8
 .B console
@@ -370,7 +383,7 @@ Define a block of defaults identified as
 If 
 .I name
 is ``*'', the automatically applied default block is defined (basically
-all consoles have an implicit ``include "*";'' at the begining
+all consoles have an implicit ``include "*";'' at the beginning
 of their definition).
 .RS
 .TP 15
@@ -397,6 +410,36 @@ Assign the serial device
 as the access to the console.
 Only consoles of type ``device'' will use this value.
 .TP
+.B devicesubst
+.RI [ " hp" [ n ] "f "
+| "" ]
+.br
+Perform string substitutions on the
+.B device
+value.
+.I h
+is the character in
+.B device
+to replace with the
+.B host
+value and
+.I p
+is the character to replace with the
+.B port
+value.
+The
+.B port
+value will be formatted to at least
+.I n
+characters, padded with 0s if
+.I n
+begins with a 0, and space characters otherwise.
+.I f
+must be either `d' or `x' or `X', specifying a decimal, lower-case
+hexdecimal, or uppercase hexdecimal representation of
+.BR port .
+If the null string (``""'') is used, no replacements will be done.
+.TP
 .B exec
 .RI [ " command "
 | "" ]
@@ -409,7 +452,37 @@ invoking ``/bin/sh -ce "\fIcommand\fP"''.
 If the null string (``""'') is used or no
 .B exec
 keyword is specified, conserver will use the command ``/bin/sh -i''.
-Only consoles of type ``device'' will use this value.
+Only consoles of type ``exec'' will use this value.
+.TP
+.B execsubst
+.RI [ " hp" [ n ] "f "
+| "" ]
+.br
+Perform string substitutions on the
+.B exec
+value.
+.I h
+is the character in
+.B exec
+to replace with the
+.B host
+value and
+.I p
+is the character to replace with the
+.B port
+value.
+The
+.B port
+value will be formatted to at least
+.I n
+characters, padded with 0s if
+.I n
+begins with a 0, and space characters otherwise.
+.I f
+must be either `d' or `x' or `X', specifying a decimal, lower-case
+hexdecimal, or uppercase hexdecimal representation of
+.BR port .
+If the null string (``""'') is used, no replacements will be done.
 .TP
 .B host
 .I hostname
@@ -421,6 +494,35 @@ You must also set the
 .B port
 option as well.
 Only consoles of type ``host'' will use this value.
+.TP
+.B idlestring
+.RI [ " string "
+| "" ]
+.br
+Assign the
+.I string
+that is sent to the console once the console is idle for an
+.I idletimeout
+amount of time.
+If the null string (``""'') is used, the string is unset and
+the default is used.
+The string is interpreted just as a
+.B break
+string is interpreted (see the
+.B break
+configuration items for details) where all delays specified (via ``\ed'')
+use the default delay time.
+The default string is ``\en''.
+.TP
+.B idletimeout
+.BR \fInumber\fP [ s | m | h ]
+.br
+Set the idle timeout of the console to
+.I number
+seconds.  If an `s', `m', or `h' is used after
+.IR number ,
+the specified time is interpreted as seconds, minutes, or hours.
+Set the timeout to zero to disable the idle timeout (the default).
 .TP
 .B include
 .I default
@@ -451,7 +553,7 @@ nothing is invoked.
 .br
 Assign the logfile specified by
 .I filename
-to the console.  Any occurance of ``&'' in
+to the console.  Any occurrence of ``&'' in
 .I filename
 will be replaced with the name of the console.
 If the null string (``""'') is used, the logfile name is unset and
@@ -606,17 +708,50 @@ Set the port used to access the console.
 The port may be specified as a
 .I number
 or a
-.IR name ,
-in which case it will use
+.IR name .
+A
+.I name
+will cause a
 .BR getservbyname (3)
-to look up a port number.
+call to look up the port number.
+The
+.BR port ,
+.BR portbase ,
+and
+.B portinc
+values are all used to calculate the final port number to connect to.
+The formula used is
+.IR finalport " = "
+.BR portbase " + "
+.BR portinc " * " port .
+By using proper values in the formula, you can reference ports on a
+terminal server by their physical numbering of 1 through
+.IR n .
 You must also set the
 .B host
 option as well.
 Only consoles of type ``host'' will use this value.
 .TP
+.B portbase
+.I number
+.br
+Set the base value for the port calculation formula.
+The default is zero.
+See
+.B port
+for the details of the formula.
+.TP
+.B portinc
+.I number
+.br
+Set the increment value for the port calculation formula.
+The default is one.
+See
+.B port
+for the details of the formula.
+.TP
 .B ro
-.RI [ " username" ,...
+.RI "[ [\fB!\fP]" username ,...
 | "" ]
 .br
 Define a list of users making up the read-only access list
@@ -624,12 +759,15 @@ for the console.
 If
 .I username
 matches a previously defined group name, all members of the previous
-group are added to the read-only access list.
+group are applied to the read-only access list (with access reversed
+if prefixed with a `!').
+Otherwise, users will be granted (or denied if prefixed with `!')
+read-only access.
 If the null string (``""'') is used, any
 users previously defined for the console's read-only list are removed.
 .TP
 .B rw
-.RI [ " username" ,...
+.RI "[ [\fB!\fP]" username ,...
 | "" ]
 .br
 Define a list of users making up the read-write access list
@@ -637,7 +775,10 @@ for the console.
 If
 .I username
 matches a previously defined group name, all members of the previous
-group are added to the read-write access list.
+group are applied to the read-write access list (with access reversed
+if prefixed with a `!').
+Otherwise, users will be granted (or denied if prefixed with `!')
+read-write access.
 If the null string (``""'') is used, any
 users previously defined for the console's read-write list are removed.
 .TP
@@ -702,7 +843,7 @@ Define a user group identified as
 .RS
 .TP 15
 .B users
-.RI [ " username" ,...
+.RI "[ [\fB!\fP]" username ,...
 | "" ]
 .br
 Define a list of users making up the group
@@ -710,7 +851,10 @@ Define a list of users making up the group
 If
 .I username
 matches a previously defined group name, all members of the previous
-group are added to the current group.
+group are applied to the current group (with access reversed
+if prefixed with a `!').
+Otherwise, users will be recorded with (or without if prefixed with `!')
+access.
 If the null string (``""'') is used, any
 users previously defined for this group are removed.
 .RE

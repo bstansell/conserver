@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.48 2003-10-02 18:49:03-07 bryan Exp $
+ *  $Id: consent.h,v 5.52 2003/11/15 20:00:08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -65,6 +65,7 @@ typedef struct names {
 
 typedef struct consentUsers {
     NAMES *user;
+    short not;
     struct consentUsers *next;
 } CONSENTUSERS;
 
@@ -78,6 +79,7 @@ typedef struct consent {	/* console information                  */
     NAMES *aliases;		/* aliases for server name              */
     /* type == DEVICE */
     char *device;		/* device file                          */
+    char *devicesubst;		/* device substitution pattern          */
     BAUD *baud;			/* the baud on this console port        */
     PARITY *parity;		/* the parity on this line              */
     FLAG hupcl;			/* use HUPCL                            */
@@ -90,15 +92,20 @@ typedef struct consent {	/* console information                  */
 #endif
     /* type == HOST */
     char *host;			/* hostname                             */
-    unsigned short port;	/* port number                          */
+    unsigned short port;	/* port number      socket = portbase + */
+    unsigned short portbase;	/* port base             portinc * port */
+    unsigned short portinc;	/* port increment                       */
     /* type == EXEC */
     char *exec;			/* exec command                         */
+    char *execsubst;		/* exec substitution pattern            */
     /* global stuff */
     char *master;		/* master hostname                      */
     unsigned short breakNum;	/* break type [1-9]                     */
     char *logfile;		/* logfile                              */
     char *initcmd;		/* initcmd command                      */
     char *motd;			/* motd                                 */
+    time_t idletimeout;		/* idle timeout                         */
+    char *idlestring;		/* string to print when idle            */
     /* timestamp stuff */
     int mark;			/* Mark (chime) interval                */
     long nextMark;		/* Next mark (chime) time               */
@@ -123,6 +130,7 @@ typedef struct consent {	/* console information                  */
     int wbufIAC;		/* next IAC location in wbuf            */
     IOSTATE ioState;		/* state of the socket                  */
     time_t stateTimer;		/* timer for ioState states             */
+    time_t lastWrite;		/* time of last data sent to console    */
 
     /*** state information ***/
     char acline[132 * 2 + 2];	/* max chars we will call a line        */

@@ -1,4 +1,4 @@
-.\" $Id: autologin.man,v 1.3 93/03/16 16:41:45 ksb Exp $
+.\" $Id: autologin.man,v 1.1 2003/11/04 02:36:24 bryan Exp $
 .TH AUTOLOGIN 8L PUCC
 .SH NAME
 autologin \- create an automatic login session from /etc/inittab

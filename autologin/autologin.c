@@ -69,7 +69,7 @@
  */
 
 #ifndef	lint
-char	*rcsid = "$Id: autologin.c,v 1.23 2002-09-20 23:29:39-07 bryan Exp $";
+char	*rcsid = "$Id: autologin.c,v 1.23 2002/09/21 06:29:39 bryan Exp $";
 #endif	/* not lint */
 extern char	*progname;
 gid_t	 awGrps[NGROUPS_MAX];

@@ -33,7 +33,7 @@ dotest()
     else
 	if [ -f results/test$testnum ]; then
 	    if diff -i test.out results/test$testnum >test$testnum.diff 2>&1; then
-		echo "succeded"
+		echo "succeeded"
 		rm -f test$testnum.diff
 	    else
 		echo "failed (diffs in test$testnum.diff)"

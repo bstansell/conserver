@@ -1,5 +1,5 @@
 /*
- *  $Id: convert.c,v 1.7 2003-08-15 14:24:39-07 bryan Exp $
+ *  $Id: convert.c,v 1.7 2003/08/15 21:24:39 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *

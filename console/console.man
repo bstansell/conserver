@@ -1,5 +1,5 @@
-.\" $Id: console.man,v 1.37 2003-10-02 19:00:45-07 bryan Exp $
-.TH CONSOLE 1 "2003-10-02" "conserver-8.0.5" "conserver"
+.\" $Id: console.man,v 1.40 2003/11/16 15:35:45 bryan Exp $
+.TH CONSOLE 1 "2003/11/16" "conserver-8.0.6" "conserver"
 .SH NAME
 console \- console server client program
 .SH SYNOPSIS
@@ -302,7 +302,7 @@ were typed).
 .PP
 The
 .B \-i
-option outputs information regarding each console in 13 colon-separated fields.
+option outputs information regarding each console in 15 colon-separated fields.
 .TP
 .I name
 The name of the console.
@@ -318,7 +318,7 @@ a command, or `!' for a remote port.
 .TP
 .I console-details
 The details regarding the console.
-The values here (all comma seperated) depend on the type of the console.
+The values here (all comma separated) depend on the type of the console.
 Local devices will have values of the device file, baud rate, and
 file descriptor for the device.
 Commands will have values of the command, the command's pid, the
@@ -329,11 +329,11 @@ and file descriptor for the socket connection.
 .I users-list
 The details of each user connected to the console.
 The details for each
-user are an `@' seperated list of `w', `r', or `s' (for read-write, read-only,
+user are an `@' separated list of `w', `r', or `s' (for read-write, read-only,
 or suspended), username, hostname the user is on, the user's idle time,
 and (for `r' and `s' users only) ``rw'' or ``ro'' (if the user wants
 read-write mode or not).
-Each user bundle is seperated by commas.
+Each user bundle is separated by commas.
 .TP
 .I state
 The state of the console.
@@ -347,7 +347,7 @@ that the server can open the file for read, but not write.
 .TP
 .I logfile-details
 The details regarding the logging for the console.
-The comma seperated
+The comma separated
 values will be the logfile, ``log'' or ``nolog'' (if logging is on
 or not - toggled via ^EcL), ``act'' or ``noact'' (if activity logging is
 enabled or not - the `a' timestamp option), the timestamp interval, and
@@ -362,13 +362,19 @@ is at work, it will have the value of ``autoup'', otherwise it
 will be ``noautoup''.
 .TP
 .I aliases
-The console aliases are presented in a comma seperated list.
+The console aliases are presented in a comma separated list.
 .TP
 .I options
-The active options for the console are presented in a comma seperated list.
+The active options for the console are presented in a comma separated list.
 .TP
 .I initcmd
 The initcmd configuration option for the console.
+.TP
+.I idletimeout
+The idletimeout configuration option for the console.
+.TP
+.I idlestring
+The idlestring configuration option for the console.
 .SH "ESCAPE SEQUENCES"
 The connection can be controlled by a two-character escape sequence, followed
 by a command.
@@ -401,6 +407,9 @@ forcibly attach read-write
 .TP
 .B g
 group info
+.TP
+.B i
+information dump
 .TP
 .B L
 toggle logging on/off

@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.148 2003-10-31 09:55:55-08 bryan Exp $
+ *  $Id: readcfg.c,v 5.157 2003/11/15 20:00:09 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -135,7 +135,6 @@ typedef struct section {
     ITEM *items;
 } SECTION;
 
-#define BREAKDELAYDEFAULT 250
 #define ALLWORDSEP ", \f\v\t\n\r"
 
 int line = 1;			/* current line number */
@@ -154,11 +153,12 @@ int parserBreakNum = 0;
 
 CONSENTUSERS *
 #if PROTOTYPES
-ConsentAddUser(CONSENTUSERS **ppCU, char *id)
+ConsentAddUser(CONSENTUSERS **ppCU, char *id, short not)
 #else
-ConsentAddUser(ppCU, id)
+ConsentAddUser(ppCU, id, not)
     CONSENTUSERS **ppCU;
     char *id;
+    short not;
 #endif
 {
     CONSENTUSERS *u = (CONSENTUSERS *)0;
@@ -168,9 +168,11 @@ ConsentAddUser(ppCU, id)
 	    == (CONSENTUSERS *)0)
 	    OutOfMem();
 	u->user = AddUserList(id);
+	u->not = not;
 	u->next = *ppCU;
 	*ppCU = u;
-    }
+    } else
+	u->not = not;
     return u;
 }
 
@@ -212,7 +214,6 @@ BreakEnd()
 
     BuildString((char *)0, breakList[parserBreakNum - 1].seq);
     BuildString(parserBreak->string, breakList[parserBreakNum - 1].seq);
-    CleanupBreak(parserBreakNum);
     breakList[parserBreakNum - 1].delay = parserBreakDelay;
     parserBreakNum = 0;
 }
@@ -290,7 +291,7 @@ BreakItemDelay(id)
     /* if it wasn't a number or the number is out of bounds */
     if ((*p != '\000') || ((delay = atoi(id)) > 999)) {
 	if (isMaster)
-	    Error("invalid port number `%s' [%s:%d]", id, file, line);
+	    Error("invalid delay number `%s' [%s:%d]", id, file, line);
 	return;
     }
     parserBreakDelay = delay;
@@ -299,6 +300,7 @@ BreakItemDelay(id)
 /* 'group' handling */
 typedef struct parserGroupUsers {
     NAMES *user;
+    short not;
     struct parserGroupUsers *next;
 } PARSERGROUPUSERS;
 
@@ -480,11 +482,12 @@ GroupFindUser(pg, id)
 
 PARSERGROUPUSERS *
 #if PROTOTYPES
-GroupAddUser(PARSERGROUP *pg, char *id)
+GroupAddUser(PARSERGROUP *pg, char *id, short not)
 #else
-GroupAddUser(pg, id)
+GroupAddUser(pg, id, not)
     PARSERGROUP *pg;
     char *id;
+    short not;
 #endif
 {
     PARSERGROUPUSERS *pgu = (PARSERGROUPUSERS *)0;
@@ -495,41 +498,11 @@ GroupAddUser(pg, id)
 	    OutOfMem();
 	pgu->user = AddUserList(id);
 	pgu->next = pg->users;
+	pgu->not = not;
 	pg->users = pgu;
-    }
+    } else
+	pgu->not = not;
     return pgu;
-}
-
-void
-#if PROTOTYPES
-GroupItemInclude(char *id)
-#else
-GroupItemInclude(id)
-    char *id;
-#endif
-{
-    char *token = (char *)0;
-    PARSERGROUP *pg = (PARSERGROUP *)0;
-
-    CONDDEBUG((1, "GroupItemInclude(%s) [%s:%d]", id, file, line));
-
-    if ((id == (char *)0) || (*id == '\000'))
-	return;
-
-    for (token = strtok(id, ALLWORDSEP); token != (char *)0;
-	 token = strtok(NULL, ALLWORDSEP)) {
-	if ((pg = GroupFind(token)) == (PARSERGROUP *)0) {
-	    if (isMaster)
-		Error("unknown group name `%s' [%s:%d]", token, file,
-		      line);
-	} else {
-	    PARSERGROUPUSERS *pgu;
-	    for (pgu = pg->users; pgu != (PARSERGROUPUSERS *)0;
-		 pgu = pgu->next) {
-		GroupAddUser(parserGroupTemp, pgu->user->name);
-	    }
-	}
-    }
 }
 
 void
@@ -557,13 +530,20 @@ GroupItemUsers(id)
 
     for (token = strtok(id, ALLWORDSEP); token != (char *)0;
 	 token = strtok(NULL, ALLWORDSEP)) {
+	int not;
+	if (token[0] == '!') {
+	    token++;
+	    not = 1;
+	} else
+	    not = 0;
 	if ((pg = GroupFind(token)) == (PARSERGROUP *)0) {
-	    GroupAddUser(parserGroupTemp, token);
+	    GroupAddUser(parserGroupTemp, token, not);
 	} else {
 	    PARSERGROUPUSERS *pgu;
 	    for (pgu = pg->users; pgu != (PARSERGROUPUSERS *)0;
 		 pgu = pgu->next) {
-		GroupAddUser(parserGroupTemp, pgu->user->name);
+		GroupAddUser(parserGroupTemp, pgu->user->name,
+			     (not ? !pgu->not : pgu->not));
 	    }
 	}
     }
@@ -621,12 +601,18 @@ DestroyParserDefaultOrConsole(c, ph, pt)
 	free(c->exec);
     if (c->device != (char *)0)
 	free(c->device);
+    if (c->devicesubst != (char *)0)
+	free(c->devicesubst);
+    if (c->execsubst != (char *)0)
+	free(c->execsubst);
     if (c->logfile != (char *)0)
 	free(c->logfile);
     if (c->initcmd != (char *)0)
 	free(c->initcmd);
     if (c->motd != (char *)0)
 	free(c->motd);
+    if (c->idlestring != (char *)0)
+	free(c->idlestring);
     if (c->execSlave != (char *)0)
 	free(c->execSlave);
     while (c->aliases != (NAMES *)0) {
@@ -675,8 +661,14 @@ ApplyDefault(d, c)
 	c->baud = d->baud;
     if (d->parity != (PARITY *)0)
 	c->parity = d->parity;
+    if (d->idletimeout != 0)
+	c->idletimeout = d->idletimeout;
     if (d->port != 0)
 	c->port = d->port;
+    if (d->portinc != 0)
+	c->portinc = d->portinc;
+    if (d->portbase != 0)
+	c->portbase = d->portbase;
     if (d->mark != 0)
 	c->mark = d->mark;
     if (d->nextMark != 0)
@@ -733,6 +725,18 @@ ApplyDefault(d, c)
 	if ((c->device = StrDup(d->device)) == (char *)0)
 	    OutOfMem();
     }
+    if (d->devicesubst != (char *)0) {
+	if (c->devicesubst != (char *)0)
+	    free(c->devicesubst);
+	if ((c->devicesubst = StrDup(d->devicesubst)) == (char *)0)
+	    OutOfMem();
+    }
+    if (d->execsubst != (char *)0) {
+	if (c->execsubst != (char *)0)
+	    free(c->execsubst);
+	if ((c->execsubst = StrDup(d->execsubst)) == (char *)0)
+	    OutOfMem();
+    }
     if (d->logfile != (char *)0) {
 	if (c->logfile != (char *)0)
 	    free(c->logfile);
@@ -751,16 +755,22 @@ ApplyDefault(d, c)
 	if ((c->motd = StrDup(d->motd)) == (char *)0)
 	    OutOfMem();
     }
+    if (d->idlestring != (char *)0) {
+	if (c->idlestring != (char *)0)
+	    free(c->idlestring);
+	if ((c->idlestring = StrDup(d->idlestring)) == (char *)0)
+	    OutOfMem();
+    }
     if (d->ro != (CONSENTUSERS *)0) {
 	CONSENTUSERS *u;
 	for (u = d->ro; u != (CONSENTUSERS *)0; u = u->next) {
-	    ConsentAddUser(&(c->ro), u->user->name);
+	    ConsentAddUser(&(c->ro), u->user->name, u->not);
 	}
     }
     if (d->rw != (CONSENTUSERS *)0) {
 	CONSENTUSERS *u;
 	for (u = d->rw; u != (CONSENTUSERS *)0; u = u->next) {
-	    ConsentAddUser(&(c->rw), u->user->name);
+	    ConsentAddUser(&(c->rw), u->user->name, u->not);
 	}
     }
 }
@@ -941,6 +951,102 @@ ProcessDevice(c, id)
 
 void
 #if PROTOTYPES
+ProcessDevicesubst(CONSENT *c, char *id)
+#else
+ProcessDevicesubst(c, id)
+    CONSENT *c;
+    char *id;
+#endif
+{
+    char *p;
+
+    if (c->devicesubst != (char *)0) {
+	free(c->devicesubst);
+	c->devicesubst = (char *)0;
+    }
+
+    if ((id == (char *)0) || (*id == '\000'))
+	return;
+
+    if (strlen(id) < 3) {
+	if (isMaster)
+	    Error("incomplete `devicesubst' option [%s:%d]", file, line);
+	return;
+    }
+
+    if (id[0] == id[1]) {
+	if (isMaster)
+	    Error
+		("first two characters of `devicesubst' option are the same [%s:%d]",
+		 file, line);
+	return;
+    }
+
+    for (p = id + 2; *p != '\000'; p++)
+	if (!isdigit((int)(*p)))
+	    break;
+    /* if it wasn't a number followed by a d/x/X */
+    if (!((*p == 'd' || *p == 'x' || *p == 'X') && *(p + 1) == '\000')) {
+	if (isMaster)
+	    Error("invalid `execsubst' specification `%s' [%s:%d]", id,
+		  file, line);
+	return;
+    }
+
+    if ((c->devicesubst = StrDup(id)) == (char *)0)
+	OutOfMem();
+}
+
+void
+#if PROTOTYPES
+ProcessExecsubst(CONSENT *c, char *id)
+#else
+ProcessExecsubst(c, id)
+    CONSENT *c;
+    char *id;
+#endif
+{
+    char *p;
+
+    if (c->execsubst != (char *)0) {
+	free(c->execsubst);
+	c->execsubst = (char *)0;
+    }
+
+    if ((id == (char *)0) || (*id == '\000'))
+	return;
+
+    if (strlen(id) < 3) {
+	if (isMaster)
+	    Error("incomplete `execsubst' option [%s:%d]", file, line);
+	return;
+    }
+
+    if (id[0] == id[1]) {
+	if (isMaster)
+	    Error
+		("first two characters of `execsubst' option are the same [%s:%d]",
+		 file, line);
+	return;
+    }
+
+    for (p = id + 2; *p != '\000'; p++)
+	if (!isdigit((int)(*p)))
+	    break;
+    /* if it wasn't a number followed by a d/x/X */
+    if (!((*p == 'd' || *p == 'x' || *p == 'X') && *(p + 1) == '\000')) {
+	if (isMaster)
+	    Error("invalid `execsubst' specification `%s' [%s:%d]", id,
+		  file, line);
+	return;
+    }
+
+    if ((c->execsubst = StrDup(id)) == (char *)0)
+	OutOfMem();
+}
+
+void
+#if PROTOTYPES
 DefaultItemDevice(char *id)
 #else
 DefaultItemDevice(id)
@@ -949,6 +1055,30 @@ DefaultItemDevice(id)
 {
     CONDDEBUG((1, "DefaultItemDevice(%s) [%s:%d]", id, file, line));
     ProcessDevice(parserDefaultTemp, id);
+}
+
+void
+#if PROTOTYPES
+DefaultItemDevicesubst(char *id)
+#else
+DefaultItemDevicesubst(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemDevicesubst(%s) [%s:%d]", id, file, line));
+    ProcessDevicesubst(parserDefaultTemp, id);
+}
+
+void
+#if PROTOTYPES
+DefaultItemExecsubst(char *id)
+#else
+DefaultItemExecsubst(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemExecsubst(%s) [%s:%d]", id, file, line));
+    ProcessExecsubst(parserDefaultTemp, id);
 }
 
 void
@@ -1139,6 +1269,26 @@ ProcessMOTD(c, id)
 
 void
 #if PROTOTYPES
+ProcessIdlestring(CONSENT *c, char *id)
+#else
+ProcessIdlestring(c, id)
+    CONSENT *c;
+    char *id;
+#endif
+{
+    if (c->idlestring != (char *)0) {
+	free(c->idlestring);
+	c->idlestring = (char *)0;
+    }
+    if (id == (char *)0 || id[0] == '\000') {
+	return;
+    }
+    if ((c->idlestring = StrDup(id)) == (char *)0)
+	OutOfMem();
+}
+
+void
+#if PROTOTYPES
 DefaultItemLogfile(char *id)
 #else
 DefaultItemLogfile(id)
@@ -1171,6 +1321,18 @@ DefaultItemMOTD(id)
 {
     CONDDEBUG((1, "DefaultItemMOTD(%s) [%s:%d]", id, file, line));
     ProcessMOTD(parserDefaultTemp, id);
+}
+
+void
+#if PROTOTYPES
+DefaultItemIdlestring(char *id)
+#else
+DefaultItemIdlestring(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemIdlestring(%s) [%s:%d]", id, file, line));
+    ProcessIdlestring(parserDefaultTemp, id);
 }
 
 void
@@ -1266,7 +1428,7 @@ ProcessOptions(c, id)
 	    c->autoreinit = negative ? FLAGFALSE : FLAGTRUE;
 	else if (strcasecmp("unloved", token) == 0)
 	    c->unloved = negative ? FLAGFALSE : FLAGTRUE;
-	else
+	else if (isMaster)
 	    Error("invalid option `%s' [%s:%d]", token, file, line);
     }
 }
@@ -1333,12 +1495,81 @@ ProcessPort(c, id)
     for (p = id; *p != '\000'; p++)
 	if (!isdigit((int)(*p)))
 	    break;
-    /* if it wasn't a number or the number was zero */
-    if ((*p != '\000') || ((c->port = (unsigned short)atoi(id)) == 0)) {
-	if (isMaster)
+
+    /* if it was a number */
+    if (*p == '\000') {
+	if (((c->port = (unsigned short)atoi(id)) == 0) && isMaster)
 	    Error("invalid port number `%s' [%s:%d]", id, file, line);
 	return;
+    } else {
+	/* non-numeric */
+	struct servent *se;
+	if ((struct servent *)0 == (se = getservbyname(id, "tcp"))) {
+	    if (isMaster)
+		Error
+		    ("invalid port name `%s': getservbyname() failure [%s:%d]",
+		     id, file, line);
+	    return;
+	} else {
+	    if (((c->port = ntohs((unsigned short)se->s_port)) == 0) &&
+		isMaster)
+		Error("invalid port number `%s' [%s:%d]", id, file, line);
+	}
     }
+}
+
+void
+#if PROTOTYPES
+ProcessPortinc(CONSENT *c, char *id)
+#else
+ProcessPortinc(c, id)
+    CONSENT *c;
+    char *id;
+#endif
+{
+    char *p;
+
+    if ((id == (char *)0) || (*id == '\000')) {
+	c->portinc = 0;
+	return;
+    }
+    for (p = id; *p != '\000'; p++)
+	if (!isdigit((int)(*p)))
+	    break;
+    /* if it wasn't a number */
+    if (*p != '\000') {
+	if (isMaster)
+	    Error("invalid portinc number `%s' [%s:%d]", id, file, line);
+	return;
+    }
+    c->portinc = (unsigned short)atoi(id) + 1;
+}
+
+void
+#if PROTOTYPES
+ProcessPortbase(CONSENT *c, char *id)
+#else
+ProcessPortbase(c, id)
+    CONSENT *c;
+    char *id;
+#endif
+{
+    char *p;
+
+    if ((id == (char *)0) || (*id == '\000')) {
+	c->portbase = 0;
+	return;
+    }
+    for (p = id; *p != '\000'; p++)
+	if (!isdigit((int)(*p)))
+	    break;
+    /* if it wasn't a number */
+    if (*p != '\000') {
+	if (isMaster)
+	    Error("invalid portbase number `%s' [%s:%d]", id, file, line);
+	return;
+    }
+    c->portbase = (unsigned short)atoi(id) + 1;
 }
 
 void
@@ -1351,6 +1582,77 @@ DefaultItemPort(id)
 {
     CONDDEBUG((1, "DefaultItemPort(%s) [%s:%d]", id, file, line));
     ProcessPort(parserDefaultTemp, id);
+}
+
+void
+#if PROTOTYPES
+DefaultItemPortbase(char *id)
+#else
+DefaultItemPortbase(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemPortbase(%s) [%s:%d]", id, file, line));
+    ProcessPortbase(parserDefaultTemp, id);
+}
+
+void
+#if PROTOTYPES
+DefaultItemPortinc(char *id)
+#else
+DefaultItemPortinc(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemPortinc(%s) [%s:%d]", id, file, line));
+    ProcessPortinc(parserDefaultTemp, id);
+}
+
+void
+#if PROTOTYPES
+ProcessIdletimeout(CONSENT *c, char *id)
+#else
+ProcessIdletimeout(c, id)
+    CONSENT *c;
+    char *id;
+#endif
+{
+    char *p;
+    int factor = 0;
+
+    if ((id == (char *)0) || (*id == '\000')) {
+	c->idletimeout = 0;
+	return;
+    }
+    for (p = id; factor == 0 && *p != '\000'; p++)
+	if (*p == 's' || *p == 'S')
+	    factor = 1;
+	else if (*p == 'm' || *p == 'M')
+	    factor = 60;
+	else if (*p == 'h' || *p == 'H')
+	    factor = 60 * 60;
+	else if (!isdigit((int)(*p)))
+	    break;
+    /* if it wasn't a number or a qualifier wasn't at the end */
+    if (*p != '\000') {
+	if (isMaster)
+	    Error("invalid idletime specification `%s' [%s:%d]", id, file,
+		  line);
+	return;
+    }
+    c->idletimeout = (time_t)atoi(id) * (factor == 0 ? 1 : factor);
+}
+
+void
+#if PROTOTYPES
+DefaultItemIdletimeout(char *id)
+#else
+DefaultItemIdletimeout(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemIdletimeout(%s) [%s:%d]", id, file, line));
+    ProcessIdletimeout(parserDefaultTemp, id);
 }
 
 void
@@ -1374,13 +1676,20 @@ ProcessRoRw(ppCU, id)
 
     for (token = strtok(id, ALLWORDSEP); token != (char *)0;
 	 token = strtok(NULL, ALLWORDSEP)) {
+	short not;
+	if (token[0] == '!') {
+	    token++;
+	    not = 1;
+	} else
+	    not = 0;
 	if ((pg = GroupFind(token)) == (PARSERGROUP *)0) {
-	    ConsentAddUser(ppCU, token);
+	    ConsentAddUser(ppCU, token, not);
 	} else {
 	    PARSERGROUPUSERS *pgu;
 	    for (pgu = pg->users; pgu != (PARSERGROUPUSERS *)0;
 		 pgu = pgu->next) {
-		ConsentAddUser(ppCU, pgu->user->name);
+		ConsentAddUser(ppCU, pgu->user->name,
+			       (not ? !pgu->not : pgu->not));
 	    }
 	}
     }
@@ -1659,6 +1968,25 @@ ConsoleEnd()
 
     switch (parserConsoleTemp->type) {
 	case EXEC:
+	    if (parserConsoleTemp->execsubst != (char *)0) {
+		if (parserConsoleTemp->port == 0 ||
+		    parserConsoleTemp->host == (char *)0) {
+		    if (parserConsoleTemp->port == 0) {
+			if (isMaster)
+			    Error
+				("[%s] console has 'execsubst' attribute without 'port' attribute (ignoring) [%s:%d]",
+				 parserConsoleTemp->server, file, line);
+		    }
+		    if (parserConsoleTemp->host == (char *)0) {
+			if (isMaster)
+			    Error
+				("[%s] console has 'execsubst' attribute without 'host' attribute (ignoring) [%s:%d]",
+				 parserConsoleTemp->server, file, line);
+		    }
+		    free(parserConsoleTemp->execsubst);
+		    parserConsoleTemp->execsubst = (char *)0;
+		}
+	    }
 	    break;
 	case DEVICE:
 	    if (parserConsoleTemp->device == (char *)0) {
@@ -1667,6 +1995,25 @@ ConsoleEnd()
 			("[%s] console missing 'device' attribute [%s:%d]",
 			 parserConsoleTemp->server, file, line);
 		invalid = 1;
+	    }
+	    if (parserConsoleTemp->devicesubst != (char *)0) {
+		if (parserConsoleTemp->port == 0 ||
+		    parserConsoleTemp->host == (char *)0) {
+		    if (parserConsoleTemp->port == 0) {
+			if (isMaster)
+			    Error
+				("[%s] console has 'devicesubst' attribute without 'port' attribute (ignoring) [%s:%d]",
+				 parserConsoleTemp->server, file, line);
+		    }
+		    if (parserConsoleTemp->host == (char *)0) {
+			if (isMaster)
+			    Error
+				("[%s] console has 'devicesubst' attribute without 'host' attribute (ignoring) [%s:%d]",
+				 parserConsoleTemp->server, file, line);
+		    }
+		    free(parserConsoleTemp->devicesubst);
+		    parserConsoleTemp->devicesubst = (char *)0;
+		}
 	    }
 	    if (parserConsoleTemp->baud == (BAUD *)0) {
 		if (isMaster)
@@ -1790,6 +2137,109 @@ ExpandLogfile(c, id)
     if ((c->logfile = StrDup(tmp))
 	== (char *)0)
 	OutOfMem();
+}
+
+void
+#if PROTOTYPES
+DoSubstitution(char *sub, int port, char *host, char **string)
+#else
+DoSubstitution(sub, port, host, string)
+    char *sub;
+    int port;
+    char *host;
+    char **string;
+#endif
+{
+    char *p = (char *)0;
+    char *pstr = (char *)0;
+    int o = 0;
+    int i = 0;
+    int plen = 0;
+    int base = 0;
+    short padzero = 0;
+    STRING *result = (STRING *)0;
+
+    if (sub == (char *)0 || sub[0] == '\000' || sub[1] == '\000' ||
+	string == (char **)0 || *string == (char *)0 || host == (char *)0)
+	return;
+    if (result == (STRING *)0)
+	result = AllocString();
+    BuildString((char *)0, result);
+
+    /* check the pattern for a length and padding */
+    for (p = sub + 2; *p != '\000'; p++)
+	if (!isdigit((int)(*p)))
+	    break;
+    if (p != sub + 2) {
+	plen = atoi(sub + 2);
+	padzero = (sub[2] == '0');
+    }
+
+    /* check for base */
+    switch (*p) {
+	case 'd':
+	    base = 10;
+	    break;
+	case 'x':
+	case 'X':
+	    base = 16;
+	    break;
+	default:
+	    return;
+    }
+    while (port >= base) {
+	if (port % base >= 10)
+	    BuildStringChar((port % base) - 10 + (*p == 'x' ? 'a' : 'A'),
+			    result);
+	else
+	    BuildStringChar((port % base) + '0', result);
+	port /= base;
+    }
+    if (port >= 10)
+	BuildStringChar(port - 10 + (*p == 'x' ? 'a' : 'A'), result);
+    else
+	BuildStringChar(port + '0', result);
+
+    /* if we're supposed to be a certain length, pad it */
+    while (result->used - 1 < plen) {
+	if (padzero == 0)
+	    BuildStringChar(' ', result);
+	else
+	    BuildStringChar('0', result);
+    }
+
+    /* reverse the text to put it in forward order */
+    o = result->used - 1;
+    for (i = 0; i < o / 2; i++) {
+	char temp;
+
+	temp = result->string[i];
+	result->string[i]
+	    = result->string[o - i - 1];
+	result->string[o - i - 1] = temp;
+    }
+    if ((pstr = StrDup(result->string)) == (char *)0)
+	OutOfMem();
+
+    BuildString((char *)0, result);
+    for (o = 0, p = *string; *(p + o) != '\000'; o++) {
+	if (*(p + o) == sub[0]) {
+	    BuildStringN(p, o, result);
+	    BuildString(host, result);
+	    p += o + 1;
+	    o = -1;
+	} else if (*(p + o) == sub[1]) {
+	    BuildStringN(p, o, result);
+	    BuildString(pstr, result);
+	    p += o + 1;
+	    o = -1;
+	}
+    }
+    BuildStringN(p, o, result);
+    free(*string);
+    if ((*string = StrDup(result->string)) == (char *)0)
+	OutOfMem();
+    free(pstr);
 }
 
 /* this will adjust parserConsoles/parserConsolesTail if we're adding
@@ -2176,7 +2626,16 @@ ConsoleAdd(c)
 	}
 
 	/* and now the rest (minus the "runtime" members - see below) */
+	pCEmatch->idletimeout = c->idletimeout;
+	if (pCEmatch->idletimeout != (time_t)0 &&
+	    (timers[T_IDLE] == (time_t)0 ||
+	     timers[T_IDLE] > pCEmatch->lastWrite + pCEmatch->idletimeout))
+	    timers[T_IDLE] = pCEmatch->lastWrite + pCEmatch->idletimeout;
+
 	SwapStr(&pCEmatch->motd, &c->motd);
+	SwapStr(&pCEmatch->idlestring, &c->idlestring);
+	pCEmatch->portinc = c->portinc;
+	pCEmatch->portbase = c->portbase;
 	pCEmatch->activitylog = c->activitylog;
 	pCEmatch->breaklog = c->breaklog;
 	pCEmatch->mark = c->mark;
@@ -2204,10 +2663,10 @@ ConsoleAdd(c)
 	DestroyConsentUsers(&(pCEmatch->rw));
 	/* now copy over the new stuff */
 	for (u = c->ro; u != (CONSENTUSERS *)0; u = u->next) {
-	    ConsentAddUser(&(pCEmatch->ro), u->user->name);
+	    ConsentAddUser(&(pCEmatch->ro), u->user->name, u->not);
 	}
 	for (u = c->rw; u != (CONSENTUSERS *)0; u = u->next) {
-	    ConsentAddUser(&(pCEmatch->rw), u->user->name);
+	    ConsentAddUser(&(pCEmatch->rw), u->user->name, u->not);
 	}
 
 	/* the code above shouldn't touch any of the "runtime" members
@@ -2263,6 +2722,26 @@ ConsoleDestroy()
 	if (c->breakNum == 0)
 	    c->breakNum = 1;
 
+	/* portbase and portinc values are +1 so a zero can show that
+	 * no value was given.  defaults: portbase=0, portinc=1
+	 */
+	if (c->portbase != 0)
+	    c->portbase--;
+	if (c->portinc != 0)
+	    c->portinc--;
+	else
+	    c->portinc = 1;
+
+	/* now calculate the "real" port number */
+	c->port = c->portbase + c->portinc * c->port;
+
+	/* check for substitutions */
+	if (c->type == DEVICE && c->devicesubst != (char *)0)
+	    DoSubstitution(c->devicesubst, c->port, c->host, &(c->device));
+
+	if (c->type == EXEC && c->execsubst != (char *)0)
+	    DoSubstitution(c->execsubst, c->port, c->host, &(c->exec));
+
 	/* go ahead and do the '&' substitution */
 	if (c->logfile != (char *)0) {
 	    char *lf;
@@ -2270,6 +2749,11 @@ ConsoleDestroy()
 	    ExpandLogfile(c, lf);
 	    free(lf);
 	}
+
+	/* set the idlestring default, if needed */
+	if (c->idlestring == (char *)0 &&
+	    (c->idlestring = StrDup("\\n")) == (char *)0)
+	    OutOfMem();
 
 	/* set the options that default true */
 	if (c->autoreinit == FLAGUNKNOWN)
@@ -2508,6 +2992,30 @@ ConsoleItemDevice(id)
 
 void
 #if PROTOTYPES
+ConsoleItemDevicesubst(char *id)
+#else
+ConsoleItemDevicesubst(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemDevicesubst(%s) [%s:%d]", id, file, line));
+    ProcessDevicesubst(parserConsoleTemp, id);
+}
+
+void
+#if PROTOTYPES
+ConsoleItemExecsubst(char *id)
+#else
+ConsoleItemExecsubst(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemExecsubst(%s) [%s:%d]", id, file, line));
+    ProcessExecsubst(parserConsoleTemp, id);
+}
+
+void
+#if PROTOTYPES
 ConsoleItemExec(char *id)
 #else
 ConsoleItemExec(id)
@@ -2592,6 +3100,18 @@ ConsoleItemMOTD(id)
 
 void
 #if PROTOTYPES
+ConsoleItemIdlestring(char *id)
+#else
+ConsoleItemIdlestring(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemIdlestring(%s) [%s:%d]", id, file, line));
+    ProcessIdlestring(parserConsoleTemp, id);
+}
+
+void
+#if PROTOTYPES
 ConsoleItemMaster(char *id)
 #else
 ConsoleItemMaster(id)
@@ -2636,6 +3156,42 @@ ConsoleItemPort(id)
 {
     CONDDEBUG((1, "ConsoleItemPort(%s) [%s:%d]", id, file, line));
     ProcessPort(parserConsoleTemp, id);
+}
+
+void
+#if PROTOTYPES
+ConsoleItemPortbase(char *id)
+#else
+ConsoleItemPortbase(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemPortbase(%s) [%s:%d]", id, file, line));
+    ProcessPortbase(parserConsoleTemp, id);
+}
+
+void
+#if PROTOTYPES
+ConsoleItemPortinc(char *id)
+#else
+ConsoleItemPortinc(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemPortinc(%s) [%s:%d]", id, file, line));
+    ProcessPortinc(parserConsoleTemp, id);
+}
+
+void
+#if PROTOTYPES
+ConsoleItemIdletimeout(char *id)
+#else
+ConsoleItemIdletimeout(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemIdletimeout(%s) [%s:%d]", id, file, line));
+    ProcessIdletimeout(parserConsoleTemp, id);
 }
 
 void
@@ -2975,7 +3531,7 @@ AccessItemInclude(id)
 		CONSENTUSERS *u;
 		for (u = pa->admin; u != (CONSENTUSERS *)0; u = u->next) {
 		    ConsentAddUser(&(parserAccessTemp->admin),
-				   u->user->name);
+				   u->user->name, u->not);
 		}
 	    }
 	}
@@ -3154,6 +3710,8 @@ DestroyConfig(c)
 	free(c->primaryport);
     if (c->secondaryport != (char *)0)
 	free(c->secondaryport);
+    if (c->unifiedlog != (char *)0)
+	free(c->unifiedlog);
 #if HAVE_OPENSSL
     if (c->sslcredentials != (char *)0)
 	free(c->sslcredentials);
@@ -3213,6 +3771,12 @@ ConfigEnd()
 		pConfig->passwdfile = parserConfigTemp->passwdfile;
 		parserConfigTemp->passwdfile = (char *)0;
 	    }
+	    if (parserConfigTemp->unifiedlog != (char *)0) {
+		if (pConfig->unifiedlog != (char *)0)
+		    free(pConfig->unifiedlog);
+		pConfig->unifiedlog = parserConfigTemp->unifiedlog;
+		parserConfigTemp->unifiedlog = (char *)0;
+	    }
 	    if (parserConfigTemp->primaryport != (char *)0) {
 		if (pConfig->primaryport != (char *)0)
 		    free(pConfig->primaryport);
@@ -3244,6 +3808,10 @@ ConfigEnd()
 	    }
 	    if (parserConfigTemp->sslrequired != FLAGUNKNOWN)
 		pConfig->sslrequired = parserConfigTemp->sslrequired;
+#endif
+#if HAVE_SETPROCTITLE
+	    if (parserConfigTemp->setproctitle != FLAGUNKNOWN)
+		pConfig->setproctitle = parserConfigTemp->setproctitle;
 #endif
 	}
     }
@@ -3348,15 +3916,15 @@ ConfigItemLogfile(id)
 #endif
 {
     CONDDEBUG((1, "ConfigItemLogfile(%s) [%s:%d]", id, file, line));
+
+    if (parserConfigTemp->logfile != (char *)0)
+	free(parserConfigTemp->logfile);
+
     if ((id == (char *)0) || (*id == '\000')) {
-	if (parserConfigTemp->logfile != (char *)0) {
-	    free(parserConfigTemp->logfile);
-	    parserConfigTemp->logfile = (char *)0;
-	}
+	parserConfigTemp->logfile = (char *)0;
 	return;
     }
-    if ((parserConfigTemp->logfile = StrDup(id))
-	== (char *)0)
+    if ((parserConfigTemp->logfile = StrDup(id)) == (char *)0)
 	OutOfMem();
 }
 
@@ -3369,15 +3937,37 @@ ConfigItemPasswordfile(id)
 #endif
 {
     CONDDEBUG((1, "ConfigItemPasswordfile(%s) [%s:%d]", id, file, line));
+
+    if (parserConfigTemp->passwdfile != (char *)0)
+	free(parserConfigTemp->passwdfile);
+
     if ((id == (char *)0) || (*id == '\000')) {
-	if (parserConfigTemp->passwdfile != (char *)0) {
-	    free(parserConfigTemp->passwdfile);
-	    parserConfigTemp->passwdfile = (char *)0;
-	}
+	parserConfigTemp->passwdfile = (char *)0;
 	return;
     }
-    if ((parserConfigTemp->passwdfile = StrDup(id))
-	== (char *)0)
+    if ((parserConfigTemp->passwdfile = StrDup(id)) == (char *)0)
+	OutOfMem();
+}
+
+void
+#if PROTOTYPES
+ConfigItemUnifiedlog(char *id)
+#else
+ConfigItemUnifiedlog(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConfigItemUnifiedlog(%s) [%s:%d]", id, file, line));
+
+    if (parserConfigTemp->unifiedlog != (char *)0)
+	free(parserConfigTemp->unifiedlog);
+
+    if ((id == (char *)0) || (*id == '\000')) {
+	parserConfigTemp->unifiedlog = (char *)0;
+	return;
+    }
+
+    if ((parserConfigTemp->unifiedlog = StrDup(id)) == (char *)0)
 	OutOfMem();
 }
 
@@ -3390,15 +3980,15 @@ ConfigItemPrimaryport(id)
 #endif
 {
     CONDDEBUG((1, "ConfigItemPrimaryport(%s) [%s:%d]", id, file, line));
+
+    if (parserConfigTemp->primaryport != (char *)0)
+	free(parserConfigTemp->primaryport);
+
     if ((id == (char *)0) || (*id == '\000')) {
-	if (parserConfigTemp->primaryport != (char *)0) {
-	    free(parserConfigTemp->primaryport);
-	    parserConfigTemp->primaryport = (char *)0;
-	}
+	parserConfigTemp->primaryport = (char *)0;
 	return;
     }
-    if ((parserConfigTemp->primaryport = StrDup(id))
-	== (char *)0)
+    if ((parserConfigTemp->primaryport = StrDup(id)) == (char *)0)
 	OutOfMem();
 }
 
@@ -3466,15 +4056,15 @@ ConfigItemSecondaryport(id)
 #endif
 {
     CONDDEBUG((1, "ConfigItemSecondaryport(%s) [%s:%d]", id, file, line));
+
+    if (parserConfigTemp->secondaryport != (char *)0)
+	free(parserConfigTemp->secondaryport);
+
     if ((id == (char *)0) || (*id == '\000')) {
-	if (parserConfigTemp->secondaryport != (char *)0) {
-	    free(parserConfigTemp->secondaryport);
-	    parserConfigTemp->secondaryport = (char *)0;
-	}
+	parserConfigTemp->secondaryport = (char *)0;
 	return;
     }
-    if ((parserConfigTemp->secondaryport = StrDup(id))
-	== (char *)0)
+    if ((parserConfigTemp->secondaryport = StrDup(id)) == (char *)0)
 	OutOfMem();
 }
 
@@ -3488,20 +4078,20 @@ ConfigItemSslcredentials(id)
 {
     CONDDEBUG((1, "ConfigItemSslcredentials(%s) [%s:%d]", id, file, line));
 #if HAVE_OPENSSL
+    if (parserConfigTemp->sslcredentials != (char *)0)
+	free(parserConfigTemp->sslcredentials);
+
     if ((id == (char *)0) || (*id == '\000')) {
-	if (parserConfigTemp->sslcredentials != (char *)0) {
-	    free(parserConfigTemp->sslcredentials);
-	    parserConfigTemp->sslcredentials = (char *)0;
-	}
+	parserConfigTemp->sslcredentials = (char *)0;
 	return;
     }
-    if ((parserConfigTemp->sslcredentials = StrDup(id))
-	== (char *)0)
+    if ((parserConfigTemp->sslcredentials = StrDup(id)) == (char *)0)
 	OutOfMem();
 #else
-    Error
-	("sslcredentials ignored - encryption not compiled into code [%s:%d]",
-	 file, line);
+    if (isMaster)
+	Error
+	    ("sslcredentials ignored - encryption not compiled into code [%s:%d]",
+	     file, line);
 #endif
 }
 
@@ -3517,9 +4107,10 @@ ConfigItemSslrequired(id)
 #if HAVE_OPENSSL
     ProcessYesNo(id, &(parserConfigTemp->sslrequired));
 #else
-    Error
-	("sslrequired ignored - encryption not compiled into code [%s:%d]",
-	 file, line);
+    if (isMaster)
+	Error
+	    ("sslrequired ignored - encryption not compiled into code [%s:%d]",
+	     file, line);
 #endif
 }
 
@@ -3535,9 +4126,10 @@ ConfigItemSetproctitle(id)
 #if HAVE_SETPROCTITLE
     ProcessYesNo(id, &(parserConfigTemp->setproctitle));
 #else
-    Error
-	("setproctitle ignored - operating system support does not exist [%s:%d]",
-	 file, line);
+    if (isMaster)
+	Error
+	    ("setproctitle ignored - operating system support does not exist [%s:%d]",
+	     file, line);
 #endif
 }
 
@@ -3557,9 +4149,13 @@ ITEM keyDefault[] = {
     {"baud", DefaultItemBaud},
     {"break", DefaultItemBreak},
     {"device", DefaultItemDevice},
+    {"devicesubst", DefaultItemDevicesubst},
     {"exec", DefaultItemExec},
+    {"execsubst", DefaultItemExecsubst},
 /*  {"flow", DefaultItemFlow}, */
     {"host", DefaultItemHost},
+    {"idlestring", DefaultItemIdlestring},
+    {"idletime", DefaultItemIdletimeout},
     {"include", DefaultItemInclude},
     {"initcmd", DefaultItemInitcmd},
     {"logfile", DefaultItemLogfile},
@@ -3568,6 +4164,8 @@ ITEM keyDefault[] = {
     {"options", DefaultItemOptions},
     {"parity", DefaultItemParity},
     {"port", DefaultItemPort},
+    {"portbase", DefaultItemPortbase},
+    {"portinc", DefaultItemPortinc},
     {"ro", DefaultItemRo},
     {"rw", DefaultItemRw},
     {"timestamp", DefaultItemTimestamp},
@@ -3580,9 +4178,13 @@ ITEM keyConsole[] = {
     {"baud", ConsoleItemBaud},
     {"break", ConsoleItemBreak},
     {"device", ConsoleItemDevice},
+    {"devicesubst", ConsoleItemDevicesubst},
     {"exec", ConsoleItemExec},
+    {"execsubst", ConsoleItemExecsubst},
 /*  {"flow", ConsoleItemFlow}, */
     {"host", ConsoleItemHost},
+    {"idlestring", ConsoleItemIdlestring},
+    {"idletimeout", ConsoleItemIdletimeout},
     {"include", ConsoleItemInclude},
     {"initcmd", ConsoleItemInitcmd},
     {"logfile", ConsoleItemLogfile},
@@ -3591,6 +4193,8 @@ ITEM keyConsole[] = {
     {"options", ConsoleItemOptions},
     {"parity", ConsoleItemParity},
     {"port", ConsoleItemPort},
+    {"portbase", ConsoleItemPortbase},
+    {"portinc", ConsoleItemPortinc},
     {"ro", ConsoleItemRo},
     {"rw", ConsoleItemRw},
     {"timestamp", ConsoleItemTimestamp},
@@ -3620,6 +4224,7 @@ ITEM keyConfig[] = {
     {"setproctitle", ConfigItemSetproctitle},
     {"sslcredentials", ConfigItemSslcredentials},
     {"sslrequired", ConfigItemSslrequired},
+    {"unifiedlog", ConfigItemUnifiedlog},
     {(char *)0, (void *)0}
 };
 
@@ -4122,6 +4727,29 @@ ReReadCfg(fd)
 		== (char *)0)
 		OutOfMem();
 	    ReopenLogfile();
+	}
+    }
+
+    /* check for changes to unifiedlog...this might (and does) have
+     * a default of (char *)0, so it's slightly different than the
+     * other code that does similar stuff (like logfile)
+     */
+    if (optConf->unifiedlog == (char *)0) {
+	char *p;
+	if (pConfig->unifiedlog == (char *)0)
+	    p = defConfig.unifiedlog;
+	else
+	    p = pConfig->unifiedlog;
+	if (config->unifiedlog == (char *)0 || p == (char *)0 ||
+	    strcmp(p, config->unifiedlog) != 0) {
+	    if (config->unifiedlog != (char *)0)
+		free(config->unifiedlog);
+	    if (p == (char *)0)
+		config->unifiedlog = p;
+	    else if ((config->unifiedlog = StrDup(p))
+		     == (char *)0)
+		OutOfMem();
+	    ReopenUnifiedlog();
 	}
     }
 

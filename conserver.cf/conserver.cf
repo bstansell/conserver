@@ -1,54 +1,67 @@
 #
-# $Id: conserver.cf,v 1.5 2003-07-04 11:05:04-07 bryan Exp $
+# Sample conserver.cf file, to give you ideas of what you can do with
+# the various configuration items.
 #
-# The character '&' in logfile names are substituted with the console
-# name.
-#
-default full {
-	rw *;
-}
+
+### set up global access
+default full	{ rw *; }
+
+### define some terminal server specifics
+# we set portbase and portinc so we can reference the ports in a
+# physical representation and let conserver do the math to figure
+# out the actual socket address
+default cisco	{ type host; portbase 2000; portinc 1; }
+default xyplex	{ type host; portbase 2000; portinc 100; }
+default iolan	{ type host; portbase 10000; portinc 1; }
+
+### set the defaults for all the consoles
+# these get applied before anything else
 default * {
+	# The '&' character is substituted with the console name
 	logfile /var/consoles/&;
-	timestamp "";
+	timestamp 1hab;
 	include full;
-}
-#
-# list of consoles we serve
-#
-console tweety {
 	master localhost;
-	type host;
-	host ts1;
-	port 2002;
 }
-console bambam {
-	master localhost;
-	type host;
-	host ts1;
-	port 2003;
+
+### define the first terminal server
+default ts1.conserver.com {
+	include xyplex;
+	host ts1.conserver.com;
+	initcmd /usr/local/sbin/login-xyplex;
 }
-console shell {
-	master localhost;
-	logfile /dev/null;
+
+# now define the consoles on ts1.conserver.com
+console web1.conserver.com { include ts1.conserver.com; port 2; }
+console ns1.conserver.com { include ts1.conserver.com; port 10; }
+console ns2.conserver.com { include ts1.conserver.com; port 8; }
+
+### define the second terminal server
+default ts2.conserver.com { include cisco; host ts2.conserver.com; }
+
+# and the consoles
+console ldap1.conserver.com { include ts2.conserver.com; port 7; }
+
+### and now some one-off consoles
+# a simple ssh invocation
+console ssh {
 	type exec;
-	exec "";
+	exec ssh localhost;
+	motd "just a simple ssh to localhost";
 }
-console telnet {
-	master localhost;
-	logfile /dev/null;
-	type exec;
-	exec telnet host;
-}
+
+# connect to /dev/ttya
 console ttya {
-	master localhost;
 	type device;
-	device /dev/ttya;
-	baud 9600;
-	parity none;
+	device /dev/ttya; parity none; baud 9600;
+	idlestring "#";
+	idletimeout 5m;		# send a '#' every 5 minutes of idle
+	timestamp "";		# no timestamps on this console
 }
-#
-# list of clients we allow
-#
+
+### list of clients we allow
 access * {
-	allowed 127.0.0.1 gnac.com;
+	allowed 10.0.0.0/8 192.168.0.0/16;
+	allowed cs1.conserver.com cs2.conserver.com cs3.conserver.com;
+	trusted 127.0.0.1;
 }

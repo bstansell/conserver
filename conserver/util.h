@@ -1,5 +1,5 @@
 /*
- *  $Id: util.h,v 1.55 2003-10-03 06:32:34-07 bryan Exp $
+ *  $Id: util.h,v 1.56 2003/11/10 20:38:25 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -114,6 +114,7 @@ extern int FileUnopen PARAMS((CONSFILE *));
 extern void OutOfMem PARAMS(());
 extern char *BuildTmpString PARAMS((const char *));
 extern char *BuildTmpStringChar PARAMS((const char));
+extern char *BuildTmpStringPrint PARAMS((char *, ...));
 extern char *BuildString PARAMS((const char *, STRING *));
 extern char *BuildStringChar PARAMS((const char, STRING *));
 extern char *BuildStringPrint PARAMS((STRING *, char *, ...));

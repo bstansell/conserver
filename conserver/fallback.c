@@ -1,5 +1,5 @@
 /*
- *  $Id: fallback.c,v 5.59 2003-10-03 06:32:34-07 bryan Exp $
+ *  $Id: fallback.c,v 5.59 2003/10/03 13:32:34 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
