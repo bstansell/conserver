@@ -1,5 +1,5 @@
 /*
- *  $Id: port.h,v 1.6 1999-01-26 20:35:17-08 bryan Exp $
+ *  $Id: port.h,v 1.7 1999-05-14 10:17:14-07 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -211,10 +211,10 @@
 #define USE_TERMIO	(defined(ETA10)||defined(V386))
 #endif
 #if !defined(USE_TERMIOS)
-#define USE_TERMIOS	(defined(HPUX7)||defined(HPUX8)||defined(HPUX9)||defined(SUN5)||defined(PTX)||defined(IRIX5)||defined(LINUX2)||defined(IRIX6))
+#define USE_TERMIOS	(defined(HPUX7)||defined(HPUX8)||defined(HPUX9)||defined(SUN5)||defined(PTX)||defined(IRIX5)||defined(LINUX2)||defined(IRIX6)||defined(SUN4)||defined(BSDOS3))
 #endif
 #if !defined(USE_TCBREAK)
-#define USE_TCBREAK	(defined(SUN4)||defined(PTX)||defined(BSDOS3))
+#define USE_TCBREAK	(defined(PTX))
 #endif
 
 /* if we have <strings.h> define this to 1, else define to 0

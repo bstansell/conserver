@@ -1,5 +1,5 @@
 /*
- *  $Id: client.h,v 5.12 1999-01-26 20:35:17-08 bryan Exp $
+ *  $Id: client.h,v 5.13 1999-02-02 11:36:26-08 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -44,6 +44,7 @@
 #define S_HOST	 8	/* still needs a host name to connect		*/
 #define S_PASSWD 9	/* still needs a passwd to connect		*/
 #define S_QUOTE 10	/* send any character we can spell		*/
+#define S_BCAST 11	/* send a broadcast message to all connections	*/
 
 typedef struct client {		/* Connection Information:		*/
 	int fd;			/* file descriptor			*/
@@ -68,6 +69,8 @@ typedef struct client {		/* Connection Information:		*/
 	char caccess;		/* did we trust the remote machine	*/
 	char accmd[MAXSERVLEN+1];/* the command the user issued		*/
 	int icursor;		/* the length of the command issused	*/
+	char msg[1024];		/* the broadcast message		*/
+	int mcursor;		/* the length of the message		*/
 	struct sockaddr_in
 		cnct_port; 	/* where from				*/
 } CLIENT;

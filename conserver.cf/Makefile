@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.5 1999-01-25 15:38:20-08 bryan Exp $
+#	$Id: Makefile,v 1.6 1999-04-12 21:29:57-07 bryan Exp $
 #
 #	Makefile for conserver.cf
 #
@@ -7,7 +7,7 @@ PREFIX=/usr/local
 BIN=${PREFIX}/bin
 ETC=${PREFIX}/etc
 MAN=${PREFIX}/man
-MANSECT=8
+MANSECT=4
 
 all: 
 

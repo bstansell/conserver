@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.5 1999-01-25 15:10:05-08 bryan Exp $
+#	$Id: Makefile,v 1.6 1999-02-01 15:42:42-08 bryan Exp $
 #
 #	Master Makefile
 #
@@ -9,6 +9,7 @@ all clean install install.man: FRC
 	@if [ -f .settings ]; then \
     	    s=`cat .settings | grep -v '^#'`; \
 	    settings=`echo $$s`; \
+	    if [ -n "${PREFIX}" ]; then settings="'PREFIX=${PREFIX}' $$settings"; fi; \
 	    for s in ${SUBDIRS}; do \
 		( cd $$s; eval ${MAKE} $$settings $@ ) \
 	    done; \

@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.25 1999-01-26 20:35:17-08 bryan Exp $
+ *  $Id: console.c,v 5.26 1999-02-02 11:36:26-08 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -77,7 +77,7 @@ extern char *sys_errlist[];
 #endif
 
 static char rcsid[] =
-	"$Id: console.c,v 5.25 1999-01-26 20:35:17-08 bryan Exp $";
+	"$Id: console.c,v 5.26 1999-02-02 11:36:26-08 bryan Exp $";
 static char *progname =
 	rcsid;
 int fVerbose = 0, fReplay = 0, fRaw = 0;
@@ -154,6 +154,7 @@ FILE *fp;
 
 static char *apcLong[] = {
 	"a(A)	attach politelty (and replay last 20 lines)",
+	"b	broadcast message",
 	"d(D)	display (local) daemon version",
 	"e esc	set the initial escape characters",
 	"f(F)	force read/write connection (and replay)",
@@ -962,8 +963,13 @@ char *pcMaster, *pcMach, *pcCmd, *pcWho;
 	/* send sign-on stuff, then wait for a reply, like "ok\r\n"
 	 * before allowing a write
 	 */
-	(void)sprintf(acMesg, "%c%c%c%c%c.", DEFATTN, DEFESC, *pcCmd, DEFATTN, DEFESC);
-	SendOut(s, acMesg, 9);
+	if ( *pcCmd == 'b' ) {
+	    (void)sprintf(acMesg, "%c%c%c%s\r\n%c%c.", DEFATTN, DEFESC, *pcCmd, pcMach, DEFATTN, DEFESC);
+	    SendOut(s, acMesg, strlen(acMesg));
+	} else {
+	    (void)sprintf(acMesg, "%c%c%c%c%c.", DEFATTN, DEFESC, *pcCmd, DEFATTN, DEFESC);
+	    SendOut(s, acMesg, 6);
+	}
 
 	/* read the server's reply,
 	 * We buffer until we close the connection because it
@@ -1148,8 +1154,9 @@ char **argv;
 	auto int fLocal;
 	auto char acPorts[1024];
 	auto char *pcUser;
+	auto char *pcMsg;
 	auto int (*pfiCall)();
-	static char acOpts[] = "aAdDsSfFe:hl:M:pvVwWUqQrux";
+	static char acOpts[] = "b:aAdDsSfFe:hl:M:pvVwWUqQrux";
 	extern long atol();
 	extern int optind;
 	extern char *optarg;
@@ -1205,6 +1212,11 @@ char **argv;
 			/* fall through */
 		case 'a':	/* attach */
 			pcCmd = "attach";
+			break;
+
+		case 'b':
+			pcCmd = "broadcast";
+			pcMsg = optarg;
 			break;
 
 		case 'D':
@@ -1274,7 +1286,7 @@ char **argv;
 
 		case 'h':
 			printf("%s: usage [-aAfFsS] [-rv] [-e esc] [-M mach] [-l username] machine\n", progname);
-			printf("%s: usage [-v] [-hdDuVwx]\n", progname);
+			printf("%s: usage [-v] [-hdDuVwx] [-b message]\n", progname);
 			printf("%s: usage [-qQ] [-M mach]\n", progname);
 			Usage(stdout, apcLong);
 			exit(0);
@@ -1300,6 +1312,7 @@ char **argv;
 	if ((char *)0 == pcCmd) {
 		pcCmd = "attach";
 	}
+
 	if ('a' == *pcCmd || 'f' == *pcCmd || 's' == *pcCmd) {
 		if (optind >= argc) {
 			fprintf(stderr, "%s: missing machine name\n", progname);
@@ -1314,6 +1327,9 @@ char **argv;
 		exit(1);
 	}
 	(void)sprintf(acPorts, "@%s", pcInMaster);
+	if ('b' == *pcCmd) {
+	    pcTo = pcMsg;
+	}
 	if ('q' == *pcCmd) {
 		auto char acPass[32];
 		(void)strcpy(acPass, getpass("Enter root password:"));

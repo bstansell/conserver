@@ -23,4 +23,4 @@ shell:|:9600p:&:
 %%
 # list of clients we allow
 # type machines
-allowed: 127.0.0.1
+trusted: 127.0.0.1

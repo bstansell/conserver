@@ -1,6 +1,6 @@
 .\" @(#)conserver.8 01/06/91 OSU CIS; Thomas A. Fine
-.\" $Id: conserver.man,v 1.4 1999-01-25 18:57:52-08 bryan Exp $
-.TH CONSERVER 8L "LOCAL"
+.\" $Id: conserver.man,v 1.5 1999-04-12 22:40:55-07 bryan Exp $
+.TH CONSERVER 8 "Local"
 .SH NAME
 conserver \- console server daemon
 .SH SYNOPSIS

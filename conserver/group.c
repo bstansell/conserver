@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.52 1999-01-26 20:35:17-08 bryan Exp $
+ *  $Id: group.c,v 5.55 1999-05-14 10:16:48-07 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -237,6 +237,42 @@ Mark(arg)
     alarm(ALARMTIME);
 }
 
+void
+SendClientsMsg(pGE, message)
+GRPENT *pGE;
+char *message;
+{
+	register CLIENT *pCL;
+
+	if ((GRPENT *)0 == pGE) {
+		return;
+	}
+
+	for (pCL = pGE->pCLall; (CLIENT *)0 != pCL; pCL = pCL->pCLscan) {
+	    if (pCL->fcon) {
+		    (void)write(pCL->fd, message, strlen(message));
+	    }
+	}
+}
+
+void
+SendShutdownMsg(pGE)
+GRPENT *pGE;
+{
+    SendClientsMsg(pGE, "[-- Console server shutting down --]\r\n");
+}
+
+static SIGRETS
+GoAway(sig)
+int sig;
+{
+	SendShutdownMsg(pGEHup);
+
+	exit(0);
+	_exit(0);
+	abort();
+}
+
 #if DO_VIRTUAL
 /* on a TERM we have to cleanup utmp entries (ask ptyd to do it)	(ksb)
  */
@@ -250,6 +286,8 @@ int sig;
 	if ((GRPENT *)0 == pGEHup) {
 		return;
 	}
+
+	SendShutdownMsg(pGEHup);
 
 	for (i = 0, pCE = pGEHup->pCElist; i < pGEHup->imembers; ++i, ++pCE) {
 		if (-1 == pCE->fdtty || 0 == pCE->fvirtual) {
@@ -514,7 +552,7 @@ int sfd;
 	(void)signal(SIGTERM, DeUtmp);
 	(void)signal(SIGCHLD, ReapVirt);
 #else
-	(void)signal(SIGTERM, SIG_DFL);
+	(void)signal(SIGTERM, GoAway);
 	(void)signal(SIGCHLD, SIG_DFL);
 #endif
 
@@ -759,6 +797,31 @@ drop:
 			}
 
 			for (i = 0; i < nr; ++i) switch (pCLServing->iState) {
+			case S_BCAST:
+				/* gather message */
+				if (pCLServing->mcursor == sizeof(pCLServing->msg)) {
+					CSTROUT(pCLServing->fd, "Message too long.\r\n");
+					goto drop;
+				}
+				if (&CECtl != pCLServing->pCEto) {
+				    write(pCLServing->fd, &acIn[i], 1);
+				}
+				if ('\n' != acIn[i]) {
+					pCLServing->msg[pCLServing->mcursor++] = acIn[i];
+					continue;
+				}
+				pCLServing->msg[pCLServing->mcursor] = '\000';
+				if ('\r' == pCLServing->msg[pCLServing->mcursor-1]) {
+					pCLServing->msg[--pCLServing->mcursor] = '\000';
+				}
+				pCLServing->mcursor = 0;
+
+				sprintf(acOut, "[Broadcast: %s]\r\n", pCLServing->msg);
+				SendClientsMsg(pGE, acOut);
+
+				pCLServing->iState = S_NORMAL;
+				continue;
+
 			case S_IDENT:
 				/* append chars to acid until white space
 				 */
@@ -1005,23 +1068,24 @@ drop:
 					continue;
 				}
 #else
-#if USE_TERMIOS || USE_TCBREAK
-				CSTROUT(pCLServing->fd, "- ");
+#if USE_TCBREAK
 				if (-1 == tcsendbreak(pCEServing->fdtty, 9)) {
 					CSTROUT(pCLServing->fd, "failed]\r\n");
 					continue;
 				}
 #else
+#if USE_TERMIOS
 				if (-1 == ioctl(pCEServing->fdtty, TIOCSBRK, (char *)0)) {
 					CSTROUT(pCLServing->fd, "failed]\r\n");
 					continue;
 				}
 				CSTROUT(pCLServing->fd, "- ");
-				sleep(3);
+				sleep(1);
 				if (-1 == ioctl(pCEServing->fdtty, TIOCCBRK, (char *)0)) {
 					CSTROUT(pCLServing->fd, "failed]\r\n");
 					continue;
 				}
+#endif
 #endif
 #endif
 		}
@@ -1082,8 +1146,20 @@ drop:
 					break;
 
 				case ';':	/* ;login: */
+					if (&CECtl != pCLServing->pCEto) {
+						goto unknown;
+					}
 					CSTROUT(pCLServing->fd, "login:\r\n");
 					pCLServing->iState = S_IDENT;
+					break;
+
+				case 'b':	/* broadcast message */
+				case 'B':
+					if (&CECtl != pCLServing->pCEto) {
+						goto unknown;
+					}
+					CSTROUT(pCLServing->fd, "Enter message]\r\n");
+					pCLServing->iState = S_BCAST;
 					break;
 
 				case 'a':	/* attach */
@@ -1489,6 +1565,7 @@ drop:
 					CSTROUT(pCLServing->fd, "quote \\");
 					break;
 				default:	/* unknown sequence */
+unknown:
 					CSTROUT(pCLServing->fd, "unknown -- use `?\']\r\n");
 					break;
 				}
@@ -1574,6 +1651,7 @@ drop:
 		pCL->ic[1] = DEFESC;
 		pCL->caccess = cType;
 		pCL->icursor = 0;
+		pCL->mcursor = 0;
 
 		/* mark as stopped (no output from console)
 		 * and spy only (on chars to console)
