@@ -1,0 +1,88 @@
+#!/bin/sh
+
+pid=0
+testnum=0
+exitval=0
+
+cleanup()
+{
+    [ -f test.out ] && rm test.out
+    [ -f c.cf ] && rm c.cf
+    [ $pid -eq 0 ] && return 0
+    kill $pid
+    for i in *.log; do rm $i; done
+    exit $exitval
+}
+
+dotest()
+{
+    testnum=`expr $testnum + 1`
+    $ECHO "executing test #$testnum...$EE"
+    if [ "$2" ]; then
+	eval "$2" > test.out 2>&1
+    else
+	(echo "$1" && sleep 2) | \
+	    ../console/console -M 127.0.0.1 -p 7777 shell > test.out 2>&1
+    fi
+    if [ "$record" ]; then
+	echo "recorded"
+	mv test.out results/test$testnum
+    else
+	if [ -f results/test$testnum ]; then
+	    if diff -i test.out results/test$testnum >test$testnum.diff 2>&1; then
+		echo "succeded"
+		rm test$testnum.diff
+	    else
+		echo "failed (diffs in test$testnum.diff)"
+		exitval=1
+	    fi
+	else
+	    echo "unknown (not recorded)"
+	fi
+	rm test.out
+    fi
+}
+
+[ ! -f ../conserver/conserver -o ! -f ../console/console ] && \
+    echo 'binaries do not exist - did you run make yet?' && exit 1
+
+trap cleanup 15
+
+if [ "`echo -n`" = "-n" ]; then
+    ECHO="echo"
+    EE="\c"
+else
+    ECHO="echo -n"
+    EE=""
+fi
+
+$ECHO "starting conserver...$EE"
+cp test1.cf c.cf
+../conserver/conserver -M 127.0.0.1 -p 7777 -v -C c.cf \
+    -P test.passwd -m 32 > conserver.log 2>&1 &
+
+pid=$!
+echo "pid $pid"
+
+sleep 3
+
+[ ! -d results ] && mkdir results
+
+dotest EVAL "../console/console -M 127.0.0.1 -p 7777 -u | sed -e 's/[0-9][0-9]*//g' -e 's/[ 	][ 	]*/ /g'"
+dotest 'c?c.'
+dotest 'cl?c.'
+dotest 'cdc.'
+dotest 'coc.'
+
+echo "moving in second config file"
+cp test2.cf c.cf
+kill -1 $pid
+sleep 3
+
+dotest EVAL "../console/console -M 127.0.0.1 -p 7777 -u | sed -e 's/[0-9][0-9]*//g' -e 's/[ 	][ 	]*/ /g'"
+dotest 'c?c.'
+dotest 'cl?c.'
+dotest 'cdc.'
+dotest 'coc.'
+
+cleanup

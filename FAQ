@@ -16,7 +16,9 @@ directed to faq@conserver.com.  The FAQ answers the following questions:
     7) How do I set up a serial port for no parity?
     8) Is "Conserver" a Trademark or Registered Trademark?
     9) When I connect to a console, it says it is down.  Why?
-   99) Ok, things just don't seem to work.  Help?!?
+   10) Is there a technical reason why --with-maxmemb's default is 16?
+       I've changed mine to 96.
+   99) OK, things just don't seem to work.  Help?!?
 
 
  1) What is conserver?
@@ -106,7 +108,43 @@ directed to faq@conserver.com.  The FAQ answers the following questions:
     telnet session), or there was an unseen typo in a path or hostname.
     The logfile should show hints of things like this and other issues.
 
-99) Ok, things just don't seem to work.  Help?!?
+10) Is there a technical reason why --with-maxmemb's default is 16?
+    I've changed mine to 96.
+
+    The following is an array of things you need to think about when
+    adjusting --with-maxmemb.  It's a bit long, but it's an important
+    question.
+
+    The big reason (and the main reason for conserver spawning multiple
+    processes) is the maximum number of open files a process can have.
+    Each console can have a few file descriptors associated with it
+    (device, logfile, connected users, and listening socket).  So, each
+    process will have about ( 2 * consoles + users + 1 ) open files
+    (--with-maxmemb sets the maximum number of consoles per process
+    in the equation).  Although most current operating systems allow a
+    large number of open files per process, the general assumption is
+    it's still pretty low.
+
+    You also have the speed of your conserver host vs the rates at which
+    data could be streaming to it.  Go back a decade and this was probably
+    more of an issue than today, but it's still something to think about.
+
+    And then you have the problem of delays.  If any of the 96 console
+    connections "lock up", it'll delay all activity on the 96 consoles.
+    With 16, there's less of an impact.  This can be an issue once the
+    server is up or during startup.  Also, with 16 consoles per process,
+    you get a bit more parallelization during startup.
+
+    So, is there any reason not to up the number to 96?  No.  Assuming you
+    know the risks and weigh things appropriately.  If I remember right,
+    I've upped the number to 48 at some sites.  But that was mainly to
+    reduce the memory footprint in older versions of the code which had
+    statically allocated buffers.  No need to worry about that with the
+    current code.  Personally, I wouldn't change from 16 unless there
+    was a really good reason (like wanting to only have one child process
+    for firewall rules or some such reason).
+
+99) OK, things just don't seem to work.  Help?!?
 
     Yes, this is a pretty vague question, but here are a few tips that
     might help.
@@ -146,5 +184,5 @@ directed to faq@conserver.com.  The FAQ answers the following questions:
       through the same problem?
 
 #
-#  $Id: FAQ,v 1.7 2002-09-22 10:21:06-07 bryan Exp $
+#  $Id: FAQ,v 1.8 2003-04-08 14:05:16-07 bryan Exp $
 #

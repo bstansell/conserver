@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.120 2003-03-09 15:20:43-08 bryan Exp $
+ *  $Id: main.c,v 5.122 2003-04-06 05:31:13-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -52,6 +52,11 @@
 #include <master.h>
 #include <readcfg.h>
 #include <version.h>
+
+#if HAVE_OPENSSL
+#include <openssl/opensslv.h>
+#endif
+
 
 int fAll = 0, fSoftcar = 0, fNoinit = 0, fVersion = 0, fStrip =
     0, fDaemon = 0, fUseLogfile = 0, fReopen = 0, fReopenall =
@@ -327,29 +332,29 @@ SetupSSL()
 	SSL_load_error_strings();
 	if (!SSL_library_init()) {
 	    Error("SetupSSL(): SSL_library_init() failed");
-	    exit(EX_UNAVAILABLE);
+	    Bye(EX_SOFTWARE);
 	}
 	if ((ctx = SSL_CTX_new(SSLv23_method())) == (SSL_CTX *) 0) {
 	    Error("SetupSSL(): SSL_CTX_new() failed");
-	    exit(EX_UNAVAILABLE);
+	    Bye(EX_SOFTWARE);
 	}
 	if (SSL_CTX_set_default_verify_paths(ctx) != 1) {
 	    Error
 		("SetupSSL(): could not load SSL default CA file and/or directory");
-	    exit(EX_UNAVAILABLE);
+	    Bye(EX_SOFTWARE);
 	}
 	if (pcCredFile != (char *)0) {
 	    if (SSL_CTX_use_certificate_chain_file(ctx, pcCredFile) != 1) {
 		Error
 		    ("SetupSSL(): could not load SSL certificate from `%s'",
 		     pcCredFile);
-		exit(EX_UNAVAILABLE);
+		Bye(EX_SOFTWARE);
 	    }
 	    if (SSL_CTX_use_PrivateKey_file
 		(ctx, pcCredFile, SSL_FILETYPE_PEM) != 1) {
 		Error("SetupSSL(): could not SSL private key from `%s'",
 		      pcCredFile);
-		exit(EX_UNAVAILABLE);
+		Bye(EX_SOFTWARE);
 	    }
 	}
 	SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, SSLVerifyCallback);
@@ -364,7 +369,7 @@ SetupSSL()
 	if (SSL_CTX_set_cipher_list(ctx, "ALL:!LOW:!EXP:!MD5:@STRENGTH") !=
 	    1) {
 	    Error("SetupSSL(): setting SSL cipher list failed");
-	    exit(EX_UNAVAILABLE);
+	    Bye(EX_SOFTWARE);
 	}
 	/* might want to turn this back on at some point, but i can't
 	 * see why right now.
@@ -393,7 +398,7 @@ ReopenLogfile()
     close(1);
     if (1 != open(pcLogfile, O_WRONLY | O_CREAT | O_APPEND, 0644)) {
 	Error("ReopenLogfile(): open(%s): %s", pcLogfile, strerror(errno));
-	exit(EX_TEMPFAIL);
+	Bye(EX_TEMPFAIL);
     }
     close(2);
     dup(1);
@@ -431,7 +436,7 @@ Daemonize()
     switch (res = fork()) {
 	case -1:
 	    Error("Daemonize(): fork(): %s", strerror(errno));
-	    exit(EX_UNAVAILABLE);
+	    Bye(EX_TEMPFAIL);
 	case 0:
 	    thepid = getpid();
 	    break;
@@ -619,6 +624,22 @@ Version()
 	}
     }
     Msg("options: %s", acA1->string);
+#if HAVE_DMALLOC
+    BuildString((char *)0, acA1);
+    BuildStringChar('0' + DMALLOC_VERSION_MAJOR, acA1);
+    BuildStringChar('.', acA1);
+    BuildStringChar('0' + DMALLOC_VERSION_MINOR, acA1);
+    BuildStringChar('.', acA1);
+    BuildStringChar('0' + DMALLOC_VERSION_PATCH, acA1);
+    if (DMALLOC_VERSION_BETA != 0) {
+	BuildString("-b", acA1);
+	BuildStringChar('0' + DMALLOC_VERSION_BETA, acA1);
+    }
+    Msg("dmalloc version: %s", acA1->string);
+#endif
+#if HAVE_OPENSSL
+    Msg("openssl version: %s", OPENSSL_VERSION_TEXT);
+#endif
     Msg("built with `%s'", CONFIGINVOCATION);
 
     if (fVerbose)
@@ -718,12 +739,13 @@ DumpDataStructures()
 		  "DumpDataStructures():  isNetworkConsole=%d, networkConsoleHost=%s",
 		  pCE->isNetworkConsole, pCE->networkConsoleHost.string);
 	    Debug(1,
-		  "DumpDataStructures():  networkConsolePort=%hu, telnetState=%d, autoReup=%d",
+		  "DumpDataStructures():  networkConsolePort=%hu, telnetState=%d, autoReup=%hu",
 		  pCE->networkConsolePort, pCE->telnetState,
 		  pCE->autoReUp);
 
-	    Debug(1, "DumpDataStructures():  baud=%s, parity=%c",
-		  pCE->pbaud->acrate, pCE->pparity->ckey);
+	    Debug(1,
+		  "DumpDataStructures():  downHard=%hu, baud=%s, parity=%c",
+		  pCE->downHard, pCE->pbaud->acrate, pCE->pparity->ckey);
 
 	    Debug(1,
 		  "DumpDataStructures():  fvirtual=%d, acslave=%s, pccmd=%s, ipid=%lu",
@@ -802,12 +824,12 @@ main(argc, argv)
     gethostname(acMyHost, sizeof(acMyHost));
     if ((struct hostent *)0 == (hpMe = gethostbyname(acMyHost))) {
 	Error("gethostbyname(%s): %s", acMyHost, hstrerror(h_errno));
-	exit(EX_UNAVAILABLE);
+	Bye(EX_TEMPFAIL);
     }
     if (4 != hpMe->h_length || AF_INET != hpMe->h_addrtype) {
 	Error("wrong address size (4 != %d) or adress family (%d != %d)",
 	      hpMe->h_length, AF_INET, hpMe->h_addrtype);
-	exit(EX_UNAVAILABLE);
+	Bye(EX_TEMPFAIL);
     }
 #if HAVE_MEMCPY
     memcpy(&acMyAddr, hpMe->h_addr, hpMe->h_length);
@@ -832,7 +854,7 @@ main(argc, argv)
 			break;
 		    default:
 			Error("unknown access type `%s'", optarg);
-			exit(EX_UNAVAILABLE);
+			Bye(EX_USAGE);
 		}
 		break;
 	    case 'b':
@@ -910,10 +932,10 @@ main(argc, argv)
 		break;
 	    case '\?':
 		Usage(0);
-		exit(EX_UNAVAILABLE);
+		Bye(EX_USAGE);
 	    default:
 		Error("option %c needs a parameter", optopt);
-		exit(EX_UNAVAILABLE);
+		Bye(EX_USAGE);
 	}
     }
 
@@ -928,7 +950,7 @@ main(argc, argv)
     close(0);
     if (0 != open("/dev/null", O_RDWR, 0644)) {
 	Error("open(/dev/null): %s", strerror(errno));
-	exit(EX_UNAVAILABLE);
+	Bye(EX_OSFILE);
     }
 
     if (fVersion) {
@@ -985,7 +1007,7 @@ main(argc, argv)
 	bindAddr = inet_addr(pcAddress);
 	if (bindAddr == (in_addr_t) (-1)) {
 	    Error("inet_addr(%s): %s", pcAddress, "invalid IP address");
-	    exit(EX_UNAVAILABLE);
+	    Bye(EX_OSERR);
 	}
 	acMyAddr.s_addr = bindAddr;
     }
@@ -998,7 +1020,7 @@ main(argc, argv)
     if (pcPort == NULL) {
 	Error
 	    ("main(): severe error - pcPort is NULL????  how can that be?");
-	exit(EX_UNAVAILABLE);
+	Bye(EX_SOFTWARE);
     }
 
     /* Look for non-numeric characters */
@@ -1014,7 +1036,7 @@ main(argc, argv)
 	struct servent *pSE;
 	if ((struct servent *)0 == (pSE = getservbyname(pcPort, "tcp"))) {
 	    Error("getservbyname(%s): %s", pcPort, strerror(errno));
-	    exit(EX_UNAVAILABLE);
+	    Bye(EX_OSERR);
 	} else {
 	    bindPort = ntohs((unsigned short)pSE->s_port);
 	}
@@ -1034,7 +1056,7 @@ main(argc, argv)
 	if ((struct servent *)0 ==
 	    (pSE = getservbyname(pcBasePort, "tcp"))) {
 	    Error("getservbyname(%s): %s", pcBasePort, strerror(errno));
-	    exit(EX_UNAVAILABLE);
+	    Bye(EX_OSERR);
 	} else {
 	    bindBasePort = ntohs((unsigned short)pSE->s_port);
 	}
@@ -1044,7 +1066,7 @@ main(argc, argv)
      */
     if ((FILE *) 0 == (fpConfig = fopen(pcConfig, "r"))) {
 	Error("fopen(%s): %s", pcConfig, strerror(errno));
-	exit(EX_UNAVAILABLE);
+	Bye(EX_NOINPUT);
     }
 
     ReadCfg(pcConfig, fpConfig);

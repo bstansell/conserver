@@ -1,10 +1,11 @@
 /*
- *  $Id: util.c,v 1.74 2003-03-09 15:20:05-08 bryan Exp $
+ *  $Id: util.c,v 1.75 2003-04-06 05:29:35-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  */
+
 #include <config.h>
 
 #include <stdio.h>
@@ -21,6 +22,7 @@
 #if HAVE_OPENSSL
 #include <openssl/ssl.h>
 #endif
+
 
 int fVerbose = 0;
 int isMultiProc = 0;

@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.91 2003-03-10 17:37:04-08 bryan Exp $
+ *  $Id: master.c,v 5.94 2003-04-07 18:48:12-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -40,13 +40,6 @@
 #include <ctype.h>
 #include <signal.h>
 
-#if defined(USE_LIBWRAP)
-#include <syslog.h>
-#include <tcpd.h>
-int allow_severity = LOG_INFO;
-int deny_severity = LOG_WARNING;
-#endif
-
 #include <compat.h>
 #include <util.h>
 
@@ -59,6 +52,12 @@ int deny_severity = LOG_WARNING;
 #include <version.h>
 #include <main.h>
 
+#if defined(USE_LIBWRAP)
+#include <syslog.h>
+#include <tcpd.h>
+int allow_severity = LOG_INFO;
+int deny_severity = LOG_WARNING;
+#endif
 
 
 static sig_atomic_t fSawQuit = 0, fSawHUP = 0, fSawUSR2 = 0, fSawUSR1 =
@@ -111,27 +110,30 @@ FixKids()
 
 	    /* A couple ways to shut down the whole system */
 	    if (WIFEXITED(UWbuf) && (WEXITSTATUS(UWbuf) == EX_UNAVAILABLE)) {
+		Msg("child pid %lu: exit(%d), shutting down",
+		    (unsigned long)pGE->pid, WEXITSTATUS(UWbuf));
 		fSawQuit = 1;
 		/* So we don't kill something that's dead */
 		pGE->pid = -1;
-		Msg("[%s] exit(%d), shutdown", pGE->pCElist->server.string,
-		    WEXITSTATUS(UWbuf));
 		break;
 	    }
 	    if (WIFSIGNALED(UWbuf) && (WTERMSIG(UWbuf) == SIGTERM)) {
+		Msg("child pid %lu: signal(%d), shutting down",
+		    (unsigned long)pGE->pid, WTERMSIG(UWbuf));
 		fSawQuit = 1;
 		/* So we don't kill something that's dead */
 		pGE->pid = -1;
-		Msg("[%s] signal(%d), shutdown",
-		    pGE->pCElist->server.string, WTERMSIG(UWbuf));
 		break;
 	    }
 
 	    /* If not, then just a simple restart of the child */
 	    if (WIFEXITED(UWbuf))
-		Msg("[%s] exit(%d), restarted", WEXITSTATUS(UWbuf));
+		Msg("child pid %lu: exit(%d), restarting", pGE->pid,
+		    WEXITSTATUS(UWbuf));
+
 	    if (WIFSIGNALED(UWbuf))
-		Msg("[%s] signal(%d), restarted", WTERMSIG(UWbuf));
+		Msg("child pid %lu: signal(%d), restarting", pGE->pid,
+		    WTERMSIG(UWbuf));
 
 	    /* this kid kid is dead, start another
 	     */
@@ -551,7 +553,7 @@ Master()
 			      -1);
 		    Error("Master(): getsockname(%u): %s",
 			  FileFDNum(csocket), strerror(errno));
-		    exit(EX_UNAVAILABLE);
+		    Bye(EX_OSERR);
 		}
 		FilePrint(csocket, "@%s", inet_ntoa(lcl.sin_addr));
 		iSep = 0;
@@ -594,7 +596,7 @@ Master()
 		continue;
 	    for (pCE = pGE->pCElist; pCE != (CONSENT *) 0;
 		 pCE = pCE->pCEnext) {
-		if (0 != strcmp(pcArgs, pCE->server.string)) {
+		if (0 != strcasecmp(pcArgs, pCE->server.string)) {
 		    continue;
 		}
 		prnum = ntohs(pGE->port);
@@ -609,7 +611,7 @@ Master()
 	 */
 	if (!fNoredir || (fNoredir && found == 0)) {
 	    for (pRC = pRCList; (REMOTE *) 0 != pRC; pRC = pRC->pRCnext) {
-		if (0 != strcmp(pcArgs, pRC->rserver.string)) {
+		if (0 != strcasecmp(pcArgs, pRC->rserver.string)) {
 		    continue;
 		}
 		ambiguous = BuildTmpString(pRC->rserver.string);
@@ -625,8 +627,8 @@ Master()
 		for (pCE = pGE->pCElist; pCE != (CONSENT *) 0;
 		     pCE = pCE->pCEnext) {
 		    if (0 !=
-			strncmp(pcArgs, pCE->server.string,
-				strlen(pcArgs))) {
+			strncasecmp(pcArgs, pCE->server.string,
+				    strlen(pcArgs))) {
 			continue;
 		    }
 		    prnum = ntohs(pGE->port);
@@ -641,8 +643,8 @@ Master()
 		for (pRC = pRCList; (REMOTE *) 0 != pRC;
 		     pRC = pRC->pRCnext) {
 		    if (0 !=
-			strncmp(pcArgs, pRC->rserver.string,
-				strlen(pcArgs))) {
+			strncasecmp(pcArgs, pRC->rserver.string,
+				    strlen(pcArgs))) {
 			continue;
 		    }
 		    ambiguous = BuildTmpString(pRC->rserver.string);

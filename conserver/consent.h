@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.35 2003-03-09 15:21:49-08 bryan Exp $
+ *  $Id: consent.h,v 5.36 2003-03-17 08:54:53-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -59,8 +59,9 @@ typedef struct consent {	/* console information                  */
     PARITY *pparity;		/* the parity on this line              */
     int mark;			/* Mark (chime) interval                */
     long nextMark;		/* Next mark (chime) time               */
-    short breakType;		/* break type [1-9]                     */
-    int autoReUp;
+    unsigned short breakType;	/* break type [1-9]                     */
+    unsigned short autoReUp;	/* is it coming back up automatically?  */
+    unsigned short downHard;	/* did it go down unexpectedly?         */
 
     /* Used if network console */
     int isNetworkConsole;
@@ -80,12 +81,12 @@ typedef struct consent {	/* console information                  */
     int fdtty;			/* the port to talk to machine on       */
     int activitylog;		/* log attach/detach/bump               */
     int breaklog;		/* log breaks sent                      */
-    short fup;			/* we setup this line?                  */
-    short fronly;		/* we can only read this console        */
+    unsigned short fup;		/* we setup this line?                  */
+    unsigned short fronly;	/* we can only read this console        */
     struct client *pCLon;	/* clients on this console              */
     struct client *pCLwr;	/* client that is writting on console   */
     char acline[132 * 2 + 2];	/* max chars we will call a line        */
-    short iend;			/* length of data stored in acline      */
+    int iend;			/* length of data stored in acline      */
     struct consent *pCEnext;	/* next console entry                   */
 } CONSENT;
 
@@ -96,8 +97,9 @@ struct hostcache {
 
 extern PARITY *FindParity PARAMS((char *));
 extern BAUD *FindBaud PARAMS((char *));
-extern void ConsInit PARAMS((CONSENT *, fd_set *, int));
-extern void ConsDown PARAMS((CONSENT *, fd_set *));
+extern void ConsInit PARAMS((CONSENT *, fd_set *, short));
+extern void ConsDown PARAMS((CONSENT *, fd_set *, short));
 extern int CheckHostCache PARAMS((const char *));
 extern void AddHostCache PARAMS((const char *));
+extern void ClearHostCache PARAMS((void));
 extern void ClearHostCache PARAMS((void));

@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.99 2003-03-09 15:20:15-08 bryan Exp $
+ *  $Id: readcfg.c,v 5.104 2003-04-07 18:57:55-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -37,6 +37,7 @@
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <stdio.h>
@@ -54,6 +55,7 @@
 #include <readcfg.h>
 #include <master.h>
 #include <main.h>
+
 
 GRPENT *pGroups = (GRPENT *) 0;
 REMOTE *pRCList = (REMOTE *) 0;	/* list of remote consoles we know about */
@@ -455,12 +457,13 @@ ReadCfg(pcFile, fp, master)
 	 * but by the end, if it has anything, it's all empty groups
 	 * in the slave and a mix of real (new) and empty in the master.
 	 */
+	/* check for dups in the main area */
 	for (pGEtmp = pGroups; pGEtmp != (GRPENT *) 0;
 	     pGEtmp = pGEtmp->pGEnext) {
 	    for (pCEtmp = pGEtmp->pCElist; pCEtmp != (CONSENT *) 0;
 		 pCEtmp = pCEtmp->pCEnext) {
 		if (pCEtmp->server.used &&
-		    strcmp(acStart, pCEtmp->server.string) == 0) {
+		    strcasecmp(acStart, pCEtmp->server.string) == 0) {
 		    if (isMaster)
 			Error("%s(%d) duplicate console name `%s'", pcFile,
 			      iLine, acStart);
@@ -472,12 +475,13 @@ ReadCfg(pcFile, fp, master)
 	}
 	if (pCEtmp != (CONSENT *) 0)
 	    continue;
+	/* check for dups in the staged area */
 	for (pGEtmp = pGEstage; pGEtmp != (GRPENT *) 0;
 	     pGEtmp = pGEtmp->pGEnext) {
 	    for (pCEtmp = pGEtmp->pCElist; pCEtmp != (CONSENT *) 0;
 		 pCEtmp = pCEtmp->pCEnext) {
 		if (pCEtmp->server.used &&
-		    strcmp(acStart, pCEtmp->server.string) == 0) {
+		    strcasecmp(acStart, pCEtmp->server.string) == 0) {
 		    if (isMaster)
 			Error("%s(%d) duplicate console name `%s'", pcFile,
 			      iLine, acStart);
@@ -522,6 +526,7 @@ ReadCfg(pcFile, fp, master)
 	 * (contains an '@host' where host is not us)
 	 * if so just add it to a linked list of remote hosts
 	 * I'm sure most sites will never use this code (ksb)
+	 * Today, I beg to differ ;-) (bryan)
 	 */
 	if ((char *)0 != (pcRem = strchr(pcLine, '@'))) {
 	    struct hostent *hpMe;
@@ -531,15 +536,15 @@ ReadCfg(pcFile, fp, master)
 	    pcRem = PruneSpace(pcRem);
 
 	    if ((struct hostent *)0 == (hpMe = gethostbyname(pcRem))) {
-		Error("ReadCfg(): gethostbyname(%s): %s", pcRem,
-		      hstrerror(h_errno));
-		exit(EX_UNAVAILABLE);
+		Error("%s(%d): gethostbyname(%s): %s", pcFile, iLine,
+		      pcRem, hstrerror(h_errno));
+		continue;
 	    }
 	    if (4 != hpMe->h_length || AF_INET != hpMe->h_addrtype) {
 		Error
 		    ("ReadCfg(): wrong address size (4 != %d) or address family (%d != %d)",
 		     hpMe->h_length, AF_INET, hpMe->h_addrtype);
-		exit(EX_UNAVAILABLE);
+		continue;
 	    }
 
 	    if (0 !=
@@ -581,7 +586,7 @@ ReadCfg(pcFile, fp, master)
 		     pGEmatch->pCElist; pCEmatch != (CONSENT *) 0;
 		     ppCE = &pCEmatch->pCEnext, pCEmatch =
 		     pCEmatch->pCEnext) {
-		    if (0 == strcmp(acStart, pCEmatch->server.string)) {
+		    if (0 == strcasecmp(acStart, pCEmatch->server.string)) {
 			/* extract pCEmatch from the linked list */
 			*ppCE = pCEmatch->pCEnext;
 			pGEmatch->imembers--;
@@ -687,13 +692,13 @@ ReadCfg(pcFile, fp, master)
 	    if (bt > 9 || bt < 0) {
 		Error("%s(%d) bad break spec `%d'", pcFile, iLine, bt);
 	    } else {
-		pCE->breakType = (short)bt;
+		pCE->breakType = bt;
 		Debug(1, "ReadCfg(): breakType set to %d", pCE->breakType);
 	    }
 	}
 
 	pCE->ipid = pCE->fdtty = -1;
-	pCE->fup = pCE->autoReUp = 0;
+	pCE->fup = pCE->autoReUp = pCE->downHard = 0;
 	pCE->pCLon = pCE->pCLwr = (CONSCLIENT *) 0;
 	pCE->fdlog = (CONSFILE *) 0;
 
@@ -895,7 +900,7 @@ ReadCfg(pcFile, fp, master)
 	    if (pCE->isNetworkConsole) {
 		if (pCEmatch->networkConsoleHost.used &&
 		    pCE->networkConsoleHost.used) {
-		    if (strcmp
+		    if (strcasecmp
 			(pCEmatch->networkConsoleHost.string,
 			 pCE->networkConsoleHost.string) != 0) {
 			BuildString((char *)0,
@@ -940,12 +945,13 @@ ReadCfg(pcFile, fp, master)
 	    pCEmatch->mark = pCE->mark;
 	    pCEmatch->nextMark = pCE->nextMark;
 	    pCEmatch->breakType = pCE->breakType;
+	    pCEmatch->downHard = pCE->downHard;
 
 	    if (!closeMatch && !isMaster) {
 		/* fdtty/fup/fronly/acslave/ipid */
 		SendClientsMsg(pCEmatch,
 			       "[-- Conserver reconfigured - console reset --]\r\n");
-		ConsDown(pCEmatch, &pGEtmp->rinit);
+		ConsDown(pCEmatch, &pGEtmp->rinit, 0);
 	    }
 
 	    /* nuke the temp data structure */
@@ -1006,7 +1012,7 @@ ReadCfg(pcFile, fp, master)
 	}
 	if ((char *)0 == (pcNext = strchr(acStart, ':'))) {
 	    Error("%s(%d) missing colon?", pcFile, iLine);
-	    exit(EX_UNAVAILABLE);
+	    continue;
 	}
 
 	do {
@@ -1027,10 +1033,14 @@ ReadCfg(pcFile, fp, master)
 		cType = 't';
 		break;
 	    default:
+		cType = ' ';
 		Error("%s(%d) unknown access key `%s'", pcFile, iLine,
 		      acStart);
-		exit(EX_UNAVAILABLE);
+		break;
 	}
+	if (cType == ' ')
+	    continue;
+
 	while ('\000' != *(pcMach = pcNext)) {
 	    int j, isCIDR = 0;
 	    while ('\000' != *pcNext &&

@@ -46,7 +46,7 @@ clean:
 	rm -f *~ *.o $(ALL) core
 
 distclean: clean
-	rm -f Makefile
+	rm -f Makefile conserver.rc
 
 install: conserver
 	$(MKDIR) $(DESTDIR)$(sbindir)

@@ -1,7 +1,33 @@
 				CHANGES
 				=======
 
-version 7.2.6 (Mar 20, 2003):
+version 7.2.7 (Apr 9, 2003):
+	- added test suite ('make test') for basic client/server
+	  communication tests
+	- changed configure script to provide better checking of options,
+	  hp-ux specifics, and functions
+	- console names are no longer case-sensitive
+	- fixed case-sensitive DNS name comparisons - reported by
+	  Peter Chubb <peter@chubb.wattle.id.au> via Jorgen Hagg
+	  <jorgen.hagg@axis.com>
+	- added dmalloc and openssl version numbers to -V output
+	- reordered includes for openssl-0.9.7a compatibility
+	- conserver.rc looks at pidfile to find the master pid - suggested
+	  by Petter Reinholdtsen <petter.reinholdtsen@usit.uio.no>
+	- misplaced code regarding --with-regex - patch by Andreas Wrede
+	  <andreas@planix.com>
+	- added password support for HP-UX trusted systems - immense
+	  help by Greg Brown <gregb_ka6max@hotmail.com>
+	- potential SIGUSR1 bug where cached terminal server availability
+	  wasn't being cleared correctly - reported by Dave Stuit
+	  <djs@tellme.com>
+	- server is now more forgiving about errors instead of just
+	  giving up and shutting everything down
+	- consoles that have trouble coming up (and are forced down)
+	  now log when they come back up - suggested by Dave Stuit
+	  <djs@tellme.com>
+
+version 7.2.6 (Mar 10, 2003):
 	- the -b conserver option was mostly broken (since 7.2.0)
 	- changed logging format so that all messages are of a similar
 	  form
@@ -403,5 +429,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.78 2003-03-10 17:45:55-08 bryan Exp $
+#  $Id: CHANGES,v 1.82 2003-04-09 07:20:21-07 bryan Exp $
 #

@@ -1,0 +1,16 @@
+[Enter `^Ec?' for help]
+[help]
+ .    disconnect                        a    attach read/write
+ b    send broadcast message            c    toggle flow control
+ d    down a console                    e    change escape sequence
+ f    force attach read/write           g    group info
+ i    information dump                  L    toggle logging on/off
+ l?   break sequence list               l0   send break per config file
+ l1-9 send specific break sequence      o    (re)open the tty and log file
+ p    replay the last 60 lines          r    replay the last 20 lines
+ s    spy read only                     u    show host status
+ v    show version info                 w    who is on this console
+ x    show console baud info            z    suspend the connection
+ <cr> ignore/abort command              ?    print this message
+ ^R   replay the last line              \ooo send character by octal code
+[disconnect]

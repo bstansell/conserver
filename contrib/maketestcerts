@@ -3,10 +3,10 @@
 #
 # This is a "simple" script that I've used to create test certificates
 # for conserver and it's OpenSSL bits.  It's far from perfect...or useful
-# outside of my own purposes.  If this helps, cool.  In the end I put
-# the rootcert.pem file in my global certs directory, point the server to
-# server.pem and point the client at client.pem.  Ugly, yeah, but it's an
-# ok test.
+# outside of my own purposes.  If this helps, cool.  In the end I put the
+# rootcert.pem file in my global certs directory (OPENSSL_ROOT/ssl/certs),
+# point the server to server.pem and point the client at client.pem.
+# Ugly, yeah, but it's an ok test.
 #
 
 [ -f rootreq.pem -a -f rootkey.pem ] || cat <<EOD | openssl req -newkey rsa:1024 -sha1 -keyout rootkey.pem -out rootreq.pem -passin pass:pass -passout pass:pass

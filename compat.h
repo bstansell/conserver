@@ -45,6 +45,10 @@
 #  define strrchr rindex
 # endif
 #endif
+#if !HAVE_STRCASECMP && HAVE_STRICMP
+# define strcasecmp stricmp
+# define strncasecmp strnicmp
+#endif
 
 #ifdef HAVE_UNISTD_H
 # include <unistd.h>
@@ -167,6 +171,14 @@ extern char *h_errlist[];
 
 #ifdef HAVE_CRYPT_H
 # include <crypt.h>
+#endif
+
+#ifdef HAVE_HPSECURITY_H
+# include <hpsecurity.h>
+#endif
+
+#ifdef HAVE_PROT_H
+# include <prot.h>
 #endif
 
 #ifdef HAVE_GETOPT_H

@@ -1,4 +1,4 @@
-.\" $Id: conserver.cf.man,v 1.26 2003-01-08 17:11:55-08 bryan Exp $
+.\" $Id: conserver.cf.man,v 1.27 2003-04-08 13:46:12-07 bryan Exp $
 .\" @(#)constab.5 01/06/91 OSU CIS; Thomas A. Fine
 .TH CONSERVER.CF 5 "Local"
 .SH NAME
@@ -166,8 +166,11 @@ looks for the first match in the config file
 for a client's IP address (or network),
 or hostname (or domain) if it is able to do a reverse lookup on the IP address,
 to determine the level of access to be granted.
-Three levels of access may be specified: ``\fBtrust\fP'', ``\fBallow\fP'',
-and ``\fBrefuse\fP''.
+Three levels of access may be specified: ``\fBtrust\fP'' (access is granted
+without a password), ``\fBallow\fP'' (access is granted with a password),
+and ``\fBrefuse\fP'' (access is not granted).  Only the first character of
+the word is important, so you can use any word that begins with
+a ``\fBt\fP'', ``\fBa\fP'', or ``\fBr\fP''.
 The access level is followed by a colon and a space-separated list of
 addresses or host names.
 Any number of any combination of these levels may be specified,
@@ -228,7 +231,7 @@ mentor:/dev/ttyh0@extra.cc.purdue.edu:2400e:&:
 # "badhost" are to be rejected, since only the first match
 # is used)
 #
-trusted: console.cc.purdue.edu 128.210.7.90
+trust: console.cc.purdue.edu 128.210.7.90
 refuse: badhost.cc.purdue.edu
 allow: cc.purdue.edu stat.cc.purdue.edu
 .SH "SEE ALSO"

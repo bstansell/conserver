@@ -15,6 +15,9 @@
 /* Socket used to communicate */
 #undef DEFPORT
 
+/* Define to 1 if you have the `bigcrypt' function. */
+#undef HAVE_BIGCRYPT
+
 /* Define to 1 if you have the <bsm/audit.h> header file. */
 #undef HAVE_BSM_AUDIT_H
 
@@ -24,10 +27,10 @@
 /* have dmalloc support */
 #undef HAVE_DMALLOC
 
-/* Define if libbsm has `getaudit'. */
+/* Define to 1 if you have the `getaudit' function. */
 #undef HAVE_GETAUDIT
 
-/* Define if libbsm has `getaudit_addr'. */
+/* Define to 1 if you have the `getaudit_addr' function. */
 #undef HAVE_GETAUDIT_ADDR
 
 /* Define to 1 if you have the `getdtablesize' function. */
@@ -44,6 +47,9 @@
 
 /* Define to 1 if you have the `getpassphrase' function. */
 #undef HAVE_GETPASSPHRASE
+
+/* Define to 1 if you have the `getprpwnam' function. */
+#undef HAVE_GETPRPWNAM
 
 /* Define to 1 if you have the `getrlimit' function. */
 #undef HAVE_GETRLIMIT
@@ -63,14 +69,26 @@
 /* Define to 1 if you have the `grantpt' function. */
 #undef HAVE_GRANTPT
 
+/* Define to 1 if you have the <hpsecurity.h> header file. */
+#undef HAVE_HPSECURITY_H
+
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
 /* Defined if in_addr_t exists */
 #undef HAVE_IN_ADDR_T
 
+/* Define to 1 if you have the `iscomsec' function. */
+#undef HAVE_ISCOMSEC
+
 /* Define to 1 if you have the `bsm' library (-lbsm). */
 #undef HAVE_LIBBSM
+
+/* Define to 1 if you have the `sec' library (-lsec). */
+#undef HAVE_LIBSEC
+
+/* Define to 1 if you have the `xnet' library (-lxnet). */
+#undef HAVE_LIBXNET
 
 /* Define to 1 if you have the `memcmp' function. */
 #undef HAVE_MEMCMP
@@ -92,6 +110,9 @@
 
 /* have POSIX regcomp */
 #undef HAVE_POSIX_REGCOMP
+
+/* Define to 1 if you have the <prot.h> header file. */
+#undef HAVE_PROT_H
 
 /* Define to 1 if you have the `ptsname' function. */
 #undef HAVE_PTSNAME
@@ -138,8 +159,14 @@
 /* Define to 1 if you have the <stdlib.h> header file. */
 #undef HAVE_STDLIB_H
 
+/* Define if strcasecmp is available */
+#undef HAVE_STRCASECMP
+
 /* Define to 1 if you have the `strerror' function. */
 #undef HAVE_STRERROR
+
+/* Define if stricmp is available */
+#undef HAVE_STRICMP
 
 /* Define to 1 if you have the <strings.h> header file. */
 #undef HAVE_STRINGS_H

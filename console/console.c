@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.115 2003-03-09 15:19:32-08 bryan Exp $
+ *  $Id: console.c,v 5.117 2003-04-06 05:29:24-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -40,15 +40,17 @@
 #include <pwd.h>
 #include <ctype.h>
 #include <sys/stat.h>
-#if HAVE_OPENSSL
-#include <openssl/ssl.h>
-#include <openssl/err.h>
-#endif
 
 #include <compat.h>
 #include <util.h>
 
 #include <version.h>
+
+#if HAVE_OPENSSL
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#include <openssl/opensslv.h>
+#endif
 
 
 int fReplay = 0, fRaw = 0, fVersion = 0, fStrip = 0;
@@ -261,6 +263,9 @@ Version()
     static STRING *acA1 = (STRING *) 0;
     static STRING *acA2 = (STRING *) 0;
     char *optionlist[] = {
+#if HAVE_DMALLOC
+	"dmalloc",
+#endif
 #if USE_LIBWRAP
 	"libwrap",
 #endif
@@ -316,6 +321,22 @@ Version()
 	}
     }
     Msg("options: %s", acA1->string);
+#if HAVE_DMALLOC
+    BuildString((char *)0, acA1);
+    BuildStringChar('0' + DMALLOC_VERSION_MAJOR, acA1);
+    BuildStringChar('.', acA1);
+    BuildStringChar('0' + DMALLOC_VERSION_MINOR, acA1);
+    BuildStringChar('.', acA1);
+    BuildStringChar('0' + DMALLOC_VERSION_PATCH, acA1);
+    if (DMALLOC_VERSION_BETA != 0) {
+	BuildString("-b", acA1);
+	BuildStringChar('0' + DMALLOC_VERSION_BETA, acA1);
+    }
+    Msg("dmalloc version: %s", acA1->string);
+#endif
+#if HAVE_OPENSSL
+    Msg("openssl version: %s", OPENSSL_VERSION_TEXT);
+#endif
     Msg("built with `%s'", CONFIGINVOCATION);
     if (fVerbose)
 	printf(COPYRIGHT);

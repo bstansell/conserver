@@ -1,5 +1,5 @@
 .\" @(#)conserver.8 01/06/91 OSU CIS; Thomas A. Fine
-.\" $Id: conserver.man,v 1.29 2003-01-08 17:17:25-08 bryan Exp $
+.\" $Id: conserver.man,v 1.32 2003-04-08 14:05:59-07 bryan Exp $
 .TH CONSERVER 8 "Local"
 .SH NAME
 conserver \- console server daemon
@@ -71,26 +71,26 @@ process that dies.  The following signals are propagated by the parent
 process to its children.
 .TP
 SIGTERM
-close all connections and exit.
+Close all connections and exit.
 .TP
 SIGHUP
-reread the configuration file.  new consoles are managed by
+Reread the configuration file.  New consoles are managed by
 forking off new childen, deleted consoles (and their clients) are dropped,
 and changes to consoles are done "in place", resetting the console
-port (bringing it down and up) only when necessary.  the console name is
-used to determine when consoles have been added/removed/changed.  all 
+port (bringing it down and up) only when necessary.  The console name is
+used to determine when consoles have been added/removed/changed.  All 
 actions performed by SIGUSR2 are also performed.
 .TP
 SIGUSR1
-try to connect to any consoles marked as
+Try to connect to any consoles marked as
 down.  This can come in handy if you had a terminal server (or more)
 that wasn't accepting connections at startup and you want
 \fBconserver\fP to try to reconnect to all those downed ports.
 .TP
 SIGUSR2
-all console logfiles are closed and reopened
+Close and reopen all console logfiles
 and, if in daemon mode (\fB\-d\fP option),
-the error logfile (see the \fB\-L\fP option).  all actions performed by
+the error logfile (see the \fB\-L\fP option).  All actions performed by
 SIGUSR1 are also performed.
 .PP
 Slave hosts which have no current
@@ -101,11 +101,23 @@ and output on stdout (or, in daemon mode, to the logfile).
 This allows a live operator or an automated log scanner
 to find otherwise unseen errors by watching in a single location.
 .PP
-\fBConserver\fP must be run as root if it is to bind to a port under 1024
-or if it must read a shadow passwd file for authentication (see
+\fBConserver\fP must be run as root if it is to bind to a port under
+1024 or if it must read protected password files (like shadow passwords)
+for authentication (see
 .BR conserver.passwd (5)).
 Otherwise, it may be run by any user, with \fB\-p\fP used to specify
 a port above 1024.
+.PP
+If encryption has been built into the code (\fB--with-openssl\fP),
+encrypted client connections (without certificate exchanges) happen
+by default.  To add certificate exchanges, use the \fB-c\fP option with
+the client and server.  For authentication of the certificates to work,
+the signing certificate must be properly trusted, which usually means
+the public portion is in \fIOPENSSL_ROOT\fP\fB/ssl/certs\fP (on both
+the client and server sides).  See the sample self-signing certficate
+making script \fBcontrib/maketestcerts\fP for further clues.  To allow
+non-encrypted client connections (in addition to encrypted client
+connections), use the \fB-E\fP option.
 .SH OPTIONS
 .PP
 Options may be given as separate arguments (e.g., \fB\-n -d\fP)
@@ -159,9 +171,10 @@ Enable debugging output, sent to stderr.  Multiple \fB-D\fP options
 increases debug output.
 .TP
 .B \-E
-If encryption has been built into the code (\fB--with-openssl\fP), encrypted
-client connections are a requirement. This option allows clients to connect
-to consoles over non-encrypted connections.
+If encryption has been built into the code (\fB--with-openssl\fP),
+encrypted client connections are a requirement. This option allows
+non-encrypted clients (as well as encrypted clients) to connect to
+consoles.
 .TP
 .B \-F
 Do not automatically reinitialize failed (unexpectedly closed)
@@ -202,12 +215,6 @@ Normally, a client connecting to a ``downed'' console does just that.
 Using this option, the server will automatically attempt to open
 (``bring up'') the console when the client connects.
 .TP
-.B \-R
-Disable automatic client redirection to other conserver hosts.  This
-means informational commands like \fB-w\fP and \fB-i\fP will only show
-the status of the local conserver host and attempts to connect to
-remote consoles will result in an informative message to the user.
-.TP
 .BI \-O min
 Enable periodic attempts (every \fImin\fP minutes) to open (``bring up'')
 all downed consoles (similar to sending a SIGUSR1).
@@ -222,6 +229,12 @@ may be changed at compile time using the \fB--with-port\fP option.
 Read the table of authorized user data from the file \fIpasswd\fP.
 The default \fIpasswd\fP may be changed at compile time using the
 \fB--with-pwdfile\fP option.
+.TP
+.B \-R
+Disable automatic client redirection to other conserver hosts.  This
+means informational commands like \fB-w\fP and \fB-i\fP will only show
+the status of the local conserver host and attempts to connect to
+remote consoles will result in an informative message to the user.
 .TP
 .B \-u
 Send unloved console output to \fBconserver\fP's stdout

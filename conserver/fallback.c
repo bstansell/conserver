@@ -1,5 +1,5 @@
 /*
- *  $Id: fallback.c,v 5.52 2003-03-08 08:38:14-08 bryan Exp $
+ *  $Id: fallback.c,v 5.53 2003-03-17 08:27:34-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -90,7 +90,7 @@ GetPseudoTTY(slave, master)
 #if HAVE_SIGACTION
     sigset_t oldmask, newmask;
 #else
-    extern RETSIGTYPE FlagReapVirt();
+    extern RETSIGTYPE FlagReapVirt PARAMS((int));
 #endif
 
     if (0 > (fd = open("/dev/ptmx", O_RDWR, 0))) {

@@ -25,6 +25,9 @@ autologin:
 autologin.install:
 	( cd autologin && $(MAKE) install $(MAKE_FLAGS) ) || exit 1;
 
+test:
+	( cd test && ./dotest ) || exit 1
+
 install:
 	for n in $(SUBDIRS); do \
 		( cd $$n && $(MAKE) $@ $(MAKE_FLAGS) ) || exit 1; \
@@ -41,4 +44,4 @@ distclean:
 	done
 	rm -f config.cache config.log config.status config.h Makefile
 
-.PHONY: autologin autologin.install clean distclean install all
+.PHONY: autologin autologin.install clean distclean install all test

@@ -1,0 +1,8 @@
+# test conserver config file
+LOGDIR=.
+BREAK4=hiya there\r
+shell:|:9600p:&.log:5
+shella:|::&.log:5
+shellb:|::&.log:
+%%
+trusted: 127.0.0.1

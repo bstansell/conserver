@@ -1,5 +1,5 @@
 /*
- *  $Id: access.c,v 5.52 2003-03-08 08:37:24-08 bryan Exp $
+ *  $Id: access.c,v 5.53 2003-04-06 05:31:54-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -167,7 +167,7 @@ AccType(addr, hname)
 	    len = strlen(pcName);
 	    while (len >= pACtmp->ilen) {
 		Debug(1, "AccType(): name=%s", pcName);
-		if (0 == strcmp(pcName, pACtmp->pcwho)) {
+		if (0 == strcasecmp(pcName, pACtmp->pcwho)) {
 		    return pACtmp->ctrust;
 		}
 		pcName = strchr(pcName, '.');
@@ -257,7 +257,7 @@ FindUniq(pRCAll)
      * else add us by returning our node
      */
     for (pRC = pRCAll->pRCuniq; (REMOTE *) 0 != pRC; pRC = pRC->pRCuniq) {
-	if (0 == strcmp(pRC->rhost.string, pRCAll->rhost.string)) {
+	if (0 == strcasecmp(pRC->rhost.string, pRCAll->rhost.string)) {
 	    return pRCAll->pRCuniq;
 	}
     }

@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.58 2003-03-09 13:53:40-08 bryan Exp $
+ *  $Id: client.c,v 5.60 2003-03-17 08:38:40-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -83,7 +83,7 @@ FindWrite(pCL)
 	} else {
 	    FileWrite(pCL->fd, "\r\n[attached]\r\n", -1);
 	}
-	TagLogfile(pCL->pCEto, "%s attached", pCL->acid.string);
+	TagLogfileAct(pCL->pCEto, "%s attached", pCL->acid.string);
 	return pCL;
     }
     return (CONSCLIENT *) 0;

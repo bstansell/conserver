@@ -1,5 +1,5 @@
-				INSTALL
-				=======
+                                INSTALL
+                                =======
 
 Upgrading?
 
@@ -12,40 +12,40 @@ Upgrading?
 
     Version 7.2.4
 
-	- If SSL support is compiled into the code, older versions of
-	  the client and server are, by default, incompatible because
-	  encrypted connections are a requirement.  Use of the -E flag in
-	  the client and/or server can work around this (but I discourage
-	  this - please upgrade the clients and servers instead).
+        - If SSL support is compiled into the code, older versions of
+          the client and server are, by default, incompatible because
+          encrypted connections are a requirement.  Use of the -E flag in
+          the client and/or server can work around this (but I discourage
+          this - please upgrade the clients and servers instead).
 
     Version 7.2.0
 
-	- The code related to broadcast messages in the client (-b) has
-	  changed.  If you want the username to come across properly in
-	  the broadcast message, you'll need to make sure you upgrade
-	  to the 7.2.0 client.
+        - The code related to broadcast messages in the client (-b) has
+          changed.  If you want the username to come across properly in
+          the broadcast message, you'll need to make sure you upgrade
+          to the 7.2.0 client.
 
     Version 7.1.1
 
-	- Both conserver.passwd and conserver.cf file parsing behaves
-	  the same now.  Both use leading whitespace as a continuation
-	  line indicator - if you have leading whitespace on a line
-	  (aside from comments) you probably should remove it.
+        - Both conserver.passwd and conserver.cf file parsing behaves
+          the same now.  Both use leading whitespace as a continuation
+          line indicator - if you have leading whitespace on a line
+          (aside from comments) you probably should remove it.
 
     Version 7.1.0
 
-	- The client/server protocol has changed.  You *MUST* use a
-	  7.1.0 client with a 7.1.0 and above server.  A 7.1.0 client
-	  is *not* backward compatible with a pre-7.1.0 server.
+        - The client/server protocol has changed.  You *MUST* use a
+          7.1.0 client with a 7.1.0 and above server.  A 7.1.0 client
+          is *not* backward compatible with a pre-7.1.0 server.
 
-	- Some of the flags in the client (-d, -D, and -r) and server
-	  (-n) have been given new identities to make the client and
-	  server flags more uniform.
+        - Some of the flags in the client (-d, -D, and -r) and server
+          (-n) have been given new identities to make the client and
+          server flags more uniform.
 
-	- The conserver.passwd file now uses the first username match
-	  to determine access rights - if you have multiple instances
-	  of a username in an existing password file, they must be
-	  combined into one to continue to work.
+        - The conserver.passwd file now uses the first username match
+          to determine access rights - if you have multiple instances
+          of a username in an existing password file, they must be
+          combined into one to continue to work.
 
 
 Quickie Instructions
@@ -53,6 +53,10 @@ Quickie Instructions
     - Download conserver (http://www.conserver.com/) and unpack
 
     - Run './configure'
+
+    - Run 'make'
+
+    - Run 'make test'
 
     - If all is well, run 'make install'
 
@@ -66,30 +70,40 @@ Detailed Instructions
       the defaults shown, you're set.  If not, here are the conserver
       unique options:
 
-	--with-port=PORT        Specify port number [conserver]
-	--with-base=PORT        Base port for secondary channel [0]
-	--with-master=MASTER    Specify master server hostname [console]
-	--with-cffile=CFFILE    Specify config filename
-	                        [SYSCONFDIR/conserver.cf]
-	--with-pwdfile=PWDFILE  Specify password filename
-	                        [SYSCONFDIR/conserver.passwd]
-	--with-logfile=LOGFILE  Specify log filename [/var/log/conserver]
-	--with-pidfile=PIDFILE  Specify PID filepath [/var/run/conserver.pid]
-	--with-maxmemb=MAXMEMB  Specify maximum consoles per process [16]
-	--with-timeout=TIMEOUT  Specify connect() timeout in seconds [10]
-	--with-libwrap[=PATH]   Compile in libwrap (tcp_wrappers) support
-	--with-openssl[=PATH]   Compile in openssl support
-	--with-regex            Use regular expressions in conserver.passwd
-	--with-pam              Enable PAM support
+        --with-64bit            Allow 64bit compilation
+        --with-port=PORT        Specify port number [conserver]
+        --with-base=PORT        Base port for secondary channel [0]
+        --with-master=MASTER    Specify master server hostname [console]
+        --with-cffile=CFFILE    Specify config filename
+                                [SYSCONFDIR/conserver.cf]
+        --with-pwdfile=PWDFILE  Specify password filename
+                                [SYSCONFDIR/conserver.passwd]
+        --with-logfile=LOGFILE  Specify log filename [/var/log/conserver]
+        --with-pidfile=PIDFILE  Specify PID filepath [/var/run/conserver.pid]
+        --with-maxmemb=MAXMEMB  Specify maximum consoles per process [16]
+        --with-timeout=TIMEOUT  Specify connect() timeout in seconds [10]
+        --with-libwrap[=PATH]   Compile in libwrap (tcp_wrappers) support
+        --with-openssl[=PATH]   Compile in OpenSSL support
+        --with-dmalloc[=PATH]   Compile in dmalloc support
+        --with-regex            Use regular expressions in conserver.passwd
+        --with-pam              Enable PAM support
 
       Not surprisingly, some match the old conserver/cons.h items...here
       they are for reference:
 
-	PORT or SERVICE		- Socket used to communicate
-	HOST			- Hostname of console server
-	CONFIG			- Config file path
-	PASSWD_FILE		- Password file path
-	MAXMEMB			- Number of consoles per child process
+        PORT or SERVICE         - Socket used to communicate
+        HOST                    - Hostname of console server
+        CONFIG                  - Config file path
+        PASSWD_FILE             - Password file path
+        MAXMEMB                 - Number of consoles per child process
+
+      A couple of notes.  First, --with-libwrap will add tcp_wrappers
+      lookups to all socket connections in the server.  --with-openssl
+      will add encryption between the client and server when you connect
+      to a console.  things such as 'console -q', 'console -w', etc. are
+      still unencrypted, as well as connections from conserver to any
+      terminal servers.  --with-dmalloc should only be used to do memory
+      allocation debugging and not used in production.
 
     - Run './configure'.  This will detect system specific
       information.  The --prefix option will redirect where things are
@@ -97,6 +111,11 @@ Detailed Instructions
       './configure --help'.
 
     - Now run 'make'.  Hopefully things will compile.
+
+    - To test your binaries, run 'make test'.  If there are problems, it
+      should mean something is wrong, but check the output differences
+      to make sure it wasn't a temporary failure.  I tried to make the
+      tests generic, but I may have missed something.
 
     - Once things build, you can run 'make install'.
 
@@ -108,32 +127,32 @@ Detailed Instructions
       configuration files and such.
 
       + Does your conserver master hostname exist?  This is the
-	hostname specified with the --with-master option.  By default
-	the hostname is "console", so make sure it's in DNS, hosts
-	files, or whatever.
+        hostname specified with the --with-master option.  By default
+        the hostname is "console", so make sure it's in DNS, hosts
+        files, or whatever.
 
       + If you used a symbolic name for the --with-port option (by
-	default it uses "conserver", so the answer would be yes),
-	you'll need to enter a definition in your services file
-	(directly, via NIS, or whatever).  Here's what we use:
+        default it uses "conserver", so the answer would be yes),
+        you'll need to enter a definition in your services file
+        (directly, via NIS, or whatever).  Here's what we use:
 
-	    console      782/tcp    conserver    # console server
+            console      782/tcp    conserver    # console server
 
-	If you used a number, you shouldn't have to worry about this
-	step.
+        If you used a number, you shouldn't have to worry about this
+        step.
 
       + Next, make sure conserver runs during boot.  The init script we
-	use under Solaris is installed in <PREFIX>/etc/conserver.rc.
-	Use that or some form of it for your own /etc/init.d script or
-	an entry in startup files (/etc/rc, /etc/rc.local, or
-	whatever).
+        use under Solaris is installed in <PREFIX>/etc/conserver.rc.
+        Use that or some form of it for your own /etc/init.d script or
+        an entry in startup files (/etc/rc, /etc/rc.local, or
+        whatever).
 
       + Now for the fun stuff.  You need to create a conserver.cf and
-	conserver.passwd file.  Those are defined with the
-	--with-cffile and --with-pwdfile settings.  If you ever need to
-	know what values were compiled into conserver, run 'conserver
-	-V'.  See the conserver.cf/INSTALL file for instructions on
-	setup of these files.
+        conserver.passwd file.  Those are defined with the
+        --with-cffile and --with-pwdfile settings.  If you ever need to
+        know what values were compiled into conserver, run 'conserver
+        -V'.  See the conserver.cf/INSTALL file for instructions on
+        setup of these files.
 
     - That's it!  Just start up the console server and enjoy!
 
@@ -142,36 +161,36 @@ Other Information And Gotchas
 
     - Debian Linux Distribution
 
-	The Debian folks have conserver distributed with the package
-	names of conserver-client and conserver-server.  They are in
-	the distribution "sid" and the "non-free" part (because the
-	Ohio State license doesn't explicitly allow for modification to
-	the code, even though it's totally implied and the intention of
-	the author - I've even got proof in email!  Oh well, can't
-	blame the Debian folks for being cautious - they've been burned
-	before, apparently).
+        The Debian folks have conserver distributed with the package
+        names of conserver-client and conserver-server.  They are in
+        the distribution "sid" and the "non-free" part (because the
+        Ohio State license doesn't explicitly allow for modification to
+        the code, even though it's totally implied and the intention of
+        the author - I've even got proof in email!  Oh well, can't
+        blame the Debian folks for being cautious - they've been burned
+        before, apparently).
 
     - Potential GCC bug
 
-	Adam Morris <AMorris@providence.org> reported a problem with
-	the following line in console/console.c:
+        Adam Morris <AMorris@providence.org> reported a problem with
+        the following line in console/console.c:
 
-	    if ((in_addr_t) (-1) == pPort->sin_addr.s_addr) {
+            if ((in_addr_t) (-1) == pPort->sin_addr.s_addr) {
 
-	This tickles a GCC bug under HP-UX 11.11 using GCC 3.0.2 in
-	64-bit mode with optimization enabled (-O).  The bug could
-	possibly be provoked in other combinations as well.  His fix is
-	to change the line to:
+        This tickles a GCC bug under HP-UX 11.11 using GCC 3.0.2 in
+        64-bit mode with optimization enabled (-O).  The bug could
+        possibly be provoked in other combinations as well.  His fix is
+        to change the line to:
 
-	    if ((in_addr_t) (-1) == inet_addr(pcToHost)) {
+            if ((in_addr_t) (-1) == inet_addr(pcToHost)) {
 
-	It's also reported that newer versions of the compiler fix the
-	issue, so if you happen to have problems with the client
-	connecting to servers, you might be tickling this bug and you
-	can upgrade the compiler, turn off the optimization, or apply
-	this code change.
+        It's also reported that newer versions of the compiler fix the
+        issue, so if you happen to have problems with the client
+        connecting to servers, you might be tickling this bug and you
+        can upgrade the compiler, turn off the optimization, or apply
+        this code change.
 
 
 #
-#  $Id: INSTALL,v 1.25 2002-10-12 20:23:58-07 bryan Exp $
+#  $Id: INSTALL,v 1.27 2003-04-09 07:15:27-07 bryan Exp $
 #

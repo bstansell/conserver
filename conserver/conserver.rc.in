@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# Startup for conserver
+#
+
+PATH=/usr/bin:/bin:/usr/local/bin
+PIDFILE="@PIDFILE@"
+
+signalmaster() {
+    sig=$1
+    if [ -f "$PIDFILE" ]; then
+	master=`cat "$PIDFILE"`
+    else
+	master=`ps -ef | grep conserver | awk '$3 == "1"{print $2}'`
+    fi
+    [ "$master" ] && kill -$sig $master
+}
+
+case "$1" in
+	'start')
+		echo "Starting console server daemon"
+		conserver -d
+		;;
+
+	'stop')
+		echo "Stopping console server daemon"
+		signalmaster TERM
+		;;
+
+	'restart')
+		echo "Restarting console server daemon"
+		signalmaster HUP
+		;;
+
+	*)
+		echo "Usage: $0 { start | stop | restart }"
+		;;
+
+esac
+exit 0

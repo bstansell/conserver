@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.209 2003-03-10 17:30:58-08 bryan Exp $
+ *  $Id: group.c,v 5.212 2003-04-07 18:47:50-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -72,17 +72,6 @@
 #include <varargs.h>
 #endif
 #include <arpa/telnet.h>
-#if HAVE_POSIX_REGCOMP
-#include <regex.h>
-#endif
-#if HAVE_PAM
-#include <security/pam_appl.h>
-#endif
-
-#if defined(USE_LIBWRAP)
-#include <syslog.h>
-#include <tcpd.h>
-#endif
 
 #include <compat.h>
 #include <util.h>
@@ -94,6 +83,17 @@
 #include <version.h>
 #include <readcfg.h>
 #include <main.h>
+
+#if HAVE_POSIX_REGCOMP
+#include <regex.h>
+#endif
+#if HAVE_PAM
+#include <security/pam_appl.h>
+#endif
+#if defined(USE_LIBWRAP)
+#include <syslog.h>
+#include <tcpd.h>
+#endif
 
 
 /* flags that a signal has occurred */
@@ -174,7 +174,7 @@ DisconnectClient(pGE, pCL, message)
     }
 
     if (fNoinit && pCEServing->pCLon->pCLnext == (CONSCLIENT *) 0)
-	ConsDown(pCEServing, &pGE->rinit);
+	ConsDown(pCEServing, &pGE->rinit, 0);
 
     FD_CLR(FileFDNum(pCL->fd), &pGE->rinit);
     FileClose(&pCL->fd);
@@ -185,12 +185,10 @@ DisconnectClient(pGE, pCL, message)
     if (pCL->fwr) {
 	pCL->fwr = 0;
 	pCL->fwantwr = 0;
-	TagLogfile(pCEServing, "%s detached", pCL->acid.string);
+	TagLogfileAct(pCEServing, "%s detached", pCL->acid.string);
 	if (pCEServing->nolog) {
 	    pCEServing->nolog = 0;
-	    FilePrint(pCEServing->fdlog,
-		      "[-- Console logging restored (logout) -- %s]\r\n",
-		      StrTime(NULL));
+	    TagLogfile(pCEServing, "Console logging restored (logout)");
 	}
 	pCEServing->pCLwr = FindWrite(pCEServing->pCLon);
     }
@@ -286,12 +284,10 @@ DestroyConsent(pGE, pCE)
 	FD_CLR(FileFDNum(pCL->fd), &pGE->rinit);
 	FileClose(&pCL->fd);
 	if (pCL->fwr) {
-	    TagLogfile(pCE, "%s detached", pCL->acid.string);
+	    TagLogfileAct(pCE, "%s detached", pCL->acid.string);
 	    if (pCE->nolog) {
 		pCE->nolog = 0;
-		FilePrint(pCE->fdlog,
-			  "[-- Console logging restored (logout) -- %s]\r\n",
-			  StrTime(NULL));
+		TagLogfile(pCE, "Console logging restored (logout)");
 	    }
 	}
 	/* mark as unconnected and remove from both
@@ -310,7 +306,7 @@ DestroyConsent(pGE, pCE)
 	pGE->pCLfree = pCL;
     }
 
-    ConsDown(pCE, &pGE->rinit);
+    ConsDown(pCE, &pGE->rinit, 0);
 
     for (ppCE = &(pGE->pCElist); *ppCE != (CONSENT *) 0;
 	 ppCE = &((*ppCE)->pCEnext)) {
@@ -493,6 +489,10 @@ CheckPass(pcUser, pcWord)
 #else /* getpw*() */
     struct passwd *pwd;
     int retval = AUTH_SUCCESS;
+    char *pass;
+#if HAVE_ISCOMSEC && HAVE_GETPRPWNAM
+    struct pr_passwd *prpwd;
+#endif
 #if HAVE_GETSPNAM
     struct spwd *spwd;
 #endif
@@ -501,28 +501,70 @@ CheckPass(pcUser, pcWord)
 	pcWord = "";
     }
     if ((pwd = getpwnam(pcUser)) == (struct passwd *)0) {
+	Debug(1, "CheckPass(): getpwnam(%s): %s", pcUser, strerror(errno));
 	retval = AUTH_NOUSER;
-    } else {
-#if HAVE_GETSPNAM
-	if ('x' == pwd->pw_passwd[0] && '\000' == pwd->pw_passwd[1]) {
-	    if ((spwd = getspnam(pwd->pw_name)) == (struct spwd *)0) {
-		retval = AUTH_NOUSER;
-	    } else {
-		if ((spwd->sp_pwdp[0] != '\000' || pcWord[0] != '\000') &&
-		    (strcmp(spwd->sp_pwdp, crypt(pcWord, spwd->sp_pwdp)) !=
-		     0)) {
-		    retval = AUTH_INVALID;
-		}
-	    }
-	} else
+	goto finished_pass;
+    }
+    pass = pwd->pw_passwd;
+
+#if HAVE_ISCOMSEC && HAVE_GETPRPWNAM
+    if (iscomsec()) {
+	Debug(1, "CheckPass(): trusted password check");
+	if ((prpwd = getprpwnam(pcUser)) == (struct pr_passwd *)0) {
+	    Debug(1, "CheckPass(): getprpwnam(%s): %s", pcUser,
+		  strerror(errno));
+	    retval = AUTH_NOUSER;
+	    goto finished_pass;
+	}
+	pass = prpwd->ufld.fd_encrypt;
+    }
 #endif
-	    if ((pwd->pw_passwd[0] != '\000' || pcWord[0] != '\000') &&
-		(strcmp(pwd->pw_passwd, crypt(pcWord, pwd->pw_passwd))
-		 != 0)) {
+
+#if HAVE_GETSPNAM
+    if ('x' == pass[0] && '\000' == pass[1]) {
+	Debug(1, "CheckPass(): shadow password check");
+	if ((spwd = getspnam(pcUser)) == (struct spwd *)0) {
+	    Debug(1, "CheckPass(): getspnam(%s): %s", pcUser,
+		  strerror(errno));
+	    retval = AUTH_NOUSER;
+	    goto finished_pass;
+	}
+	pass = spwd->sp_pwdp;
+    }
+#endif
+
+    if (pass[0] == '\000' && pcWord[0] == '\000') {
+	retval = AUTH_SUCCESS;	/* let empty password match */
+    } else {
+	char *encrypted;
+	char *salt;
+
+	if (pass[0] == '\000')
+	    salt = "XX";
+	else
+	    salt = pass;
+
+#if HAVE_ISCOMSEC && HAVE_BIGCRYPT
+	if (iscomsec())
+	    encrypted = bigcrypt(pcWord, salt);
+	else
+#endif
+	    encrypted = crypt(pcWord, salt);
+	if ((strcmp(pass, encrypted) != 0)) {
+	    Debug(1, "CheckPass(): password check failed (%s)", pass);
 	    retval = AUTH_INVALID;
 	}
     }
+
+  finished_pass:
     endpwent();
+#if HAVE_ISCOMSEC && HAVE_GETPRPWNAM
+    if (iscomsec())
+	endprpwent();
+#endif
+#if HAVE_GETSPNAM
+    endspent();
+#endif
     return retval;
 #endif /* getpw*() */
 }
@@ -630,6 +672,8 @@ ReUp(pGE, automatic)
 	(!fReopenall || ((time(NULL) - lastup) < (fReopenall * 60))))
 	return;
 
+    ClearHostCache();
+
     for (pCE = pGE->pCElist; pCE != (CONSENT *) 0; pCE = pCE->pCEnext) {
 	if (pCE->fup || fNoinit || (automatic == 1 && !pCE->autoReUp))
 	    continue;
@@ -687,6 +731,32 @@ void
 TagLogfile(const CONSENT * pCE, const char *fmt, ...)
 #else
 TagLogfile(pCE, fmt, va_alist)
+    const CONSENT *pCE;
+    const char *fmt;
+    va_dcl
+#endif
+{
+    va_list ap;
+#if PROTOTYPES
+    va_start(ap, fmt);
+#else
+    va_start(ap);
+#endif
+
+    if ((pCE == (CONSENT *) 0) || (pCE->fdlog == (CONSFILE *) 0))
+	return;
+
+    FileWrite(pCE->fdlog, "[-- ", -1);
+    FileVWrite(pCE->fdlog, fmt, ap);
+    FilePrint(pCE->fdlog, " -- %s]\r\n", StrTime(NULL));
+    va_end(ap);
+}
+
+void
+#if PROTOTYPES
+TagLogfileAct(const CONSENT * pCE, const char *fmt, ...)
+#else
+TagLogfileAct(pCE, fmt, va_alist)
     const CONSENT *pCE;
     const char *fmt;
     va_dcl
@@ -862,7 +932,7 @@ DeUtmp(pGE, sfd)
 			     "[-- Console server shutting down --]\r\n");
 
 	for (pCE = pGE->pCElist; pCE != (CONSENT *) 0; pCE = pCE->pCEnext) {
-	    ConsDown(pCE, &pGE->rinit);
+	    ConsDown(pCE, &pGE->rinit, 0);
 	}
     }
 
@@ -917,13 +987,13 @@ ReapVirt(pGE)
 	    if (pCE->pCLwr != (CONSCLIENT *) 0) {
 		pCE->pCLwr->fwr = 0;
 		pCE->pCLwr->fwantwr = 1;
-		TagLogfile(pCE, "%s detached", pCE->pCLwr->acid.string);
+		TagLogfileAct(pCE, "%s detached", pCE->pCLwr->acid.string);
 		pCE->pCLwr = (CONSCLIENT *) 0;
 	    }
 
 	    if (fNoautoreup &&
 		!(WIFEXITED(UWbuf) && WEXITSTATUS(UWbuf) == 0)) {
-		ConsDown(pCE, &pGE->rinit);
+		ConsDown(pCE, &pGE->rinit, 0);
 	    } else {
 		/* Try an initial reconnect */
 		Msg("[%s] automatic reinitialization", pCE->server.string);
@@ -1036,11 +1106,11 @@ CheckPasswd(pCLServing, pw_string)
 			char *p;
 			int status;
 			static STRING *tomatch = (STRING *) 0;
-			if (tomatch == (STRING *) 0)
-			    tomatch = AllocString();
 #if HAVE_POSIX_REGCOMP
 			regex_t re;
 #endif
+			if (tomatch == (STRING *) 0)
+			    tomatch = AllocString();
 			BuildString((char *)0, tomatch);
 #if HAVE_POSIX_REGCOMP
 			BuildStringChar('^', tomatch);
@@ -1052,7 +1122,9 @@ CheckPasswd(pCLServing, pw_string)
 			p = pCLServing->pCEwant->server.string;
 			while (p != (char *)0) {
 #if HAVE_POSIX_REGCOMP
-			    if (regcomp(&re, tomatch->string, REG_NOSUB)
+			    if (regcomp
+				(&re, tomatch->string,
+				 REG_NOSUB | REG_ICASE)
 				!= 0) {
 				Error
 				    ("CheckPasswd(): %s(%d) server name `%s' not a valid regular expression",
@@ -1062,7 +1134,7 @@ CheckPasswd(pCLServing, pw_string)
 			    status = regexec(&re, p, 0, NULL, 0);
 			    regfree(&re);
 #else
-			    status = strcmp(tomatch->string, p);
+			    status = strcasecmp(tomatch->string, p);
 #endif
 			    if (status == 0) {
 				Verbose("[%s] user %s authenticated",
@@ -1403,13 +1475,11 @@ DoBreakWork(pCLServing, pCEServing, bt, cleanup)
 	FileWrite(pCLServing->fd, "sent]\r\n", -1);
 	if (pCEServing->breaklog) {
 	    if (waszero) {
-		FilePrint(pCEServing->fdlog,
-			  "[-- break #0(%d) sent -- `%s' -- %s]\r\n", bt,
-			  breakList[bt - 1].string, StrTime(NULL));
+		TagLogfile(pCEServing, "break #0(%d) sent -- `%s'", bt,
+			   breakList[bt - 1].string);
 	    } else {
-		FilePrint(pCEServing->fdlog,
-			  "[-- break #%d sent -- `%s' -- %s]\r\n", bt,
-			  breakList[bt - 1].string, StrTime(NULL));
+		TagLogfile(pCEServing, "break #%d sent -- `%s'", bt,
+			   breakList[bt - 1].string);
 	    }
 	}
     }
@@ -1454,7 +1524,7 @@ AttemptSSL(pCL)
     fdnum = FileFDNum(pCL->fd);
     if (ctx == (SSL_CTX *) 0) {
 	Error("AttemptSSL(): WTF?  The SSL context disappeared?!?!?");
-	exit(EX_UNAVAILABLE);
+	Bye(EX_SOFTWARE);
     }
     if (!(ssl = SSL_new(ctx))) {
 	Error("AttemptSSL(): SSL_new() failed for client `%s' (fd %d)",
@@ -1748,13 +1818,13 @@ Kiddie(pGE, sfd)
 		if (pCEServing->pCLwr != (CONSCLIENT *) 0) {
 		    pCEServing->pCLwr->fwr = 0;
 		    pCEServing->pCLwr->fwantwr = 1;
-		    TagLogfile(pCEServing, "%s detached",
-			       pCEServing->pCLwr->acid.string);
+		    TagLogfileAct(pCEServing, "%s detached",
+				  pCEServing->pCLwr->acid.string);
 		    pCEServing->pCLwr = (CONSCLIENT *) 0;
 		}
 
 		if (fNoautoreup) {
-		    ConsDown(pCEServing, &pGE->rinit);
+		    ConsDown(pCEServing, &pGE->rinit, 1);
 		} else {
 		    /* Try an initial reconnect */
 		    Msg("[%s] automatic reinitialization",
@@ -2015,8 +2085,8 @@ Kiddie(pGE, sfd)
 			for (pCE = pGE->pCElist; pCE != (CONSENT *) 0;
 			     pCE = pCE->pCEnext) {
 			    if (0 ==
-				strcmp(pCLServing->accmd.string,
-				       pCE->server.string)) {
+				strcasecmp(pCLServing->accmd.string,
+					   pCE->server.string)) {
 				pCLServing->pCEwant = pCE;
 				BuildString((char *)0, &pCLServing->accmd);
 				break;
@@ -2026,9 +2096,10 @@ Kiddie(pGE, sfd)
 			    for (pCE = pGE->pCElist; pCE != (CONSENT *) 0;
 				 pCE = pCE->pCEnext) {
 				if (0 ==
-				    strncmp(pCLServing->accmd.string,
-					    pCE->server.string,
-					    pCLServing->accmd.used - 1)) {
+				    strncasecmp(pCLServing->accmd.string,
+						pCE->server.string,
+						pCLServing->accmd.used -
+						1)) {
 				    pCLServing->pCEwant = pCE;
 				    BuildString((char *)0,
 						&pCLServing->accmd);
@@ -2100,8 +2171,8 @@ Kiddie(pGE, sfd)
 			if (pCLServing->fwr) {
 			    pCLServing->fwr = 0;
 			    pCLServing->fwantwr = 0;
-			    TagLogfile(pCEServing, "%s detached",
-				       pCLServing->acid.string);
+			    TagLogfileAct(pCEServing, "%s detached",
+					  pCLServing->acid.string);
 			    pCEServing->pCLwr =
 				FindWrite(pCEServing->pCLon);
 			}
@@ -2150,8 +2221,8 @@ Kiddie(pGE, sfd)
 			    FileWrite(pCLServing->fd, "attached]\r\n", -1);
 			    /* this keeps the ops console neat */
 			    pCEServing->iend = 0;
-			    TagLogfile(pCEServing, "%s attached",
-				       pCLServing->acid.string);
+			    TagLogfileAct(pCEServing, "%s attached",
+					  pCLServing->acid.string);
 			} else {
 			    FileWrite(pCLServing->fd, "spy]\r\n", -1);
 			}
@@ -2203,8 +2274,8 @@ Kiddie(pGE, sfd)
 				FileWrite(pCLServing->fd,
 					  " -- attached]\r\n", -1);
 			    }
-			    TagLogfile(pCEServing, "%s attached",
-				       pCLServing->acid.string);
+			    TagLogfileAct(pCEServing, "%s attached",
+					  pCLServing->acid.string);
 			} else {
 			    FileWrite(pCLServing->fd, " -- spy mode]\r\n",
 				      -1);
@@ -2398,8 +2469,9 @@ Kiddie(pGE, sfd)
 					FileWrite(pCLServing->fd,
 						  "attached]\r\n", -1);
 				    }
-				    TagLogfile(pCEServing, "%s attached",
-					       pCLServing->acid.string);
+				    TagLogfileAct(pCEServing,
+						  "%s attached",
+						  pCLServing->acid.string);
 				} else if (pCL == pCLServing) {
 				    if (pCEServing->nolog) {
 					FileWrite(pCLServing->fd,
@@ -2492,9 +2564,9 @@ Kiddie(pGE, sfd)
 
 				pCLServing->fwr = 0;
 				pCEServing->pCLwr = (CONSCLIENT *) 0;
-				TagLogfile(pCEServing, "%s detached",
-					   pCLServing->acid.string);
-				ConsDown(pCEServing, &pGE->rinit);
+				TagLogfileAct(pCEServing, "%s detached",
+					      pCLServing->acid.string);
+				ConsDown(pCEServing, &pGE->rinit, 0);
 				FileWrite(pCLServing->fd, "line down]\r\n",
 					  -1);
 
@@ -2565,9 +2637,10 @@ Kiddie(pGE, sfd)
 				    FileWrite(pCL->fd,
 					      pCLServing->acid.string, -1);
 				    FileWrite(pCL->fd, "]\r\n", -1);
-				    TagLogfile(pCEServing, "%s bumped %s",
-					       pCLServing->acid.string,
-					       pCL->acid.string);
+				    TagLogfileAct(pCEServing,
+						  "%s bumped %s",
+						  pCLServing->acid.string,
+						  pCL->acid.string);
 				} else {
 				    if (pCEServing->nolog) {
 					FileWrite(pCLServing->fd,
@@ -2577,8 +2650,9 @@ Kiddie(pGE, sfd)
 					FileWrite(pCLServing->fd,
 						  "attached]\r\n", -1);
 				    }
-				    TagLogfile(pCEServing, "%s attached",
-					       pCLServing->acid.string);
+				    TagLogfileAct(pCEServing,
+						  "%s attached",
+						  pCLServing->acid.string);
 				}
 				pCEServing->pCLwr = pCLServing;
 				pCLServing->fwr = 1;
@@ -2718,17 +2792,17 @@ Kiddie(pGE, sfd)
 				    if (pCEServing->nolog) {
 					FileWrite(pCLServing->fd,
 						  "logging off]\r\n", -1);
-					FilePrint(pCEServing->fdlog,
-						  "[-- Console logging disabled by %s -- %s]\r\n",
-						  pCLServing->acid.string,
-						  StrTime(NULL));
+					TagLogfile(pCEServing,
+						   "Console logging disabled by %s",
+						   pCLServing->acid.
+						   string);
 				    } else {
 					FileWrite(pCLServing->fd,
 						  "logging on]\r\n", -1);
-					FilePrint(pCEServing->fdlog,
-						  "[-- Console logging restored by %s -- %s]\r\n",
-						  pCLServing->acid.string,
-						  StrTime(NULL));
+					TagLogfile(pCEServing,
+						   "Console logging restored by %s",
+						   pCLServing->acid.
+						   string);
 				    }
 				} else {
 				    FilePrint(pCLServing->fd,
@@ -2780,13 +2854,15 @@ Kiddie(pGE, sfd)
 				    pCLServing->fwr = 1;
 				    FileWrite(pCLServing->fd,
 					      "up -- attached]\r\n", -1);
-				    TagLogfile(pCEServing, "%s attached",
-					       pCLServing->acid.string);
+				    TagLogfileAct(pCEServing,
+						  "%s attached",
+						  pCLServing->acid.string);
 				} else if (pCL == pCLServing) {
 				    FileWrite(pCLServing->fd, "up]\r\n",
 					      -1);
-				    TagLogfile(pCEServing, "%s attached",
-					       pCLServing->acid.string);
+				    TagLogfileAct(pCEServing,
+						  "%s attached",
+						  pCLServing->acid.string);
 				} else {
 				    FilePrint(pCLServing->fd,
 					      "up, %s is attached]\r\n",
@@ -2824,8 +2900,8 @@ Kiddie(pGE, sfd)
 				    break;
 				}
 				pCLServing->fwr = 0;
-				TagLogfile(pCEServing, "%s detached",
-					   pCLServing->acid.string);
+				TagLogfileAct(pCEServing, "%s detached",
+					      pCLServing->acid.string);
 				pCEServing->pCLwr =
 				    FindWrite(pCEServing->pCLon);
 				FileWrite(pCLServing->fd, "spying]\r\n",
@@ -2914,8 +2990,9 @@ Kiddie(pGE, sfd)
 				    pCLServing->fwr = 0;
 				    pCLServing->fwantwr = 0;
 				    pCEServing->pCLwr = (CONSCLIENT *) 0;
-				    TagLogfile(pCEServing, "%s detached",
-					       pCLServing->acid.string);
+				    TagLogfileAct(pCEServing,
+						  "%s detached",
+						  pCLServing->acid.string);
 				}
 				break;
 
@@ -3219,14 +3296,14 @@ Spawn(pGE)
      */
     if ((sfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 	Error("Spawn(): socket(): %s", strerror(errno));
-	exit(EX_UNAVAILABLE);
+	Bye(EX_OSERR);
     }
 #if HAVE_SETSOCKOPT
     if (setsockopt
 	(sfd, SOL_SOCKET, SO_REUSEADDR, (char *)&true, sizeof(true)) < 0) {
 	Error("Spawn(): setsockopt(%u,SO_REUSEADDR): %s", sfd,
 	      strerror(errno));
-	exit(EX_UNAVAILABLE);
+	Bye(EX_OSERR);
     }
 #endif
 
@@ -3239,14 +3316,14 @@ Spawn(pGE)
 	    lstn_port.sin_port = htons(bindBasePort + portInc);
 	} else {
 	    Error("Spawn(): bind(%u): %s", sfd, strerror(errno));
-	    exit(EX_UNAVAILABLE);
+	    Bye(EX_OSERR);
 	}
     }
     so = sizeof(lstn_port);
 
     if (-1 == getsockname(sfd, (struct sockaddr *)&lstn_port, &so)) {
 	Error("Spawn(): getsockname(%u): %s", sfd, strerror(errno));
-	exit(EX_UNAVAILABLE);
+	Bye(EX_OSERR);
     }
     pGE->port = lstn_port.sin_port;
 
@@ -3255,7 +3332,7 @@ Spawn(pGE)
     switch (pid = fork()) {
 	case -1:
 	    Error("Spawn(): fork(): %s", strerror(errno));
-	    exit(EX_UNAVAILABLE);
+	    Bye(EX_OSERR);
 	default:
 	    close(sfd);
 	    /* hmm...there seems to be a potential linux bug here as well.
@@ -3279,13 +3356,13 @@ Spawn(pGE)
     }
     if (listen(sfd, SOMAXCONN) < 0) {
 	Error("Spawn(): listen(%u): %s", sfd, strerror(errno));
-	exit(EX_UNAVAILABLE);
+	Bye(EX_OSERR);
     }
     ssocket = FileOpenFD(sfd, simpleSocket);
     if ((CONSFILE *) 0 == ssocket) {
 	Error("Spawn(): FileOpenFD(%u): %s", sfd, strerror(errno));
 	close(sfd);
-	exit(EX_UNAVAILABLE);
+	Bye(EX_OSERR);
     }
     Kiddie(pGE, ssocket);
 
@@ -3293,5 +3370,5 @@ Spawn(pGE)
      */
     FileClose(&ssocket);
     Error("Spawn(): internal flow error");
-    exit(EX_UNAVAILABLE);
+    Bye(EX_SOFTWARE);
 }

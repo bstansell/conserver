@@ -31,138 +31,164 @@ AC_SUBST(MKDIR)
 
 
 dnl ### Custom settings. ############################################
-ac_cv_allow_64bit=no
 AC_MSG_CHECKING(whether to allow 64bit compilation)
 AC_ARG_WITH(64bit,
 	AC_HELP_STRING([--with-64bit],[Allow 64bit compilation]),
-	[if test "$withval" = yes; then
-		ac_cv_allow_64bit=yes
-	fi])
-AC_MSG_RESULT($ac_cv_allow_64bit)
+		[with_64bit=yes], [with_64bit=no])
+AC_MSG_RESULT($with_64bit)
 
 AC_MSG_CHECKING(for port number specification)
 AC_ARG_WITH(port,
 	AC_HELP_STRING([--with-port=PORT],[Specify port number @<:@conserver@:>@]),
-	[if test "$withval" != yes -a "$withval" != no; then
-		AC_DEFINE_UNQUOTED(DEFPORT, "$withval")
-		AC_MSG_RESULT(port '$withval')
-	else
+	[case "$withval" in
+	    yes|no)
 		AC_DEFINE_UNQUOTED(DEFPORT, "conserver")
 		AC_MSG_RESULT(port 'conserver')
-	fi],
+		;;
+	    *)
+		AC_DEFINE_UNQUOTED(DEFPORT, "$withval")
+		AC_MSG_RESULT(port '$withval')
+		;;
+	esac],
 	[AC_DEFINE_UNQUOTED(DEFPORT, "conserver")
 	AC_MSG_RESULT(port 'conserver')])
 
 AC_MSG_CHECKING(for secondary channel base port)
 AC_ARG_WITH(base,
 	AC_HELP_STRING([--with-base=PORT], [Base port for secondary channel @<:@0@:>@]),
-	[if test "$withval" != yes -a "$withval" != no; then
-		AC_DEFINE_UNQUOTED(DEFBASEPORT, "$withval")
-		AC_MSG_RESULT(port '$withval')
-	else
+	[case "$withval" in
+	    yes|no)
 		AC_DEFINE_UNQUOTED(DEFBASEPORT, "0")
 		AC_MSG_RESULT(port '0')
-	fi],
+		;;
+	    *)
+		AC_DEFINE_UNQUOTED(DEFBASEPORT, "$withval")
+		AC_MSG_RESULT(port '$withval')
+		;;
+	esac],
 	[AC_DEFINE_UNQUOTED(DEFBASEPORT, "0")
 	AC_MSG_RESULT(port '0')])
 
 AC_MSG_CHECKING(for master conserver hostname)
 AC_ARG_WITH(master,
 	AC_HELP_STRING([--with-master=MASTER],[Specify master server hostname @<:@console@:>@]),
-	[if test "$withval" != yes; then
-		AC_DEFINE_UNQUOTED(MASTERHOST, "$withval")
-		AC_MSG_RESULT('$withval')
-	else
+	[case "$withval" in
+	    yes|no)
 		AC_DEFINE_UNQUOTED(MASTERHOST, "console")
 		AC_MSG_RESULT('console')
-	fi],
+		;;
+	    *)
+		AC_DEFINE_UNQUOTED(MASTERHOST, "$withval")
+		AC_MSG_RESULT('$withval')
+		;;
+	esac],
 	[AC_DEFINE_UNQUOTED(MASTERHOST, "console")
 	AC_MSG_RESULT('console')])
 
 AC_MSG_CHECKING(for configuration filename)
 AC_ARG_WITH(cffile,
 	AC_HELP_STRING([--with-cffile=CFFILE],[Specify config filename @<:@SYSCONFDIR/conserver.cf@:>@]),
-	[if test "$withval" != yes; then
-		if expr "x$withval" : "x/" > /dev/null 2>&1; then
-			AC_DEFINE_UNQUOTED(CONFIGFILE, ["$withval"])
-			AC_MSG_RESULT('$withval')
-		else
-			AC_DEFINE_UNQUOTED(CONFIGFILE, [SYSCONFDIR "/$withval"])
-			AC_MSG_RESULT('$sysconfdir/$withval')
-		fi
-	else
+	[case "$withval" in
+	    yes|no)
 		AC_DEFINE_UNQUOTED(CONFIGFILE, [SYSCONFDIR "/conserver.cf"])
 		AC_MSG_RESULT('$sysconfdir/conserver.cf')
-	fi],
+		;;
+	    [[\\/]]* | ?:[[\\/]]* )
+		AC_DEFINE_UNQUOTED(CONFIGFILE, ["$withval"])
+		AC_MSG_RESULT('$withval')
+		;;
+	    *)
+		AC_DEFINE_UNQUOTED(CONFIGFILE, [SYSCONFDIR "/$withval"])
+		AC_MSG_RESULT('$sysconfdir/$withval')
+		;;
+	esac],
 	[AC_DEFINE_UNQUOTED(CONFIGFILE, [SYSCONFDIR "/conserver.cf"])
 	AC_MSG_RESULT('$sysconfdir/conserver.cf')])
 
 AC_MSG_CHECKING(for password filename)
 AC_ARG_WITH(pwdfile,
 	AC_HELP_STRING([--with-pwdfile=PWDFILE],[Specify password filename @<:@SYSCONFDIR/conserver.passwd@:>@]),
-	[if test "$withval" != yes; then
-		if expr "x$withval" : "x/" > /dev/null 2>&1; then
-			AC_DEFINE_UNQUOTED(PASSWDFILE, ["$withval"])
-			AC_MSG_RESULT('$withval')
-		else
-			AC_DEFINE_UNQUOTED(PASSWDFILE, [SYSCONFDIR "/$withval"])
-			AC_MSG_RESULT('$sysconfdir/$withval')
-		fi
-	else
+	[case "$withval" in
+	    yes|no)
 		AC_DEFINE_UNQUOTED(PASSWDFILE, [SYSCONFDIR "/conserver.passwd"])
 		AC_MSG_RESULT('$sysconfdir/conserver.passwd')
-	fi],
+		;;
+	    [[\\/]]* | ?:[[\\/]]* )
+		AC_DEFINE_UNQUOTED(PASSWDFILE, ["$withval"])
+		AC_MSG_RESULT('$withval')
+		;;
+	    *)
+		AC_DEFINE_UNQUOTED(PASSWDFILE, [SYSCONFDIR "/$withval"])
+		AC_MSG_RESULT('$sysconfdir/$withval')
+		;;
+	esac],
 	[AC_DEFINE_UNQUOTED(PASSWDFILE, [SYSCONFDIR "/conserver.passwd"])
 	AC_MSG_RESULT('$sysconfdir/conserver.passwd')])
 
 AC_MSG_CHECKING(for log filename)
 AC_ARG_WITH(logfile,
 	AC_HELP_STRING([--with-logfile=LOGFILE],[Specify log filename @<:@/var/log/conserver@:>@]),
-	[if test "$withval" != yes; then
-		AC_DEFINE_UNQUOTED(LOGFILEPATH, "$withval")
-		AC_MSG_RESULT('$withval')
-	else
+	[case "$withval" in
+	    yes|no)
 		AC_DEFINE_UNQUOTED(LOGFILEPATH, "/var/log/conserver")
 		AC_MSG_RESULT('/var/log/conserver')
-	fi],
+		;;
+	    *)
+		AC_DEFINE_UNQUOTED(LOGFILEPATH, "$withval")
+		AC_MSG_RESULT('$withval')
+		;;
+	esac],
 	[AC_DEFINE_UNQUOTED(LOGFILEPATH, "/var/log/conserver")
 	AC_MSG_RESULT('/var/log/conserver')])
 
+AC_SUBST(PIDFILE)
 AC_MSG_CHECKING(for PID filename)
 AC_ARG_WITH(pidfile,
 	AC_HELP_STRING([--with-pidfile=PIDFILE],[Specify PID filepath @<:@/var/run/conserver.pid@:>@]),
-	[if test "$withval" != yes; then
-		AC_DEFINE_UNQUOTED(PIDFILE, "$withval")
-		AC_MSG_RESULT('$withval')
-	else
-		AC_DEFINE_UNQUOTED(PIDFILE, "/var/run/conserver.pid")
-		AC_MSG_RESULT('/var/run/conserver.pid')
-	fi],
-	[AC_DEFINE_UNQUOTED(PIDFILE, "/var/run/conserver.pid")
-	AC_MSG_RESULT('/var/run/conserver.pid')])
+	[case "$withval" in
+	    yes|no)
+		PIDFILE="/var/run/conserver.pid"
+		;;
+	    *)
+		PIDFILE="$withval"
+		;;
+	esac],
+	[PIDFILE="/var/run/conserver.pid"])
+AC_DEFINE_UNQUOTED(PIDFILE, "$PIDFILE")
+AC_MSG_RESULT('$PIDFILE')
 
 AC_MSG_CHECKING(for MAXMEMB setting)
 AC_ARG_WITH(maxmemb,
 	AC_HELP_STRING([--with-maxmemb=MAXMEMB],[Specify maximum consoles per process @<:@16@:>@]),
-	[if test "$withval" != yes; then
-		AC_DEFINE_UNQUOTED(MAXMEMB, $withval)
-		AC_MSG_RESULT($withval)
-	else
+	[case "$withval" in
+	    yes|no)
 		AC_DEFINE_UNQUOTED(MAXMEMB, 16)
 		AC_MSG_RESULT(16)
-	fi],
+		;;
+	    *)
+		if expr "$withval" : '[[0-9]]*$' >/dev/null 2>&1 &&
+		   test "$withval" -gt 0 -a "$withval" -lt 256; then
+		    AC_DEFINE_UNQUOTED(MAXMEMB, $withval)
+		    AC_MSG_RESULT($withval)
+		else
+		    AC_DEFINE_UNQUOTED(MAXMEMB, 16)
+		    AC_MSG_RESULT([value out of bounds (0<x<256) - setting to 16])
+		fi
+		;;
+	esac],
 	[AC_DEFINE_UNQUOTED(MAXMEMB, 16)
 	AC_MSG_RESULT(16)])
 
 AC_MSG_CHECKING(for connect() timeout)
 AC_ARG_WITH(timeout,
 	AC_HELP_STRING([--with-timeout=TIMEOUT],[Specify connect() timeout in seconds @<:@10@:>@]),
-	[if test "$withval" -gt 0 -o "$withval" -lt 300; then
+	[if expr "$withval" : '[[0-9]]*$' >/dev/null 2>&1 &&
+	    test "$withval" -gt 0 -a "$withval" -lt 300; then
 		AC_DEFINE_UNQUOTED(CONNECTTIMEOUT, $withval)
 		AC_MSG_RESULT($withval)
 	else
 		AC_DEFINE_UNQUOTED(CONNECTTIMEOUT, 10)
-		AC_MSG_RESULT(10)
+		AC_MSG_RESULT([value out of bounds (0<x<300) - setting to 10])
 	fi],
 	[AC_DEFINE_UNQUOTED(CONNECTTIMEOUT, 10)
 	AC_MSG_RESULT(10)])
@@ -172,15 +198,15 @@ AC_PROG_CC
 AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
+
 dnl ### Compiler characteristics. ##################################
 AC_AIX
-AC_PROG_CC
 AC_C_CONST
 AC_C_PROTOTYPES
 
 AC_CHECK_SIZEOF(long)
 if test "$ac_cv_sizeof_long" -gt 4; then
-    if test "$ac_cv_allow_64bit" != "yes"; then
+    if test "$with_64bit" != "yes"; then
 	AC_MSG_ERROR([cannot build on >32bit systems (to override use --with-64bit)])
     else
 	AC_MSG_WARN([building a 64bit version of conserver - good luck!])
@@ -224,6 +250,19 @@ AC_CHECK_TYPE([socklen_t],[AC_DEFINE(HAVE_SOCKLEN_T,1,
 	[Defined if socklen_t exists])],,[$ac_includes_default
 #include <sys/socket.h>])
 
+
+dnl ### Host specific checks. ######################################
+AC_CANONICAL_HOST
+
+case "$host" in
+*-*-hpux*)
+    CPPFLAGS="$CPPFLAGS -D_XOPEN_SOURCE_EXTENDED=1"
+    AC_CHECK_LIB(xnet,t_error,,AC_MSG_ERROR([-lxnet needed on HP-UX]))
+    AC_CHECK_LIB(sec,getspnam)
+    AC_CHECK_HEADERS(hpsecurity.h prot.h)
+    AC_CHECK_FUNCS(bigcrypt iscomsec getprpwnam)
+    ;;
+esac
 
 dnl ### Check for libraries. #######################################
 AC_SEARCH_LIBS(socket,socket)
@@ -384,6 +423,7 @@ AC_ARG_WITH(regex,
 	    AC_MSG_RESULT(no)
 	fi],[AC_MSG_RESULT(no)])
 
+AC_MSG_CHECKING(for PAM support)
 AC_ARG_WITH(pam,
     AC_HELP_STRING([--with-pam],
 	[Enable PAM support]),
@@ -407,21 +447,26 @@ AC_ARG_WITH(pam,
 			[AC_MSG_RESULT(no)])])],)
 
 	    LIBS="$oLIBS"
-	fi],)
+	else
+	    AC_MSG_RESULT(no)
+	fi],[AC_MSG_RESULT(no)])
 
 
 AC_CHECK_FUNCS(getopt strerror getrlimit getsid setsid getuserattr setgroups tcgetpgrp tcsetpgrp tcgetattr tcsetattr tcsendbreak setpgrp getutent setttyent getspnam setlinebuf setvbuf ptsname grantpt unlockpt sigaction setsockopt getdtablesize putenv memset memcpy memcmp sysconf getpassphrase getlogin)
 AC_FUNC_SETPGRP
+AC_CHECK_FUNC(strcasecmp,
+	[AC_DEFINE(HAVE_STRCASECMP, 1, [Define if strcasecmp is available])],
+	[AC_CHECK_FUNC(stricmp,
+		[AC_DEFINE(HAVE_STRICMP, 1, [Define if stricmp is available])],
+		[AC_MSG_ERROR([strcasecmp or stricmp must be available])])])
 
 dnl    Checks for libbsm functions
 AC_CHECK_HEADERS(bsm/audit.h)
 AC_CHECK_LIB(bsm, getaudit)
-AC_CHECK_FUNC(getaudit,
-    AC_DEFINE(HAVE_GETAUDIT, 1, [Define if libbsm has `getaudit'.]))
-AC_CHECK_FUNC(getaudit_addr,
-    AC_DEFINE(HAVE_GETAUDIT_ADDR, 1, [Define if libbsm has `getaudit_addr'.]))
+AC_CHECK_FUNCS(getaudit getaudit_addr)
 
 
 dnl ### Create output files. #######################################
 AC_CONFIG_FILES([Makefile conserver/Makefile conserver.cf/Makefile console/Makefile autologin/Makefile])
+AC_CONFIG_FILES([conserver/conserver.rc], [chmod +x conserver/conserver.rc])
 AC_OUTPUT
