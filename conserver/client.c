@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.76 2003/11/20 13:56:38 bryan Exp $
+ *  $Id: client.c,v 5.79 2003/11/28 23:36:02 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -97,15 +97,15 @@ FindWrite(pCE)
  */
 void
 #if PROTOTYPES
-Replay(CONSFILE *fdLog, CONSFILE *fdOut, int iBack)
+Replay(CONSENT *pCE, CONSFILE *fdOut, int iBack)
 #else
-Replay(fdLog, fdOut, iBack)
-    CONSFILE *fdLog;
+Replay(pCE, fdOut, iBack)
+    CONSENT *pCE;
     CONSFILE *fdOut;
     int iBack;
 #endif
 {
-
+    CONSFILE *fdLog = (CONSFILE *)0;
     off_t file_pos;
     off_t buf_pos;
     char *buf;
@@ -130,7 +130,16 @@ Replay(fdLog, fdOut, iBack)
     unsigned long dmallocMarkReplay = 0;
 #endif
 
-    if ((CONSFILE *)0 == fdLog) {
+    if (pCE != (CONSENT *)0) {
+	fdLog = pCE->fdlog;
+
+	/* no logfile and down and logfile defined?  try and open it */
+	if (fdLog == (CONSFILE *)0 && !pCE->fup &&
+	    pCE->logfile != (char *)0)
+	    fdLog = FileOpen(pCE->logfile, O_RDONLY, 0644);
+    }
+
+    if (fdLog == (CONSFILE *)0) {
 	FileWrite(fdOut, FLAGFALSE, "[no log file on this console]\r\n",
 		  -1);
 	return;
@@ -179,17 +188,9 @@ Replay(fdLog, fdOut, iBack)
 	     * the rest (as we work our way back in the file) should be
 	     */
 	    buf_pos = (file_pos / BUFSIZ) * BUFSIZ;
-#if defined(SEEK_SET)
-	    /* PTX and maybe other Posix systems
-	     */
 	    if (FileSeek(fdLog, buf_pos, SEEK_SET) < 0) {
 		goto common_exit;
 	    }
-#else
-	    if (FileSeek(fdLog, buf_pos, L_SET) < 0) {
-		goto common_exit;
-	    }
-#endif
 	    if ((r = FileRead(fdLog, buf, BUFSIZ)) < 0) {
 		goto common_exit;
 	    }
@@ -339,6 +340,10 @@ Replay(fdLog, fdOut, iBack)
 
   common_exit:
 
+    /* if we opened the logfile, close it */
+    if (fdLog != pCE->fdlog)
+	FileClose(&fdLog);
+
     if ((struct lines *)0 != lines) {
 	for (i = 0; i < n_lines; i++) {
 	    DestroyString(lines[i].mark_end);
@@ -397,6 +402,7 @@ static HELP aHLTable[] = {
     {WHEN_ALWAYS, "w    who is on this console"},
     {WHEN_ALWAYS, "x    show console baud info"},
     {WHEN_ALWAYS, "z    suspend the connection"},
+    {WHEN_ATTACH, "|    attach local command"},
     {WHEN_ALWAYS, "<cr> ignore/abort command"},
     {WHEN_ALWAYS, "?    print this message"},
     {WHEN_ALWAYS, "^R   replay the last line"},

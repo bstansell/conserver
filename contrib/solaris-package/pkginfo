@@ -1,7 +1,7 @@
 PKG="conserver"
 NAME="Console server and client"
 CATEGORY="system"
-VERSION="8.0.7"
+VERSION="8.0.8"
 DESC="Console server and client"
 CLASSES=none
 ARCH=sparc

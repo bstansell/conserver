@@ -1,5 +1,5 @@
 /*
- *  $Id: client.h,v 5.33 2003/10/10 10:28:49 bryan Exp $
+ *  $Id: client.h,v 5.35 2003/11/28 15:55:34 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -46,7 +46,8 @@ typedef enum clientState {
     S_IDENT,			/* probational connection (who is this)    */
     S_PASSWD,			/* still needs a passwd to connect         */
     S_QUOTE,			/* send any character we can spell         */
-    S_BCAST			/* send a broadcast message to all clients */
+    S_BCAST,			/* send a broadcast message to all clients */
+    S_CWAIT			/* wait for client                         */
 } CLIENTSTATE;
 
 typedef struct client {		/* Connection Information:              */
@@ -82,7 +83,7 @@ typedef struct client {		/* Connection Information:              */
       cnct_port;		/* where from                           */
 } CONSCLIENT;
 
-extern void Replay PARAMS((CONSFILE *, CONSFILE *, int));
+extern void Replay PARAMS((CONSENT *, CONSFILE *, int));
 extern void HelpUser PARAMS((CONSCLIENT *));
 extern void FindWrite PARAMS((CONSENT *));
 extern int ClientAccessOk PARAMS((CONSCLIENT *));

@@ -1,6 +1,19 @@
 				CHANGES
 				=======
 
+version 8.0.8 (Dec 2, 2003):
+	- added client ^Ec| sequence for running a command on the client
+	  and having it's I/O directed to the console - inspired by
+	  discussions with David Williamson
+	  <david+conserver@williamsons.net> years ago  ;-)
+	- touched up Makefiles to test against .h files
+	- fixed inability to replay the console log while the console is
+	  down - reported by Matt Selsky <selsky@columbia.edu>
+	- added a console 'logfilemax' option for rotating the console
+	  logfile once the file is greater than the specified size
+	- added sample configuration files to conserver.cf/samples
+	- tweaked some failure messages and initcmd notifications
+
 version 8.0.7 (Nov 20, 2003):
 	- renamed util.[ch] to cutil.[ch] to prevent name conflict with
 	  system util.h, reordered some #includes, and fixed a configure
@@ -624,5 +637,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.135 2003/11/20 14:48:29 bryan Exp $
+#  $Id: CHANGES,v 1.140 2003/12/02 16:26:59 bryan Exp $
 #

@@ -29,13 +29,16 @@ LIBS	= @LIBS@ @CONSLIBS@
 CONSERVER_OBJS = access.o client.o consent.o group.o main.o master.o \
 		 readcfg.o fallback.o cutil.o
 CONSERVER_HDRS = ../config.h $(top_srcdir)/compat.h $(srcdir)/access.h \
-		 $(srcdir)/client.h $(srcdir)/consent.h $(srcdir)/group.h \
-		 $(srcdir)/main.h $(srcdir)/master.h $(srcdir)/readcfg.h \
-		 $(srcdir)/util.h
+		 $(srcdir)/client.h $(srcdir)/consent.h $(srcdir)/cutil.h \
+		 $(srcdir)/group.h $(srcdir)/main.h $(srcdir)/master.h \
+		 $(srcdir)/readcfg.h $(srcdir)/version.h
+
 ALL = conserver convert
 
 
 all: $(ALL)
+
+$(CONSERVER_OBJS): $(CONSERVER_HDRS)
 
 conserver: $(CONSERVER_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o conserver $(CONSERVER_OBJS) $(LIBS)

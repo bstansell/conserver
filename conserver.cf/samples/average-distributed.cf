@@ -1,0 +1,108 @@
+#
+# I took the average.cf file and expanded it to use a distributed
+# conserver setup...two conserver hosts (conserver1 and conserver2), but
+# the basic philosophy would hold for many more console and/or conserver
+# hosts.
+#
+
+# ------ define a user group ------
+group sysadmin {
+    users bryan, todd, dave;
+}
+# helpers is everyone but the sysadmin group
+group helpers {
+    users *, !sysadmin;
+}
+
+
+# ------ make sure breaks are the way we want --------
+break 1 { string "\z"; }
+break 2 { string "\r\d~\d^b"; delay 600; }
+break 3 { string "#."; }
+
+
+# ----- define some console types ------
+# yeah, just setting a break doesn't quite seem worth it, but perhaps,
+# some day, there will be more host-specific stuff.
+default sun-std { break 1; }
+default sun-alt { break 2; }
+default sun-lom { break 3; }
+
+
+# ------ defaults ------
+# we set a 'global' default so we can reuse the bits below.  we're going
+# to set the '*' default, then define consoles, reset the '*' default,
+# define more consoles, etc.
+default global {
+	logfile /var/consoles/&;	# '&' is replaced with console name
+	timestamp 1hab;			# write timestamps
+	rw sysadmin;			# allow sysadmins full access
+	ro helpers;			# allow helpers to watch
+	include sun-std;
+}
+
+
+# --------- define our terminal attributes ----------
+# simple tcp connections are "easy"
+default cisco { type host; portbase 2000; portinc 1; }
+default xyplex  { type host; portbase 2000; portinc 100; }
+
+# this is a cyclades card referenced with /dev/ttyC0 through /dev/ttyC31
+# we set the various port calculation bits and pattern substitution to
+# come up with a generic definition
+default cyclades { type device; device /dev/ttyC&; baud 9600; parity none;
+		   devicesubst .&d; portbase -1; portinc 1; host unused; }
+
+## this is a term server accessed with an ssh command
+# it too uses pattern substitution and such to get the job done
+default ciscossh { type exec; portbase 2000; portinc 1;
+		   exec /usr/local/bin/ssh -p P -l tsuser H;
+		   execsubst HPd; }
+
+
+# ------- set the global default for the first conserver host -------
+# the consoles below (until the default is reset) are managed
+# by conserver1.conserver.com
+default * { include global; master conserver1.conserver.com; }
+
+# ------- define the consoles on ts1.conserver.com --------
+default ts1.conserver.com { include cisco; host ts1.conserver.com; }
+console web1.conserver.com { include ts1.conserver.com; port 2; }
+console ns1.conserver.com { include ts1.conserver.com; port 10; }
+
+# ------- define the consoles on ts2.conserver.com --------
+default ts2.conserver.com { include xyplex; host ts2.conserver.com; }
+console web2.conserver.com { include ts2.conserver.com; port 4; }
+console ns2.conserver.com { include ts2.conserver.com; port 22; }
+
+# ------- set the global default for the second conserver host -------
+# the following consoles are managed by conserver2.conserver.com
+default * { include global; master conserver2.conserver.com; }
+
+# ------- define the consoles on ts3.conserver.com --------
+default ts3.conserver.com { include ciscossh; host ts3.conserver.com; }
+console ftp1.conserver.com { include ts3.conserver.com; include sun-lom;
+			     port 7; }
+
+# ------- set up the an access list to avoid the default -------
+# anything *not* matched here will fallback to the default access mode
+access * {
+	trusted 127.0.0.1;
+	allowed 10.0.0.0/8;
+}
+
+# conserver2 has an extra leg that is trusted
+access conserver2.conserver.com { trusted 192.168.0.0/16; }
+
+# ------- do some server configuration ---------
+# both conserver1.conserver.com and conserver2.conserver.com use the same
+# set of defaults
+config * {
+	defaultaccess rejected;
+	daemonmode on;
+	logfile /var/log/conserver;
+}
+
+# we're going to set the default access on conserver2 to allowed, because
+# it's in a higher-trust network
+config conserver2.conserver.com { defaultaccess allowed; }

@@ -1,0 +1,28 @@
+#
+# This is a fairly basic configuration file that interacts with one
+# terminal server.
+#
+
+# first, we're going to set some generic console defaults so that we
+# don't have to duplicate them for each console.
+default * {
+	logfile /var/consoles/&;	# '&' is replaced with console name
+	timestamp 1hab;			# write timestamps
+	rw *;				# allow all users
+	master localhost;
+	type host;
+	host ts1.conserver.com;		# consoles on ts1.conserver.co
+	portbase 2000;			# port numbers start at 2001 and
+	portinc 1;			# go up by 1 (port #1 == 2001, etc)
+}
+
+# define two consoles on the terminal server
+console web1.conserver.com { port 2; }	# calculates to tcp port 2002
+console ns1.conserver.com { port 10; }	# calculates to tcp port 2010
+
+# set up the an access list to avoid the default
+# anything *not* matched here will fallback to the default access (-a)
+# mode
+access * {
+	trusted 127.0.0.1;
+}

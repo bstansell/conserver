@@ -31,6 +31,8 @@ ALL = autologin
 
 all: $(ALL)
 
+$(AUTOLOGIN_OBJS): $(AUTOLOGIN_HDRS)
+
 autologin: $(AUTOLOGIN_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o autologin $(AUTOLOGIN_OBJS) $(LIBS)
 

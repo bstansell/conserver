@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.151 2003/11/20 13:56:41 bryan Exp $
+ *  $Id: console.c,v 5.152 2003/11/28 00:47:30 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -54,6 +54,9 @@ unsigned short bindPort;
 CONSFILE *cfstdout;
 char *pcUser = (char *)0;
 int disconnectCount = 0;
+STRING *execCmd = (STRING *)0;
+CONSFILE *execCmdFile = (CONSFILE *)0;
+pid_t execCmdPid = 0;
 
 #if HAVE_OPENSSL
 SSL_CTX *ctx = (SSL_CTX *)0;
@@ -625,15 +628,17 @@ OOB(sig)
 
 void
 #if PROTOTYPES
-ProcessUrgentData(int s)
+ProcessUrgentData(CONSFILE *pcf)
 #else
-ProcessUrgentData(s)
-    int s;
+ProcessUrgentData(pcf)
+    CONSFILE *pcf;
 #endif
 {
     static char acCmd;
+    int s;
 
     SawUrg = 0;
+    s = FileFDNum(pcf);
 
     /* get the pending urgent message
      */
@@ -642,7 +647,7 @@ ProcessUrgentData(s)
 	    case EWOULDBLOCK:
 		/* clear any pending input to make room */
 		read(s, &acCmd, 1);
-		write(1, ".", 1);
+		FileWrite(cfstdout, FLAGFALSE, ".", 1);
 		continue;
 	    case EINVAL:
 	    default:
@@ -652,21 +657,57 @@ ProcessUrgentData(s)
 	}
     }
     switch (acCmd) {
+	case OB_EXEC:
+	    FileWrite(cfstdout, FLAGFALSE, "exec: ", 6);
+	    BuildString((char *)0, execCmd);
+	    for (;;) {
+		char c;
+		if (read(0, &c, 1) == 0)
+		    break;
+		if (c == '\n' || c == '\r') {
+		    FileWrite(cfstdout, FLAGFALSE, "]\r\n", 3);
+		    if (execCmd->used <= 1) {
+			char s = OB_DROP;
+			FileWrite(pcf, FLAGFALSE, &s, 1);
+		    }
+		    break;
+		}
+		if (c == '\a' || (c >= ' ' && c <= '~')) {
+		    BuildStringChar(c, execCmd);
+		    FileWrite(cfstdout, FLAGFALSE, &c, 1);
+		} else if ((c == '\b' || c == 0x7f) && execCmd->used > 1) {
+		    if (execCmd->string[execCmd->used - 2] != '\a') {
+			FileWrite(cfstdout, FLAGFALSE, "\b \b", 3);
+		    }
+		    execCmd->string[execCmd->used - 2] = '\000';
+		    execCmd->used--;
+		} else if ((c == 0x15) && execCmd->used > 1) {
+		    while (execCmd->used > 1) {
+			if (execCmd->string[execCmd->used - 2] != '\a') {
+			    FileWrite(cfstdout, FLAGFALSE, "\b \b", 3);
+			}
+			execCmd->string[execCmd->used - 2] = '\000';
+			execCmd->used--;
+		    }
+		}
+	    }
+	    break;
 	case OB_SUSP:
 #if defined(SIGSTOP)
-	    write(1, "stop]", 5);
+	    FileWrite(cfstdout, FLAGFALSE, "stop]", 5);
 	    C2Cooked();
 	    kill(getpid(), SIGSTOP);
 	    C2Raw();
-	    write(1, "[press any character to continue", 32);
+	    FileWrite(cfstdout, FLAGFALSE,
+		      "[press any character to continue", 32);
 #else
-	    write(1,
-		  "stop not supported -- press any character to continue",
-		  53);
+	    FileWrite(cfstdout, FLAGFALSE,
+		      "stop not supported -- press any character to continue",
+		      53);
 #endif
 	    break;
 	case OB_DROP:
-	    write(1, "dropped by server]\r\n", 20);
+	    FileWrite(cfstdout, FLAGFALSE, "dropped by server]\r\n", 20);
 	    C2Cooked();
 	    Bye(EX_UNAVAILABLE);
 	 /*NOTREACHED*/ default:
@@ -674,6 +715,179 @@ ProcessUrgentData(s)
 	    fflush(stderr);
 	    break;
     }
+}
+
+static void
+#if PROTOTYPES
+ReapVirt(void)
+#else
+ReapVirt()
+#endif
+{
+    pid_t pid;
+    int UWbuf;
+
+    while (-1 != (pid = waitpid(-1, &UWbuf, WNOHANG | WUNTRACED))) {
+	if (0 == pid)
+	    break;
+
+	/* stopped child is just continued
+	 */
+	if (WIFSTOPPED(UWbuf) && 0 == kill(pid, SIGCONT)) {
+	    Msg("child pid %lu: stopped, sending SIGCONT",
+		(unsigned long)pid);
+	    continue;
+	}
+
+	if (WIFEXITED(UWbuf))
+	    Verbose("child process %lu: exit(%d)", pid,
+		    WEXITSTATUS(UWbuf));
+	if (WIFSIGNALED(UWbuf))
+	    Verbose("child process %lu: signal(%d)", pid, WTERMSIG(UWbuf));
+	if (pid == execCmdPid) {
+	    if (WIFEXITED(UWbuf))
+		FilePrint(cfstdout, FLAGFALSE,
+			  "[local command terminated - pid %lu: exit(%d)]\r\n",
+			  pid, WEXITSTATUS(UWbuf));
+	    if (WIFSIGNALED(UWbuf))
+		FilePrint(cfstdout, FLAGFALSE,
+			  "[local command terminated - pid %lu: signal(%d)]\r\n",
+			  pid, WTERMSIG(UWbuf));
+	}
+    }
+}
+
+static sig_atomic_t fSawReapVirt = 0;
+
+#if HAVE_SIGACTION
+static
+#endif
+  RETSIGTYPE
+#if PROTOTYPES
+FlagReapVirt(int sig)
+#else
+FlagReapVirt(sig)
+    int sig;
+#endif
+{
+    fSawReapVirt = 1;
+#if !HAVE_SIGACTION
+    SimpleSignal(SIGCHLD, FlagReapVirt);
+#endif
+}
+
+/* invoke the execcmd command */
+void
+#if PROTOTYPES
+ExecCmd(void)
+#else
+ExecCmd()
+#endif
+{
+    int i;
+    pid_t iNewGrp;
+    extern char **environ;
+    int pin[2];
+    int pout[2];
+    static char *apcArgv[] = {
+	"/bin/sh", "-ce", (char *)0, (char *)0
+    };
+
+    if (execCmd == (STRING *)0 || execCmd->used <= 1)
+	return;
+
+    CONDDEBUG((1, "ExecCmd(): `%s'", execCmd->string));
+
+    /* pin[0] = parent read, pin[1] = child write */
+    if (pipe(pin) != 0) {
+	Error("ExecCmd(): pipe(): %s", strerror(errno));
+	return;
+    }
+    /* pout[0] = child read, pout[l] = parent write */
+    if (pipe(pout) != 0) {
+	close(pin[0]);
+	close(pin[1]);
+	Error("ExecCmd(): pipe(): %s", strerror(errno));
+	return;
+    }
+
+    fflush(stdout);
+    fflush(stderr);
+
+    switch (execCmdPid = fork()) {
+	case -1:
+	    return;
+	case 0:
+	    thepid = getpid();
+	    break;
+	default:
+	    close(pout[0]);
+	    close(pin[1]);
+	    if ((execCmdFile =
+		 FileOpenPipe(pin[0], pout[1])) == (CONSFILE *)0) {
+		Error("ExecCmd(): FileOpenPipe(%d,%d) failed", pin[0],
+		      pout[1]);
+		close(pin[0]);
+		close(pout[1]);
+		kill(execCmdPid, SIGHUP);
+		return;
+	    }
+	    FilePrint(cfstdout, FLAGFALSE,
+		      "[local command running - pid %lu]\r\n", execCmdPid);
+	    FD_SET(pin[0], &rinit);
+	    if (maxfd < pin[0] + 1)
+		maxfd = pin[0] + 1;
+	    fflush(stderr);
+	    return;
+    }
+
+    close(pin[0]);
+    close(pout[1]);
+
+    /* put the signals back that we ignore (trapped auto-reset to default)
+     */
+#if defined(SIGURG)
+    SimpleSignal(SIGURG, SIG_DFL);
+#endif
+    SimpleSignal(SIGPIPE, SIG_DFL);
+    SimpleSignal(SIGCHLD, SIG_DFL);
+
+    /* setup new process with clean file descriptors
+     * stderr still goes to stderr...so user sees it
+     */
+    i = GetMaxFiles();
+    for ( /* i above */ ; --i > 3;) {
+	if (i != pout[0] && i != pin[1])
+	    close(i);
+    }
+    close(1);
+    close(0);
+
+# if HAVE_SETSID
+    iNewGrp = setsid();
+    if (-1 == iNewGrp) {
+	Error("ExecCmd(): setsid(): %s", strerror(errno));
+	iNewGrp = getpid();
+    }
+# else
+    iNewGrp = getpid();
+# endif
+
+    if (dup(pout[0]) != 0 || dup(pin[1]) != 1) {
+	Error("ExecCmd(): fd sync error");
+	Bye(EX_OSERR);
+    }
+    close(pout[0]);
+    close(pin[1]);
+
+    tcsetpgrp(0, iNewGrp);
+
+    apcArgv[2] = execCmd->string;
+
+    execve(apcArgv[0], apcArgv, environ);
+    Error("ExecCmd(): execve(%s): %s", apcArgv[2], strerror(errno));
+    Bye(EX_OSERR);
+    return;
 }
 
 /* interact with a group server					(ksb)
@@ -690,7 +904,7 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 {
     int nc;
     int fIn = '-';
-    fd_set rmask, rinit;
+    fd_set rmask, wmask;
     int i;
     int justProcessedUrg = 0;
     char *r = (char *)0;
@@ -723,6 +937,7 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 #if defined(SIGURG)
     SimpleSignal(SIGURG, OOB);
 #endif
+    SimpleSignal(SIGCHLD, FlagReapVirt);
 
     /* if we are going for a particular console
      * send sign-on stuff, then wait for some indication of what mode
@@ -818,12 +1033,16 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 
     C2Raw();
 
+    /* set socket to non-blocking */
+    SetFlags(FileFDNum(pcf), O_NONBLOCK, 0);
+
     /* read from stdin and the socket (non-blocking!).
      * rmask indicates which descriptors to read from,
      * the others are not used, nor is the result from
      * select, read, or write.
      */
     FD_ZERO(&rinit);
+    FD_ZERO(&winit);
     FD_SET(FileFDNum(pcf), &rinit);
     FD_SET(0, &rinit);
     if (maxfd < FileFDNum(pcf) + 1)
@@ -831,14 +1050,46 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
     for (;;) {
 	justProcessedUrg = 0;
 	if (SawUrg) {
-	    ProcessUrgentData(FileFDNum(pcf));
+	    ProcessUrgentData(pcf);
 	    justProcessedUrg = 1;
+	}
+	if (execCmd != (STRING *)0 && execCmd->used > 1) {
+	    char *r;
+	    char s = OB_EXEC;
+	    ExecCmd();
+	    BuildString((char *)0, execCmd);
+	    if (execCmdFile == (CONSFILE *)0) {	/* exec failed */
+		s = OB_DROP;
+		FileWrite(pcf, FLAGFALSE, &s, 1);	/* say forget it */
+	    } else {
+		/* go back to blocking mode */
+		SetFlags(FileFDNum(pcf), 0, O_NONBLOCK);
+		FileWrite(pcf, FLAGFALSE, &s, 1);	/* say we're ready */
+		r = ReadReply(pcf, 0);
+		/* now back to non-blocking now that we've got reply */
+		SetFlags(FileFDNum(pcf), O_NONBLOCK, 0);
+		/* if we aren't still r/w, abort */
+		if (strncmp(r, "[rw]", 4) != 0) {
+		    FileWrite(cfstdout, FLAGFALSE,
+			      "[no longer read-write - aborting command]\r\n",
+			      -1);
+		    FD_CLR(FileFDNum(execCmdFile), &rinit);
+		    FD_CLR(FileFDOutNum(execCmdFile), &winit);
+		    FileClose(&execCmdFile);
+		    kill(execCmdPid, SIGHUP);
+		}
+	    }
+	}
+	if (fSawReapVirt) {
+	    fSawReapVirt = 0;
+	    ReapVirt();
 	}
 	/* reset read mask and select on it
 	 */
 	rmask = rinit;
+	wmask = winit;
 	if (-1 ==
-	    select(maxfd, &rmask, (fd_set *)0, (fd_set *)0,
+	    select(maxfd, &rmask, &wmask, (fd_set *)0,
 		   (struct timeval *)0)) {
 	    if (errno != EINTR) {
 		Error("Master(): select(): %s", strerror(errno));
@@ -847,8 +1098,34 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 	    continue;
 	}
 
+	/* anything from execCmd */
+	if (execCmdFile != (CONSFILE *)0) {
+	    if (FileCanRead(execCmdFile, &rmask, &wmask)) {
+		if ((nc =
+		     FileRead(execCmdFile, acMesg, sizeof(acMesg))) < 0) {
+		    FD_CLR(FileFDNum(execCmdFile), &rinit);
+		    FD_CLR(FileFDOutNum(execCmdFile), &winit);
+		    FileClose(&execCmdFile);
+		} else {
+		    if (fStrip) {
+			for (i = 0; i < nc; ++i)
+			    acMesg[i] &= 127;
+		    }
+		    FileWrite(pcf, FLAGFALSE, acMesg, nc);
+		}
+	    } else if (!FileBufEmpty(execCmdFile) &&
+		       FileCanWrite(execCmdFile, &rmask, &wmask)) {
+		CONDDEBUG((1, "CallUp(): flushing fd %d",
+			   FileFDNum(execCmdFile)));
+		if (FileWrite(execCmdFile, FLAGFALSE, (char *)0, 0) < 0) {
+		    /* -bryan */
+		    break;
+		}
+	    }
+	}
+
 	/* anything from socket? */
-	if (FD_ISSET(FileFDNum(pcf), &rmask)) {
+	if (FileCanRead(pcf, &rmask, &wmask)) {
 	    if ((nc = FileRead(pcf, acMesg, sizeof(acMesg))) < 0) {
 		/* if we got an error/eof after returning from suspend */
 		if (justProcessedUrg) {
@@ -862,6 +1139,15 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 		    acMesg[i] &= 127;
 	    }
 	    FileWrite(cfstdout, FLAGFALSE, acMesg, nc);
+	    if (execCmdFile != (CONSFILE *)0) {
+		FileWrite(execCmdFile, FLAGFALSE, acMesg, nc);
+	    }
+	} else if (!FileBufEmpty(pcf) && FileCanWrite(pcf, &rmask, &wmask)) {
+	    CONDDEBUG((1, "CallUp(): flushing fd %d", FileFDNum(pcf)));
+	    if (FileWrite(pcf, FLAGFALSE, (char *)0, 0) < 0) {
+		/* -bryan */
+		break;
+	    }
 	}
 
 	/* anything from stdin? */
@@ -874,11 +1160,31 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 		    continue;
 		}
 	    }
-	    if (fStrip) {
-		for (i = 0; i < nc; ++i)
-		    acMesg[i] &= 127;
+	    if (execCmdFile == (CONSFILE *)0) {
+		if (fStrip) {
+		    for (i = 0; i < nc; ++i)
+			acMesg[i] &= 127;
+		}
+		FileWrite(pcf, FLAGFALSE, acMesg, nc);
+	    } else {
+		for (i = 0; i < nc; ++i) {
+		    if (acMesg[i] == '\n' || acMesg[i] == '\r')
+			FilePrint(cfstdout, FLAGFALSE,
+				  "[local command running - pid %lu]\r\n",
+				  execCmdPid);
+		    else if (acMesg[i] == 0x03) {	/* ctrl-c */
+			kill(execCmdPid, SIGHUP);
+			FilePrint(cfstdout, FLAGFALSE,
+				  "[local command sent SIGHUP - pid %lu]\r\n",
+				  execCmdPid);
+		    } else if (acMesg[i] == 0x1c) {	/* ctrl-\ */
+			kill(execCmdPid, SIGKILL);
+			FilePrint(cfstdout, FLAGFALSE,
+				  "[local command sent SIGKILL - pid %lu]\r\n",
+				  execCmdPid);
+		    }
+		}
 	    }
-	    FileWrite(pcf, FLAGFALSE, acMesg, nc);
 	}
     }
     C2Cooked();
@@ -1387,6 +1693,8 @@ main(argc, argv)
 	}
     }
 
+    if (execCmd == (STRING *)0)
+	execCmd = AllocString();
 
     SimpleSignal(SIGPIPE, SIG_IGN);
 

@@ -33,6 +33,7 @@ Bryan Stansell
 
 - pipe input/output (console <-> program) via 'console'
     - some apps (net-ups thing, gdb) might need to talk to user
+    - ^Ec| does this, but the interact with user bits might not work
 
 - autologout?  setting per console?  gack, would have to interpret data.
 
@@ -59,8 +60,6 @@ Bryan Stansell
 - server -M flag should accept multiple addresses (comma separated)
     - should client as well?
 
-- logfile rotation based on size
-
 - automatic log rotation in general : Egan Ford <egan@us.ibm.com>
 
 - website docs on serial port configs
@@ -83,9 +82,9 @@ Bryan Stansell
 - send a string when connected to a console, so you can set the
   xterm title, for example : Richard Threadgill <richardt@tellme.com>
 
-- allows for very long replays (hundres of lines) : John Stoffel
+- allow for very long replays (hundres of lines) : John Stoffel
   <stoffel@lucent.com>
 
 #
-#  $Id: TODO,v 1.42 2003/11/15 17:08:15 bryan Exp $
+#  $Id: TODO,v 1.44 2003/11/29 14:10:47 bryan Exp $
 #

@@ -1,5 +1,5 @@
 /*
- *  $Id: cutil.h,v 1.56 2003/11/10 20:38:25 bryan Exp $
+ *  $Id: cutil.h,v 1.57 2003/11/28 00:47:29 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -18,6 +18,7 @@
 
 /* communication constants
  */
+#define OB_EXEC		'E'	/* exec a command on the client */
 #define OB_SUSP		'Z'	/* suspended by server          */
 #define OB_DROP		'.'	/* dropped by server            */
 

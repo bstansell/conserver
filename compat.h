@@ -287,6 +287,10 @@ typedef int socklen_t;
 #define ONLRET 0
 #endif
 
+#ifndef SEEK_SET
+#define SEEK_SET L_SET
+#endif
+
 #ifndef PARAMS
 # if PROTOTYPES
 #  define PARAMS(protos) protos

@@ -1,0 +1,90 @@
+#
+# This would be what i'd expect a more common configuration file would
+# look like.  There are consoles attached to multiple devices, simple
+# access lists, etc.
+#
+
+# ------ define a user group ------
+group sysadmin {
+    users bryan, todd, dave;
+}
+# helpers is everyone but the sysadmin group
+group helpers {
+    users *, !sysadmin;
+}
+
+
+# ------ make sure breaks are the way we want --------
+break 1 { string "\z"; }
+break 2 { string "\r\d~\d^b"; delay 600; }
+break 3 { string "#."; }
+
+
+# ----- define some console types ------
+# yeah, just setting a break doesn't quite seem worth it, but perhaps,
+# some day, there will be more host-specific stuff.
+default sun-std { break 1; }
+default sun-alt { break 2; }
+default sun-lom { break 3; }
+
+
+# ------ defaults ------
+# now for some generic console defaults so that we don't have to
+# duplicate them for each console.
+default * {
+	logfile /var/consoles/&;	# '&' is replaced with console name
+	timestamp 1hab;			# write timestamps
+	rw sysadmin;			# allow sysadmins full access
+	ro helpers;			# allow helpers to watch
+	master localhost;
+	include sun-std;
+}
+
+
+# --------- define our terminal attributes ----------
+# simple tcp connections are "easy"
+default cisco { type host; portbase 2000; portinc 1; }
+default xyplex  { type host; portbase 2000; portinc 100; }
+
+# this is a cyclades card referenced with /dev/ttyC0 through /dev/ttyC31
+# we set the various port calculation bits and pattern substitution to
+# come up with a generic definition
+default cyclades { type device; device /dev/ttyC&; baud 9600; parity none;
+		   devicesubst .&d; portbase -1; portinc 1; host unused; }
+
+## this is a term server accessed with an ssh command
+# it too uses pattern substitution and such to get the job done
+default ciscossh { type exec; portbase 2000; portinc 1;
+		   exec /usr/local/bin/ssh -p P -l tsuser H;
+		   execsubst HPd; }
+
+
+# ------- define the consoles on ts1.conserver.com --------
+default ts1.conserver.com { include cisco; host ts1.conserver.com; }
+console web1.conserver.com { include ts1.conserver.com; port 2; }
+console ns1.conserver.com { include ts1.conserver.com; port 10; }
+
+# ------- define the consoles on ts2.conserver.com --------
+default ts2.conserver.com { include xyplex; host ts2.conserver.com; }
+console web2.conserver.com { include ts2.conserver.com; port 4; }
+console ns2.conserver.com { include ts2.conserver.com; port 22; }
+
+# ------- define the consoles on ts3.conserver.com --------
+default ts3.conserver.com { include ciscossh; host ts3.conserver.com; }
+console ftp1.conserver.com { include ts3.conserver.com; include sun-lom;
+			     port 7; }
+
+
+# ------- set up the an access list to avoid the default -------
+# anything *not* matched here will fallback to the default access mode
+access * {
+	trusted 127.0.0.1;
+	allowed 10.0.0.0/8;
+}
+
+# ------- do some server configuration ---------
+config * {
+	defaultaccess rejected;
+	daemonmode on;
+	logfile /var/log/conserver;
+}

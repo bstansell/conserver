@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.158 2003/11/20 13:56:39 bryan Exp $
+ *  $Id: readcfg.c,v 5.160 2003/12/01 02:15:18 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -663,6 +663,8 @@ ApplyDefault(d, c)
 	c->parity = d->parity;
     if (d->idletimeout != 0)
 	c->idletimeout = d->idletimeout;
+    if (d->logfilemax != 0)
+	c->logfilemax = d->logfilemax;
     if (d->port != 0)
 	c->port = d->port;
     if (d->portinc != 0)
@@ -1301,6 +1303,66 @@ DefaultItemLogfile(id)
 
 void
 #if PROTOTYPES
+ProcessLogfilemax(CONSENT *c, char *id)
+#else
+ProcessLogfilemax(c, id)
+    CONSENT *c;
+    char *id;
+#endif
+{
+    char *p;
+    off_t v = 0;
+
+    c->logfilemax = 0;
+
+    if (id == (char *)0 || id[0] == '\000')
+	return;
+
+    for (p = id; *p != '\000'; p++) {
+	if (!isdigit((int)(*p)))
+	    break;
+	v = v * 10 + (*p - '0');
+    }
+
+    /* if it wasn't just numbers */
+    if (*p != '\000') {
+	if ((*p == 'k' || *p == 'K') && *(p + 1) == '\000') {
+	    v *= 1024;
+	} else if ((*p == 'm' || *p == 'M') && *(p + 1) == '\000') {
+	    v *= 1024 * 1024;
+	} else {
+	    if (isMaster)
+		Error("invalid `logfilemax' specification `%s' [%s:%d]",
+		      id, file, line);
+	    return;
+	}
+    }
+
+    if (v < 2048) {
+	if (isMaster)
+	    Error
+		("invalid `logfilemax' specification `%s' (must be >= 2K) [%s:%d]",
+		 id, file, line);
+	return;
+    }
+
+    c->logfilemax = v;
+}
+
+void
+#if PROTOTYPES
+DefaultItemLogfilemax(char *id)
+#else
+DefaultItemLogfilemax(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemLogfilemax(%s) [%s:%d]", id, file, line));
+    ProcessLogfilemax(parserDefaultTemp, id);
+}
+
+void
+#if PROTOTYPES
 DefaultItemInitcmd(char *id)
 #else
 DefaultItemInitcmd(id)
@@ -1543,6 +1605,12 @@ ProcessPortinc(c, id)
 	return;
     }
     c->portinc = (unsigned short)atoi(id) + 1;
+    /* make sure the value was >=1 */
+    if (c->portinc <= 1) {
+	if (isMaster)
+	    Error("invalid portinc number `%s' [%s:%d]", id, file, line);
+	c->portinc = 0;
+    }
 }
 
 void
@@ -1560,16 +1628,24 @@ ProcessPortbase(c, id)
 	c->portbase = 0;
 	return;
     }
+
+    /* if we have -1, allow it (we allow >= -1 now) */
+    if (id[0] == '-' && id[1] == '1' && id[2] == '\000') {
+	c->portbase = 1;
+	return;
+    }
+
     for (p = id; *p != '\000'; p++)
 	if (!isdigit((int)(*p)))
 	    break;
+
     /* if it wasn't a number */
     if (*p != '\000') {
 	if (isMaster)
 	    Error("invalid portbase number `%s' [%s:%d]", id, file, line);
 	return;
     }
-    c->portbase = (unsigned short)atoi(id) + 1;
+    c->portbase = (unsigned short)atoi(id) + 2;
 }
 
 void
@@ -2632,6 +2708,11 @@ ConsoleAdd(c)
 	     timers[T_IDLE] > pCEmatch->lastWrite + pCEmatch->idletimeout))
 	    timers[T_IDLE] = pCEmatch->lastWrite + pCEmatch->idletimeout;
 
+	pCEmatch->logfilemax = c->logfilemax;
+	if (pCEmatch->logfilemax != (off_t) 0 &&
+	    timers[T_ROLL] == (time_t)0)
+	    timers[T_ROLL] = time((time_t)0);
+
 	SwapStr(&pCEmatch->motd, &c->motd);
 	SwapStr(&pCEmatch->idlestring, &c->idlestring);
 	pCEmatch->portinc = c->portinc;
@@ -2722,17 +2803,20 @@ ConsoleDestroy()
 	if (c->breakNum == 0)
 	    c->breakNum = 1;
 
-	/* portbase and portinc values are +1 so a zero can show that
-	 * no value was given.  defaults: portbase=0, portinc=1
+	/* portbase and portinc values are +2 and +1, so a zero can
+	 * show that no value was given.  defaults: portbase=0, portinc=1
 	 */
 	if (c->portbase != 0)
-	    c->portbase--;
+	    c->portbase -= 2;
 	if (c->portinc != 0)
 	    c->portinc--;
 	else
 	    c->portinc = 1;
 
 	/* now calculate the "real" port number */
+	/* this formula should always give >= 0 because
+	 * portbase >= -1, portinc >= 1, and port >= 1
+	 */
 	c->port = c->portbase + c->portinc * c->port;
 
 	/* check for substitutions */
@@ -3072,6 +3156,18 @@ ConsoleItemLogfile(id)
 {
     CONDDEBUG((1, "ConsoleItemLogfile(%s) [%s:%d]", id, file, line));
     ProcessLogfile(parserConsoleTemp, id);
+}
+
+void
+#if PROTOTYPES
+ConsoleItemLogfilemax(char *id)
+#else
+ConsoleItemLogfilemax(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemLogfilemax(%s) [%s:%d]", id, file, line));
+    ProcessLogfilemax(parserConsoleTemp, id);
 }
 
 void
@@ -4159,6 +4255,7 @@ ITEM keyDefault[] = {
     {"include", DefaultItemInclude},
     {"initcmd", DefaultItemInitcmd},
     {"logfile", DefaultItemLogfile},
+    {"logfilemax", DefaultItemLogfilemax},
     {"master", DefaultItemMaster},
     {"motd", DefaultItemMOTD},
     {"options", DefaultItemOptions},
@@ -4188,6 +4285,7 @@ ITEM keyConsole[] = {
     {"include", ConsoleItemInclude},
     {"initcmd", ConsoleItemInitcmd},
     {"logfile", ConsoleItemLogfile},
+    {"logfilemax", ConsoleItemLogfilemax},
     {"master", ConsoleItemMaster},
     {"motd", ConsoleItemMOTD},
     {"options", ConsoleItemOptions},

@@ -14,39 +14,53 @@ default cisco	{ type host; portbase 2000; portinc 1; }
 default xyplex	{ type host; portbase 2000; portinc 100; }
 default iolan	{ type host; portbase 10000; portinc 1; }
 
+### set up some custom break sequences
+break 4 { string "+\d+\d+"; delay 300; }
+break 5 { string "\033c"; }
+
 ### set the defaults for all the consoles
 # these get applied before anything else
 default * {
 	# The '&' character is substituted with the console name
 	logfile /var/consoles/&;
+	# timestamps every hour with activity and break logging
 	timestamp 1hab;
+	# include the 'full' default
 	include full;
+	# master server is localhost
 	master localhost;
 }
 
 ### define the first terminal server
 default ts1.conserver.com {
+	# use the xyplex defaults
 	include xyplex;
+	# host to connect to is ts1.conserver.com
 	host ts1.conserver.com;
+	# run login-xyplex when connecting to the term server
 	initcmd /usr/local/sbin/login-xyplex;
 }
 
 # now define the consoles on ts1.conserver.com
-console web1.conserver.com { include ts1.conserver.com; port 2; }
+# bryan isn't allowed on web1.conserver.com
+console web1.conserver.com { include ts1.conserver.com; port 2; rw !bryan; }
 console ns1.conserver.com { include ts1.conserver.com; port 10; }
 console ns2.conserver.com { include ts1.conserver.com; port 8; }
 
 ### define the second terminal server
+# this one is a cisco, with simple socket connections
 default ts2.conserver.com { include cisco; host ts2.conserver.com; }
 
-# and the consoles
+# and the consoles on ts2.conserver.com
 console ldap1.conserver.com { include ts2.conserver.com; port 7; }
 
 ### and now some one-off consoles
+# we still inherit the '*' default set
 # a simple ssh invocation
 console ssh {
 	type exec;
 	exec ssh localhost;
+	# provide a 'message-of-the-day'
 	motd "just a simple ssh to localhost";
 }
 
@@ -58,6 +72,38 @@ console ttya {
 	idletimeout 5m;		# send a '#' every 5 minutes of idle
 	timestamp "";		# no timestamps on this console
 }
+
+### define a group of users
+group sysadmin {
+    users bryan, todd;
+    users dave;
+}
+
+### reset the defaults for the next set of consoles
+# again, these get applied before anything else
+default * {
+	# The '&' character is substituted with the console name
+	logfile /var/consoles/&;
+	timestamp 5m;
+	rw sysadmin;  # use the group defined above
+	master localhost;
+}
+
+default cyclades {
+	# sets up /dev/ttyC0 through /dev/ttyC31, for a 32 port card
+	type device;
+	device /dev/ttyC.;
+	devicesubst ,.d;
+	portbase -1;
+	portinc 1;
+	host none; # not really used, since devicesubst doesn't use it
+	baud 9600;
+	parity none;
+}
+
+console modem1.conserver.com { include cyclades; port 2; break 4; }
+# todd isn't allowed on modem2.conserver.com
+console modem2.conserver.com { include cyclades; port 6; rw !todd; }
 
 ### list of clients we allow
 access * {

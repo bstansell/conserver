@@ -1,5 +1,5 @@
 /*
- *  $Id: group.h,v 5.41 2003/11/15 20:00:09 bryan Exp $
+ *  $Id: group.h,v 5.42 2003/11/28 23:36:02 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -40,7 +40,8 @@
 #define T_MARK		2
 #define T_REINIT	3
 #define T_AUTOUP	4
-#define T_MAX		5	/* T_MAX *must* be last */
+#define T_ROLL		5
+#define T_MAX		6	/* T_MAX *must* be last */
 
 /* return values used by CheckPass()
  */

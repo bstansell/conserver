@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.275 2003/11/20 13:56:38 bryan Exp $
+ *  $Id: group.c,v 5.279 2003/12/02 16:21:43 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -860,7 +860,7 @@ ReOpen(pGE)
 	     FileOpen(pCE->logfile, O_RDWR | O_CREAT | O_APPEND, 0644))) {
 	    Error("[%s] FileOpen(%s): %s: forcing down", pCE->server,
 		  pCE->logfile, strerror(errno));
-	    ConsoleError(pCE);
+	    ConsDown(pCE, FLAGTRUE, FLAGTRUE);
 	    continue;
 	}
     }
@@ -977,6 +977,116 @@ TagLogfileAct(pCE, fmt, va_alist)
     FileVWrite(pCE->fdlog, FLAGTRUE, fmt, ap);
     FilePrint(pCE->fdlog, FLAGFALSE, " -- %s]\r\n", StrTime((time_t *)0));
     va_end(ap);
+}
+
+static void
+#if PROTOTYPES
+RollLogs(GRPENT *pGE)
+#else
+RollLogs(pGE)
+    GRPENT *pGE;
+#endif
+{
+    CONSENT *pCE;
+    struct stat stLog;
+    char *t = (char *)0;
+    char timestr[40];
+    time_t tyme = (time_t)0;
+    short maxset = 0;
+    char buf[4096];
+    int roll = 0;
+    int r = 0;
+    CONSFILE *old;
+
+    if ((GRPENT *)0 == pGE)
+	return;
+
+    for (pCE = pGE->pCElist; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
+	if (pCE->logfilemax == 0)
+	    continue;
+	maxset = 1;
+	if (pCE->fdlog == (CONSFILE *)0)
+	    continue;
+	if (FileStat(pCE->fdlog, &stLog) != 0) {
+	    CONDDEBUG((1, "RollLogs(): FileStat(%d) failed",
+		       FileFDNum(pCE->fdlog)));
+	    continue;
+	}
+	if (stLog.st_size < pCE->logfilemax)
+	    continue;
+	if (pCE->logfilemax > 1024) {
+	    if (pCE->logfilemax > 0x100000)
+		Msg("[%s] logfile exceeds %dMB: rolling", pCE->server,
+		    pCE->logfilemax / 0x100000);
+	    else
+		Msg("[%s] logfile exceeds %dKB: rolling", pCE->server,
+		    pCE->logfilemax / 1024);
+	}
+
+	if (pCE->logfilemax < 4000)
+	    roll = 100;
+	else if (pCE->logfilemax > 160000)
+	    roll = 4000;
+	else
+	    roll = pCE->logfilemax * 0.025;
+
+	r = 0;
+
+	if (FileSeek(pCE->fdlog, stLog.st_size - roll, SEEK_SET) > 0) {
+	    if ((r = FileRead(pCE->fdlog, buf, 4096)) > 0) {
+		if (r == roll) {
+		    for (; r != 0 && buf[roll - r] != '\n'; r--);
+		    r--;	/* go beyond \n */
+		} else
+		    r = 0;
+	    }
+	}
+
+	if (tyme == (time_t)0) {
+	    tyme = time((time_t *)0);
+	    strftime(timestr, sizeof(timestr), "-%Y%m%d-%H%M%S",
+		     gmtime(&tyme));
+	}
+	BuildTmpString((char *)0);
+	t = BuildTmpStringPrint("%s%s", pCE->logfile, timestr);
+
+	if (rename(pCE->logfile, t) != 0) {
+	    Error("[%s] RollLogs(): rename(%s,%s) failed: %s", pCE->server,
+		  pCE->logfile, t, strerror(errno));
+	    continue;
+	}
+
+	old = pCE->fdlog;
+
+	if ((pCE->fdlog =
+	     FileOpen(pCE->logfile, O_RDWR | O_CREAT | O_APPEND,
+		      0644)) == (CONSFILE *)0) {
+	    FileClose(&old);
+	    Error("[%s] RollLogs(): open(%s): %s: forcing down",
+		  pCE->server, pCE->logfile, strerror(errno));
+	    ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+	    continue;
+	}
+	if (r > 0) {
+	    FileWrite(pCE->fdlog, FLAGFALSE, buf + roll - r, r);
+	    ftruncate(FileFDNum(old), stLog.st_size - r);
+	}
+
+	FileClose(&old);
+    }
+
+    if (tyme != (time_t)0)
+	BuildTmpString((char *)0);
+
+    if (maxset == 0)
+	timers[T_ROLL] = (time_t)0;
+    else {
+	if (timers[T_ROLL] == (time_t)0)
+	    /* try and spread processes out a bit */
+	    timers[T_ROLL] = time((time_t *)0) + 300 + (pGE->id * 7) % 60;
+	else
+	    timers[T_ROLL] = time((time_t *)0) + 300;
+    }
 }
 
 static void
@@ -1191,8 +1301,12 @@ ReapVirt(pGE)
 
 	for (pCE = pGE->pCElist; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
 	    if (pid == pCE->initpid) {
-		Verbose("[%s] initcmd terminated: pid %lu", pCE->server,
-			(unsigned long)pCE->initpid);
+		if (WIFEXITED(UWbuf))
+		    Msg("[%s] initcmd terminated: pid %lu: exit(%d)",
+			pCE->server, pid, WEXITSTATUS(UWbuf));
+		if (WIFSIGNALED(UWbuf))
+		    Msg("[%s] initcmd terminated: pid %lu: signal(%d)",
+			pCE->server, pid, WTERMSIG(UWbuf));
 		TagLogfileAct(pCE, "initcmd terminated");
 		pCE->initpid = 0;
 		StopInit(pCE);
@@ -1238,6 +1352,10 @@ ReapVirt(pGE)
 
 static char acStop[] = {	/* buffer for OOB stop command          */
     OB_SUSP
+};
+
+static char acExec[] = {	/* buffer for OOB exec command          */
+    OB_EXEC
 };
 
 int
@@ -1795,9 +1913,10 @@ CommandForce(pGE, pCLServing, pCEServing, tyme)
 	    FilePrint(pCLServing->fd, FLAGFALSE, "bumped %s]\r\n",
 		      pCL->acid->string);
 	}
-	FilePrint(pCL->fd, FLAGFALSE,
-		  "\r\n[forced to `spy' mode by %s]\r\n",
-		  pCLServing->acid->string);
+	if (pCL->fcon)
+	    FilePrint(pCL->fd, FLAGFALSE,
+		      "\r\n[forced to `spy' mode by %s]\r\n",
+		      pCLServing->acid->string);
 	TagLogfileAct(pCEServing, "%s bumped %s", pCLServing->acid->string,
 		      pCL->acid->string);
     } else {
@@ -2119,6 +2238,7 @@ DoConsoleRead(pCEServing)
     /* read terminal line */
     if ((nr =
 	 FileRead(pCEServing->cofile, acInOrig, sizeof(acInOrig))) < 0) {
+	Error("[%s] read failure", pCEServing->server);
 	ConsoleError(pCEServing);
 	return;
     }
@@ -2704,6 +2824,19 @@ DoClientRead(pGE, pCLServing)
 			    pCLServing->msg->string[pCLServing->msg->used -
 						    2] = '\000';
 			    pCLServing->msg->used--;
+			} else if ((acIn[i] == 0x15) &&
+				   pCLServing->msg->used > 1) {
+			    while (pCLServing->msg->used > 1) {
+				if (pCLServing->msg->
+				    string[pCLServing->msg->used - 2] !=
+				    '\a' && pGE->pCEctl != pCEServing) {
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					      "\b \b", 3);
+				}
+				pCLServing->msg->string[pCLServing->msg->
+							used - 2] = '\000';
+				pCLServing->msg->used--;
+			    }
 			}
 			continue;
 		    }
@@ -2773,8 +2906,18 @@ DoClientRead(pGE, pCLServing)
 			FileWrite(pCLServing->fd, FLAGFALSE,
 				  " -- spy mode]\r\n", -1);
 		    }
+		    /* fall through */
+		case S_CWAIT:
 		    pCLServing->fcon = 1;
 		    pCLServing->iState = S_NORMAL;
+		    if (acInOrig[i] == OB_EXEC) {
+			if (pCEServing->pCLwr == pCLServing)
+			    FileWrite(pCLServing->fd, FLAGFALSE,
+				      "[rw]\r\n", -1);
+			else
+			    FileWrite(pCLServing->fd, FLAGFALSE,
+				      "[ro]\r\n", -1);
+		    }
 		    continue;
 
 		case S_NORMAL:
@@ -3014,20 +3157,20 @@ DoClientRead(pGE, pCLServing)
 			case '\022':	/* ^R */
 			    FileWrite(pCLServing->fd, FLAGFALSE, "^R]\r\n",
 				      -1);
-			    Replay(pCEServing->fdlog, pCLServing->fd, 1);
+			    Replay(pCEServing, pCLServing->fd, 1);
 			    break;
 
 			case 'R':	/* DEC vt100 pf3 */
 			case 'r':	/* replay 20 lines */
 			    FileWrite(pCLServing->fd, FLAGFALSE,
 				      "replay]\r\n", -1);
-			    Replay(pCEServing->fdlog, pCLServing->fd, 20);
+			    Replay(pCEServing, pCLServing->fd, 20);
 			    break;
 
 			case 'p':	/* replay 60 lines */
 			    FileWrite(pCLServing->fd, FLAGFALSE,
 				      "long replay]\r\n", -1);
-			    Replay(pCEServing->fdlog, pCLServing->fd, 60);
+			    Replay(pCEServing, pCLServing->fd, 60);
 			    break;
 
 			case 'S':	/* DEC vt100 pf4 */
@@ -3074,6 +3217,18 @@ DoClientRead(pGE, pCLServing)
 				      "examine]\r\n", -1);
 			    CommandExamine(pGE, pCLServing, pCEServing,
 					   tyme);
+			    break;
+
+			case '|':	/* wait for client */
+			    if (!pCLServing->fwr) {
+				FileWrite(pCLServing->fd, FLAGFALSE,
+					  "attach to run local command]\r\n",
+					  -1);
+				continue;
+			    }
+			    FileSend(pCLServing->fd, acExec, 1, MSG_OOB);
+			    pCLServing->fcon = 0;
+			    pCLServing->iState = S_CWAIT;
 			    break;
 
 			case 'z':	/* suspend the client */
@@ -3237,6 +3392,7 @@ FlushConsole(pCEServing)
 	    if (FileWrite
 		(pCEServing->cofile, FLAGFALSE, pCEServing->wbuf->string,
 		 pCEServing->wbuf->used - 1) < 0) {
+		Error("[%s] write failure", pCEServing->server);
 		ConsoleError(pCEServing);
 		break;
 	    }
@@ -3270,6 +3426,8 @@ FlushConsole(pCEServing)
 			    (pCEServing->cofile, FLAGFALSE,
 			     pCEServing->wbuf->string,
 			     pCEServing->wbufIAC - 2) < 0) {
+			    Error("[%s] write failure",
+				  pCEServing->server);
 			    ConsoleError(pCEServing);
 			    break;
 			}
@@ -3425,6 +3583,7 @@ FlushConsole(pCEServing)
 		    if (FileWrite
 			(pCEServing->cofile, FLAGFALSE, buf->string,
 			 buf->used - 1) < 0) {
+			Error("[%s] write failure", pCEServing->server);
 			ConsoleError(pCEServing);
 			break;
 		    }
@@ -3605,6 +3764,7 @@ Kiddie(pGE, sfd)
     SimpleSignal(SIGUSR1, FlagReUp);
 
     /* prime the pump */
+    RollLogs(pGE);
     Mark(pGE);
 
     /* the MAIN loop a group server
@@ -3727,6 +3887,11 @@ Kiddie(pGE, sfd)
 	    time((time_t *)0) >= timers[T_AUTOUP])
 	    ReUp(pGE, 1);
 
+	/* do we need to check on log file sizes? */
+	if (timers[T_ROLL] != (time_t)0 &&
+	    time((time_t *)0) >= timers[T_ROLL])
+	    RollLogs(pGE);
+
 	/* check on various timers and set the appropriate timeout */
 	/* all this so we don't have to use alarm() any more... */
 
@@ -3834,6 +3999,8 @@ Kiddie(pGE, sfd)
 			if (FileWrite
 			    (pCEServing->cofile, FLAGFALSE, (char *)0,
 			     0) < 0) {
+			    Error("[%s] write failure",
+				  pCEServing->server);
 			    ConsoleError(pCEServing);
 			    break;
 			}
@@ -3846,6 +4013,8 @@ Kiddie(pGE, sfd)
 			if (FileWrite
 			    (pCEServing->fdlog, FLAGFALSE, (char *)0,
 			     0) < 0) {
+			    Error("[%s] write failure",
+				  pCEServing->server);
 			    ConsoleError(pCEServing);
 			    break;
 			}
@@ -3859,6 +4028,8 @@ Kiddie(pGE, sfd)
 			if (FileWrite
 			    (pCEServing->initfile, FLAGFALSE, (char *)0,
 			     0) < 0) {
+			    Error("[%s] write failure",
+				  pCEServing->server);
 			    ConsoleError(pCEServing);
 			    break;
 			}

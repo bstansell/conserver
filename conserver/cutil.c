@@ -1,5 +1,5 @@
 /*
- *  $Id: cutil.c,v 1.107 2003/11/20 13:59:55 bryan Exp $
+ *  $Id: cutil.c,v 1.109 2003/12/02 16:21:43 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -921,7 +921,12 @@ FileClose(pcfp)
 	    break;
     }
 
-    CONDDEBUG((2, "FileClose(): closed fd %d", cfp->fd));
+    if (cfp->ftype == simplePipe) {
+	CONDDEBUG((2, "FileClose(): closed fd %d/%d", cfp->fd,
+		   cfp->fdout));
+    } else {
+	CONDDEBUG((2, "FileClose(): closed fd %d", cfp->fd));
+    }
     DestroyString(cfp->wbuf);
     free(cfp);
     *pcfp = (CONSFILE *)0;
@@ -1108,6 +1113,19 @@ FileWrite(cfp, bufferonly, buf, len)
 			break;
 		    }
 		    retval = -1;
+		    /* i believe, as of 8.0.8, we need to just ignore
+		     * this and actually produce the error message
+		     * below.  perhaps we'll have a lot of extra
+		     * FileWrite() errors, perhaps not.  things shouldn't
+		     * just close down and cause errors in normal cases,
+		     * right?!?  -bryan
+		     * maybe not right now, actually.  i'm going to check
+		     * the return code of FileWrite() on the "important"
+		     * things and let the others silently fail and have
+		     * the FileRead() catch problems - like it has been
+		     * doing.  i really should be checking all the return
+		     * codes...and i'm sure i'll get there eventually.
+		     */
 		    if (errno == EPIPE)
 			break;
 		    Error("FileWrite(): fd %d: %s", fdout,

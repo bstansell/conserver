@@ -1,5 +1,5 @@
-.\" $Id: conserver.cf.man,v 1.51 2003/11/15 20:00:11 bryan Exp $
-.TH CONSERVER.CF 5 "2003/11/15" "conserver-8.0.7" "conserver"
+.\" $Id: conserver.cf.man,v 1.53 2003/12/01 02:15:39 bryan Exp $
+.TH CONSERVER.CF 5 "2003/12/01" "conserver-8.0.8" "conserver"
 .SH NAME
 conserver.cf \- console configuration file for
 .BR conserver (8)
@@ -493,7 +493,12 @@ as the host to connect to for accessing the console.
 You must also set the
 .B port
 option as well.
-Only consoles of type ``host'' will use this value.
+Normally, only consoles of type ``host'' will use this value.
+If the
+.B devicesubst
+or
+.B execsubst
+keywords are used in ``device'' and ``exec'' types, this value is used.
 .TP
 .B idlestring
 .RI [ " string "
@@ -558,6 +563,36 @@ to the console.  Any occurrence of ``&'' in
 will be replaced with the name of the console.
 If the null string (``""'') is used, the logfile name is unset and
 no logging will occur.
+.TP
+.B logfilemax
+.BR \fInumber\fP [ k | m ]
+.br
+Enable automatic rotation of
+.B logfile
+once it's size exceeds
+.I number
+bytes.
+Specifying
+.B k
+or
+.B m
+interpret
+.I number
+as kilobytes and megabytes.
+.I number
+must be at least 2048 bytes.
+A value of zero will turn off automatic rotation of
+.BR logfile .
+The
+.B logfile
+.I filename
+will be renamed
+.IR filename -\s-1YYYYMMDD\s0-\s-1HHMMSS\s0,
+where the extension is the current GMT year, month, day, hour,
+minute, and second (to prevent issues with clock rollbacks).
+File sizes are checked every 5 minutes with an additional initial
+pseudo-random delay of up to one minute (to help prevent all processes
+checking all consoles simultaneously).
 .TP
 .B master
 .RI [ " hostname " | " ipaddr " ]
@@ -730,12 +765,19 @@ terminal server by their physical numbering of 1 through
 You must also set the
 .B host
 option as well.
-Only consoles of type ``host'' will use this value.
+Normally, only consoles of type ``host'' will use this value.
+If the
+.B devicesubst
+or
+.B execsubst
+keywords are used in ``device'' and ``exec'' types, this value is used.
 .TP
 .B portbase
 .I number
 .br
 Set the base value for the port calculation formula.
+.I number
+must be -1 or greater.
 The default is zero.
 See
 .B port
@@ -745,6 +787,8 @@ for the details of the formula.
 .I number
 .br
 Set the increment value for the port calculation formula.
+.I number
+must be 1 or greater.
 The default is one.
 See
 .B port

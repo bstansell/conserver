@@ -1,0 +1,11 @@
+#
+# I believe this is the smallest configuration file that is also fully
+# functional.  You have to be happy with the default access type (-a)
+# as well as the default access list that gets used.
+# 
+
+console simple {
+    master localhost;
+    type exec;
+    rw *;
+}

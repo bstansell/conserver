@@ -11,7 +11,7 @@
  r    replay the last 20 lines          s    spy read only
  u    show host status                  v    show version info
  w    who is on this console            x    show console baud info
- z    suspend the connection            <cr> ignore/abort command
- ?    print this message                ^R   replay the last line
- \ooo send character by octal code
+ z    suspend the connection            |    attach local command
+ <cr> ignore/abort command              ?    print this message
+ ^R   replay the last line              \ooo send character by octal code
 [disconnect]

@@ -1,0 +1,21 @@
+I put together the sample configuration files in this directory in hopes
+that it would help folks see some of the possibilities of the
+configuration file format.  Each of the files are syntatically correct,
+but have never actually been used.
+
+Each file is basically built upon the previous...theoretically, if not
+actually.  Hopefully they'll help show some of the cool things you can
+do with the configuration file and help those trying to figure out how
+they should even start.
+
+    simple.cf - A very simple, one console config file
+
+    basic.cf - A config with a couple consoles, mostly using defaults
+
+    average.cf - A config for many consoles, using breaks, user lists,
+		 etc...bascially customizing each area
+
+    average-distributed.cf - Taking average.cf to multiple conserver
+			     hosts with overrides on those hosts
+
+Bryan Stansell

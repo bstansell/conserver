@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.52 2003/11/15 20:00:08 bryan Exp $
+ *  $Id: consent.h,v 5.53 2003/11/28 23:36:02 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -102,6 +102,7 @@ typedef struct consent {	/* console information                  */
     char *master;		/* master hostname                      */
     unsigned short breakNum;	/* break type [1-9]                     */
     char *logfile;		/* logfile                              */
+    off_t logfilemax;		/* size limit for rolling logfile       */
     char *initcmd;		/* initcmd command                      */
     char *motd;			/* motd                                 */
     time_t idletimeout;		/* idle timeout                         */

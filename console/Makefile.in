@@ -15,7 +15,7 @@ MKDIR = @MKDIR@
 
 ### Compiler and link options
 CC	= @CC@
-CFLAGS	= @CFLAGS@ # -DPUCC -DSUN5
+CFLAGS	= @CFLAGS@
 DEFS	= @DEFS@ -DSYSCONFDIR=\"$(sysconfdir)\"
 CPPFLAGS = -I.. -I$(top_srcdir) -I$(srcdir) -I$(top_srcdir)/conserver $(DEFS) @CPPFLAGS@
 LDFLAGS	= @LDFLAGS@
@@ -26,17 +26,22 @@ LIBS	= @LIBS@
 ### Makefile rules - no user-servicable parts below
 
 CONSOLE_OBJS = console.o getpassword.o ../conserver/cutil.o
-CONSOLE_HDRS = ../config.h $(top_srcdir)/compat.h $(top_srcdir)/conserver/port.h
+CONSOLE_HDRS = ../config.h $(top_srcdir)/compat.h \
+	       $(top_srcdir)/conserver/cutil.h \
+	       $(top_srcdir)/conserver/version.h \
+	       $(srcdir)/getpassword.h
 ALL = console
 
 
 all: $(ALL)
 
+$(CONSOLE_OBJS): $(CONSOLE_HDRS)
+
 console: $(CONSOLE_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o console $(CONSOLE_OBJS) $(LIBS)
 
-../conserver/util.o:
-	( cd ../conserver && $(MAKE) $(MAKE_FLAGS) util.o ) || exit 1;
+../conserver/cutil.o:
+	( cd ../conserver && $(MAKE) $(MAKE_FLAGS) cutil.o ) || exit 1;
 
 .c.o:
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
