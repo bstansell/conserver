@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.124 2003/12/25 19:22:00 bryan Exp $
+ *  $Id: master.c,v 5.125 2004/04/13 18:12:00 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -569,6 +569,9 @@ DoNormalRead(pCLServing)
 		int iSep = 1;
 
 		if ((GRPENT *)0 != pGroups) {
+#if USE_UNIX_DOMAIN_SOCKETS
+		    FilePrint(pCLServing->fd, FLAGTRUE, "@0");
+#else
 		    struct sockaddr_in lcl;
 		    socklen_t so = sizeof(lcl);
 		    if (-1 ==
@@ -583,6 +586,7 @@ DoNormalRead(pCLServing)
 		    }
 		    FilePrint(pCLServing->fd, FLAGTRUE, "@%s",
 			      inet_ntoa(lcl.sin_addr));
+#endif
 		    iSep = 0;
 		}
 		if (config->redirect == FLAGTRUE) {
@@ -673,8 +677,13 @@ Master()
     int msfd;
     socklen_t so;
     fd_set rmask, wmask;
+#if USE_UNIX_DOMAIN_SOCKETS
+    struct sockaddr_un master_port;
+    static STRING *portPath = (STRING *)0;
+#else
     struct sockaddr_in master_port;
     int true = 1;
+#endif
     FILE *fp;
     CONSCLIENT *pCLServing = (CONSCLIENT *)0;
     CONSCLIENT *pCL = (CONSCLIENT *)0;
@@ -715,6 +724,40 @@ Master()
 #else
     bzero((char *)&master_port, sizeof(master_port));
 #endif
+
+#if USE_UNIX_DOMAIN_SOCKETS
+    master_port.sun_family = AF_UNIX;
+
+    if (portPath == (STRING *)0)
+	portPath = AllocString();
+    BuildStringPrint(portPath, "%s/0", interface);
+    if (portPath->used > sizeof(master_port.sun_path)) {
+	Error("Master(): path to socket too long: %s", portPath->string);
+	return;
+    }
+    strcpy(master_port.sun_path, portPath->string);
+
+    if ((msfd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
+	Error("Master(): socket(AF_UNIX,SOCK_STREAM): %s",
+	      strerror(errno));
+	return;
+    }
+
+    if (!SetFlags(msfd, O_NONBLOCK, 0))
+	return;
+
+    if (bind(msfd, (struct sockaddr *)&master_port, sizeof(master_port)) <
+	0) {
+	Error("Master(): bind(%s): %s", master_port.sun_path,
+	      strerror(errno));
+	return;
+    }
+    if (listen(msfd, SOMAXCONN) < 0) {
+	Error("Master(): listen(%s): %s", master_port.sun_path,
+	      strerror(errno));
+	return;
+    }
+#else
     master_port.sin_family = AF_INET;
     master_port.sin_addr.s_addr = bindAddr;
     master_port.sin_port = htons(bindPort);
@@ -724,7 +767,7 @@ Master()
 	      strerror(errno));
 	return;
     }
-#if  HAVE_SETSOCKOPT
+# if HAVE_SETSOCKOPT
     if (setsockopt
 	(msfd, SOL_SOCKET, SO_REUSEADDR, (char *)&true,
 	 sizeof(true)) < 0) {
@@ -732,7 +775,7 @@ Master()
 	      strerror(errno));
 	return;
     }
-#endif
+# endif
 
     if (!SetFlags(msfd, O_NONBLOCK, 0))
 	return;
@@ -748,6 +791,7 @@ Master()
 	      strerror(errno));
 	return;
     }
+#endif
 
     fp = fopen(PIDFILE, "w");
     if (fp) {
@@ -943,6 +987,9 @@ Master()
     }
 
     close(msfd);
+#if USE_UNIX_DOMAIN_SOCKETS
+    unlink(master_port.sun_path);
+#endif
 
     /* clean up the free list */
     while (pCLmfree != (CONSCLIENT *)0) {

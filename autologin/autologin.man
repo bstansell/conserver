@@ -1,4 +1,4 @@
-.\" $Id: autologin.man,v 1.1 2003/11/04 02:36:24 bryan Exp $
+.\" $Id: autologin.man,v 1.2 2004/03/23 18:32:06 bryan Exp $
 .TH AUTOLOGIN 8L PUCC
 .SH NAME
 autologin \- create an automatic login session from /etc/inittab
@@ -112,12 +112,21 @@ environment variable set to
 	ss10:2:respawn:/usr/local/etc/autologin \-e TERM=reg20 \-t/dev/tty10 \-lssinfo
 .ad
 .PP
-Adding the following line to \fI/etc/ttytab\fP on a Sun 4.1.\fIx\fP
+Adding the following line to
+.I /etc/ttytab
+on a Sun
+.RI 4.1. x
 machine establishes a root login on the console device:
+.br
 .na
 	console "/usr/local/etc/autologin \-lroot \-t"    xterm   on local secure
 .ad
-Note that \fIinit\fP provides the \fItty\fP argument on the end of the command.
+.PP
+Note that
+.I init
+provides the
+.I tty
+argument on the end of the command.
 .SH FILES
 /bin/su
 .br

@@ -91,7 +91,7 @@ dotest 'cdc.'
 dotest 'coc.'
 
 dotest EVAL "echo 'tu.' | ../console/console -M 127.0.0.1 -p 7777 -e 'tu' shell"
-dotest EVAL "../console/console -M 127.0.0.1 -p 7777 -P | sed -e 's/:.*//'"
+dotest EVAL "../console/console -M 127.0.0.1 -p 7777 -R | sed -e 's/ [^ ]*$//'"
 dotest EVAL "../console/console -M 127.0.0.1 -p 7777 -x | sed -e 's/ on [^ ]* */ on /'"
 
 cleanup

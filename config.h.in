@@ -324,11 +324,17 @@
 /* Defined if we trust reverse DNS */
 #undef TRUST_REVERSE_DNS
 
+/* Directory for Unix domain sockets */
+#undef UDSDIR
+
 /* Defined if we produce extended messages */
 #undef USE_EXTENDED_MESSAGES
 
 /* use tcp_wrappers libwrap */
 #undef USE_LIBWRAP
+
+/* Defined if we use Unix domain sockets */
+#undef USE_UNIX_DOMAIN_SOCKETS
 
 /* Define to 1 if on AIX 3.
    System headers sometimes define this.

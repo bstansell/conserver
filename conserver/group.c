@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.291 2004/03/16 04:17:31 bryan Exp $
+ *  $Id: group.c,v 5.293 2004/04/13 18:12:00 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -1265,7 +1265,14 @@ DeUtmp(pGE, sfd)
 #endif
 {
     CONSENT *pCE;
+#if USE_UNIX_DOMAIN_SOCKETS
+    struct sockaddr_un lstn_port;
+    socklen_t so;
 
+    so = sizeof(lstn_port);
+    if (getsockname(sfd, (struct sockaddr *)&lstn_port, &so) != -1)
+	unlink(lstn_port.sun_path);
+#endif
     /* shut down the socket */
     close(sfd);
 
@@ -4469,18 +4476,53 @@ Spawn(pGE)
 {
     pid_t pid;
     int sfd;
+#if USE_UNIX_DOMAIN_SOCKETS
+    struct sockaddr_un lstn_port;
+    static STRING *portPath = (STRING *)0;
+#else
     socklen_t so;
-    struct sockaddr_in lstn_port;
     int true = 1;
     unsigned short portInc = 0;
+    struct sockaddr_in lstn_port;
+#endif
 
-    /* get a socket for listening
-     */
+    /* get a socket for listening */
 #if HAVE_MEMSET
     memset((void *)&lstn_port, 0, sizeof(lstn_port));
 #else
     bzero((char *)&lstn_port, sizeof(lstn_port));
 #endif
+
+#if USE_UNIX_DOMAIN_SOCKETS
+    lstn_port.sun_family = AF_UNIX;
+
+    if (portPath == (STRING *)0)
+	portPath = AllocString();
+    BuildStringPrint(portPath, "%s/%u", interface, pGE->id);
+    if (portPath->used > sizeof(lstn_port.sun_path)) {
+	Error("Spawn(): path to socket too long: %s", portPath->string);
+	Bye(EX_OSERR);
+    }
+    strcpy(lstn_port.sun_path, portPath->string);
+
+    /* create a socket to listen on
+     * (prepared by master so he can see the port number of the kid)
+     */
+    if ((sfd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
+	Error("Spawn(): socket(): %s", strerror(errno));
+	Bye(EX_OSERR);
+    }
+
+    if (!SetFlags(sfd, O_NONBLOCK, 0))
+	Bye(EX_OSERR);
+
+    if (bind(sfd, (struct sockaddr *)&lstn_port, sizeof(lstn_port)) < 0) {
+	Error("Spawn(): bind(%s): %s", lstn_port.sun_path,
+	      strerror(errno));
+	Bye(EX_OSERR);
+    }
+    pGE->port = pGE->id;
+#else
     lstn_port.sin_family = AF_INET;
     lstn_port.sin_addr.s_addr = bindAddr;
     lstn_port.sin_port = htons(bindBasePort);
@@ -4492,24 +4534,24 @@ Spawn(pGE)
 	Error("Spawn(): socket(): %s", strerror(errno));
 	Bye(EX_OSERR);
     }
-#if HAVE_SETSOCKOPT
+# if HAVE_SETSOCKOPT
     if (setsockopt
 	(sfd, SOL_SOCKET, SO_REUSEADDR, (char *)&true, sizeof(true)) < 0) {
 	Error("Spawn(): setsockopt(%u,SO_REUSEADDR): %s", sfd,
 	      strerror(errno));
 	Bye(EX_OSERR);
     }
-#endif
+# endif
 
     if (!SetFlags(sfd, O_NONBLOCK, 0))
 	Bye(EX_OSERR);
 
     while (bind(sfd, (struct sockaddr *)&lstn_port, sizeof(lstn_port)) < 0) {
 	if (bindBasePort && (
-#if defined(EADDRINUSE)
+# if defined(EADDRINUSE)
 				(errno == EADDRINUSE) ||
-#endif
-				(errno == EACCES)) && portInc++) {
+# endif
+				(errno == EACCES)) && ++portInc) {
 	    lstn_port.sin_port = htons(bindBasePort + portInc);
 	} else {
 	    Error("Spawn(): bind(%hu): %s", ntohs(lstn_port.sin_port),
@@ -4524,6 +4566,7 @@ Spawn(pGE)
 	Bye(EX_OSERR);
     }
     pGE->port = ntohs(lstn_port.sin_port);
+#endif
 
     fflush(stderr);
     fflush(stdout);
@@ -4587,12 +4630,20 @@ Spawn(pGE)
     }
 
     if (listen(sfd, SOMAXCONN) < 0) {
+#if USE_UNIX_DOMAIN_SOCKETS
+	Error("Spawn(): listen(%s): %s", lstn_port.sun_path,
+	      strerror(errno));
+#else
 	Error("Spawn(): listen(%hu): %s", pGE->port, strerror(errno));
+#endif
 	Bye(EX_OSERR);
     }
     Kiddie(pGE, sfd);
 
     /* should never get here...but on errors we could */
     close(sfd);
+#if USE_UNIX_DOMAIN_SOCKETS
+    unlink(lstn_port.sun_path);
+#endif
     Bye(EX_SOFTWARE);
 }

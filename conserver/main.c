@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.178 2004/03/11 16:23:59 bryan Exp $
+ *  $Id: main.c,v 5.179 2004/04/13 18:12:00 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -41,6 +41,7 @@
 #include <version.h>
 
 #include <net/if.h>
+#include <dirent.h>
 #if HAVE_SYS_SOCKIO_H
 # include <sys/sockio.h>
 #endif
@@ -523,7 +524,7 @@ Usage(wantfull)
 #endif
 {
     static char u_terse[] =
-	"[-7dDEFhinoRSuvV] [-a type] [-m max] [-M addr] [-p port] [-b port] [-c cred] [-C config] [-P passwd] [-L logfile] [-O min] [-U logfile]";
+	"[-7dDEFhinoRSuvV] [-a type] [-m max] [-M master] [-p port] [-b port] [-c cred] [-C config] [-P passwd] [-L logfile] [-O min] [-U logfile]";
     static char *full[] = {
 	"7          strip the high bit off all console data",
 	"a type     set the default access type",
@@ -546,11 +547,19 @@ Usage(wantfull)
 	"i          initialize console connections on demand",
 	"L logfile  give a new logfile path to the server process",
 	"m max      maximum consoles managed per process",
-	"M addr     address to listen on (all addresses by default)",
+#if USE_UNIX_DOMAIN_SOCKETS
+	"M master   directory that holds the Unix domain sockets",
+#else
+	"M master   address to listen on (all addresses by default)",
+#endif
 	"n          obsolete - see -u",
 	"o          reopen downed console on client connect",
 	"O min      reopen all downed consoles every <min> minutes",
+#if USE_UNIX_DOMAIN_SOCKETS
+	"p port     ignored - Unix domain sockets compiled into code",
+#else
 	"p port     port to listen on",
+#endif
 	"P passwd   give a new passwd file to the server process",
 	"R          disable automatic client redirection",
 	"S          syntax check of configuration file",
@@ -616,9 +625,13 @@ Version()
     Msg("default pidfile is `%s'", PIDFILE);
     Msg("default limit is %d member%s per group", MAXMEMB,
 	MAXMEMB == 1 ? "" : "s");
+#if USE_UNIX_DOMAIN_SOCKETS
+    Msg("default socket directory `%s'", UDSDIR);
+#else
     Msg("default primary port referenced as `%s'", defConfig.primaryport);
     Msg("default secondary base port referenced as `%s'",
 	defConfig.secondaryport);
+#endif
 
     BuildString((char *)0, acA1);
     if (optionlist[0] == (char *)0)
@@ -1153,6 +1166,94 @@ ProbeInterfaces()
 #endif
 }
 
+/* This makes sure a directory exists and tries to create it if it
+ * doesn't.  returns 0 for success, -1 for error
+ */
+#if USE_UNIX_DOMAIN_SOCKETS
+int
+#if PROTOTYPES
+VerifyEmptyDirectory(char *d)
+#else
+VerifyEmptyDirectory(d)
+    char *d;
+#endif
+{
+    struct stat dstat;
+    DIR *dir;
+    struct dirent *de;
+    STRING *path = (STRING *)0;
+    int retval = 0;
+
+    while (1) {
+	if (stat(d, &dstat) == -1) {
+	    if (errno == ENOENT) {
+		if (mkdir(d, 0755) == -1) {
+		    Error("mkdir(%s): %s", d, strerror(errno));
+		    return -1;
+		}
+		CONDDEBUG((1, "VerifyEmptyDirectory: created `%s'", d));
+		continue;
+	    } else {
+		Error("stat(%s): %s", d, strerror(errno));
+		return -1;
+	    }
+	}
+	if (S_ISDIR(dstat.st_mode))
+	    break;
+	return -1;
+    }
+
+    /* now make sure it's empty...erase anything you see, etc */
+    if ((dir = opendir(d)) == (DIR *) 0) {
+	Error("opendir(%s): %s", d, strerror(errno));
+	return -1;
+    }
+
+    while ((de = readdir(dir)) != (struct dirent *)0) {
+	if ((strcmp(de->d_name, ".") == 0) ||
+	    (strcmp(de->d_name, "..") == 0))
+	    continue;
+/* we're going to just let the user deal with non-empty directories */
+	Error("non-empty directory `%s'", d);
+	retval = -1;
+	break;
+/* this is probably too extreme.  if someone happens to point conserver
+ * at /etc, for example, it could (if running as root) nuke the password
+ * database, config files, etc.  too many important files could be
+ * shredded with a small typo.
+ */
+#if 0
+	if (path == (STRING *)0)
+	    path = AllocString();
+	BuildStringPrint(path, "%s/%s", d, de->d_name);
+	if (stat(path->string, &dstat) == -1) {
+	    Error("stat(%s): %s", path->string, strerror(errno));
+	    retval = -1;
+	    break;
+	}
+	if (S_ISDIR(dstat.st_mode)) {
+	    if (rmdir(path->string) != 0) {
+		Error("rmdir(%s): %s", path->string, strerror(errno));
+		retval = -1;
+		break;
+	    }
+	} else {
+	    if (unlink(path->string) != 0) {
+		Error("unlink(%s): %s", path->string, strerror(errno));
+		retval = -1;
+		break;
+	    }
+	}
+#endif
+    }
+
+    if (path != (STRING *)0)
+	DestroyString(path);
+
+    return retval;
+}
+#endif
+
 /* find out where/who we are						(ksb)
  * parse optons
  * read in the config file, open the log file
@@ -1180,8 +1281,10 @@ main(argc, argv)
     char *curuser = (char *)0;
     int curuid = 0;
     GRPENT *pGE = (GRPENT *)0;
+#if !USE_UNIX_DOMAIN_SOCKETS
 #if HAVE_INET_ATON
     struct in_addr inetaddr;
+#endif
 #endif
 
     isMultiProc = 1;		/* make sure stuff has the pid */
@@ -1379,34 +1482,43 @@ main(argc, argv)
     if (fSyntaxOnly)
 	Msg("performing configuration file syntax check");
 
+#if USE_UNIX_DOMAIN_SOCKETS
+    /* Don't do any redirects if we're purely local
+     * (but it allows them to see where remote consoles are)
+     */
+    optConf->redirect = FLAGFALSE;
+    if (interface == (char *)0)
+	interface = UDSDIR;
+#else
     /* set up the address to bind to */
     if (interface == (char *)0 ||
 	(interface[0] == '*' && interface[1] == '\000'))
 	bindAddr = INADDR_ANY;
     else {
-#if HAVE_INET_ATON
+# if HAVE_INET_ATON
 	if (inet_aton(interface, &inetaddr) == 0) {
 	    Error("inet_aton(%s): %s", interface, "invalid IP address");
 	    Bye(EX_OSERR);
 	}
 	bindAddr = inetaddr.s_addr;
-#else
+# else
 	bindAddr = inet_addr(interface);
 	if (bindAddr == (in_addr_t) (-1)) {
 	    Error("inet_addr(%s): %s", interface, "invalid IP address");
 	    Bye(EX_OSERR);
 	}
-#endif
+# endif
     }
     if (fDebug) {
 	struct in_addr ba;
 	ba.s_addr = bindAddr;
 	CONDDEBUG((1, "main(): bind address set to `%s'", inet_ntoa(ba)));
     }
+#endif
 
     /* must do all this so IsMe() works right */
     if (gethostname(myHostname, MAXHOSTNAME) != 0) {
-	Error("gethostname(): %s", interface, strerror(errno));
+	Error("gethostname(): %s", strerror(errno));
 	Bye(EX_OSERR);
     }
     ProbeInterfaces();
@@ -1423,6 +1535,7 @@ main(argc, argv)
     ReadCfg(pcConfig, fpConfig);
     fclose(fpConfig);
 
+#if !USE_UNIX_DOMAIN_SOCKETS
     /* set up the port to bind to */
     if (optConf->primaryport != (char *)0)
 	config->primaryport = StrDup(optConf->primaryport);
@@ -1482,6 +1595,7 @@ main(argc, argv)
 	    bindBasePort = ntohs((unsigned short)pSE->s_port);
 	}
     }
+#endif
 
     if (optConf->passwdfile != (char *)0)
 	config->passwdfile = StrDup(optConf->passwdfile);
@@ -1580,7 +1694,13 @@ main(argc, argv)
 
     if (pGroups == (GRPENT *)0 && pRCList == (REMOTE *)0) {
 	Error("no consoles found in configuration file");
-    } else if (!fSyntaxOnly) {
+    } else if (fSyntaxOnly) {
+	/* short-circuit */
+#if USE_UNIX_DOMAIN_SOCKETS
+    } else if (VerifyEmptyDirectory(interface) == -1) {
+	Error("Master(): %s: unusable socket directory", interface);
+#endif
+    } else {
 #if HAVE_OPENSSL
 	/* Prep the SSL layer */
 	SetupSSL();
@@ -1603,7 +1723,6 @@ main(argc, argv)
 		continue;
 
 	    Spawn(pGE);
-
 	    Verbose("group #%d pid %lu on port %hu", pGE->id,
 		    (unsigned long)pGE->pid, pGE->port);
 	}
@@ -1617,8 +1736,13 @@ main(argc, argv)
 		local += pGE->imembers;
 	    for (pRC = pRCList; (REMOTE *)0 != pRC; pRC = pRC->pRCnext)
 		remote++;
+# if USE_UNIX_DOMAIN_SOCKETS
+	    setproctitle("master: port 0, %d local, %d remote", local,
+			 remote);
+#else
 	    setproctitle("master: port %hu, %d local, %d remote", bindPort,
 			 local, remote);
+#endif
 	}
 #endif
 

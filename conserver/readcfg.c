@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.168 2004/03/11 16:23:59 bryan Exp $
+ *  $Id: readcfg.c,v 5.169 2004/04/13 18:12:01 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -143,7 +143,7 @@ int isStartup = 0;
 GRPENT *pGroupsOld = (GRPENT *)0;
 GRPENT *pGEstage = (GRPENT *)0;
 GRPENT *pGE = (GRPENT *)0;
-static unsigned int groupID = 0;
+static unsigned int groupID = 1;
 REMOTE **ppRC = (REMOTE **)0;
 
 /* 'break' handling */

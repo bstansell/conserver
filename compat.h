@@ -8,6 +8,9 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#if USE_UNIX_DOMAIN_SOCKETS
+#include <sys/un.h>
+#endif
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <ctype.h>

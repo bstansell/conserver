@@ -1,6 +1,6 @@
 .\" @(#)conserver.8 01/06/91 OSU CIS; Thomas A. Fine
-.\" $Id: conserver.man,v 1.43 2004/03/23 01:02:29 bryan Exp $
-.TH CONSERVER 8 "2004/03/23" "conserver-8.1.3" "conserver"
+.\" $Id: conserver.man,v 1.46 2004/04/13 18:19:26 bryan Exp $
+.TH CONSERVER 8 "2004/04/13" "conserver-8.1.4" "conserver"
 .SH NAME
 conserver \- console server daemon
 .SH SYNOPSIS
@@ -11,7 +11,7 @@ conserver \- console server daemon
 .RB [ \-m
 .IR max ]
 .RB [ \-M
-.IR addr ]
+.IR master ]
 .RB [ \-p
 .IR port ]
 .RB [ \-b
@@ -50,7 +50,7 @@ knowledge of the distribution of consoles among servers.)
 .B Conserver
 forks a child for each group of consoles it must manage
 and assigns each process a port number to listen on.
-The maximum number of consoles managed by each child process is set using
+The maximum number of consoles managed by each child process is set using the
 .B \-m
 option.
 The
@@ -76,14 +76,31 @@ the
 .BR conserver.cf (5)
 access list.
 .PP
+When Unix domain sockets are used between the client and
+server (enabled using
+.BR --with-uds ),
+authentication checks are done on the hardcoded address ``127.0.0.1''.
+Automatic client redirection is also disabled (as if the
+.B \-R
+option was used) since the client cannot communicate with remote servers.
+The directory used to hold the sockets is checked to make sure it's empty
+when the server starts.
+The server will
+.B not
+remove any files in the directory itself, just in case the directory is
+accidentally specified as ``/etc'' or some other critical location.
+The server will do it's best to remove all the sockets when it shuts down,
+but it could stop ungracefully (crash, ``kill -9'', etc)
+and leave files behind.
+It's would then be up to the admin (or a creative startup script) to clean
+up the directory before the server will start again.
+.PP
 .B Conserver
 completely controls any connection to a console.
 All escape sequences given by the user to
 .B console
 are passed to the server without interpretation.
-The server recognizes and processes all escape sequences,
-The suspend sequence is recognized by the server and sent back to the
-client as a TCP out-of-band command, which the client processes.
+The server recognizes and processes all escape sequences.
 .PP
 The
 .B conserver
@@ -217,7 +234,7 @@ option.
 .B \-d
 Become a daemon.
 Disconnects from the controlling terminal and sends
-all output to the logfile (see
+all output (including any debug output) to the logfile (see
 .BR \-L ).
 .TP
 .B \-D
@@ -271,11 +288,20 @@ may be changed at compile time using the
 .B --with-maxmemb
 option.
 .TP
-.BI \-M addr
-Set the address to listen on.
-This allows conserver to bind to a
+.BI \-M master
+Normally, this allows conserver to bind to a
 particular IP address (like `127.0.0.1') instead of all interfaces.
 The default is to bind to all addresses.
+However, if
+.B --with-uds
+was used to enable Unix domain sockets for client/server communication,
+this points conserver to the directory where it should store the sockets.
+The default
+.IR master
+directory, ``/tmp/conserver'',
+may be changed at compile time using the
+.B --with-uds
+option.
 .TP
 .B \-n
 Obsolete (now a no-op); see
@@ -301,6 +327,9 @@ The default
 may be changed at compile time using the
 .B --with-port
 option.
+If the
+.B --with-uds
+option was used, this option is ignored.
 .TP
 .BI \-P passwd
 Read the table of authorized user data from the file
@@ -443,6 +472,9 @@ the master conserver process ID
 .TP
 .B /var/log/conserver
 log of errors and informational messages
+.TP
+.B /tmp/conserver
+directory to hold Unix domain sockets (if enabled)
 .PD
 .PP
 Additionally, output from individual consoles may be logged

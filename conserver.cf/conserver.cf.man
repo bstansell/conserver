@@ -1,5 +1,5 @@
-.\" $Id: conserver.cf.man,v 1.58 2004/02/24 02:59:36 bryan Exp $
-.TH CONSERVER.CF 5 "2004/02/24" "conserver-8.1.3" "conserver"
+.\" $Id: conserver.cf.man,v 1.61 2004/03/26 13:03:01 bryan Exp $
+.TH CONSERVER.CF 5 "2004/03/26" "conserver-8.1.4" "conserver"
 .SH NAME
 conserver.cf \- console configuration file for
 .BR conserver (8)
@@ -123,7 +123,7 @@ fashion (top down), so order is important.
 .RS
 .TP 15
 .B admin
-.RI "[ [\fB!\fP]" username ,...
+.RI "[ [\f3!\fP]" username ,...
 | "" ]
 .br
 Define a list of users making up the admin list for the console server.
@@ -264,7 +264,8 @@ all conserver hosts.
 .RS
 .TP 15
 .B defaultaccess
-.RB [ " rejected " | " trusted " | " allowed " ]
+.RB [ " rejected " | " trusted "
+.RB | " allowed " ]
 .br
 Set the default access permission for all hosts not matched by
 an access list (see the
@@ -272,7 +273,9 @@ an access list (see the
 command-line flag).
 .TP
 .B daemonmode
-.RB [ " yes " | " true " | " on " | " no " | " false " | " off " ]
+.RB [ " yes " | " true "
+.RB | " on " | " no "
+.RB | " false " | " off " ]
 .br
 Set whether or not to become a daemon when run (see the
 .B \-d
@@ -300,7 +303,9 @@ Set the port used by the master conserver process (see the
 command-line flag).
 .TP
 .B redirect
-.RB [ " yes " | " true " | " on " | " no " | " false " | " off " ]
+.RB [ " yes " | " true "
+.RB | " on " | " no "
+.RB | " false " | " off " ]
 .br
 Turn redirection on or off (see the
 .B \-R
@@ -309,7 +314,7 @@ command-line flag).
 .B reinitcheck
 .I number
 .br
-Set the number of seconds used between reinitialization checks (see the
+Set the number of minutes used between reinitialization checks (see the
 .B \-O
 command-line flag).
 .TP
@@ -321,7 +326,9 @@ Set the base port number used by child processes (see the
 command-line flag).
 .TP
 .B setproctitle
-.RB [ " yes " | " true " | " on " | " no " | " false " | " off " ]
+.RB [ " yes " | " true "
+.RB | " on " | " no "
+.RB | " false " | " off " ]
 .br
 Set whether or not the process title shows master/group functionality
 as well as the port number the process is listening on and how many
@@ -340,7 +347,9 @@ credentials file location (see the
 command-line flag).
 .TP
 .B sslrequired
-.RB [ " yes " | " true " | " on " | " no " | " false " | " off " ]
+.RB [ " yes " | " true "
+.RB | " on " | " no "
+.RB | " false " | " off " ]
 .br
 Set whether or not encryption is required when talking to clients (see the
 .B \-E
@@ -388,8 +397,11 @@ of their definition).
 .RS
 .TP 15
 .B baud
-.RB [ " 300 " | " 600 " | " 1800 " | " 2400 " | " 4800"
-.RB | " 9600 " | " 19200 " | " 38400 " | " 57600 " | " 115200 " ]
+.RB [ " 300 " | " 600 "
+.RB | " 1800 " | " 2400 "
+.RB | " 4800 "  | " 9600 "
+.RB | " 19200 " | " 38400 "
+.RB | " 57600 " | " 115200 " ]
 .br
 Assign the baud rate to the console.
 Only consoles of type ``device'' will use this value.
@@ -411,7 +423,7 @@ as the access to the console.
 Only consoles of type ``device'' will use this value.
 .TP
 .B devicesubst
-.RI [ c = t [ n ] f "[,...]"
+[\f2c\fP=\f2t\fP[\f2n\fP]\f2f\fP[,...]
 | "" ]
 .br
 Perform character substitutions on the
@@ -419,7 +431,7 @@ Perform character substitutions on the
 value.
 A series of replacements can be defined by specifying a
 comma-separated list of
-.IR c = t [ n ] f
+\f2c\fP=\f2t\fP[\f2n\fP]\f2f\fP
 sequences where
 .I c
 is any printable character,
@@ -488,14 +500,14 @@ Assign the string
 .I command
 as the command to access the console.
 Conserver will run the command by
-invoking ``/bin/sh -ce "\fIcommand\fP"''.
+invoking ``/bin/sh -ce "\f2command\fP"''.
 If the null string (``""'') is used or no
 .B exec
 keyword is specified, conserver will use the command ``/bin/sh -i''.
 Only consoles of type ``exec'' will use this value.
 .TP
 .B execsubst
-.RI [ c = t [ n ] f "[,...]"
+[\f2c\fP=\f2t\fP[\f2n\fP]\f2f\fP[,...]
 | "" ]
 .br
 Perform character substitutions on the
@@ -543,7 +555,7 @@ use the default delay time.
 The default string is ``\en''.
 .TP
 .B idletimeout
-.BR \fInumber\fP [ s | m | h ]
+\f2number\fP[\f3s\fP|\f3m\fP|\f3h\fP]
 .br
 Set the idle timeout of the console to
 .I number
@@ -577,7 +589,7 @@ If the null string (``""'') is used, the command is unset and
 nothing is invoked.
 .TP
 .B initsubst
-.RI [ c = t [ n ] f "[,...]"
+[\f2c\fP=\f2t\fP[\f2n\fP]\f2f\fP[,...]
 | "" ]
 .br
 Perform character substitutions on the
@@ -602,7 +614,7 @@ If the null string (``""'') is used, the logfile name is unset and
 no logging will occur.
 .TP
 .B logfilemax
-.BR \fInumber\fP [ k | m ]
+\f2number\fP[\f3k\fP|\f3m\fP]
 .br
 Enable automatic rotation of
 .B logfile
@@ -772,7 +784,9 @@ Default is
 .RE
 .TP
 .B parity
-.RB [ " even " | " mark " | " none " | " odd " | " space " ]
+.RB [ " even " | " mark "
+.RB | " none " | " odd "
+.RB | " space " ]
 .br
 Set the parity option for the console.
 Only consoles of type ``device'' will use this value.
@@ -858,7 +872,7 @@ console option still applies when data is read by the server, and if enabled,
 can impact the encapsulation process.
 .TP
 .B ro
-.RI "[ [\fB!\fP]" username ,...
+.RI "[ [\f3!\fP]" username ,...
 | "" ]
 .br
 Define a list of users making up the read-only access list
@@ -874,7 +888,7 @@ If the null string (``""'') is used, any
 users previously defined for the console's read-only list are removed.
 .TP
 .B rw
-.RI "[ [\fB!\fP]" username ,...
+.RI "[ [\f3!\fP]" username ,...
 | "" ]
 .br
 Define a list of users making up the read-write access list
@@ -891,7 +905,7 @@ users previously defined for the console's read-write list are removed.
 .TP
 .B timestamp
 [
-.RB [ \fInumber\fP [ m | h | d | l ]][ a ][ b ]
+[\f2number\fP[\f3m\fP|\f3h\fP|\f3d\fP|\f3l\fP]][\f3a\fP][\f3b\fP]
 | "" ]
 .br
 Specifies the time between timestamps applied to the console
@@ -922,7 +936,8 @@ A
 can be specified to add logging of break sequences sent to the console.
 .TP
 .B type
-.RB [ " device " | " exec " | " host " ]
+.RB [ " device " | " exec "
+.RB | " host " ]
 .br
 Set the type of console.
 The type
@@ -951,7 +966,7 @@ Define a user group identified as
 .RS
 .TP 15
 .B users
-.RI "[ [\fB!\fP]" username ,...
+.RI "[ [\f3!\fP]" username ,...
 | "" ]
 .br
 Define a list of users making up the group

@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.161 2004/03/20 14:40:42 bryan Exp $
+ *  $Id: console.c,v 5.162 2004/04/13 18:12:03 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -47,8 +47,12 @@ int fReqEncryption = 1;
 char *pcCredFile = (char *)0;
 #endif
 int chAttn = -1, chEsc = -1;
-char *pcInMaster =		/* which machine is current */
-    MASTERHOST;
+char *pcInMaster =
+#if USE_UNIX_DOMAIN_SOCKETS
+    UDSDIR;
+#else
+    MASTERHOST;			/* which machine is current */
+#endif
 char *pcPort = DEFPORT;
 unsigned short bindPort;
 CONSFILE *cfstdout;
@@ -270,10 +274,14 @@ Version()
 	acA2 = AllocString();
 
     Msg("%s", THIS_VERSION);
+#if USE_UNIX_DOMAIN_SOCKETS
+    Msg("default socket directory `%s\'", UDSDIR);
+#else
     Msg("default initial master server `%s\'", MASTERHOST);
+    Msg("default port referenced as `%s'", DEFPORT);
+#endif
     Msg("default escape sequence `%s%s\'", FmtCtl(DEFATTN, acA1),
 	FmtCtl(DEFESC, acA2));
-    Msg("default port referenced as `%s'", DEFPORT);
 
     BuildString((char *)0, acA1);
     if (optionlist[0] == (char *)0)
@@ -430,8 +438,13 @@ GetPort(pcToHost, sPort)
 #endif
 {
     int s;
+#if USE_UNIX_DOMAIN_SOCKETS
+    struct sockaddr_un port;
+    static STRING *portPath = (STRING *)0;
+#else
     struct hostent *hp = (struct hostent *)0;
     struct sockaddr_in port;
+#endif
 
 #if HAVE_MEMSET
     memset((void *)(&port), '\000', sizeof(port));
@@ -439,21 +452,47 @@ GetPort(pcToHost, sPort)
     bzero((char *)(&port), sizeof(port));
 #endif
 
-#if HAVE_INET_ATON
-    if (inet_aton(pcToHost, &(port.sin_addr)) == 0)
+#if USE_UNIX_DOMAIN_SOCKETS
+    if (portPath == (STRING *)0)
+	portPath = AllocString();
+    BuildStringPrint(portPath, "%s/%hu", pcInMaster, sPort);
+    port.sun_family = AF_UNIX;
+    if (portPath->used > sizeof(port.sun_path)) {
+	Error("GetPort: path to socket too long: %s", portPath->string);
+	return (CONSFILE *)0;
+    }
+    strcpy(port.sun_path, portPath->string);
+
+    CONDDEBUG((1, "GetPort: socket=%s", port.sun_path));
+
+    /* set up the socket to talk to the server for all consoles
+     * (it will tell us who to talk to to get a real connection)
+     */
+    if ((s = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
+	Error("socket(AF_UNIX,SOCK_STREAM): %s", strerror(errno));
+	return (CONSFILE *)0;
+    }
+
+    if (connect(s, (struct sockaddr *)(&port), sizeof(port)) < 0) {
+	Error("connect(): %s: %s", port.sun_path, strerror(errno));
+	return (CONSFILE *)0;
+    }
 #else
+# if HAVE_INET_ATON
+    if (inet_aton(pcToHost, &(port.sin_addr)) == 0)
+# else
     port.sin_addr.s_addr = inet_addr(pcToHost);
     if ((in_addr_t) (-1) == port.sin_addr.s_addr)
-#endif
+# endif
     {
 	if ((struct hostent *)0 != (hp = gethostbyname(pcToHost))) {
-#if HAVE_MEMCPY
+# if HAVE_MEMCPY
 	    memcpy((char *)&port.sin_addr.s_addr, (char *)hp->h_addr,
 		   hp->h_length);
-#else
+# else
 	    bcopy((char *)hp->h_addr, (char *)&port.sin_addr.s_addr,
 		  hp->h_length);
-#endif
+# endif
 	} else {
 	    Error("gethostbyname(%s): %s", pcToHost, hstrerror(h_errno));
 	    return (CONSFILE *)0;
@@ -481,11 +520,13 @@ GetPort(pcToHost, sPort)
 	Error("socket(AF_INET,SOCK_STREAM): %s", strerror(errno));
 	return (CONSFILE *)0;
     }
+
     if (connect(s, (struct sockaddr *)(&port), sizeof(port)) < 0) {
 	Error("connect(): %hu@%s: %s", ntohs(port.sin_port), pcToHost,
 	      strerror(errno));
 	return (CONSFILE *)0;
     }
+#endif
 
     return FileOpenFD(s, simpleSocket);
 }
@@ -1270,6 +1311,7 @@ DoCmds(master, pports, cmdi)
     int len;
     char *ports;
     char *pcopy;
+    char *serverName;
 
     if ((pcopy = ports = StrDup(pports)) == (char *)0)
 	OutOfMem();
@@ -1292,13 +1334,27 @@ DoCmds(master, pports, cmdi)
 	} else
 	    server = master;
 
+#if USE_UNIX_DOMAIN_SOCKETS
+	serverName = "localhost";
+#else
+	serverName = server;
+#endif
+
 	if (*ports == '\000') {
+#if USE_UNIX_DOMAIN_SOCKETS
+	    port = 0;
+#else
 	    port = htons(bindPort);
+#endif
 	} else if (!isdigit((int)(ports[0]))) {
-	    Error("invalid port spec for %s: `%s'", server, ports);
+	    Error("invalid port spec for %s: `%s'", serverName, ports);
 	    continue;
 	} else {
+#if USE_UNIX_DOMAIN_SOCKETS
+	    port = (short)atoi(ports);
+#else
 	    port = htons((short)atoi(ports));
+#endif
 	}
 
       attemptLogin:
@@ -1310,7 +1366,7 @@ DoCmds(master, pports, cmdi)
 	t = ReadReply(pcf, 0);
 	if (strcmp(t, "ok\r\n") != 0) {
 	    FileClose(&pcf);
-	    FilePrint(cfstdout, FLAGFALSE, "%s: %s", server, t);
+	    FilePrint(cfstdout, FLAGFALSE, "%s: %s", serverName, t);
 	    continue;
 	}
 #if HAVE_OPENSSL
@@ -1321,7 +1377,8 @@ DoCmds(master, pports, cmdi)
 		AttemptSSL(pcf);
 	    }
 	    if (FileGetType(pcf) != SSLSocket) {
-		Error("Encryption not supported by server `%s'", server);
+		Error("Encryption not supported by server `%s'",
+		      serverName);
 		FileClose(&pcf);
 		continue;
 	    }
@@ -1339,9 +1396,9 @@ DoCmds(master, pports, cmdi)
 	    if (t[7] == ' ') {
 		hostname = PruneSpace(t + 7);
 		if (*hostname == '\000')
-		    hostname = server;
+		    hostname = serverName;
 	    } else
-		hostname = server;
+		hostname = serverName;
 	    if (tmpString == (STRING *)0)
 		tmpString = AllocString();
 	    if (tmpString->used <= 1) {
@@ -1351,7 +1408,7 @@ DoCmds(master, pports, cmdi)
 		pass = GetPassword(tmpString->string);
 		if (pass == (char *)0) {
 		    Error("could not get password from tty for `%s'",
-			  server);
+			  serverName);
 		    FileClose(&pcf);
 		    continue;
 		}
@@ -1363,12 +1420,12 @@ DoCmds(master, pports, cmdi)
 		      tmpString->used - 1);
 	    t = ReadReply(pcf, 0);
 	    if (strcmp(t, "ok\r\n") != 0) {
-		FilePrint(cfstdout, FLAGFALSE, "%s: %s", server, t);
+		FilePrint(cfstdout, FLAGFALSE, "%s: %s", serverName, t);
 		if (++count < 3) {
 		    BuildString((char *)0, tmpString);
 		    goto attemptLogin;
 		}
-		Error("too many bad passwords for `%s'", server);
+		Error("too many bad passwords for `%s'", serverName);
 		count = 0;
 		FileClose(&pcf);
 		continue;
@@ -1376,7 +1433,7 @@ DoCmds(master, pports, cmdi)
 		count = 0;
 	} else if (strcmp(t, "ok\r\n") != 0) {
 	    FileClose(&pcf);
-	    FilePrint(cfstdout, FLAGFALSE, "%s: %s", server, t);
+	    FilePrint(cfstdout, FLAGFALSE, "%s: %s", serverName, t);
 	    continue;
 	}
 
@@ -1412,7 +1469,8 @@ DoCmds(master, pports, cmdi)
 		    Bye(EX_SOFTWARE);
 		}
 	    } else if (result[0] != '[') {	/* did we not get a connection? */
-		FilePrint(cfstdout, FLAGFALSE, "%s: %s", server, result);
+		FilePrint(cfstdout, FLAGFALSE, "%s: %s", serverName,
+			  result);
 		FileClose(&pcf);
 		continue;
 	    } else {
@@ -1452,7 +1510,7 @@ DoCmds(master, pports, cmdi)
 		 */
 		if (cmds[0][0] == 'd') {
 		    if (result[0] != 'o' || result[1] != 'k') {
-			FileWrite(cfstdout, FLAGTRUE, server, -1);
+			FileWrite(cfstdout, FLAGTRUE, serverName, -1);
 			FileWrite(cfstdout, FLAGTRUE, ": ", 2);
 			FileWrite(cfstdout, FLAGFALSE, result, len);
 		    } else {
@@ -1461,8 +1519,9 @@ DoCmds(master, pports, cmdi)
 		} else if ((cmds[0][0] != 'b' && cmds[0][0] != 't') ||
 			   (result[0] != 'o' || result[1] != 'k')) {
 		    /* did a 'master' before this or doing a 'disconnect' */
-		    if (cmds[1][0] == 'm' || cmds[0][0] == 'd') {
-			FileWrite(cfstdout, FLAGTRUE, server, -1);
+		    if ((cmds[1] != (char *)0 && cmds[1][0] == 'm') ||
+			cmds[0][0] == 'd') {
+			FileWrite(cfstdout, FLAGTRUE, serverName, -1);
 			FileWrite(cfstdout, FLAGTRUE, ": ", 2);
 		    }
 		    FileWrite(cfstdout, FLAGFALSE, result, len);
@@ -1514,7 +1573,6 @@ main(argc, argv)
     extern int optind;
     extern int optopt;
     extern char *optarg;
-    int i;
     static STRING *textMsg = (STRING *)0;
     int cmdi;
     static STRING *consoleName = (STRING *)0;
@@ -1556,7 +1614,10 @@ main(argc, argv)
 		/* fall through */
 	    case 'b':
 		pcCmd = "broadcast";
-		cmdarg = optarg;
+		if (cmdarg != (char *)0)
+		    free(cmdarg);
+		if ((cmdarg = StrDup(optarg)) == (char *)0)
+		    OutOfMem();
 		break;
 
 	    case 'c':
@@ -1571,7 +1632,10 @@ main(argc, argv)
 
 	    case 'd':
 		pcCmd = "disconnect";
-		cmdarg = optarg;
+		if (cmdarg != (char *)0)
+		    free(cmdarg);
+		if ((cmdarg = StrDup(optarg)) == (char *)0)
+		    OutOfMem();
 		break;
 
 	    case 'E':
@@ -1702,6 +1766,8 @@ main(argc, argv)
 	    Error("missing console name");
 	    Bye(EX_UNAVAILABLE);
 	}
+	if (cmdarg != (char *)0)
+	    free(cmdarg);
 	if ((cmdarg = StrDup(argv[optind++])) == (char *)0)
 	    OutOfMem();
     } else if (*pcCmd == 't') {
@@ -1709,24 +1775,27 @@ main(argc, argv)
 	    Error("missing message text");
 	    Bye(EX_UNAVAILABLE);
 	}
-	cmdarg = argv[optind++];
+	if (cmdarg != (char *)0)
+	    free(cmdarg);
+	if ((cmdarg = StrDup(argv[optind++])) == (char *)0)
+	    OutOfMem();
     }
 
     if (optind < argc) {
 	Error("extra garbage on command line? (%s...)", argv[optind]);
 	Bye(EX_UNAVAILABLE);
     }
-
+#if !USE_UNIX_DOMAIN_SOCKETS
     /* if we somehow lost the port (or got an empty string), reset */
     if (pcPort == (char *)0 || pcPort[0] == '\000')
 	pcPort = DEFPORT;
 
     /* Look for non-numeric characters */
-    for (i = 0; pcPort[i] != '\000'; i++)
-	if (!isdigit((int)pcPort[i]))
+    for (opt = 0; pcPort[opt] != '\000'; opt++)
+	if (!isdigit((int)pcPort[opt]))
 	    break;
 
-    if (pcPort[i] == '\000') {
+    if (pcPort[opt] == '\000') {
 	/* numeric only */
 	bindPort = atoi(pcPort);
     } else {
@@ -1739,6 +1808,7 @@ main(argc, argv)
 	    bindPort = ntohs((u_short) pSE->s_port);
 	}
     }
+#endif
 
     if (pcUser == (char *)0 || pcUser[0] == '\000') {
 	if (((pcUser = getenv("LOGNAME")) == (char *)0) &&
@@ -1836,8 +1906,9 @@ main(argc, argv)
 	free(cmdarg);
 
     if (*pcCmd == 'd')
-	FilePrint(cfstdout, FLAGFALSE, "Disconnected %d users\n",
-		  disconnectCount);
+	FilePrint(cfstdout, FLAGFALSE, "disconnected %d %s\n",
+		  disconnectCount,
+		  disconnectCount == 1 ? "user" : "users");
 
     Bye(0);
     return 0;			/* noop - Bye() terminates us */

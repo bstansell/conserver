@@ -1,5 +1,5 @@
 /*
- *  $Id: main.h,v 5.51 2003/11/10 15:37:24 bryan Exp $
+ *  $Id: main.h,v 5.52 2004/04/13 18:12:00 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -49,6 +49,9 @@ extern CONFIG *optConf;
 extern CONFIG *config;
 extern CONFIG defConfig;
 extern CONSFILE *unifiedlog;
+#if USE_UNIX_DOMAIN_SOCKETS
+extern char *interface;
+#endif
 #if HAVE_OPENSSL
 extern SSL_CTX *ctx;
 #endif

@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.81 2004/03/20 14:40:40 bryan Exp $
+ *  $Id: client.c,v 5.83 2004/04/13 18:12:00 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -315,8 +315,7 @@ Replay(pCE, fdOut, iBack)
 	    if ((char *)0 != s) {
 		*s = '\000';
 	    }
-	    FileWrite(fdOut, FLAGTRUE, lines[i].line->string,
-		      lines[i].line->used - 1);
+	    FileWrite(fdOut, FLAGTRUE, lines[i].line->string, -1);
 	    FileWrite(fdOut, FLAGTRUE, " .. ", 4);
 
 	    /* build the end string by removing the leading "[-- MARK -- "
@@ -488,15 +487,31 @@ ClientAccessOk(pCL)
 #endif
 {
     char *peername = (char *)0;
+    int retval = 1;
+
+#if USE_UNIX_DOMAIN_SOCKETS
+    struct in_addr addr;
+
+# if HAVE_INET_ATON
+    inet_aton("127.0.0.1", &addr);
+# else
+    addr.s_addr = inet_addr("127.0.0.1");
+# endif
+    pCL->caccess = AccType(&addr, &peername);
+    if (pCL->caccess == 'r') {
+	FileWrite(pCL->fd, FLAGFALSE, "access from your host refused\r\n",
+		  -1);
+	retval = 0;
+    }
+#else
     socklen_t so;
     int cfd;
     struct sockaddr_in in_port;
-    int retval = 1;
     int getpeer = -1;
 
     cfd = FileFDNum(pCL->fd);
     pCL->caccess = 'r';
-#if defined(USE_LIBWRAP)
+# if defined(USE_LIBWRAP)
     {
 	struct request_info request;
 	request_init(&request, RQ_DAEMON, progname, RQ_FILE, cfd, 0);
@@ -508,7 +523,7 @@ ClientAccessOk(pCL)
 	    goto setpeer;
 	}
     }
-#endif
+# endif
 
     so = sizeof(in_port);
     if (-1 ==
@@ -523,16 +538,22 @@ ClientAccessOk(pCL)
 		  -1);
 	retval = 0;
     }
-
   setpeer:
+#endif
+
     if (pCL->peername != (STRING *)0) {
 	BuildString((char *)0, pCL->peername);
 	if (peername != (char *)0)
 	    BuildString(peername, pCL->peername);
+#if USE_UNIX_DOMAIN_SOCKETS
+	else
+	    BuildString("127.0.0.1", pCL->peername);
+#else
 	else if (getpeer != -1)
 	    BuildString(inet_ntoa(in_port.sin_addr), pCL->peername);
 	else
 	    BuildString("<unknown>", pCL->peername);
+#endif
     }
     if (peername != (char *)0)
 	free(peername);

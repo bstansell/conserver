@@ -17,9 +17,12 @@ AH_TEMPLATE([HAVE_DMALLOC], [have dmalloc support])
 AH_TEMPLATE([HAVE_SA_LEN],[Defined if sa_len member exists in struct sockaddr])
 AH_TEMPLATE([TRUST_REVERSE_DNS],[Defined if we trust reverse DNS])
 AH_TEMPLATE([USE_EXTENDED_MESSAGES],[Defined if we produce extended messages])
+AH_TEMPLATE([USE_UNIX_DOMAIN_SOCKETS],[Defined if we use Unix domain sockets])
+AH_TEMPLATE([UDSDIR], [Directory for Unix domain sockets])
 
 dnl ### Normal initialization. ######################################
 AC_INIT
+AC_PREREQ(2.59)
 AC_CONFIG_SRCDIR([conserver/main.c])
 AC_CONFIG_HEADER(config.h)
 
@@ -49,7 +52,7 @@ dnl AC_MSG_RESULT($with_64bit)
 
 AC_MSG_CHECKING(for port number specification)
 AC_ARG_WITH(port,
-	AC_HELP_STRING([--with-port=PORT],[Specify port number @<:@conserver@:>@]),
+	AS_HELP_STRING([--with-port=PORT],[Specify port number @<:@conserver@:>@]),
 	[case "$withval" in
 	    yes|no)
 		AC_DEFINE_UNQUOTED(DEFPORT, "conserver")
@@ -65,7 +68,7 @@ AC_ARG_WITH(port,
 
 AC_MSG_CHECKING(for secondary channel base port)
 AC_ARG_WITH(base,
-	AC_HELP_STRING([--with-base=PORT], [Base port for secondary channel @<:@0@:>@]),
+	AS_HELP_STRING([--with-base=PORT], [Base port for secondary channel @<:@0@:>@]),
 	[case "$withval" in
 	    yes|no)
 		AC_DEFINE_UNQUOTED(DEFBASEPORT, "0")
@@ -81,7 +84,7 @@ AC_ARG_WITH(base,
 
 AC_MSG_CHECKING(for master conserver hostname)
 AC_ARG_WITH(master,
-	AC_HELP_STRING([--with-master=MASTER],[Specify master server hostname @<:@console@:>@]),
+	AS_HELP_STRING([--with-master=MASTER],[Specify master server hostname @<:@console@:>@]),
 	[case "$withval" in
 	    yes|no)
 		AC_DEFINE_UNQUOTED(MASTERHOST, "console")
@@ -97,7 +100,7 @@ AC_ARG_WITH(master,
 
 AC_MSG_CHECKING(for configuration filename)
 AC_ARG_WITH(cffile,
-	AC_HELP_STRING([--with-cffile=CFFILE],[Specify config filename @<:@SYSCONFDIR/conserver.cf@:>@]),
+	AS_HELP_STRING([--with-cffile=CFFILE],[Specify config filename @<:@SYSCONFDIR/conserver.cf@:>@]),
 	[case "$withval" in
 	    yes|no)
 		AC_DEFINE_UNQUOTED(CONFIGFILE, [SYSCONFDIR "/conserver.cf"])
@@ -117,7 +120,7 @@ AC_ARG_WITH(cffile,
 
 AC_MSG_CHECKING(for password filename)
 AC_ARG_WITH(pwdfile,
-	AC_HELP_STRING([--with-pwdfile=PWDFILE],[Specify password filename @<:@SYSCONFDIR/conserver.passwd@:>@]),
+	AS_HELP_STRING([--with-pwdfile=PWDFILE],[Specify password filename @<:@SYSCONFDIR/conserver.passwd@:>@]),
 	[case "$withval" in
 	    yes|no)
 		AC_DEFINE_UNQUOTED(PASSWDFILE, [SYSCONFDIR "/conserver.passwd"])
@@ -137,7 +140,7 @@ AC_ARG_WITH(pwdfile,
 
 AC_MSG_CHECKING(for log filename)
 AC_ARG_WITH(logfile,
-	AC_HELP_STRING([--with-logfile=LOGFILE],[Specify log filename @<:@/var/log/conserver@:>@]),
+	AS_HELP_STRING([--with-logfile=LOGFILE],[Specify log filename @<:@/var/log/conserver@:>@]),
 	[case "$withval" in
 	    yes|no)
 		AC_DEFINE_UNQUOTED(LOGFILEPATH, "/var/log/conserver")
@@ -154,7 +157,7 @@ AC_ARG_WITH(logfile,
 AC_SUBST(PIDFILE)
 AC_MSG_CHECKING(for PID filename)
 AC_ARG_WITH(pidfile,
-	AC_HELP_STRING([--with-pidfile=PIDFILE],[Specify PID filepath @<:@/var/run/conserver.pid@:>@]),
+	AS_HELP_STRING([--with-pidfile=PIDFILE],[Specify PID filepath @<:@/var/run/conserver.pid@:>@]),
 	[case "$withval" in
 	    yes|no)
 		PIDFILE="/var/run/conserver.pid"
@@ -169,7 +172,7 @@ AC_MSG_RESULT('$PIDFILE')
 
 AC_MSG_CHECKING(for MAXMEMB setting)
 AC_ARG_WITH(maxmemb,
-	AC_HELP_STRING([--with-maxmemb=MAXMEMB],[Specify maximum consoles per process @<:@16@:>@]),
+	AS_HELP_STRING([--with-maxmemb=MAXMEMB],[Specify maximum consoles per process @<:@16@:>@]),
 	[case "$withval" in
 	    yes|no)
 		AC_DEFINE_UNQUOTED(MAXMEMB, 16)
@@ -191,7 +194,7 @@ AC_ARG_WITH(maxmemb,
 
 AC_MSG_CHECKING(for connect() timeout)
 AC_ARG_WITH(timeout,
-	AC_HELP_STRING([--with-timeout=TIMEOUT],[Specify connect() timeout in seconds @<:@10@:>@]),
+	AS_HELP_STRING([--with-timeout=TIMEOUT],[Specify connect() timeout in seconds @<:@10@:>@]),
 	[if expr "$withval" : '[[0-9]]*$' >/dev/null 2>&1 &&
 	    test "$withval" -gt 0 -a "$withval" -lt 300; then
 		AC_DEFINE_UNQUOTED(CONNECTTIMEOUT, $withval)
@@ -205,7 +208,7 @@ AC_ARG_WITH(timeout,
 
 AC_MSG_CHECKING(whether to trust reverse DNS)
 AC_ARG_WITH(trustrevdns,
-	AC_HELP_STRING([--with-trustrevdns],[Trust reverse DNS information]),
+	AS_HELP_STRING([--with-trustrevdns],[Trust reverse DNS information]),
 	[case "$withval" in
 	    yes)
 		AC_DEFINE(TRUST_REVERSE_DNS)
@@ -218,7 +221,7 @@ AC_ARG_WITH(trustrevdns,
 
 AC_MSG_CHECKING(whether to display extended messages)
 AC_ARG_WITH(extmsgs,
-	AC_HELP_STRING([--with-extmsgs],[Produce extended messages]),
+	AS_HELP_STRING([--with-extmsgs],[Produce extended messages]),
 	[case "$withval" in
 	    yes)
 		AC_DEFINE(USE_EXTENDED_MESSAGES)
@@ -226,6 +229,32 @@ AC_ARG_WITH(extmsgs,
 		;;
 	    *)
 		AC_MSG_RESULT(no)
+		;;
+	esac],[AC_MSG_RESULT(no)])
+
+AC_MSG_CHECKING(whether to use Unix domain sockets)
+AC_ARG_WITH(uds,
+	AS_HELP_STRING([--with-uds@<:@=DIR@:>@    ],
+	    [Use Unix domain sockets for client/server communication @<:@/tmp/conserver@:>@]),
+	[case "$withval" in
+	    yes)
+		AC_DEFINE_UNQUOTED(UDSDIR, "/tmp/conserver")
+		AC_DEFINE(USE_UNIX_DOMAIN_SOCKETS)
+		AC_MSG_RESULT([/tmp/conserver])
+		;;
+	    no)
+		AC_MSG_RESULT(no)
+		;;
+	    *)
+		AC_DEFINE_UNQUOTED(UDSDIR, "$withval")
+		AC_DEFINE(USE_UNIX_DOMAIN_SOCKETS)
+		AC_MSG_RESULT('$withval')
+		if expr "$withval" : '/' >/dev/null 2>&1; then
+		    :
+		else
+		    echo "*** WARNING *** you may have better success using a fully-qualified path"
+		    echo "*** WARNING *** instead of '$withval'"
+		fi
 		;;
 	esac],[AC_MSG_RESULT(no)])
 
@@ -315,7 +344,7 @@ AC_SUBST(CONSLIBS)
 AC_SUBST(CONSCPPFLAGS)
 AC_SUBST(CONSLDFLAGS)
 AC_ARG_WITH(libwrap,
-    AC_HELP_STRING([--with-libwrap@<:@=PATH@:>@],
+    AS_HELP_STRING([--with-libwrap@<:@=PATH@:>@],
 	[Compile in libwrap (tcp_wrappers) support]),
     [if test "$withval" != "no"; then
 	if test "$withval" != "yes"; then
@@ -365,7 +394,7 @@ AC_ARG_WITH(libwrap,
 )
 
 AC_ARG_WITH(openssl,
-    AC_HELP_STRING([--with-openssl@<:@=PATH@:>@],
+    AS_HELP_STRING([--with-openssl@<:@=PATH@:>@],
 	[Compile in OpenSSL support]),
     [if test "$withval" != "no"; then
 	if test "$withval" != "yes"; then
@@ -403,7 +432,7 @@ AC_ARG_WITH(openssl,
 )
 
 AC_ARG_WITH(dmalloc,
-    AC_HELP_STRING([--with-dmalloc@<:@=PATH@:>@],
+    AS_HELP_STRING([--with-dmalloc@<:@=PATH@:>@],
 	[Compile in dmalloc support]),
     [if test "$withval" != "no"; then
 	if test "$withval" != "yes"; then
@@ -478,7 +507,7 @@ dnl 	fi],[AC_MSG_RESULT(no)])
 
 AC_MSG_CHECKING(for PAM support)
 AC_ARG_WITH(pam,
-    AC_HELP_STRING([--with-pam],
+    AS_HELP_STRING([--with-pam],
 	[Enable PAM support]),
 	[if test "$withval" = yes; then
 	    oLIBS="$LIBS"
