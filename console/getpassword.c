@@ -1,5 +1,5 @@
 /*
- *  $Id: getpassword.c,v 1.6 2003-09-12 10:36:19-07 bryan Exp $
+ *  $Id: getpassword.c,v 1.7 2003-09-28 12:29:17-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -45,7 +45,7 @@ C2Raw(fd)
 
     if (0 != tcgetattr(fd, &o_tios)) {
 	Error("tcgetattr(%d): %s", fd, strerror(errno));
-	exit(EX_UNAVAILABLE);
+	Bye(EX_UNAVAILABLE);
     }
     n_tios = o_tios;
     n_tios.c_iflag &= ~(IUCLC | IXON);
@@ -55,7 +55,7 @@ C2Raw(fd)
     n_tios.c_cc[VTIME] = 0;
     if (0 != tcsetattr(fd, TCSANOW, &n_tios)) {
 	Error("tcsetattr(%d, TCSANOW): %s", fd, strerror(errno));
-	exit(EX_UNAVAILABLE);
+	Bye(EX_UNAVAILABLE);
     }
     screwy = 1;
 }

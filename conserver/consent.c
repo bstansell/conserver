@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.125 2003-08-15 14:24:39-07 bryan Exp $
+ *  $Id: consent.c,v 5.127 2003-09-28 10:37:20-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -248,6 +248,187 @@ TtyDev(pCE)
     return 0;
 }
 
+void
+#if PROTOTYPES
+StopInit(CONSENT *pCE)
+#else
+StopInit(pCE)
+    CONSENT *pCE;
+#endif
+{
+    if (pCE->initcmd == (char *)0)
+	return;
+
+    if (pCE->initpid != 0) {
+	Verbose("[%s] initcmd terminated: pid %lu", pCE->server,
+		(unsigned long)pCE->initpid);
+	CONDDEBUG((1, "StopInit(): sending initcmd pid %lu signal %d",
+		   (unsigned long)pCE->initpid, SIGHUP));
+	kill(pCE->initpid, SIGHUP);
+	pCE->initpid = 0;
+    }
+
+    if (pCE->initfile != (CONSFILE *)0) {
+	int initfile = FileFDNum(pCE->initfile);
+	FD_CLR(initfile, &rinit);
+	initfile = FileFDOutNum(pCE->initfile);
+	FD_CLR(initfile, &winit);
+	FileClose(&pCE->initfile);
+	pCE->initfile = (CONSFILE *)0;
+    }
+}
+
+/* invoke the initcmd command */
+void
+#if PROTOTYPES
+StartInit(CONSENT *pCE)
+#else
+StartInit(pCE)
+    CONSENT *pCE;
+#endif
+{
+    int i;
+    pid_t iNewGrp;
+    extern char **environ;
+    int pin[2];
+    int pout[2];
+    static char *apcArgv[] = {
+	"/bin/sh", "-ce", (char *)0, (char *)0
+    };
+
+    if (pCE->initcmd == (char *)0)
+	return;
+
+    /* this should never happen, but hey, just in case */
+    if (pCE->initfile != (CONSFILE *)0 || pCE->initpid != 0) {
+	Error("[%s] StartInit(): initpid/initfile sync error",
+	      pCE->server);
+	StopInit(pCE);
+    }
+
+    if (pCE->pCLwr != (CONSCLIENT *)0) {
+	CONSCLIENT *pCL = pCE->pCLwr;
+	pCL->fwr = 0;
+	pCL->fwantwr = 1;
+	/*
+	   FileWrite(pCL->fd,
+	   "[forced to `spy' mode by initialization command]\r\n",
+	   -1);
+	   TagLogfileAct(pCE, "initialization command bumped %s",
+	   pCL->acid->string);
+	 */
+	pCE->pCLwr = (CONSCLIENT *)0;
+    }
+
+    /* pin[0] = parent read, pin[1] = child write */
+    if (pipe(pin) != 0) {
+	Error("[%s] StartInit(): pipe(): %s", pCE->server,
+	      strerror(errno));
+	return;
+    }
+    /* pout[0] = child read, pout[l] = parent write */
+    if (pipe(pout) != 0) {
+	close(pin[0]);
+	close(pin[1]);
+	Error("[%s] StartInit(): pipe(): %s", pCE->server,
+	      strerror(errno));
+	return;
+    }
+
+    fflush(stdout);
+    fflush(stderr);
+
+    switch (pCE->initpid = fork()) {
+	case -1:
+	    pCE->initpid = 0;
+	    return;
+	case 0:
+	    thepid = getpid();
+	    break;
+	default:
+	    close(pout[0]);
+	    close(pin[1]);
+	    if ((pCE->initfile =
+		 FileOpenPipe(pin[0], pout[1])) == (CONSFILE *)0) {
+		Error("[%s] FileOpenPipe(%d,%d) failed: forcing down",
+		      pCE->server, pin[0], pout[1]);
+		close(pin[0]);
+		close(pout[1]);
+		kill(pCE->initpid, SIGHUP);
+		pCE->initpid = 0;
+		return;
+	    }
+	    Verbose("[%s] initcmd started: pid %lu", pCE->server,
+		    (unsigned long)pCE->initpid);
+	    FD_SET(pin[0], &rinit);
+	    if (maxfd < pin[0] + 1)
+		maxfd = pin[0] + 1;
+	    fflush(stderr);
+	    return;
+    }
+
+    close(pin[0]);
+    close(pout[1]);
+
+    /* put the signals back that we ignore (trapped auto-reset to default)
+     */
+    SimpleSignal(SIGQUIT, SIG_DFL);
+    SimpleSignal(SIGINT, SIG_DFL);
+    SimpleSignal(SIGPIPE, SIG_DFL);
+#if defined(SIGTTOU)
+    SimpleSignal(SIGTTOU, SIG_DFL);
+#endif
+#if defined(SIGTTIN)
+    SimpleSignal(SIGTTIN, SIG_DFL);
+#endif
+#if defined(SIGTSTP)
+    SimpleSignal(SIGTSTP, SIG_DFL);
+#endif
+#if defined(SIGPOLL)
+    SimpleSignal(SIGPOLL, SIG_DFL);
+#endif
+
+    /* setup new process with clean file descriptors
+     */
+    i = GetMaxFiles();
+    for ( /* i above */ ; --i > 2;) {
+	if (i != pout[0] && i != pin[1])
+	    close(i);
+    }
+    /* leave 2 until we have to close it */
+    close(1);
+    close(0);
+
+# if HAVE_SETSID
+    iNewGrp = setsid();
+    if (-1 == iNewGrp) {
+	Error("[%s] setsid(): %s", pCE->server, strerror(errno));
+	iNewGrp = getpid();
+    }
+# else
+    iNewGrp = getpid();
+# endif
+
+    if (dup(pout[0]) != 0 || dup(pin[1]) != 1) {
+	Error("[%s] StartInit(): fd sync error", pCE->server);
+	Bye(EX_OSERR);
+    }
+    close(pout[0]);
+    close(pin[1]);
+
+    tcsetpgrp(0, iNewGrp);
+
+    apcArgv[2] = pCE->initcmd;
+
+    close(2);
+    dup(1);			/* better be 2, but it is too late now */
+
+    execve(apcArgv[0], apcArgv, environ);
+    Error("[%s] execve(%s): %s", pCE->server, apcArgv[2], strerror(errno));
+    Bye(EX_OSERR);
+    return;
+}
+
 /* setup a virtual device						(ksb)
  */
 static int
@@ -424,11 +605,13 @@ ConsDown(pCE, downHard, force)
 #endif
 {
     if (force != FLAGTRUE &&
-	!(FileBufEmpty(pCE->fdlog) && FileBufEmpty(pCE->cofile))) {
+	!(FileBufEmpty(pCE->fdlog) && FileBufEmpty(pCE->cofile) &&
+	  FileBufEmpty(pCE->initfile))) {
 	pCE->ioState = ISFLUSHING;
 	return;
     }
 
+    StopInit(pCE);
     if (pCE->ipid != 0) {
 	CONDDEBUG((1, "ConsDown(): sending pid %lu signal %d",
 		   (unsigned long)pCE->ipid, SIGHUP));
@@ -674,6 +857,9 @@ ConsInit(pCE)
 	Msg("[%s] console up", pCE->server);
 	pCE->downHard = FLAGFALSE;
     }
+
+    if (pCE->ioState == ISNORMAL)
+	StartInit(pCE);
 }
 
 int

@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.157 2003-09-22 08:33:58-07 bryan Exp $
+ *  $Id: main.c,v 5.160 2003-09-29 07:01:35-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -66,6 +66,10 @@ CONFIG *config = (CONFIG *)0;
 char *interface = (char *)0;
 
 struct sockaddr_in in_port;
+
+#if HAVE_DMALLOC && DMALLOC_MARK_MAIN
+unsigned long dmallocMarkMain = 0;
+#endif
 
 #if HAVE_OPENSSL
 SSL_CTX *ctx = (SSL_CTX *)0;
@@ -473,7 +477,7 @@ Usage(wantfull)
     static char u_terse[] =
 	"[-7dDEFhinoRSuvV] [-a type] [-m max] [-M addr] [-p port] [-b port] [-c cred] [-C config] [-P passwd] [-L logfile] [-O min]";
     static char *full[] = {
-	"7          strip the high bit of all console data",
+	"7          strip the high bit off all console data",
 	"a type     set the default access type",
 	"b port     base port for secondary channel (any by default)",
 #if HAVE_OPENSSL
@@ -696,11 +700,15 @@ SummarizeDataStructures()
 		size += strlen(pCE->master);
 	    if (pCE->logfile != (char *)0)
 		size += strlen(pCE->logfile);
+	    if (pCE->initcmd != (char *)0)
+		size += strlen(pCE->initcmd);
 	    if (pCE->execSlave != (char *)0)
 		size += strlen(pCE->execSlave);
 	    if (pCE->fdlog != (CONSFILE *)0)
 		size += sizeof(CONSFILE);
 	    if (pCE->cofile != (CONSFILE *)0)
+		size += sizeof(CONSFILE);
+	    if (pCE->initfile != (CONSFILE *)0)
 		size += sizeof(CONSFILE);
 	    if (pCE->aliases != (NAMES *)0) {
 		NAMES *n;
@@ -776,6 +784,10 @@ DumpDataStructures()
     REMOTE *pRC;
     char *empty = "<empty>";
 
+#if HAVE_DMALLOC && DMALLOC_MARK_MAIN
+    CONDDEBUG((1, "DumpDataStructures(): dmalloc / MarkMain"));
+    dmalloc_log_changed(dmallocMarkMain, 1, 0, 1);
+#endif
 #define EMPTYSTR(x) x == (char *)0 ? empty : x
     if (!fDebug)
 	return;
@@ -864,6 +876,10 @@ DumpDataStructures()
 		       pCE->reinitoncc == FLAGTRUE ? "true" : "false",
 		       pCE->striphigh == FLAGTRUE ? "true" : "false",
 		       pCE->unloved == FLAGTRUE ? "true" : "false"));
+	    CONDDEBUG((1,
+		       "DumpDataStructures():  initpid=%lu, initcmd=%s, initfile=%d",
+		       (unsigned long)pCE->initpid, EMPTYSTR(pCE->initcmd),
+		       FileFDNum(pCE->initfile)));
 	    if (pCE->ro) {
 		CONSENTUSERS *u;
 		for (u = pCE->ro; u != (CONSENTUSERS *)0; u = u->next) {
@@ -911,6 +927,20 @@ ProbeInterfaces()
     int r = 0, m = 0;
     int bufsize = 2048;
     int count = 0;
+
+    /* if we use -M, just fill the array with that interface */
+    if (bindAddr != INADDR_ANY) {
+	myAddrs = (struct in_addr *)calloc(2, sizeof(struct in_addr));
+	if (myAddrs == (struct in_addr *)0)
+	    OutOfMem();
+#if HAVE_MEMCPY
+	memcpy(&(myAddrs[0].s_addr), &bindAddr, sizeof(in_addr_t));
+#else
+	bcopy(&bindAddr, &(myAddrs[0].s_addr), sizeof(in_addr_t));
+#endif
+	Verbose("interface address %s (-M option)", inet_ntoa(myAddrs[0]));
+	return;
+    }
 
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
 	Error("ProbeInterfaces(): socket(): %s", strerror(errno));
@@ -1011,6 +1041,20 @@ ProbeInterfaces()
     int count;
     struct hostent *he;
 
+    /* if we use -M, just fill the array with that interface */
+    if (bindAddr != INADDR_ANY) {
+	myAddrs = (struct in_addr *)calloc(2, sizeof(struct in_addr));
+	if (myAddrs == (struct in_addr *)0)
+	    OutOfMem();
+#if HAVE_MEMCPY
+	memcpy(&(myAddrs[0].s_addr), &bindAddr, sizeof(in_addr_t));
+#else
+	bcopy(&bindAddr, &(myAddrs[0].s_addr), sizeof(in_addr_t));
+#endif
+	Verbose("interface address %s (-M option)", inet_ntoa(myAddrs[0]));
+	return;
+    }
+
     Verbose("using hostname for interface addresses");
     if ((struct hostent *)0 == (he = gethostbyname(myHostname))) {
 	Error("ProbeInterfaces(): gethostbyname(%s): %s", myHostname,
@@ -1028,23 +1072,11 @@ ProbeInterfaces()
     if (myAddrs != (struct in_addr *)0)
 	free(myAddrs);
     myAddrs = (struct in_addr *)0;
-    if (bindAddr != INADDR_ANY)
-	count++;
     if (count == 0)
 	return;
     myAddrs = (struct in_addr *)calloc(count + 1, sizeof(struct in_addr));
     if (myAddrs == (struct in_addr *)0)
 	OutOfMem();
-    if (bindAddr != INADDR_ANY) {
-	count--;
-#if HAVE_MEMCPY
-	memcpy(&(myAddrs[count].s_addr), &bindAddr, sizeof(in_addr_t));
-#else
-	bcopy(&bindAddr, &(myAddrs[count].s_addr), sizeof(in_addr_t));
-#endif
-	Verbose("interface address %s (-M option)",
-		inet_ntoa(myAddrs[count]));
-    }
     for (count--; count >= 0; count--) {
 #if HAVE_MEMCPY
 	memcpy(&(myAddrs[count].s_addr), he->h_addr_list[count],
@@ -1437,6 +1469,10 @@ main(argc, argv)
 	config->sslcredentials = pConfig->sslcredentials;
     else
 	config->sslcredentials = (char *)0;
+#endif
+
+#if HAVE_DMALLOC && DMALLOC_MARK_MAIN
+    dmallocMarkMain = dmalloc_mark();
 #endif
 
     if (pGroups == (GRPENT *)0 && pRCList == (REMOTE *)0) {

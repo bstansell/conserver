@@ -1,5 +1,5 @@
-.\" $Id: conserver.cf.man,v 1.41 2003-09-21 15:05:48-07 bryan Exp $
-.TH CONSERVER.CF 5 "2003-09-21" "conserver-8.0.0" "conserver"
+.\" $Id: conserver.cf.man,v 1.42 2003-09-28 12:23:04-07 bryan Exp $
+.TH CONSERVER.CF 5 "2003-09-28" "conserver-8.0.1" "conserver"
 .SH NAME
 conserver.cf \- console configuration file for
 .BR conserver (8)
@@ -419,6 +419,21 @@ The default block defined using the name
 .I default
 is applied to the current console or default block.
 The included default block must be previously defined.
+.TP
+.B initcmd
+.RI [ " command "
+| "" ]
+.br
+Invoke
+.I command
+as soon as the console is brought up, redirecting the console
+to stdin, stdout, and stderr of
+.IR command .
+The
+.I command
+is passed as an argument to ``/bin/sh -ce''.
+If the null string (``""'') is used, the command is unset and
+nothing is invoked.
 .TP
 .B logfile
 .RI [ " filename "

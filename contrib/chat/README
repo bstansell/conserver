@@ -1,0 +1,8 @@
+Information from Greg Woods <woods@weird.com>:
+
+    This version of "chat" is derived from the NetBSD variant found in
+    /usr/src/usr.sbin/pppd/chat.
+
+    It has had a new '-I' command-line flag added so that it can ignore
+    the fact it's not running on a TTY device (i.e. to allow it to work
+    over a socket).

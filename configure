@@ -6762,7 +6762,7 @@ done
 
 
 
-                                                  ac_config_files="$ac_config_files Makefile conserver/Makefile conserver.cf/Makefile console/Makefile autologin/Makefile"
+                                                            ac_config_files="$ac_config_files Makefile conserver/Makefile conserver.cf/Makefile console/Makefile autologin/Makefile contrib/chat/Makefile"
 
           ac_config_files="$ac_config_files conserver/conserver.rc"
 
@@ -7295,6 +7295,7 @@ do
   "conserver.cf/Makefile" ) CONFIG_FILES="$CONFIG_FILES conserver.cf/Makefile" ;;
   "console/Makefile" ) CONFIG_FILES="$CONFIG_FILES console/Makefile" ;;
   "autologin/Makefile" ) CONFIG_FILES="$CONFIG_FILES autologin/Makefile" ;;
+  "contrib/chat/Makefile" ) CONFIG_FILES="$CONFIG_FILES contrib/chat/Makefile" ;;
   "conserver/conserver.rc" ) CONFIG_FILES="$CONFIG_FILES conserver/conserver.rc" ;;
   "config.h" ) CONFIG_HEADERS="$CONFIG_HEADERS config.h" ;;
   *) { { echo "$as_me:$LINENO: error: invalid argument: $ac_config_target" >&5

@@ -1,5 +1,5 @@
 /*
- *  $Id: client.h,v 5.31 2003-08-24 13:00:50-07 bryan Exp $
+ *  $Id: client.h,v 5.32 2003-09-28 08:41:20-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -85,5 +85,5 @@ typedef struct client {		/* Connection Information:              */
 
 extern void Replay PARAMS((CONSFILE *, CONSFILE *, int));
 extern void HelpUser PARAMS((CONSCLIENT *));
-extern CONSCLIENT *FindWrite PARAMS((CONSCLIENT *));
+extern void FindWrite PARAMS((CONSENT *));
 extern int ClientAccessOk PARAMS((CONSCLIENT *));

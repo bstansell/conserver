@@ -1,5 +1,5 @@
 /*
- *  $Id: util.c,v 1.98 2003-08-24 10:40:10-07 bryan Exp $
+ *  $Id: util.c,v 1.99 2003-09-28 08:51:52-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -75,12 +75,12 @@ StrTime(ltime)
     time_t *ltime;
 #endif
 {
-    static char curtime[25];
+    static char curtime[40];	/* just in case ctime() varies */
     time_t tyme;
 
     tyme = time((time_t *)0);
     strcpy(curtime, ctime(&tyme));
-    curtime[24] = '\000';
+    curtime[24] = '\000';	/* might need to adjust this at some point */
     if (ltime != NULL)
 	*ltime = tyme;
     return (const char *)curtime;
@@ -730,6 +730,37 @@ FileOpenFD(fd, type)
     return cfp;
 }
 
+/* This encapsulates a pipe pair in a CONSFILE
+ * object.  Returns a CONSFILE pointer to that object.
+ */
+CONSFILE *
+#if PROTOTYPES
+FileOpenPipe(int fd, int fdout)
+#else
+FileOpenPipe(fd, fdout)
+    int fd;
+    int fdout;
+#endif
+{
+    CONSFILE *cfp;
+
+    if ((cfp = (CONSFILE *)calloc(1, sizeof(CONSFILE)))
+	== (CONSFILE *)0)
+	OutOfMem();
+    cfp->ftype = simplePipe;
+    cfp->fd = fd;
+    cfp->fdout = fdout;
+    cfp->wbuf = AllocString();
+#if HAVE_OPENSSL
+    cfp->ssl = (SSL *)0;
+    cfp->waitForRead = cfp->waitForWrite = FLAGFALSE;
+#endif
+
+    CONDDEBUG((2, "FileOpenPipe(): encapsulated pipe pair fd %d and fd %d",
+	       fd, fdout));
+    return cfp;
+}
+
 /* This is to "unencapsulate" the file descriptor */
 int
 #if PROTOTYPES
@@ -745,6 +776,9 @@ FileUnopen(cfp)
 	case simpleFile:
 	    retval = cfp->fd;
 	    break;
+	case simplePipe:
+	    retval = cfp->fd;
+	    break;
 	case simpleSocket:
 	    retval = cfp->fd;
 	    break;
@@ -758,6 +792,7 @@ FileUnopen(cfp)
 	    break;
     }
     CONDDEBUG((2, "FileUnopen(): unopened fd %d", cfp->fd));
+    DestroyString(cfp->wbuf);
     free(cfp);
 
     return retval;
@@ -824,6 +859,14 @@ FileClose(pcfp)
 	case simpleFile:
 	    do {
 		retval = close(cfp->fd);
+	    } while (retval == -1 && errno == EINTR);
+	    break;
+	case simplePipe:
+	    do {
+		retval = close(cfp->fd);
+	    } while (retval == -1 && errno == EINTR);
+	    do {
+		retval = close(cfp->fdout);
 	    } while (retval == -1 && errno == EINTR);
 	    break;
 	case simpleSocket:
@@ -896,6 +939,7 @@ FileRead(cfp, buf, len)
 
     switch (cfp->ftype) {
 	case simpleFile:
+	case simplePipe:
 	case simpleSocket:
 	    while (retval < 0) {
 		if ((retval = read(cfp->fd, buf, len)) <= 0) {
@@ -994,9 +1038,15 @@ FileWrite(cfp, buf, len)
     int len_orig = len;
     int len_out = 0;
     int retval = 0;
+    int fdout = 0;
 
     if (len < 0 && buf != (char *)0)
 	len = strlen(buf);
+
+    if (cfp->ftype == simplePipe)
+	fdout = cfp->fdout;
+    else
+	fdout = cfp->fd;
 
     if (fDebug && len > 0 && buf != (char *)0) {
 	static STRING *tmpString = (STRING *)0;
@@ -1005,7 +1055,7 @@ FileWrite(cfp, buf, len)
 	BuildString((char *)0, tmpString);
 	FmtCtlStr(buf, len > 30 ? 30 : len, tmpString);
 	CONDDEBUG((2, "FileWrite(): sending `%s' to fd %d",
-		   tmpString->string, cfp->fd));
+		   tmpString->string, fdout));
     }
     /* save the data */
     if (len > 0 && buf != (char *)0)
@@ -1024,10 +1074,11 @@ FileWrite(cfp, buf, len)
      * stop when we hit an error or flush all the data.
      */
     switch (cfp->ftype) {
+	case simplePipe:
 	case simpleFile:
 	case simpleSocket:
 	    while (len > 0) {
-		if ((retval = write(cfp->fd, buf, len)) < 0) {
+		if ((retval = write(fdout, buf, len)) < 0) {
 		    if (errno == EINTR)
 			continue;
 		    if (errno == EAGAIN) {
@@ -1038,7 +1089,7 @@ FileWrite(cfp, buf, len)
 		    retval = -1;
 		    if (errno == EPIPE)
 			break;
-		    Error("FileWrite(): fd %d: %s", cfp->fd,
+		    Error("FileWrite(): fd %d: %s", fdout,
 			  strerror(errno));
 		    break;
 		}
@@ -1110,20 +1161,20 @@ FileWrite(cfp, buf, len)
 	}
     }
     if (cfp->wbuf->used <= 1)
-	FD_CLR(cfp->fd, &winit);
+	FD_CLR(fdout, &winit);
     else {
-	FD_SET(cfp->fd, &winit);
+	FD_SET(fdout, &winit);
 	CONDDEBUG((2, "FileWrite(): buffered %d byte%s for fd %d",
 		   (cfp->wbuf->used <= 1) ? 0 : cfp->wbuf->used,
-		   (cfp->wbuf->used <= 1) ? "" : "s", cfp->fd));
+		   (cfp->wbuf->used <= 1) ? "" : "s", fdout));
     }
 
     if (len_out >= 0) {
 	CONDDEBUG((2, "FileWrite(): wrote %d byte%s to fd %d", len_out,
-		   (len_out == 1) ? "" : "s", cfp->fd));
+		   (len_out == 1) ? "" : "s", fdout));
     } else {
 	CONDDEBUG((2, "FileWrite(): write of %d byte%s to fd %d: %s",
-		   len_orig, (len_out == -1) ? "" : "s", cfp->fd,
+		   len_orig, (len_out == -1) ? "" : "s", fdout,
 		   strerror(errno)));
     }
     return len_out;
@@ -1139,12 +1190,19 @@ FileCanRead(cfp, prfd, pwfd)
     fd_set *pwfd;
 #endif
 {
+    int fdout;
+
     if (cfp == (CONSFILE *)0)
 	return 0;
 
+    if (cfp->ftype == simplePipe)
+	fdout = cfp->fdout;
+    else
+	fdout = cfp->fd;
+
     return ((FD_ISSET(cfp->fd, prfd)
 #if HAVE_OPENSSL
-	     && cfp->waitForRead != FLAGTRUE) || (FD_ISSET(cfp->fd, pwfd)
+	     && cfp->waitForRead != FLAGTRUE) || (FD_ISSET(fdout, pwfd)
 						  && cfp->waitForWrite ==
 						  FLAGTRUE
 #endif
@@ -1161,10 +1219,17 @@ FileCanWrite(cfp, prfd, pwfd)
     fd_set *pwfd;
 #endif
 {
+    int fdout;
+
     if (cfp == (CONSFILE *)0)
 	return 0;
 
-    return ((FD_ISSET(cfp->fd, pwfd)
+    if (cfp->ftype == simplePipe)
+	fdout = cfp->fdout;
+    else
+	fdout = cfp->fd;
+
+    return ((FD_ISSET(fdout, pwfd)
 #if HAVE_OPENSSL
 	     && cfp->waitForWrite != FLAGTRUE) || (FD_ISSET(cfp->fd, prfd)
 						   && cfp->waitForRead ==
@@ -1399,6 +1464,9 @@ FileStat(cfp, buf)
 	case simpleFile:
 	    retval = fstat(cfp->fd, buf);
 	    break;
+	case simplePipe:
+	    retval = -1;
+	    break;
 	case simpleSocket:
 	    retval = fstat(cfp->fd, buf);
 	    break;
@@ -1431,6 +1499,9 @@ FileSeek(cfp, offset, whence)
     switch (cfp->ftype) {
 	case simpleFile:
 	    retval = lseek(cfp->fd, offset, whence);
+	    break;
+	case simplePipe:
+	    retval = -1;
 	    break;
 	case simpleSocket:
 	    retval = lseek(cfp->fd, offset, whence);
@@ -1466,6 +1537,9 @@ FileFDNum(cfp)
 	case simpleFile:
 	    retval = cfp->fd;
 	    break;
+	case simplePipe:
+	    retval = cfp->fd;
+	    break;
 	case simpleSocket:
 	    retval = cfp->fd;
 	    break;
@@ -1482,6 +1556,21 @@ FileFDNum(cfp)
     return retval;
 }
 
+/* Returns the file descriptor number of the underlying file */
+int
+#if PROTOTYPES
+FileFDOutNum(CONSFILE *cfp)
+#else
+FileFDOutNum(cfp)
+    CONSFILE *cfp;
+#endif
+{
+    if (cfp == (CONSFILE *)0 || cfp->ftype != simplePipe)
+	return -1;
+
+    return cfp->fdout;
+}
+
 /* Returns the file type */
 enum consFileType
 #if PROTOTYPES
@@ -1494,6 +1583,8 @@ FileGetType(cfp)
     switch (cfp->ftype) {
 	case simpleFile:
 	    return simpleFile;
+	case simplePipe:
+	    return simplePipe;
 	case simpleSocket:
 	    return simpleSocket;
 #if HAVE_OPENSSL
@@ -1628,6 +1719,9 @@ FileSend(cfp, msg, len, flags)
     switch (cfp->ftype) {
 	case simpleFile:
 	    retval = send(cfp->fd, msg, len, flags);
+	    break;
+	case simplePipe:
+	    retval = send(cfp->fdout, msg, len, flags);
 	    break;
 	case simpleSocket:
 	    retval = send(cfp->fd, msg, len, flags);

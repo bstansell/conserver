@@ -1,5 +1,5 @@
-.\" $Id: console.man,v 1.33 2003-09-22 08:21:31-07 bryan Exp $
-.TH CONSOLE 1 "2003-09-22" "conserver-8.0.0" "conserver"
+.\" $Id: console.man,v 1.36 2003-09-28 15:30:52-07 bryan Exp $
+.TH CONSOLE 1 "2003-09-28" "conserver-8.0.1" "conserver"
 .SH NAME
 console \- console server client program
 .SH SYNOPSIS
@@ -259,7 +259,7 @@ attached to
 .IR console ).
 .TP
 .B \-u
-Show a list of all consoles with status (`up' or `down')
+Show a list of all consoles with status (`up', `down', or `init')
 and attached users
 .RI ( user @ host
 if attached read-write, `<spies>' if only users in spy mode, or `<none>').
@@ -302,7 +302,7 @@ were typed).
 .PP
 The
 .B \-i
-option outputs information regarding each console in 12 colon-separated fields.
+option outputs information regarding each console in 13 colon-separated fields.
 .TP
 .I name
 The name of the console.
@@ -337,7 +337,7 @@ Each user bundle is seperated by commas.
 .TP
 .I state
 The state of the console.
-Values with either be ``up'' or ``down''.
+Values with either be ``up'', ``down'', or ``init''.
 .TP
 .I perm
 This value will either be ``rw'' or ``ro''.
@@ -366,6 +366,9 @@ The console aliases are presented in a comma seperated list.
 .TP
 .I options
 The active options for the console are presented in a comma seperated list.
+.TP
+.I initcmd
+The initcmd configuration option for the console.
 .SH "ESCAPE SEQUENCES"
 The connection can be controlled by a two-character escape sequence, followed
 by a command.
@@ -534,6 +537,9 @@ Never run
 .B console
 from within a console connection (unless you set each
 escape sequence differently).
+.PP
+The \-i output can produce more than the stated number of fields of
+information if the user-provided information has embedded colons.
 .PP
 I'm sure there are more, I just don't know where they are.
 Please let me know if you find any.

@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.137 2003-08-21 15:03:25-07 bryan Exp $
+ *  $Id: readcfg.c,v 5.140 2003-09-28 09:32:55-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -26,8 +26,8 @@
 #include <compat.h>
 
 #include <util.h>
-#include <client.h>
 #include <consent.h>
+#include <client.h>
 #include <group.h>
 #include <access.h>
 #include <readcfg.h>
@@ -623,6 +623,8 @@ DestroyParserDefaultOrConsole(c, ph, pt)
 	free(c->device);
     if (c->logfile != (char *)0)
 	free(c->logfile);
+    if (c->initcmd != (char *)0)
+	free(c->initcmd);
     if (c->execSlave != (char *)0)
 	free(c->execSlave);
     if (c->wbuf != (STRING *)0)
@@ -725,6 +727,12 @@ ApplyDefault(d, c)
 	if (c->logfile != (char *)0)
 	    free(c->logfile);
 	if ((c->logfile = strdup(d->logfile)) == (char *)0)
+	    OutOfMem();
+    }
+    if (d->initcmd != (char *)0) {
+	if (c->initcmd != (char *)0)
+	    free(c->initcmd);
+	if ((c->initcmd = strdup(d->initcmd)) == (char *)0)
 	    OutOfMem();
     }
     if (d->ro != (CONSENTUSERS *)0) {
@@ -1073,6 +1081,27 @@ ProcessLogfile(c, id)
 
 void
 #if PROTOTYPES
+ProcessRuninit(CONSENT *c, char *id)
+#else
+ProcessRuninit(c, id)
+    CONSENT *c;
+    char *id;
+#endif
+{
+    if (c->initcmd != (char *)0) {
+	free(c->initcmd);
+	c->initcmd = (char *)0;
+    }
+    if (id == (char *)0 || id[0] == '\000') {
+	return;
+    }
+    if ((c->initcmd = strdup(id))
+	== (char *)0)
+	OutOfMem();
+}
+
+void
+#if PROTOTYPES
 DefaultItemLogfile(char *id)
 #else
 DefaultItemLogfile(id)
@@ -1081,6 +1110,18 @@ DefaultItemLogfile(id)
 {
     CONDDEBUG((1, "DefaultItemLogfile(%s) [%s:%d]", id, file, line));
     ProcessLogfile(parserDefaultTemp, id);
+}
+
+void
+#if PROTOTYPES
+DefaultItemRuninit(char *id)
+#else
+DefaultItemRuninit(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemRuninit(%s) [%s:%d]", id, file, line));
+    ProcessRuninit(parserDefaultTemp, id);
 }
 
 void
@@ -1945,6 +1986,14 @@ ConsoleAdd(c)
 	    if (!FileBufEmpty(pCEmatch->cofile))
 		FD_SET(cofile, &winit);
 	}
+	if (pCEmatch->initfile != (CONSFILE *)0) {
+	    int initfile = FileFDNum(pCEmatch->initfile);
+	    FD_SET(initfile, &rinit);
+	    if (maxfd < initfile + 1)
+		maxfd = initfile + 1;
+	    if (!FileBufEmpty(pCEmatch->initfile))
+		FD_SET(FileFDOutNum(pCEmatch->initfile), &winit);
+	}
 
 	/* now check for any changes between pCEmatch & c.
 	 * we can munch the pCEmatch structure 'cause ConsDown()
@@ -1963,6 +2012,20 @@ ConsoleAdd(c)
 		   c->logfile != (char *)0) {
 	    SwapStr(pCEmatch->logfile, c->logfile);
 	    closeMatch = 0;
+	}
+	if (pCEmatch->initcmd != (char *)0 && c->initcmd != (char *)0) {
+	    if (strcmp(pCEmatch->initcmd, c->initcmd) != 0) {
+		SwapStr(pCEmatch->initcmd, c->initcmd);
+		/* only trigger reinit if we're running the old command */
+		if (pCEmatch->initpid != 0)
+		    closeMatch = 0;
+	    }
+	} else if (pCEmatch->initcmd != (char *)0 ||
+		   c->initcmd != (char *)0) {
+	    SwapStr(pCEmatch->initcmd, c->initcmd);
+	    /* only trigger reinit if we're running the old command */
+	    if (pCEmatch->initpid != 0)
+		closeMatch = 0;
 	}
 
 	switch (pCEmatch->type) {
@@ -2266,7 +2329,8 @@ ConsoleDestroy()
 			    TagLogfile(pCE,
 				       "Console logging restored (bumped)");
 			}
-			pCE->pCLwr = FindWrite(pCE->pCLon);
+			pCE->pCLwr = (CONSCLIENT *)0;
+			FindWrite(pCE);
 		    }
 		} else {
 		    FileWrite(pCL->fd,
@@ -2440,6 +2504,18 @@ ConsoleItemLogfile(id)
 {
     CONDDEBUG((1, "ConsoleItemLogfile(%s) [%s:%d]", id, file, line));
     ProcessLogfile(parserConsoleTemp, id);
+}
+
+void
+#if PROTOTYPES
+ConsoleItemRuninit(char *id)
+#else
+ConsoleItemRuninit(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemRuninit(%s) [%s:%d]", id, file, line));
+    ProcessRuninit(parserConsoleTemp, id);
 }
 
 void
@@ -2844,8 +2920,6 @@ AccessProcessACL(trust, acl)
 #endif
 {
     char *token = (char *)0;
-    int i = 0, isCIDR = 0;
-    int nCount = 0, dCount = 0, sCount = 0, mCount = 0, sPos = 0;
     ACCESS **ppa = (ACCESS **)0;
     ACCESS *pa = (ACCESS *)0;
     in_addr_t addr;
@@ -2872,6 +2946,8 @@ AccessProcessACL(trust, acl)
 
     for (token = strtok(acl, ALLWORDSEP); token != (char *)0;
 	 token = strtok(NULL, ALLWORDSEP)) {
+	int i = 0, isCIDR = 0;
+	int nCount = 0, dCount = 0, sCount = 0, mCount = 0, sPos = 0;
 	/* Scan for [0-9./], and stop if you find something else */
 	for (i = 0; token[i] != '\000'; i++) {
 	    if (isdigit((int)(token[i]))) {
@@ -3000,6 +3076,8 @@ DestroyConfig(c)
 	return;
     if (c->logfile != (char *)0)
 	free(c->logfile);
+    if (c->initcmd != (char *)0)
+	free(c->initcmd);
     if (c->passwdfile != (char *)0)
 	free(c->passwdfile);
     if (c->primaryport != (char *)0)
@@ -3058,6 +3136,12 @@ ConfigEnd()
 		    free(pConfig->logfile);
 		pConfig->logfile = parserConfigTemp->logfile;
 		parserConfigTemp->logfile = (char *)0;
+	    }
+	    if (parserConfigTemp->initcmd != (char *)0) {
+		if (pConfig->initcmd != (char *)0)
+		    free(pConfig->initcmd);
+		pConfig->initcmd = parserConfigTemp->initcmd;
+		parserConfigTemp->initcmd = (char *)0;
 	    }
 	    if (parserConfigTemp->passwdfile != (char *)0) {
 		if (pConfig->passwdfile != (char *)0)
@@ -3377,6 +3461,7 @@ ITEM keyDefault[] = {
     {"parity", DefaultItemParity},
     {"port", DefaultItemPort},
     {"ro", DefaultItemRo},
+    {"initcmd", DefaultItemRuninit},
     {"rw", DefaultItemRw},
     {"timestamp", DefaultItemTimestamp},
     {"type", DefaultItemType},
@@ -3398,6 +3483,7 @@ ITEM keyConsole[] = {
     {"parity", ConsoleItemParity},
     {"port", ConsoleItemPort},
     {"ro", ConsoleItemRo},
+    {"initcmd", ConsoleItemRuninit},
     {"rw", ConsoleItemRw},
     {"timestamp", ConsoleItemTimestamp},
     {"type", ConsoleItemType},

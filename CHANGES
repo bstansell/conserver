@@ -1,6 +1,29 @@
 				CHANGES
 				=======
 
+version 8.0.1 (Sep 29, 2003):
+	- fixed bug in access list parsing where multiple addresses per
+	  line can cause errors - reported by Jay McCanta
+	  <mccantaj@amgen.com>
+	- changed client password prompt to show hostname passed down by
+	  the server - suggested by Toby Gerhart <toby.gerhart@eds.com>
+	- fixed bug where remote console names were only search for
+	  substring matches - reported by Toby Gerhart
+	  <toby.gerhart@eds.com> 
+	- the server -M option wasn't being used properly to limit the
+	  consoles managed by the host
+	- added 'initcmd' console option which allows a command to
+	  interact with a console right after a console is opened -
+	  suggested by Greg Woods <woods@weird.com>
+	- added the chat program contributed by Greg Woods
+	  <woods@weird.com> to the contrib/chat directory
+	- added WUNTRACED to waitpid() for catching suspended processes
+	- reworded some client/server messages to be clearer
+	- embedded non-printable characters in break lists now display
+	  correctly when '^Ecl?' is used
+	- in case client aborts unexpectedly, terminal state should
+	  now be restored to normal
+
 version 8.0.0 (Sep 22, 2003):
 	- better error messages and management of the user's password
 	- 8.0.0-beta4 mistakenly lost conserver.passwd usage
@@ -517,5 +540,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.103 2003-09-22 10:42:00-07 bryan Exp $
+#  $Id: CHANGES,v 1.109 2003-09-29 08:41:20-07 bryan Exp $
 #

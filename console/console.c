@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.137 2003-09-22 08:23:57-07 bryan Exp $
+ *  $Id: console.c,v 5.141 2003-09-29 08:36:06-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -71,26 +71,26 @@ SetupSSL()
 	SSL_load_error_strings();
 	if (!SSL_library_init()) {
 	    Error("SSL library initialization failed");
-	    exit(EX_UNAVAILABLE);
+	    Bye(EX_UNAVAILABLE);
 	}
 	if ((ctx = SSL_CTX_new(SSLv23_method())) == (SSL_CTX *)0) {
 	    Error("Creating SSL context failed");
-	    exit(EX_UNAVAILABLE);
+	    Bye(EX_UNAVAILABLE);
 	}
 	if (SSL_CTX_set_default_verify_paths(ctx) != 1) {
 	    Error("Could not load SSL default CA file and/or directory");
-	    exit(EX_UNAVAILABLE);
+	    Bye(EX_UNAVAILABLE);
 	}
 	if (pcCredFile != (char *)0) {
 	    if (SSL_CTX_use_certificate_chain_file(ctx, pcCredFile) != 1) {
 		Error("Could not load SSL certificate from '%s'",
 		      pcCredFile);
-		exit(EX_UNAVAILABLE);
+		Bye(EX_UNAVAILABLE);
 	    }
 	    if (SSL_CTX_use_PrivateKey_file
 		(ctx, pcCredFile, SSL_FILETYPE_PEM) != 1) {
 		Error("Could not SSL private key from '%s'", pcCredFile);
-		exit(EX_UNAVAILABLE);
+		Bye(EX_UNAVAILABLE);
 	    }
 	}
 	SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, SSLVerifyCallback);
@@ -104,7 +104,7 @@ SetupSSL()
 	if (SSL_CTX_set_cipher_list(ctx, "ALL:!LOW:!EXP:!MD5:@STRENGTH") !=
 	    1) {
 	    Error("Setting SSL cipher list failed");
-	    exit(EX_UNAVAILABLE);
+	    Bye(EX_UNAVAILABLE);
 	}
     }
 }
@@ -121,11 +121,11 @@ AttemptSSL(pcf)
 
     if (ctx == (SSL_CTX *)0) {
 	Error("WTF?  The SSL context disappeared?!?!?");
-	exit(EX_UNAVAILABLE);
+	Bye(EX_UNAVAILABLE);
     }
     if (!(ssl = SSL_new(ctx))) {
 	Error("Couldn't create new SSL context");
-	exit(EX_UNAVAILABLE);
+	Bye(EX_UNAVAILABLE);
     }
     FileSetSSL(pcf, ssl);
     SSL_set_fd(ssl, FileFDNum(pcf));
@@ -133,22 +133,13 @@ AttemptSSL(pcf)
     if (SSL_connect(ssl) <= 0) {
 	Error("SSL negotiation failed");
 	ERR_print_errors_fp(stderr);
-	exit(EX_UNAVAILABLE);
+	Bye(EX_UNAVAILABLE);
     }
     FileSetType(pcf, SSLSocket);
     CONDDEBUG((1, "SSL Connection: %s :: %s", SSL_get_cipher_version(ssl),
 	       SSL_get_cipher_name(ssl)));
 }
 #endif
-
-void
-#if PROTOTYPES
-DestroyDataStructures(void)
-#else
-DestroyDataStructures()
-#endif
-{
-}
 
 /* output a control (or plain) character as a UNIX user would expect it	(ksb)
  */
@@ -189,7 +180,7 @@ Usage(wantfull)
 #endif
 {
     static char *full[] = {
-	"7       strip the high bit of all console data",
+	"7       strip the high bit off all console data",
 	"a(A)    attach politely (and replay last 20 lines)",
 	"b(B)    send broadcast message to all users (on master)",
 #if HAVE_OPENSSL
@@ -206,8 +197,8 @@ Usage(wantfull)
 	"E       ignored - encryption not compiled into code",
 #endif
 	"f(F)    force read/write connection (and replay)",
-	"i(I)    display information in machine-parseable form (on master)",
 	"h       output this message",
+	"i(I)    display information in machine-parseable form (on master)",
 	"l user  use username instead of current username",
 	"M mach  master server to poll first",
 	"p port  port to connect to",
@@ -388,7 +379,7 @@ ValidateEsc()
     }
     if (c1 > 127 || c2 > 127) {
 	Error("High-bit set in escape sequence: not allowed with -7");
-	exit(EX_UNAVAILABLE);
+	Bye(EX_UNAVAILABLE);
     }
 }
 
@@ -408,12 +399,12 @@ ParseEsc(pcText)
     pcTemp = pcText;
     if (ParseChar(&pcTemp, &c1) || ParseChar(&pcTemp, &c2)) {
 	Error("poorly formed escape sequence `%s\'", pcText);
-	exit(EX_UNAVAILABLE);
+	Bye(EX_UNAVAILABLE);
     }
     if ('\000' != *pcTemp) {
 	Error("too many characters in new escape sequence at ...`%s\'",
 	      pcTemp);
-	exit(EX_UNAVAILABLE);
+	Bye(EX_UNAVAILABLE);
     }
     chAttn = c1;
     chEsc = c2;
@@ -521,7 +512,7 @@ C2Raw()
 
     if (0 != tcgetattr(0, &o_tios)) {
 	Error("tcgetattr(0): %s", strerror(errno));
-	exit(EX_UNAVAILABLE);
+	Bye(EX_UNAVAILABLE);
     }
     n_tios = o_tios;
     n_tios.c_iflag &= ~(INLCR | IGNCR | ICRNL | IUCLC | IXON);
@@ -531,7 +522,7 @@ C2Raw()
     n_tios.c_cc[VTIME] = 0;
     if (0 != tcsetattr(0, TCSANOW, &n_tios)) {
 	Error("tcsetattr(0, TCSANOW): %s", strerror(errno));
-	exit(EX_UNAVAILABLE);
+	Bye(EX_UNAVAILABLE);
     }
     screwy = 1;
 }
@@ -550,6 +541,16 @@ C2Cooked()
 	return;
     tcsetattr(0, TCSANOW, &o_tios);
     screwy = 0;
+}
+
+void
+#if PROTOTYPES
+DestroyDataStructures(void)
+#else
+DestroyDataStructures()
+#endif
+{
+    C2Cooked();
 }
 
 char *
@@ -579,7 +580,7 @@ ReadReply(fd)
 		    break;
 		C2Cooked();
 		Error("lost connection");
-		exit(EX_UNAVAILABLE);
+		Bye(EX_UNAVAILABLE);
 	    default:
 		BuildStringN(buf, nr, result);
 		if (toEOF)	/* if toEOF, read until EOF */
@@ -669,7 +670,7 @@ ProcessUrgentData(s)
 	case OB_DROP:
 	    write(1, "dropped by server]\r\n", 20);
 	    C2Cooked();
-	    exit(EX_UNAVAILABLE);
+	    Bye(EX_UNAVAILABLE);
 	 /*NOTREACHED*/ default:
 	    Error("unknown out of band command `%c\'\r", acCmd);
 	    fflush(stderr);
@@ -735,14 +736,15 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 	/* OK -- we are good as gold */
 	fIn = 'a';
     } else if (0 == strcmp(result, "[spy]\r\n") ||
-	       0 == strcmp(result, "[ok]\r\n")) {
+	       0 == strcmp(result, "[ok]\r\n") ||
+	       0 == strcmp(result, "[read-only -- initializing]\r\n")) {
 	/* Humph, someone else is on
 	 * or we have an old version of the server (4.X)
 	 */
 	fIn = 's';
-    } else if (0 == strcmp(result, "[host is read-only]\r\n")) {
+    } else if (0 == strcmp(result, "[console is read-only]\r\n")) {
 	fIn = 'r';
-    } else if (0 == strcmp(result, "[line to host is down]\r\n")) {
+    } else if (0 == strcmp(result, "[line to console is down]\r\n")) {
 	/* ouch, the machine is down on the server */
 	fIn = '-';
 	Error("%s is down", pcMach);
@@ -752,18 +754,9 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 	    PutCtlc(chEsc, stdout);
 	    printf("o\' to open console line]\n");
 	}
-    } else if (0 == strcmp(result, "[no -- on ctl]\r\n")) {
-	fIn = '-';
-	Error("%s is a control port", pcMach);
-	if (fVerbose) {
-	    printf("[use `");
-	    PutCtlc(chAttn, stdout);
-	    PutCtlc(chEsc, stdout);
-	    printf(";\' to open a console line]\n");
-	}
     } else {
 	FilePrint(cfstdout, "%s: %s", pcMach, result);
-	exit(EX_UNAVAILABLE);
+	Bye(EX_UNAVAILABLE);
     }
 
     /* change escape sequence (if set on the command line)
@@ -783,7 +776,7 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 	r = ReadReply(pcf, 0);
 	if (strncmp(r, "[redef:", 7) != 0) {
 	    Error("protocol botch on redef of escape sequence");
-	    exit(EX_UNAVAILABLE);
+	    Bye(EX_UNAVAILABLE);
 	}
     }
 
@@ -974,15 +967,23 @@ DoCmds(master, ports, cmdi)
 	FileWrite(pcf, t, -1);
 
 	t = ReadReply(pcf, 0);
-	if (strcmp(t, "passwd?\r\n") == 0) {
+	if (strncmp(t, "passwd?", 7) == 0) {
 	    static int count = 0;
 	    static STRING *tmpString = (STRING *)0;
+	    char *hostname = (char *)0;
+
+	    if (t[7] == ' ') {
+		hostname = PruneSpace(t + 7);
+		if (*hostname == '\000')
+		    hostname = server;
+	    } else
+		hostname = server;
 	    if (tmpString == (STRING *)0)
 		tmpString = AllocString();
 	    if (tmpString->used <= 1) {
 		char *pass;
 		sprintf(acMesg, "Enter %s@%s's password: ", pcUser,
-			master);
+			hostname);
 		pass = GetPassword(acMesg);
 		if (pass == (char *)0) {
 		    Error("could not get password from tty for `%s'",
@@ -1036,7 +1037,7 @@ DoCmds(master, ports, cmdi)
 		static int limit = 0;
 		if (limit++ > 10) {
 		    Error("forwarding level too deep!");
-		    exit(EX_SOFTWARE);
+		    Bye(EX_SOFTWARE);
 		}
 	    } else if (result[0] != '[') {	/* did we not get a connection? */
 		FilePrint(cfstdout, "%s: %s", server, result);
@@ -1260,11 +1261,11 @@ main(argc, argv)
 		BuildString((char *)0, textMsg);
 		if (optarg == (char *)0 || *optarg == '\000') {
 		    Error("no destination specified for -t", optarg);
-		    exit(EX_UNAVAILABLE);
+		    Bye(EX_UNAVAILABLE);
 		} else if (strchr(optarg, ' ') != (char *)0) {
 		    Error("-t option cannot contain a space: `%s'",
 			  optarg);
-		    exit(EX_UNAVAILABLE);
+		    Bye(EX_UNAVAILABLE);
 		}
 		BuildString("textmsg ", textMsg);
 		BuildString(optarg, textMsg);
@@ -1296,21 +1297,21 @@ main(argc, argv)
 
 	    case 'h':		/* huh? */
 		Usage(1);
-		exit(EX_OK);
+		Bye(EX_OK);
 
 	    case '\?':		/* huh? */
 		Usage(0);
-		exit(EX_UNAVAILABLE);
+		Bye(EX_UNAVAILABLE);
 
 	    default:
 		Error("option %c needs a parameter", optopt);
-		exit(EX_UNAVAILABLE);
+		Bye(EX_UNAVAILABLE);
 	}
     }
 
     if (fVersion) {
 	Version();
-	exit(EX_OK);
+	Bye(EX_OK);
     }
 
     /* finish resolving the command to do */
@@ -1321,20 +1322,20 @@ main(argc, argv)
     if (*pcCmd == 'a' || *pcCmd == 'f' || *pcCmd == 's') {
 	if (optind >= argc) {
 	    Error("missing console name");
-	    exit(EX_UNAVAILABLE);
+	    Bye(EX_UNAVAILABLE);
 	}
 	cmdarg = argv[optind++];
     } else if (*pcCmd == 't') {
 	if (optind >= argc) {
 	    Error("missing message text");
-	    exit(EX_UNAVAILABLE);
+	    Bye(EX_UNAVAILABLE);
 	}
 	cmdarg = argv[optind++];
     }
 
     if (optind < argc) {
 	Error("extra garbage on command line? (%s...)", argv[optind]);
-	exit(EX_UNAVAILABLE);
+	Bye(EX_UNAVAILABLE);
     }
 
     /* if we somehow lost the port (or got an empty string), reset */
@@ -1354,7 +1355,7 @@ main(argc, argv)
 	struct servent *pSE;
 	if ((pSE = getservbyname(pcPort, "tcp")) == (struct servent *)0) {
 	    Error("getservbyname(%s): %s", pcPort, strerror(errno));
-	    exit(EX_UNAVAILABLE);
+	    Bye(EX_UNAVAILABLE);
 	} else {
 	    bindPort = ntohs((u_short) pSE->s_port);
 	}
@@ -1367,13 +1368,13 @@ main(argc, argv)
 	    Error
 		("$LOGNAME and $USER do not exist and getpwuid fails: %d: %s",
 		 (int)(getuid()), strerror(errno));
-	    exit(EX_UNAVAILABLE);
+	    Bye(EX_UNAVAILABLE);
 	}
 	if (pcUser == (char *)0) {
 	    if (pwdMe->pw_name == (char *)0 || pwdMe->pw_name[0] == '\000') {
 		Error("Username for uid %d does not exist",
 		      (int)(getuid()));
-		exit(EX_UNAVAILABLE);
+		Bye(EX_UNAVAILABLE);
 	    } else {
 		pcUser = pwdMe->pw_name;
 	    }
@@ -1414,5 +1415,6 @@ main(argc, argv)
     if (*pcCmd == 'd')
 	FilePrint(cfstdout, "Disconnected %d users\n", disconnectCount);
 
-    exit(retval);
+    Bye(retval);
+    return 0;			/* noop - Bye() terminates us */
 }

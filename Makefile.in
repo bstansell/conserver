@@ -25,6 +25,12 @@ autologin:
 autologin.install:
 	( cd autologin && $(MAKE) install $(MAKE_FLAGS) ) || exit 1;
 
+chat:
+	( cd contrib/chat && $(MAKE) $@ $(MAKE_FLAGS) ) || exit 1;
+
+chat.install:
+	( cd contrib/chat && $(MAKE) install $(MAKE_FLAGS) ) || exit 1;
+
 test:
 	( cd test && ./dotest ) || exit 1
 

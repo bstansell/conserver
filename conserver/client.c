@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.69 2003-08-15 14:24:39-07 bryan Exp $
+ *  $Id: client.c,v 5.70 2003-09-28 08:42:06-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -52,36 +52,40 @@ int deny_severity = LOG_WARNING;
 
 /* find the next guy who wants to write on the console			(ksb)
  */
-CONSCLIENT *
+void
 #if PROTOTYPES
-FindWrite(CONSCLIENT *pCL)
+FindWrite(CONSENT *pCE)
 #else
-FindWrite(pCL)
-    CONSCLIENT *pCL;
+FindWrite(pCE)
+    CONSENT *pCE;
 #endif
 {
-    /* return the first guy to have the `want write' bit set
+    CONSCLIENT *pCL;
+
+    /* make the first guy to have the `want write' bit set the writer
      * (tell him of the promotion, too)  we could look for the
      * most recent or some such... I guess it doesn't matter that
      * much.
      */
-    for ( /*passed in */ ; (CONSCLIENT *)0 != pCL; pCL = pCL->pCLnext) {
+    if (pCE->pCLwr != (CONSCLIENT *)0 || pCE->fronly ||
+	!(pCE->fup && pCE->ioState == ISNORMAL &&
+	  pCE->initfile == (CONSFILE *)0))
+	return;
+
+    for (pCL = pCE->pCLon; (CONSCLIENT *)0 != pCL; pCL = pCL->pCLnext) {
 	if (!pCL->fwantwr || pCL->fro)
 	    continue;
-	if (!(pCL->pCEto->fup && pCL->pCEto->ioState == ISNORMAL) ||
-	    pCL->pCEto->fronly)
-	    break;
 	pCL->fwantwr = 0;
 	pCL->fwr = 1;
-	if (pCL->pCEto->nolog) {
+	if (pCE->nolog) {
 	    FileWrite(pCL->fd, "\r\n[attached (nologging)]\r\n", -1);
 	} else {
 	    FileWrite(pCL->fd, "\r\n[attached]\r\n", -1);
 	}
-	TagLogfileAct(pCL->pCEto, "%s attached", pCL->acid->string);
-	return pCL;
+	TagLogfileAct(pCE, "%s attached", pCL->acid->string);
+	pCE->pCLwr = pCL;
+	return;
     }
-    return (CONSCLIENT *)0;
 }
 
 /* replay last iBack lines of the log file upon connect to console	(ksb)

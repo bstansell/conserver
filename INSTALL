@@ -10,6 +10,13 @@ Upgrading?
     new features added to the client if you're considering *not*
     upgrading.
 
+    Version 8.0.1
+
+	- There's a slight client/server protocol change to implement
+	  the new 'initcmd' console option.  If you use this
+	  functionality with an 8.0.0 client, you'll run into a
+	  compatibility problem while the 'initcmd' command is running.
+
     Version 8.0.0
 
 	- The client/server protocol has been rearchitected.  You *MUST*
@@ -239,5 +246,5 @@ Other Information And Gotchas
 
 
 #
-#  $Id: INSTALL,v 1.32 2003-08-23 11:20:55-07 bryan Exp $
+#  $Id: INSTALL,v 1.33 2003-09-28 17:50:05-07 bryan Exp $
 #

@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.248 2003-09-19 08:58:18-07 bryan Exp $
+ *  $Id: group.c,v 5.256 2003-09-29 08:39:13-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -220,7 +220,8 @@ DisconnectClient(pGE, pCL, message, force)
 	    pCEServing->nolog = 0;
 	    TagLogfile(pCEServing, "Console logging restored (logout)");
 	}
-	pCEServing->pCLwr = FindWrite(pCEServing->pCLon);
+	pCEServing->pCLwr = (CONSCLIENT *)0;
+	FindWrite(pCEServing);
     }
 
     /* mark as unconnected and remove from both
@@ -802,10 +803,10 @@ ConsoleError(pCE)
 	ConsInit(pCE);
 
 	/* If we didn't succeed, try again later */
-	if (!pCE->fup)
-	    pCE->autoReUp = 1;
+	if (pCE->fup)
+	    FindWrite(pCE);
 	else
-	    pCE->pCLwr = FindWrite(pCE->pCLon);
+	    pCE->autoReUp = 1;
     }
 }
 
@@ -884,8 +885,8 @@ ReUp(pGE, automatic)
 	if (automatic)
 	    Msg("[%s] automatic reinitialization", pCE->server);
 	ConsInit(pCE);
-	if (pCE->fup && pCE->ioState == ISNORMAL)
-	    pCE->pCLwr = FindWrite(pCE->pCLon);
+	if (pCE->fup)
+	    FindWrite(pCE);
 	else if (automatic)
 	    pCE->autoReUp = autoReUp;
     }
@@ -1131,13 +1132,15 @@ ReapVirt(pGE)
     int UWbuf;
     CONSENT *pCE;
 
-    while (-1 != (pid = waitpid(-1, &UWbuf, WNOHANG))) {
+    while (-1 != (pid = waitpid(-1, &UWbuf, WNOHANG | WUNTRACED))) {
 	if (0 == pid) {
 	    break;
 	}
 	/* stopped child is just continued
 	 */
 	if (WIFSTOPPED(UWbuf) && 0 == kill(pid, SIGCONT)) {
+	    Msg("child pid %lu: stopped, sending SIGCONT",
+		(unsigned long)pid);
 	    continue;
 	}
 
@@ -1146,6 +1149,15 @@ ReapVirt(pGE)
 	}
 
 	for (pCE = pGE->pCElist; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
+	    if (pid == pCE->initpid) {
+		Verbose("[%s] initcmd terminated: pid %lu", pCE->server,
+			(unsigned long)pCE->initpid);
+		pCE->initpid = 0;
+		StopInit(pCE);
+		FindWrite(pCE);
+		break;
+	    }
+
 	    if (pid != pCE->ipid)
 		continue;
 
@@ -1172,11 +1184,12 @@ ReapVirt(pGE)
 		ConsInit(pCE);
 
 		/* If we didn't succeed, try again later */
-		if (!pCE->fup)
-		    pCE->autoReUp = 1;
+		if (pCE->fup)
+		    FindWrite(pCE);
 		else
-		    pCE->pCLwr = FindWrite(pCE->pCLon);
+		    pCE->autoReUp = 1;
 	    }
+	    break;
 	}
     }
 }
@@ -1640,14 +1653,16 @@ CommandAttach(pGE, pCLServing, pCEServing, tyme)
 {
     CONSCLIENT *pCL;
 
-    if (pGE->pCEctl == pCEServing) {
-	FileWrite(pCLServing->fd, "no -- on ctl]\r\n", -1);
-    } else if (!(pCEServing->fup && pCEServing->ioState == ISNORMAL)) {
-	FileWrite(pCLServing->fd, "line to host is down]\r\n", -1);
-    } else if (pCEServing->fronly) {
-	FileWrite(pCLServing->fd, "host is read-only]\r\n", -1);
+    if (pCEServing->fronly) {
+	FileWrite(pCLServing->fd, "console is read-only]\r\n", -1);
+    } else if (pCEServing->initfile != (CONSFILE *)0 ||
+	       pCEServing->ioState == INCONNECT) {
+	FileWrite(pCLServing->fd, "read-only -- initializing]\r\n", -1);
+	pCLServing->fwantwr = 1;
     } else if (pCLServing->fro) {
 	FileWrite(pCLServing->fd, "read-only]\r\n", -1);
+    } else if (!(pCEServing->fup && pCEServing->ioState == ISNORMAL)) {
+	FileWrite(pCLServing->fd, "line to console is down]\r\n", -1);
     } else if ((CONSCLIENT *)0 == (pCL = pCEServing->pCLwr)) {
 	pCEServing->pCLwr = pCLServing;
 	pCLServing->fwr = 1;
@@ -1685,8 +1700,14 @@ CommandChangeFlow(pGE, pCLServing, pCEServing, tyme)
     struct termios sbuf;
     int cofile;
 
-    if (pCEServing->type != DEVICE && pCEServing->type != EXEC)
+    if (!pCLServing->fwr) {
+	FileWrite(pCLServing->fd, "attach to change flow]\r\n", -1);
 	return;
+    }
+    if (pCEServing->type != DEVICE && pCEServing->type != EXEC) {
+	FileWrite(pCLServing->fd, "ok]\r\n", -1);
+	return;
+    }
     cofile = FileFDNum(pCEServing->cofile);
     if (-1 == tcgetattr(cofile, &sbuf)) {
 	FileWrite(pCLServing->fd, "failed]\r\n", -1);
@@ -1694,14 +1715,17 @@ CommandChangeFlow(pGE, pCLServing, pCEServing, tyme)
     }
     if (0 != (sbuf.c_iflag & IXON)) {
 	sbuf.c_iflag &= ~(IXON);
-	FileWrite(pCLServing->fd, "ixon OFF]\r\n", -1);
     } else {
 	sbuf.c_iflag |= IXON;
-	FileWrite(pCLServing->fd, "ixon ON]\r\n", -1);
     }
     if (-1 == tcsetattr(cofile, TCSANOW, &sbuf)) {
 	FileWrite(pCLServing->fd, "failed]\r\n", -1);
 	return;
+    }
+    if ((sbuf.c_iflag & IXON) == 0) {
+	FileWrite(pCLServing->fd, "ixon OFF]\r\n", -1);
+    } else {
+	FileWrite(pCLServing->fd, "ixon ON]\r\n", -1);
     }
 }
 
@@ -1719,11 +1743,15 @@ CommandDown(pGE, pCLServing, pCEServing, tyme)
 {
     CONSCLIENT *pCL;
 
-    if (pGE->pCEctl == pCEServing) {
-	FileWrite(pCLServing->fd, "no -- on ctl]\r\n", -1);
-	return;
-    }
-    if (!pCLServing->fwr && !pCEServing->fronly && !pCLServing->fro) {
+    /* if client is read-only OR
+     *    console is read-only OR
+     *    (console is up, normal state, and not running command AND
+     *     client isn't the writer)
+     * then just pop out an "error" message
+     */
+    if (pCLServing->fro || pCEServing->fronly ||
+	(pCEServing->fup && pCEServing->ioState == ISNORMAL &&
+	 pCEServing->initfile == (CONSFILE *)0 && !pCLServing->fwr)) {
 	FileWrite(pCLServing->fd, "attach to down line]\r\n", -1);
 	return;
     }
@@ -1812,17 +1840,19 @@ CommandForce(pGE, pCLServing, pCEServing, tyme)
 {
     CONSCLIENT *pCL;
 
-    if (pGE->pCEctl == pCEServing) {
-	FileWrite(pCLServing->fd, "no -- on ctl]\r\n", -1);
-	return;
-    } else if (pCLServing->fro) {
+    if (pCLServing->fro) {
 	FileWrite(pCLServing->fd, "read-only]\r\n", -1);
 	return;
+    } else if (pCEServing->initfile != (CONSFILE *)0 ||
+	       pCEServing->ioState == INCONNECT) {
+	FileWrite(pCLServing->fd, "read-only -- initializing]\r\n", -1);
+	pCLServing->fwantwr = 1;
+	return;
     } else if (pCEServing->fronly) {
-	FileWrite(pCLServing->fd, "host is read-only]\r\n", -1);
+	FileWrite(pCLServing->fd, "console is read-only]\r\n", -1);
 	return;
     } else if (!(pCEServing->fup && pCEServing->ioState == ISNORMAL)) {
-	FileWrite(pCLServing->fd, "line to host is down]\r\n", -1);
+	FileWrite(pCLServing->fd, "line to console is down]\r\n", -1);
 	return;
     }
     if ((CONSCLIENT *)0 != (pCL = pCEServing->pCLwr)) {
@@ -1908,7 +1938,12 @@ CommandHosts(pGE, pCLServing, pCEServing, tyme)
 	sprintf((char *)buf, " %-24.24s %c %-4.4s %-.40s\r\n", pCE->server,
 		pCE == pCEServing ? '*' : ' ', (pCE->fup &&
 						pCE->ioState ==
-						ISNORMAL) ? "up" : "down",
+						ISNORMAL) ? (pCE->
+							     initfile ==
+							     (CONSFILE *)0
+							     ? "up" :
+							     "init") :
+		"down",
 		pCE->pCLwr ? pCE->pCLwr->acid->string : pCE->
 		pCLon ? "<spies>" : "<none>");
 	FileWrite(pCLServing->fd, (char *)buf, -1);
@@ -1978,8 +2013,10 @@ CommandInfo(pGE, pCLServing, pCEServing, tyme)
 
 	FilePrint(pCLServing->fd, ":%s:%s:%s,%s,%s,%s,%d,%d:%d:%s:",
 		  ((pCE->fup &&
-		    pCE->ioState == ISNORMAL) ? "up" : "down"),
-		  (pCE->fronly ? "ro" : "rw"),
+		    pCE->ioState == ISNORMAL) ? (pCE->initfile ==
+						 (CONSFILE *)0 ? "up" :
+						 "init")
+		   : "down"), (pCE->fronly ? "ro" : "rw"),
 		  (pCE->logfile == (char *)0 ? "" : pCE->logfile),
 		  (pCE->nolog ? "nolog" : "log"),
 		  (pCE->activitylog == FLAGTRUE ? "act" : "noact"),
@@ -2020,11 +2057,10 @@ CommandInfo(pGE, pCLServing, pCEServing, tyme)
 	    s = BuildTmpString(",autoreinit");
 	if (pCE->unloved == FLAGTRUE)
 	    s = BuildTmpString(",unloved");
-	FilePrint(pCLServing->fd, ":");
-	if (s != (char *)0)
-	    FilePrint(pCLServing->fd, "%s", s + 1);
+	FilePrint(pCLServing->fd, ":%s:%s\r\n",
+		  (s == (char *)0 ? "" : s + 1),
+		  (pCE->initcmd == (char *)0 ? "" : pCE->initcmd));
 	BuildTmpString((char *)0);
-	FilePrint(pCLServing->fd, "\r\n");
     }
 }
 
@@ -2052,7 +2088,7 @@ CommandLogging(pGE, pCLServing, pCEServing, tyme)
 		       pCLServing->acid->string);
 	}
     } else {
-	FilePrint(pCLServing->fd, "read-only]\r\n");
+	FilePrint(pCLServing->fd, "attach to toggle logging]\r\n");
     }
 }
 
@@ -2070,11 +2106,15 @@ CommandOpen(pGE, pCLServing, pCEServing, tyme)
 {
     CONSCLIENT *pCL;
 
-    if (pGE->pCEctl == pCEServing) {
-	FileWrite(pCLServing->fd, "no -- on ctl]\r\n", -1);
-	return;
-    }
-    if (pCEServing->fup && !pCLServing->fwr) {
+    /* if client is read-only OR
+     *    console is read-only OR
+     *    (console is up, normal state, and not running command AND
+     *     client isn't the writer)
+     * then just pop out an "error" message
+     */
+    if (pCLServing->fro || pCEServing->fronly ||
+	(pCEServing->fup && pCEServing->ioState == ISNORMAL &&
+	 pCEServing->initfile == (CONSFILE *)0 && !pCLServing->fwr)) {
 	FileWrite(pCLServing->fd, "attach to reopen]\r\n", -1);
 	return;
     }
@@ -2082,8 +2122,11 @@ CommandOpen(pGE, pCLServing, pCEServing, tyme)
      * change fd's
      */
     ConsInit(pCEServing);
-    if (!(pCEServing->fup && pCEServing->ioState == ISNORMAL)) {
-	FileWrite(pCLServing->fd, "line to host is down]\r\n", -1);
+    if (pCEServing->initfile != (CONSFILE *)0 ||
+	pCEServing->ioState == INCONNECT) {
+	FileWrite(pCLServing->fd, "read-only -- initializing]\r\n", -1);
+    } else if (!(pCEServing->fup && pCEServing->ioState == ISNORMAL)) {
+	FileWrite(pCLServing->fd, "line to console is down]\r\n", -1);
     } else if (pCEServing->fronly) {
 	FileWrite(pCLServing->fd, "up read-only]\r\n", -1);
     } else if ((CONSCLIENT *)0 == (pCL = pCEServing->pCLwr)) {
@@ -2218,6 +2261,12 @@ DoConsoleRead(pCEServing)
 	WriteLog(pCEServing, (char *)acIn, nr);
     }
 
+    /* if we have a command running, interface with it and then
+     * allow the normal stuff to happen (so folks can watch)
+     */
+    if (pCEServing->initfile != (CONSFILE *)0)
+	FileWrite(pCEServing->initfile, (char *)acIn, nr);
+
     /* output all console info nobody is attached
      */
     if (pCEServing->pCLwr == (CONSCLIENT *)0 &&
@@ -2247,6 +2296,39 @@ DoConsoleRead(pCEServing)
 	if (pCL->fcon) {
 	    FileWrite(pCL->fd, (char *)acIn, nr);
 	}
+    }
+}
+
+void
+#if PROTOTYPES
+DoCommandRead(CONSENT *pCEServing)
+#else
+DoCommandRead(pCEServing)
+    CONSENT *pCEServing;
+#endif
+{
+    unsigned char acInOrig[BUFSIZ];
+    int nr, i, fd;
+
+    if (pCEServing->initfile == (CONSFILE *)0)
+	return;
+
+    fd = FileFDNum(pCEServing->initfile);
+
+    /* read from command */
+    if ((nr =
+	 FileRead(pCEServing->initfile, acInOrig, sizeof(acInOrig))) < 0) {
+	StopInit(pCEServing);
+	FindWrite(pCEServing);
+	return;
+    }
+    CONDDEBUG((1, "DoCommandRead(): read %d bytes from fd %d", nr, fd));
+
+    for (i = 0; i < nr; ++i) {
+	if (pCEServing->striphigh == FLAGTRUE)
+	    PutConsole(pCEServing, acInOrig[i] & 127, 1);
+	else
+	    PutConsole(pCEServing, acInOrig[i], 1);
     }
 }
 
@@ -2408,7 +2490,8 @@ DoClientRead(pGE, pCLServing)
 				    pCLServing->acid->string);
 			    FileWrite(pCLServing->fd, "ok\r\n", -1);
 			} else {
-			    FileWrite(pCLServing->fd, "passwd?\r\n", -1);
+			    FilePrint(pCLServing->fd, "passwd? %s\r\n",
+				      myHostname);
 			    pCLServing->iState = S_PASSWD;
 			}
 		    }
@@ -2496,7 +2579,8 @@ DoClientRead(pGE, pCLServing)
 			pCLServing->fwantwr = 0;
 			TagLogfileAct(pCEServing, "%s detached",
 				      pCLServing->acid->string);
-			pCEServing->pCLwr = FindWrite(pCEServing->pCLon);
+			pCEServing->pCLwr = (CONSCLIENT *)0;
+			FindWrite(pCEServing);
 		    }
 
 		    /* inform operators of the change
@@ -2528,14 +2612,20 @@ DoClientRead(pGE, pCLServing)
 
 		    /* try for attach on new console
 		     */
-		    if (!
-			(pCEServing->fup &&
-			 pCEServing->ioState == ISNORMAL)) {
+		    if (pCEServing->fronly) {
 			FileWrite(pCLServing->fd,
-				  "[line to host is down]\r\n", -1);
-		    } else if (pCEServing->fronly) {
+				  "[console is read-only]\r\n", -1);
+		    } else if (pCEServing->initfile != (CONSFILE *)0 ||
+			       pCEServing->ioState == INCONNECT) {
+			pCLServing->fwantwr = 1;
 			FileWrite(pCLServing->fd,
-				  "[host is read-only]\r\n", -1);
+				  "[read-only -- initializing]\r\n", -1);
+		    } else
+			if (!
+			    (pCEServing->fup &&
+			     pCEServing->ioState == ISNORMAL)) {
+			FileWrite(pCLServing->fd,
+				  "[line to console is down]\r\n", -1);
 		    } else if (((CONSCLIENT *)0 == pCEServing->pCLwr)
 			       && !pCLServing->fro) {
 			pCEServing->pCLwr = pCLServing;
@@ -2546,6 +2636,7 @@ DoClientRead(pGE, pCLServing)
 			TagLogfileAct(pCEServing, "%s attached",
 				      pCLServing->acid->string);
 		    } else {
+			pCLServing->fwantwr = 1;
 			FileWrite(pCLServing->fd, "[spy]\r\n", -1);
 		    }
 		    pCLServing->fcon = 1;
@@ -2774,21 +2865,31 @@ DoClientRead(pGE, pCLServing)
 				      " 0 -   0ms, <undefined>\r\n", -1);
 			else {
 			    sprintf(ms, "%3d", breakList[i - 1].delay);
+			    FmtCtlStr(breakList[i - 1].seq->string,
+				      breakList[i - 1].seq->used - 1,
+				      acA1);
 			    FilePrint(pCLServing->fd,
 				      " 0 - %sms, `%s'\r\n", ms,
-				      breakList[i - 1].seq->string);
+				      acA1->string);
 			}
 			for (i = 0; i < 9; i++) {
 			    if (breakList[i].seq->used > 1) {
 				sprintf(ms, "%3d", breakList[i].delay);
+				FmtCtlStr(breakList[i].seq->string,
+					  breakList[i].seq->used - 1,
+					  acA1);
 				FilePrint(pCLServing->fd,
 					  " %d - %sms, `%s'\r\n", i + 1,
-					  ms, breakList[i].seq->string);
+					  ms, acA1->string);
 			    }
 			}
 		    } else {
-			int bt = acIn[i] - '0';
-			SendBreak(pCLServing, pCEServing, bt);
+			if (pCLServing->fwr) {
+			    int bt = acIn[i] - '0';
+			    SendBreak(pCLServing, pCEServing, bt);
+			} else
+			    FileWrite(pCLServing->fd,
+				      "attach to send break]\r\n", -1);
 		    }
 		    continue;
 
@@ -2916,13 +3017,8 @@ DoClientRead(pGE, pCLServing)
 			case 'l':	/* halt character 1     */
 			    if (pCEServing->fronly) {
 				FileWrite(pCLServing->fd,
-					  "can't halt read-only host]\r\n",
+					  "can't halt read-only console]\r\n",
 					  -1);
-				continue;
-			    }
-			    if (!pCLServing->fwr) {
-				FileWrite(pCLServing->fd,
-					  "attach to halt]\r\n", -1);
 				continue;
 			    }
 			    pCLServing->iState = S_HALT1;
@@ -2961,8 +3057,8 @@ DoClientRead(pGE, pCLServing)
 			    pCLServing->fwr = 0;
 			    TagLogfileAct(pCEServing, "%s detached",
 					  pCLServing->acid->string);
-			    pCEServing->pCLwr =
-				FindWrite(pCEServing->pCLon);
+			    pCEServing->pCLwr = (CONSCLIENT *)0;
+			    FindWrite(pCEServing);
 			    FileWrite(pCLServing->fd, "spying]\r\n", -1);
 			    break;
 
@@ -3013,7 +3109,17 @@ DoClientRead(pGE, pCLServing)
 			    break;
 
 			case '\t':	/* toggle tab expand    */
-			    FileWrite(pCLServing->fd, "tabs]\r\n", -1);
+			    if (!pCLServing->fwr) {
+				FileWrite(pCLServing->fd,
+					  "attach to toggle tabs]\r\n",
+					  -1);
+				continue;
+			    }
+			    if (pCEServing->type != DEVICE &&
+				pCEServing->type != EXEC) {
+				FileWrite(pCLServing->fd, "ok]\r\n", -1);
+				continue;
+			    }
 			    if (-1 ==
 				tcgetattr(FileFDNum(pCEServing->cofile),
 					  &sbuf)) {
@@ -3038,6 +3144,12 @@ DoClientRead(pGE, pCLServing)
 					  -1);
 				continue;
 			    }
+			    if (XTABS == (TABDLY & sbuf.c_oflag))
+				FileWrite(pCLServing->fd, "tabs OFF]\r\n",
+					  -1);
+			    else
+				FileWrite(pCLServing->fd, "tabs ON]\r\n",
+					  -1);
 			    break;
 
 			case 'Q':	/* DEC vt100 PF2 */
@@ -3047,23 +3159,22 @@ DoClientRead(pGE, pCLServing)
 			    FileWrite(pCLServing->fd, "disconnect]\r\n",
 				      -1);
 			    nr = 0;
-			    if (!pCEServing->fup ||
-				pCEServing->type != DEVICE) {
-				DisconnectClient(pGE, pCLServing,
-						 (char *)0, FLAGFALSE);
-				continue;
-			    }
-			    if (-1 ==
-				tcgetattr(FileFDNum(pCEServing->cofile),
-					  &sbuf)) {
-				FileWrite(pCLServing->fd, "[failed]\r\n",
-					  -1);
-				continue;
-			    }
-			    if (0 == (sbuf.c_iflag & IXOFF)) {
-				sbuf.c_iflag |= IXOFF | IXON;
-				tcsetattr(FileFDNum(pCEServing->cofile),
-					  TCSANOW, &sbuf);
+			    if (pCEServing->fup &&
+				pCEServing->type == DEVICE) {
+				if (-1 ==
+				    tcgetattr(FileFDNum
+					      (pCEServing->cofile),
+					      &sbuf)) {
+				    FileWrite(pCLServing->fd,
+					      "[failed]\r\n", -1);
+				    continue;
+				}
+				if (0 == (sbuf.c_iflag & IXOFF)) {
+				    sbuf.c_iflag |= IXOFF | IXON;
+				    tcsetattr(FileFDNum
+					      (pCEServing->cofile),
+					      TCSANOW, &sbuf);
+				}
 			    }
 			    DisconnectClient(pGE, pCLServing, (char *)0,
 					     FLAGFALSE);
@@ -3078,7 +3189,7 @@ DoClientRead(pGE, pCLServing)
 			case '\\':	/* quote mode (send ^Q,^S) */
 			    if (pCEServing->fronly) {
 				FileWrite(pCLServing->fd,
-					  "can't write to read-only host]\r\n",
+					  "can't write to read-only console]\r\n",
 					  -1);
 				continue;
 			    }
@@ -3404,11 +3515,14 @@ Kiddie(pGE, sfd)
 			    break;
 			}
 			pCEServing->ioState = ISNORMAL;
+			StartInit(pCEServing);
 		    }
 		    break;
 		case ISNORMAL:
 		    if (FileCanRead(pCEServing->cofile, &rmask, &wmask))
 			DoConsoleRead(pCEServing);
+		    if (FileCanRead(pCEServing->initfile, &rmask, &wmask))
+			DoCommandRead(pCEServing);
 		    /* fall through to ISFLUSHING for buffered data */
 		case ISFLUSHING:
 		    /* write cofile data */
@@ -3432,10 +3546,23 @@ Kiddie(pGE, sfd)
 			    break;
 			}
 		    }
+		    /* write initfile data */
+		    if (!FileBufEmpty(pCEServing->initfile) &&
+			FileCanWrite(pCEServing->initfile, &rmask,
+				     &wmask)) {
+			CONDDEBUG((1, "Kiddie(): flushing fd %d",
+				   FileFDNum(pCEServing->initfile)));
+			if (FileWrite(pCEServing->initfile, (char *)0, 0) <
+			    0) {
+			    ConsoleError(pCEServing);
+			    break;
+			}
+		    }
 		    /* stop if we're in ISFLUSHING state and out of data */
 		    if ((pCEServing->ioState == ISFLUSHING) &&
 			FileBufEmpty(pCEServing->cofile) &&
-			FileBufEmpty(pCEServing->fdlog))
+			FileBufEmpty(pCEServing->fdlog) &&
+			FileBufEmpty(pCEServing->initfile))
 			/* no ConsoleError() for same reason as above */
 			ConsDown(pCEServing, FLAGFALSE, FLAGTRUE);
 		    break;
@@ -3508,7 +3635,7 @@ Kiddie(pGE, sfd)
 	    int justHadDelay = 0;
 	    if (pCEServing->wbuf->used <= 1)
 		continue;
-	    if (!pCEServing->fup) {
+	    if (!(pCEServing->fup && pCEServing->ioState == ISNORMAL)) {
 		/* if we have data but aren't up, drop it */
 		BuildString((char *)0, pCEServing->wbuf);
 		pCEServing->wbufIAC = 0;

@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.46 2003-08-18 20:01:16-07 bryan Exp $
+ *  $Id: consent.h,v 5.47 2003-09-28 08:43:04-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -93,12 +93,11 @@ typedef struct consent {	/* console information                  */
     unsigned short port;	/* port number                          */
     /* type == EXEC */
     char *exec;			/* exec command                         */
-    /* */
+    /* global stuff */
     char *master;		/* master hostname                      */
-    /* */
     unsigned short breakNum;	/* break type [1-9]                     */
-    /* */
     char *logfile;		/* logfile                              */
+    char *initcmd;		/* initcmd command                      */
     /* timestamp stuff */
     int mark;			/* Mark (chime) interval                */
     long nextMark;		/* Next mark (chime) time               */
@@ -117,6 +116,8 @@ typedef struct consent {	/* console information                  */
     char *execSlave;		/* pseudo-device slave side             */
     int execSlaveFD;		/* fd of slave side                     */
     pid_t ipid;			/* pid of virtual command               */
+    pid_t initpid;		/* pid of initcmd command               */
+    CONSFILE *initfile;		/* the command run on init              */
     STRING *wbuf;		/* write() buffer                       */
     int wbufIAC;		/* next IAC location in wbuf            */
     IOSTATE ioState;		/* state of the socket                  */
@@ -154,3 +155,5 @@ extern void ConsInit PARAMS((CONSENT *));
 extern void ConsDown PARAMS((CONSENT *, FLAG, FLAG));
 extern REMOTE *FindUniq PARAMS((REMOTE *));
 extern void DestroyRemoteConsole PARAMS((REMOTE *));
+extern void StartInit PARAMS((CONSENT *));
+extern void StopInit PARAMS((CONSENT *));

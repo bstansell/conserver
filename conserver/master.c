@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.113 2003-09-19 08:58:18-07 bryan Exp $
+ *  $Id: master.c,v 5.115 2003-09-29 08:39:13-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -76,13 +76,15 @@ FixKids()
     int UWbuf;
     GRPENT *pGE;
 
-    while (-1 != (pid = waitpid(-1, &UWbuf, WNOHANG))) {
+    while (-1 != (pid = waitpid(-1, &UWbuf, WNOHANG | WUNTRACED))) {
 	if (0 == pid) {
 	    break;
 	}
 	/* stopped child is just continuted
 	 */
 	if (WIFSTOPPED(UWbuf) && 0 == kill(pid, SIGCONT)) {
+	    Msg("child pid %lu: stopped, sending SIGCONT",
+		(unsigned long)pid);
 	    continue;
 	}
 
@@ -256,6 +258,17 @@ CommandCall(pCL, args)
 	    ambiguous = BuildTmpString(pCE->server);
 	    ambiguous = BuildTmpString(", ");
 	    ++found;
+	}
+    }
+    if (config->redirect == FLAGTRUE ||
+	(config->redirect != FLAGTRUE && found == 0)) {
+	for (pRC = pRCList; (REMOTE *)0 != pRC; pRC = pRC->pRCnext) {
+	    if (strcasecmp(args, pRC->rserver) != 0)
+		continue;
+	    ambiguous = BuildTmpString(pRC->rserver);
+	    ambiguous = BuildTmpString(", ");
+	    ++found;
+	    pRCFound = pRC;
 	}
     }
     if (found == 0) {		/* Then look for substring matches */
@@ -512,7 +525,8 @@ DoNormalRead(pCLServing)
 				pCLServing->acid->string);
 			FileWrite(pCLServing->fd, "ok\r\n", -1);
 		    } else {
-			FileWrite(pCLServing->fd, "passwd?\r\n", -1);
+			FilePrint(pCLServing->fd, "passwd? %s\r\n",
+				  myHostname);
 			pCLServing->iState = S_PASSWD;
 		    }
 		}

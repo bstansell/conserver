@@ -1,5 +1,5 @@
 /*
- *  $Id: util.h,v 1.52 2003-08-23 11:06:35-07 bryan Exp $
+ *  $Id: util.h,v 1.53 2003-09-28 08:45:31-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -28,6 +28,7 @@
 enum consFileType {
     simpleFile,
     simpleSocket,
+    simplePipe,
 #if HAVE_OPENSSL
     SSLSocket,
 #endif
@@ -64,6 +65,7 @@ typedef struct consFile {
     /* Standard socket type stuff */
     enum consFileType ftype;
     int fd;
+    int fdout;			/* only used when a simplePipe */
     STRING *wbuf;
 #if HAVE_OPENSSL
     /* SSL stuff */
@@ -96,6 +98,7 @@ extern int GetMaxFiles PARAMS(());
 extern char *FmtCtl PARAMS((int, STRING *));
 extern void FmtCtlStr PARAMS((char *, int, STRING *));
 extern CONSFILE *FileOpenFD PARAMS((int, enum consFileType));
+extern CONSFILE *FileOpenPipe PARAMS((int, int));
 extern CONSFILE *FileOpen PARAMS((const char *, int, int));
 extern int FileClose PARAMS((CONSFILE **));
 extern int FileRead PARAMS((CONSFILE *, void *, int));
@@ -106,6 +109,7 @@ extern int FileStat PARAMS((CONSFILE *, struct stat *));
 extern int FileSeek PARAMS((CONSFILE *, off_t, int));
 extern int FileSend PARAMS((CONSFILE *, const void *, size_t, int));
 extern int FileFDNum PARAMS((CONSFILE *));
+extern int FileFDOutNum PARAMS((CONSFILE *));
 extern int FileUnopen PARAMS((CONSFILE *));
 extern void OutOfMem PARAMS(());
 extern char *BuildTmpString PARAMS((const char *));

@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.h,v 5.31 2003-08-21 15:02:16-07 bryan Exp $
+ *  $Id: readcfg.h,v 5.32 2003-09-28 08:54:16-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -11,6 +11,7 @@ typedef struct config {
     char defaultaccess;
     FLAG daemonmode;
     char *logfile;
+    char *initcmd;
     char *passwdfile;
     char *primaryport;
     FLAG redirect;

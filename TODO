@@ -74,10 +74,6 @@ Bryan Stansell
 - suggestions by Trevor Fiatal <trevor@seven.com>
     - include server hostname on 'console -x' output
 
-- ability to configure strings to be sent to a console whenever it is
-  (re)opened (eg. a termserver login) : Greg A. Woods
-  <woods@planix.com>
-
 - ability to configure strings to be sent to a console periodically :
   Greg A. Woods <woods@planix.com>
 
@@ -85,5 +81,5 @@ Bryan Stansell
   <woods@planix.com>
 
 #
-#  $Id: TODO,v 1.36 2003-08-24 15:11:03-07 bryan Exp $
+#  $Id: TODO,v 1.37 2003-09-28 12:23:23-07 bryan Exp $
 #
