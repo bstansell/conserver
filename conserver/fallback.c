@@ -1,5 +1,5 @@
 /*
- *  $Id: fallback.c,v 5.40 2002-01-21 02:48:33-08 bryan Exp $
+ *  $Id: fallback.c,v 5.44 2002-02-12 20:28:14-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -17,7 +17,6 @@
 #include <config.h>
 
 #include <sys/param.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/file.h>
 #include <fcntl.h>
@@ -34,15 +33,6 @@
 #include <port.h>
 #include <util.h>
 
-/* Allocate some space for the results of getpseudotty */
-#if (defined(_AIX) || defined(PTX4))
-static char acMaster[] = "/dev/ptc/XXXXXXXXX";
-static char acSlave[] = "/dev/pts/XXXXXXXXX";
-#else
-static char acMaster[] = "/dev/ptyXX";
-static char acSlave[] = "/dev/ttyXX";
-#endif /* _AIX */
-
 #if defined(HAVE_PTSNAME) && defined(HAVE_GRANTPT) && defined(HAVE_UNLOCKPT)
 #if defined(linux)
 extern char *ptsname();
@@ -54,8 +44,13 @@ extern int unlockpt();
  * DYNIX/ptx v4.0
  */
 static int
+#if USE_ANSI_PROTO
+getpseudotty(STRING * slave, STRING * master)
+#else
 getpseudotty(slave, master)
-    char **master, **slave;
+    STRING *slave;
+    STRING *master;
+#endif
 {
     int fd;
     char *pcName;
@@ -87,19 +82,19 @@ getpseudotty(slave, master)
 #endif
 
     unlockpt(fd);		/* unlock slave */
+    buildMyString((char *)0, master);
     if ((char *)0 == (pcName = ttyname(fd))) {
-	(void)strcpy(acMaster, "/dev/ptmx");
+	buildMyString("/dev/ptmx", master);
     } else {
-	(void)strcpy(acMaster, pcName);
+	buildMyString(pcName, master);
     }
-    *master = acMaster;
 
     if ((char *)0 == (pcName = ptsname(fd))) {
 	return -1;
     }
 
-    (void)strcpy(acSlave, pcName);
-    *slave = acSlave;
+    buildMyString((char *)0, slave);
+    buildMyString(pcName, slave);
 
     return fd;
 }
@@ -121,8 +116,13 @@ static char chartwo[] =
  * get a pty for the user (emulate the neato sequent call)		(mm)
  */
 static int
+#if USE_ANSI_PROTO
+getpseudotty(STRING * slave, STRING * master)
+#else
 getpseudotty(slave, master)
-    char **master, **slave;
+    STRING *slave;
+    STRING *master;
+#endif
 {
     int fd;
     char *pcName;
@@ -133,12 +133,12 @@ getpseudotty(slave, master)
     if ((char *)0 == (pcName = ttyname(fd))) {
 	return -1;
     }
-    (void)strcpy(acSlave, pcName);
-    *slave = acSlave;
+    buildMyString((char *)0, slave);
+    buildMyString(pcName, slave);
 
-    (void)strcpy(acMaster, pcName);
-    acMaster[7] = 'c';
-    *master = acMaster;
+    buildMyString((char *)0, master);
+    buildMyString(pcName, master);
+    master->string[7] = 'c';
 
     return fd;
 }
@@ -147,9 +147,16 @@ getpseudotty(slave, master)
  * get a pty for the user (emulate the neato sequent call)		(ksb)
  */
 static int
+#if USE_ANSI_PROTO
+getpseudotty(STRING * slave, STRING * master)
+#else
 getpseudotty(slave, master)
-    char **master, **slave;
+    STRING *slave;
+    STRING *master;
+#endif
 {
+    static char acMaster[] = "/dev/ptyXX";
+    static char acSlave[] = "/dev/ttyXX";
     static char *pcOne = charone, *pcTwo = chartwo;
     int fd, iLoop, iIndex = sizeof("/dev/pty") - 1;
     char *pcOld1;
@@ -192,8 +199,11 @@ getpseudotty(slave, master)
 	}
 	break;
     }
-    *master = acMaster;
-    *slave = acSlave;
+
+    buildMyString((char *)0, master);
+    buildMyString(acMaster, master);
+    buildMyString((char *)0, slave);
+    buildMyString(acSlave, slave);
     return fd;
 }
 # endif	/* _AIX */
@@ -203,16 +213,23 @@ getpseudotty(slave, master)
  * get a Joe pty bacause the daemon is not with us, sadly.		(ksb)
  */
 int
+#if USE_ANSI_PROTO
+FallBack(STRING * pcSlave, STRING * pcMaster)
+#else
 FallBack(pcSlave, pcMaster)
-    char *pcSlave, *pcMaster;
+    STRING *pcSlave, *pcMaster;
+#endif
 {
     int fd;
-    char *pcTSlave, *pcTMaster;
+    static STRING pcTSlave = { (char *)0, 0, 0 };
+    static STRING pcTMaster = { (char *)0, 0, 0 };
 
     if (-1 == (fd = getpseudotty(&pcTSlave, &pcTMaster))) {
 	return -1;
     }
-    (void)strcpy(pcSlave, pcTSlave);
-    (void)strcpy(pcMaster, pcTMaster);
+    buildMyString((char *)0, pcSlave);
+    buildMyString(pcTSlave.string, pcSlave);
+    buildMyString((char *)0, pcMaster);
+    buildMyString(pcTMaster.string, pcMaster);
     return fd;
 }

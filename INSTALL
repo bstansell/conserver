@@ -10,6 +10,13 @@ Upgrading?
     new features added to the client if you're considering *not*
     upgrading.
 
+    Version 7.2.0
+
+	- The code related to broadcast messages in the client (-b) has
+	  changed.  If you want the username to come across properly in
+	  the broadcast message, you'll need to make sure you upgrade
+	  to the 7.2.0 client.
+
     Version 7.1.1
 
 	- Both conserver.passwd and conserver.cf file parsing behaves
@@ -59,7 +66,6 @@ Detailed Instructions
 	--with-logfile=LOGFILE  Specify log filename [/var/log/conserver]
 	--with-pidfile=PIDFILE  Specify PID filepath [/var/run/conserver.pid]
 	--with-maxmemb=MAXMEMB  Specify maximum consoles per process [16]
-	--with-maxgrp=MAXGRP    Specify maximum number of processes [32]
 	--with-timeout=TIMEOUT  Specify connect() timeout in seconds [10]
 	--with-libwrap[=PATH]   Compile in libwrap (tcp_wrappers) support
 
@@ -71,7 +77,6 @@ Detailed Instructions
 	CONFIG			- Config file path
 	PASSWD_FILE		- Password file path
 	MAXMEMB			- Number of consoles per child process
-	MAXGRP			- Number of child processes
 
     - Run './configure'.  This will detect system specific
       information.  The --prefix option will redirect where things are
@@ -120,5 +125,5 @@ Detailed Instructions
     - That's it!  Just start up the console server and enjoy!
 
 #
-#  $Id: INSTALL,v 1.19 2001-10-15 23:22:03-07 bryan Exp $
+#  $Id: INSTALL,v 1.21 2002-03-12 00:19:25-08 bryan Exp $
 #

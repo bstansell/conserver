@@ -182,6 +182,10 @@ extern char *h_errlist[];
 # define setgroups(x, y)	0
 #endif
 
+#ifndef HAVE_IN_ADDR_T
+typedef unsigned long in_addr_t;
+#endif
+
 /*
  * IUCLC, OLCUC and XCASE were removed from IEEE Std 1003.1-200x
  *  as legacy definitions.

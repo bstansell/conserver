@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.70 2002-01-21 02:48:33-08 bryan Exp $
+ *  $Id: readcfg.c,v 5.82 2002-03-11 18:21:37-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -32,7 +32,6 @@
 
 #include <config.h>
 
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/file.h>
@@ -57,29 +56,31 @@
 #include <master.h>
 #include <main.h>
 
-GRPENT aGroups[MAXGRP];		/* even spread is OK            */
-CONSENT aConsoles[MAXGRP * MAXMEMB];	/* gross over allocation        */
-REMOTE *pRCList;		/* list of remote consoles we know about */
-int
-  iLocal;			/* number of local consoles             */
-
-ACCESS *pACList;		/* `who do you love' (or trust)         */
-int
-  iAccess;			/* how many access restrictions we have */
+GRPENT *pGroups = (GRPENT *) 0;
+REMOTE *pRCList = (REMOTE *) 0;	/* list of remote consoles we know about */
+ACCESS *pACList = (ACCESS *) 0;	/* `who do you love' (or trust)         */
 STRING *breakList = (STRING *) 0;	/* list of break sequences */
+REMOTE *pRCUniq = (REMOTE *) 0;	/* list of uniq console servers         */
+
+static unsigned int groupID = 0;
 
 /* Parse the [number(m|h|d|l)[a]] spec
  * return 0 on invalid spec, non-zero on valid spec
  */
 int
+#if USE_ANSI_PROTO
+parseMark(const char *pcFile, const int iLine, const char *pcMark,
+	  time_t tyme, CONSENT * pCE)
+#else
 parseMark(pcFile, iLine, pcMark, tyme, pCE)
     const char *pcFile;
     const int iLine;
     const char *pcMark;
     time_t tyme;
     CONSENT *pCE;
+#endif
 {
-    char mark[BUFSIZ];
+    static STRING mark = { (char *)0, 0, 0 };
     char *p, *n = (char *)0;
     int activity = 0;
     int factor = 0, pfactor = 0;
@@ -87,9 +88,10 @@ parseMark(pcFile, iLine, pcMark, tyme, pCE)
 
     if ((pcMark == (char *)0) || (*pcMark == '\000'))
 	return 0;
-    (void)strcpy(mark, pcMark);
+    buildMyString((char *)0, &mark);
+    buildMyString(pcMark, &mark);
 
-    for (p = mark; *p != '\000'; p++) {
+    for (p = mark.string; *p != '\000'; p++) {
 	if (*p == 'a' || *p == 'A') {
 	    if (n != (char *)0) {
 		Error
@@ -151,7 +153,7 @@ parseMark(pcFile, iLine, pcMark, tyme, pCE)
 	value = pvalue * factor;
     }
 
-    Debug("Mark spec of `%s' parsed: factor=%d, value=%d, activity=%d",
+    Debug(1, "Mark spec of `%s' parsed: factor=%d, value=%d, activity=%d",
 	  pcMark, factor, value, activity);
 
     if (pCE != (CONSENT *) 0) {
@@ -192,8 +194,12 @@ parseMark(pcFile, iLine, pcMark, tyme, pCE)
  * a pointer to the start of the non-space part
  */
 char *
+#if USE_ANSI_PROTO
+pruneSpace(char *string)
+#else
 pruneSpace(string)
     char *string;
+#endif
 {
     char *p;
     char *head = (char *)0;
@@ -228,42 +234,99 @@ pruneSpace(string)
  * to manage the consoles
  */
 void
-ReadCfg(pcFile, fp)
+#if USE_ANSI_PROTO
+ReadCfg(char *pcFile, FILE * fp)
+#else
+ReadCfg(pcFile, fp, master)
     char *pcFile;
     FILE *fp;
+#endif
 {
-    GRPENT *pGE;
-    int iG, minG;
+    ACCESS *pACtmp;
+    ACCESS **ppAC;
+    GRPENT **ppGE;
+    GRPENT *pGE = (GRPENT *) 0;
+    GRPENT *pGEtmp = (GRPENT *) 0;
+    GRPENT *pGEmatch = (GRPENT *) 0;
+    GRPENT *pGEstage = (GRPENT *) 0;
     int iLine;
     unsigned char *acIn;
     static STRING acInSave = { (char *)0, 0, 0 };
     char *acStart;
-    GRPENT *pGEAll;
-    CONSENT *pCE;
+    CONSENT *pCE = (CONSENT *) 0;
+    CONSENT *pCEmatch = (CONSENT *) 0;
     REMOTE **ppRC;
-    char LogDirectory[MAXLOGLEN];
+    REMOTE *pRCtmp;
+    static STRING LogDirectory = { (char *)0, 0, 0 };
     time_t tyme;
-    char defMark[BUFSIZ];
+    static STRING defMark = { (char *)0, 0, 0 };
+    int isStartup = (pGroups == (GRPENT *) 0 && pRCList == (REMOTE *) 0);
+    REMOTE *pRCListOld = (REMOTE *) 0;
+    GRPENT *pGroupsOld = (GRPENT *) 0;
+    CONSCLIENT *pCLtmp = (CONSCLIENT *) 0;
+
+    /* if we're the master process, this will either be the first time
+     * reading the config file (in which case we'll just build the two
+     * data structures: local and remote consoles), or it will be the
+     * Nth time through, and we'll adjust the existing data structures
+     * so that everything looks straight (using the same adjustment
+     * logic as the children so everyone is in sync).  now, by adjusting
+     * i actually mean that we move aside all the old groups and start
+     * moving them back into the active list as we come across them in
+     * the config file.  anything we haven't moved back into the active
+     * list then gets nuked.
+     *
+     * if we're the children, this is a reread of the config file (by
+     * definition).  in that case, we just need to remove any consoles
+     * that have left our control or adjust the attributes of any consoles
+     * we get to keep.
+     *
+     * yep, slippery little slope we're walking here.  hope we survive!
+     */
+    if (!isStartup) {
+	pGroupsOld = pGroups;
+	pRCListOld = pRCList;
+	pGroups = (GRPENT *) 0;
+	pRCList = (REMOTE *) 0;
+    }
 
     tyme = time((time_t *) 0);
-    LogDirectory[0] = '\000';
-    defMark[0] = '\000';
-    pGEAll = aGroups;		/* fill in these structs        */
-    pCE = aConsoles;
+    buildMyString((char *)0, &defMark);
+    buildMyString((char *)0, &LogDirectory);
+    buildMyString((char *)0, &acInSave);
     ppRC = &pRCList;
-    iLocal = 0;
 
+    /* initialize the break lists */
     if ((STRING *) 0 == breakList) {
 	breakList = (STRING *) calloc(9, sizeof(STRING));
 	if ((STRING *) 0 == breakList) {
 	    OutOfMem();
 	}
+    } else {
+	for (iLine = 0; iLine < 9; iLine++) {
+	    buildMyString((char *)0, &breakList[iLine]);
+	}
     }
-    buildMyString((char *)0, &acInSave);
     buildMyString("\\z", &breakList[0]);
     buildMyString("\\r~^b", &breakList[1]);
     buildMyString("#.reset -x\\r", &breakList[2]);
-    iG = minG = 0;
+
+    /* nuke the groups lists (should be a noop, but...) */
+    while (pGroups != (GRPENT *) 0) {
+	pGEtmp = pGroups->pGEnext;
+	destroyGroup(pGroups);
+	pGroups = pGEtmp;
+    }
+
+    /* nuke the remote consoles */
+    while (pRCList != (REMOTE *) 0) {
+	pRCtmp = pRCList->pRCnext;
+	destroyString(&pRCList->rserver);
+	destroyString(&pRCList->rhost);
+	free(pRCList);
+	pRCList = pRCtmp;
+    }
+
     iLine = 0;
     while ((acIn = readLine(fp, &acInSave, &iLine)) != (unsigned char *)0) {
 	char *pcLine, *pcMode, *pcLog, *pcRem, *pcStart, *pcMark, *pcBreak;
@@ -279,18 +342,19 @@ ReadCfg(pcFile, fp)
 	    acStart = pruneSpace(acStart);
 	    pcLine = pruneSpace(pcLine);
 	    if (0 == strcmp(acStart, "LOGDIR")) {
-		(void)strcpy(LogDirectory, pcLine);
+		buildMyString((char *)0, &LogDirectory);
+		buildMyString(pcLine, &LogDirectory);
 	    } else if (0 == strcmp(acStart, "TIMESTAMP")) {
-		if (parseMark(pcFile, iLine, pcLine, tyme, NULL))
-		    (void)strcpy(defMark, pcLine);
-		else
-		    defMark[0] = '\000';
+		buildMyString((char *)0, &defMark);
+		if (parseMark(pcFile, iLine, pcLine, tyme, NULL)) {
+		    buildMyString(pcLine, &defMark);
+		}
 	    } else if (0 == strcmp(acStart, "DOMAINHACK")) {
 		domainHack = 1;
 	    } else if (0 == strncmp(acStart, "BREAK", 5) &&
 		       acStart[5] >= '1' && acStart[5] <= '9' &&
 		       acStart[6] == '\000') {
-		Debug("BREAK%c found with `%s'", acStart[5], pcLine);
+		Debug(1, "BREAK%c found with `%s'", acStart[5], pcLine);
 		if (pcLine[0] == '\000') {
 		    buildMyString((char *)0, &breakList[acStart[5] - '1']);
 		} else {
@@ -371,80 +435,137 @@ ReadCfg(pcFile, fp)
 		bcmp(&acMyAddr.s_addr, hpMe->h_addr, hpMe->h_length)
 #endif
 		) {
-
-		REMOTE *pRCTemp;
-		pRCTemp = (REMOTE *) calloc(1, sizeof(REMOTE));
-		if ((REMOTE *) 0 == pRCTemp) {
-		    OutOfMem();
-		}
-		(void)strcpy(pRCTemp->rhost, pcRem);
-		(void)strcpy(pRCTemp->rserver, acStart);
-		*ppRC = pRCTemp;
-		ppRC = &pRCTemp->pRCnext;
-		if (fVerbose) {
-		    Info("%s remote on %s", acStart, pcRem);
+		/* the master process just gets this added to the list.
+		 * if it existed as a local console before, it'll be
+		 * pruned later.
+		 */
+		if (isMaster) {
+		    REMOTE *pRCTemp;
+		    pRCTemp = (REMOTE *) calloc(1, sizeof(REMOTE));
+		    if ((REMOTE *) 0 == pRCTemp) {
+			OutOfMem();
+		    }
+		    buildMyString((char *)0, &pRCTemp->rhost);
+		    buildMyString(pcRem, &pRCTemp->rhost);
+		    buildMyString((char *)0, &pRCTemp->rserver);
+		    buildMyString(acStart, &pRCTemp->rserver);
+		    *ppRC = pRCTemp;
+		    ppRC = &pRCTemp->pRCnext;
+		    if (fVerbose) {
+			Info("%s remote on %s", acStart, pcRem);
+		    }
 		}
 		continue;
 	    }
 	}
 
-	/* take the same group as the last line, by default
+	if (!isStartup) {
+	    CONSENT **ppCE;
+	    /* hunt for a local match, "pCEmatch != (CONSENT *)0" if found */
+	    pCEmatch = (CONSENT *) 0;
+	    for (pGEmatch = pGroupsOld; pGEmatch != (GRPENT *) 0;
+		 pGEmatch = pGEmatch->pGEnext) {
+		for (ppCE = &pGEmatch->pCElist, pCEmatch =
+		     pGEmatch->pCElist; pCEmatch != (CONSENT *) 0;
+		     ppCE = &pCEmatch->pCEnext, pCEmatch =
+		     pCEmatch->pCEnext) {
+		    if (0 == strcmp(acStart, pCEmatch->server.string)) {
+			/* extract pCEmatch from the linked list */
+			*ppCE = pCEmatch->pCEnext;
+			pGEmatch->imembers--;
+			break;
+		    }
+		}
+		if (pCEmatch != (CONSENT *) 0)
+		    break;
+	    }
+
+	    /* we're a child and we didn't find a match, next! */
+	    if (!isMaster && (pCEmatch == (CONSENT *) 0))
+		continue;
+
+	    /* otherwise....we'll fall through and build a group with a
+	     * single console.  at then end we'll do all the hard work
+	     * of shuffling things around, comparing, etc.  this way we
+	     * end up with the same parsed/pruned strings in the same
+	     * fields and we don't have to do a lot of the same work here
+	     * (especially the whitespace pruning)
+	     */
+	}
+
+	/* ok, we're ready to rock and roll...first, lets make
+	 * sure we have a group to go in and then we'll pop
+	 * out a console and start filling it up
 	 */
-	if (MAXMEMB == pGEAll[iG].imembers) {
-	    ++iG;
+	/* let's get going with a group */
+	if (pGroups == (GRPENT *) 0) {
+	    pGroups = (GRPENT *) calloc(1, sizeof(GRPENT));
+	    if (pGroups == (GRPENT *) 0)
+		OutOfMem();
+	    pGE = pGroups;
+	    pGE->pid = -1;
+	    pGE->id = groupID++;
 	}
-	if (iG < minG || iG >= MAXGRP) {
-	    Error("%s(%d) group number out of bounds %d <= %d < %d",
-		  pcFile, iLine, minG, iG, MAXGRP);
-	    exit(EX_UNAVAILABLE);
+
+	/* if we've filled up the group, get another...
+	 */
+	if (cMaxMemb == pGE->imembers) {
+	    pGE->pGEnext = (GRPENT *) calloc(1, sizeof(GRPENT));
+	    if (pGE->pGEnext == (GRPENT *) 0)
+		OutOfMem();
+	    pGE = pGE->pGEnext;
+	    pGE->pid = -1;
+	    pGE->id = groupID++;
 	}
-	minG = iG;
-	pGE = pGEAll + iG;
-	if (0 == pGE->imembers++) {
-	    pGE->pCElist = pCE;
-	}
-	if (pGE->imembers > MAXMEMB) {
+
+	pCE = (CONSENT *) calloc(1, sizeof(CONSENT));
+	if (pCE == (CONSENT *) 0)
+	    OutOfMem();
+	pCE->pCEnext = pGE->pCElist;
+	pGE->pCElist = pCE;
+	pGE->imembers++;
+
+	if (pGE->imembers > cMaxMemb) {
 	    Error
-		("%s(%d) group %d has more than %d members -- but we'll give it a spin",
-		 pcFile, iLine, iG, MAXMEMB);
+		("%s(%d) group has more than %d members -- but we'll give it a spin - THIS SHOULD NEVER HAPPEN",
+		 pcFile, iLine, cMaxMemb);
 	}
 
 	/* fill in the console entry
+	 * everything is calloc()ed, so STRING types are ready to rock
 	 */
-	if (sizeof(aConsoles) / sizeof(CONSENT) == iLocal) {
-	    Error
-		("%s(%d) %d is too many consoles for hard coded tables, adjust MAXGRP or MAXMEMB",
-		 pcFile, iLine, iLocal);
-	    exit(EX_UNAVAILABLE);
-	}
-	(void)strcpy(pCE->server, acStart);
+
+	buildMyString(acStart, &pCE->server);
 
 	/*
 	 *  Here we substitute the console name for any '&' character in the
 	 *  logfile name.  That way you can just have something like
 	 *  "/var/console/&" for each of the conserver.cf entries.
 	 */
-	*(pCE->lfile) = '\000';
 	pcStart = pcLog;
 	while ((char *)0 != (pcRem = strchr(pcStart, '&'))) {
 	    *pcRem = '\000';
-	    (void)strcat(pCE->lfile, pcStart);
-	    (void)strcat(pCE->lfile, acStart);
+	    buildMyString(pcStart, &pCE->lfile);
+	    buildMyString(acStart, &pCE->lfile);
 	    pcStart = pcRem + 1;
 	}
-	(void)strcat(pCE->lfile, pcStart);
-	if (LogDirectory[0] && (pCE->lfile)[0] != '/') {
-	    char lfile[MAXLOGLEN];
-	    strcpy(lfile, pCE->lfile);
-	    strcpy(pCE->lfile, LogDirectory);
-	    strcat(pCE->lfile, "/");
-	    strcat(pCE->lfile, lfile);
+	buildMyString(pcStart, &pCE->lfile);
+	if (LogDirectory.used && pCE->lfile.used &&
+	    *pCE->lfile.string != '/') {
+	    char *p;
+	    buildString((char *)0);
+	    p = buildString(pCE->lfile.string);
+	    buildMyString((char *)0, &pCE->lfile);
+	    buildMyString(LogDirectory.string, &pCE->lfile);
+	    buildMyStringChar('/', &pCE->lfile);
+	    buildMyString(p, &pCE->lfile);
+	    buildString((char *)0);
 	}
 
 	if (pcMark) {
 	    (void)parseMark(pcFile, iLine, pcMark, tyme, pCE);
 	} else {
-	    (void)parseMark(pcFile, iLine, defMark, tyme, pCE);
+	    (void)parseMark(pcFile, iLine, defMark.string, tyme, pCE);
 	}
 
 	pCE->breakType = 1;
@@ -455,71 +576,314 @@ ReadCfg(pcFile, fp)
 		Error("%s(%d) bad break spec `%d'", pcFile, iLine, bt);
 	    } else {
 		pCE->breakType = (short int)bt;
-		Debug("breakType set to %d", pCE->breakType);
+		Debug(1, "breakType set to %d", pCE->breakType);
 	    }
 	}
 
+	pCE->ipid = pCE->fdtty = -1;
+	pCE->fup = pCE->autoReUp = 0;
+	pCE->pCLon = pCE->pCLwr = (CONSCLIENT *) 0;
+	pCE->fdlog = (CONSFILE *) 0;
+
 	if (pcLine[0] == '!') {
+	    char acOut[100];
 	    pcLine = pruneSpace(pcLine + 1);
 	    pCE->isNetworkConsole = 1;
 	    pCE->telnetState = 0;
-	    strcpy(pCE->networkConsoleHost, pcLine);
+	    buildMyString((char *)0, &pCE->networkConsoleHost);
+	    buildMyString(pcLine, &pCE->networkConsoleHost);
 	    pCE->networkConsolePort = atoi(pcMode);
-
-	    if (fVerbose) {
-		Info("%s is network on %s/%d logged to %s", acStart,
-		     pCE->networkConsoleHost, pCE->networkConsolePort,
-		     pCE->lfile);
-	    }
 	    pCE->fvirtual = 0;
-	    sprintf(pCE->dfile, "%s/%d", pCE->networkConsoleHost,
-		    pCE->networkConsolePort);
+	    buildMyString((char *)0, &pCE->dfile);
+	    buildMyString(pCE->networkConsoleHost.string, &pCE->dfile);
+	    sprintf(acOut, "/%d", pCE->networkConsolePort);
+	    buildMyString(acOut, &pCE->dfile);
 	    pCE->pbaud = FindBaud("Netwk");
 	    pCE->pparity = FindParity(" ");
+	    if (isStartup && fVerbose) {
+		Info("%s is network on %s logged to %s", acStart,
+		     pCE->dfile.string, pCE->lfile.string);
+	    }
 	} else if ('|' == pcLine[0]) {
 	    pcLine = pruneSpace(pcLine + 1);
 	    pCE->isNetworkConsole = 0;
 	    pCE->telnetState = 0;
 	    pCE->fvirtual = 1;
-	    if ((char *)0 ==
-		(pCE->pccmd = malloc((strlen(pcLine) | 7) + 1))) {
-		OutOfMem();
+	    buildMyString((char *)0, &pCE->pccmd);
+	    buildMyString(pcLine, &pCE->pccmd);
+	    buildMyString((char *)0, &pCE->dfile);
+	    buildMyString("/dev/null", &pCE->dfile);
+	    buildMyString((char *)0, &pCE->acslave);
+	    buildMyString("/dev/null", &pCE->acslave);
+	    pCE->pbaud = FindBaud("Local");
+	    pCE->pparity = FindParity(" ");
+	    if (isStartup && fVerbose) {
+		Info("%s with command `%s' logged to %s", acStart,
+		     pCE->pccmd.string, pCE->lfile.string);
 	    }
-	    (void)strcpy(pCE->pccmd, pcLine);
-	    (void)strcpy(pCE->dfile, "/dev/null");
-	    (void)strcpy(pCE->acslave, "/dev/null");
 	} else {
 	    pCE->isNetworkConsole = 0;
 	    pCE->telnetState = 0;
 	    pCE->fvirtual = 0;
-	    (void)strcpy(pCE->dfile, pcLine);
-	}
-	pCE->ipid = -1;
-
-	if (!pCE->isNetworkConsole) {
-	    /* find user baud and parity
-	     * default to first table entry for baud and parity
-	     */
+	    buildMyString((char *)0, &pCE->dfile);
+	    buildMyString(pcLine, &pCE->dfile);
 	    pCE->pbaud = FindBaud(pcMode);
+	    if (pCE->pbaud->irate == 0) {
+		Error("%s(%d) invalid baud rate `%s'", pcFile, iLine,
+		      pcMode);
+		destroyConsent(pGE, pCE);
+		continue;
+	    }
 	    pCE->pparity = FindParity(pcMode);
-	    if (fVerbose) {
-		if (pCE->fvirtual)
-		    Info("%s with command `%s' logged to %s", acStart,
-			 pCE->pccmd, pCE->lfile);
-		else
-		    Info("%s is on %s (%s%c) logged to %s", acStart,
-			 pCE->dfile, pCE->pbaud->acrate,
-			 pCE->pparity->ckey, pCE->lfile);
+	    if (isStartup && fVerbose) {
+		Info("%s is on %s (%s%c) logged to %s", acStart,
+		     pCE->dfile.string, pCE->pbaud->acrate,
+		     pCE->pparity->ckey, pCE->lfile.string);
 	    }
 	}
-	++pCE, ++iLocal;
+
+	/* ok, now for the hard part of the reread */
+	if (pCEmatch != (CONSENT *) 0) {
+	    short int closeMatch = 1;
+	    /* see if the group is already staged */
+	    for (pGEtmp = pGEstage; pGEtmp != (GRPENT *) 0;
+		 pGEtmp = pGEtmp->pGEnext) {
+		if (pGEtmp->id == pGEmatch->id)
+		    break;
+	    }
+
+	    /* if not, allocate one, copy the data, and reset things */
+	    if (pGEtmp == (GRPENT *) 0) {
+		if ((GRPENT *) 0 ==
+		    (pGEtmp = (GRPENT *) calloc(1, sizeof(GRPENT))))
+		    OutOfMem();
+
+		/* copy the data */
+		*pGEtmp = *pGEmatch;
+
+		/* don't destroy the fake console */
+		pGEmatch->pCEctl = (CONSENT *) 0;
+
+		/* prep counters and such */
+		pGEtmp->pCElist = (CONSENT *) 0;
+		pGEtmp->pCLall = (CONSCLIENT *) 0;
+		pGEtmp->imembers = 0;
+		FD_ZERO(&pGEtmp->rinit);
+
+		/* link in to the staging area */
+		pGEtmp->pGEnext = pGEstage;
+		pGEstage = pGEtmp;
+
+		/* fix the free list (the easy one) */
+		/* the ppCLbnext link needs to point to the new group */
+		if (pGEtmp->pCLfree != (CONSCLIENT *) 0)
+		    pGEtmp->pCLfree->ppCLbnext = &pGEtmp->pCLfree;
+		pGEmatch->pCLfree = (CONSCLIENT *) 0;
+
+		if (pGEtmp->pCEctl) {
+		    /* fix the half-logged in clients */
+		    /* the pCLscan list needs to be rebuilt */
+		    /* file descriptors need to be watched */
+		    for (pCLtmp = pGEtmp->pCEctl->pCLon;
+			 pCLtmp != (CONSCLIENT *) 0;
+			 pCLtmp = pCLtmp->pCLnext) {
+			/* remove cleanly from the old group */
+			if ((CONSCLIENT *) 0 != pCLtmp->pCLscan) {
+			    pCLtmp->pCLscan->ppCLbscan = pCLtmp->ppCLbscan;
+			}
+			*(pCLtmp->ppCLbscan) = pCLtmp->pCLscan;
+			/* insert into the new group */
+			pCLtmp->pCLscan = pGEtmp->pCLall;
+			pCLtmp->ppCLbscan = &pGEtmp->pCLall;
+			if (pCLtmp->pCLscan != (CONSCLIENT *) 0) {
+			    pCLtmp->pCLscan->ppCLbscan = &pCLtmp->pCLscan;
+			}
+			pGEtmp->pCLall = pCLtmp;
+			/* set file descriptors */
+			FD_SET(fileFDNum(pCLtmp->fd), &pGEtmp->rinit);
+		    }
+		}
+	    }
+	    /* fix the real clients */
+	    /* the pCLscan list needs to be rebuilt */
+	    /* file descriptors need to be watched */
+	    for (pCLtmp = pCEmatch->pCLon; pCLtmp != (CONSCLIENT *) 0;
+		 pCLtmp = pCLtmp->pCLnext) {
+		/* remove cleanly from the old group */
+		if ((CONSCLIENT *) 0 != pCLtmp->pCLscan) {
+		    pCLtmp->pCLscan->ppCLbscan = pCLtmp->ppCLbscan;
+		}
+		*(pCLtmp->ppCLbscan) = pCLtmp->pCLscan;
+		/* insert into the new group */
+		pCLtmp->pCLscan = pGEtmp->pCLall;
+		pCLtmp->ppCLbscan = &pGEtmp->pCLall;
+		if (pCLtmp->pCLscan != (CONSCLIENT *) 0) {
+		    pCLtmp->pCLscan->ppCLbscan = &pCLtmp->pCLscan;
+		}
+		pGEtmp->pCLall = pCLtmp;
+		/* set file descriptors */
+		FD_SET(fileFDNum(pCLtmp->fd), &pGEtmp->rinit);
+	    }
+
+	    /* add the original console to the new group */
+	    pCEmatch->pCEnext = pGEtmp->pCElist;
+	    pGEtmp->pCElist = pCEmatch;
+	    pGEtmp->imembers++;
+	    if (pCEmatch->fdtty != -1) {
+		FD_SET(pCEmatch->fdtty, &pGEtmp->rinit);
+	    }
+
+	    /* now check for any changes between pCEmatch & pCE! */
+
+	    if (pCEmatch->isNetworkConsole != pCE->isNetworkConsole ||
+		pCEmatch->fvirtual != pCE->fvirtual)
+		closeMatch = 0;
+	    if (pCEmatch->dfile.used && pCEmatch->dfile.used) {
+		if (strcmp(pCEmatch->dfile.string, pCE->dfile.string) != 0) {
+		    buildMyString((char *)0, &pCEmatch->dfile);
+		    buildMyString(pCE->dfile.string, &pCEmatch->dfile);
+		    if (!pCE->fvirtual)
+			closeMatch = 0;
+		}
+	    } else if (pCEmatch->dfile.used || pCE->dfile.used) {
+		buildMyString((char *)0, &pCEmatch->dfile);
+		buildMyString(pCE->dfile.string, &pCEmatch->dfile);
+		if (!pCE->fvirtual)
+		    closeMatch = 0;
+	    }
+	    if (pCEmatch->lfile.used && pCEmatch->lfile.used) {
+		if (strcmp(pCEmatch->lfile.string, pCE->lfile.string) != 0) {
+		    buildMyString((char *)0, &pCEmatch->lfile);
+		    buildMyString(pCE->lfile.string, &pCEmatch->lfile);
+		    fileClose(&pCEmatch->fdlog);
+		    closeMatch = 0;
+		}
+	    } else if (pCEmatch->lfile.used || pCE->lfile.used) {
+		buildMyString((char *)0, &pCEmatch->lfile);
+		buildMyString(pCE->lfile.string, &pCEmatch->lfile);
+		fileClose(&pCEmatch->fdlog);
+		closeMatch = 0;
+	    }
+	    if (pCEmatch->pbaud != pCE->pbaud) {
+		pCEmatch->pbaud = pCE->pbaud;
+		closeMatch = 0;
+	    }
+	    if (pCEmatch->pparity != pCE->pparity) {
+		pCEmatch->pparity = pCE->pparity;
+		closeMatch = 0;
+	    }
+	    if (pCEmatch->isNetworkConsole != pCE->isNetworkConsole) {
+		pCEmatch->isNetworkConsole = pCE->isNetworkConsole;
+		closeMatch = 0;
+	    }
+	    if (pCEmatch->fvirtual != pCE->fvirtual) {
+		pCEmatch->fvirtual = pCE->fvirtual;
+		closeMatch = 0;
+	    }
+	    if (pCE->isNetworkConsole) {
+		if (pCEmatch->networkConsoleHost.used &&
+		    pCEmatch->networkConsoleHost.used) {
+		    if (strcmp
+			(pCEmatch->networkConsoleHost.string,
+			 pCE->networkConsoleHost.string) != 0) {
+			buildMyString((char *)0,
+				      &pCEmatch->networkConsoleHost);
+			buildMyString(pCE->networkConsoleHost.string,
+				      &pCEmatch->networkConsoleHost);
+			closeMatch = 0;
+		    }
+		} else if (pCEmatch->networkConsoleHost.used ||
+			   pCE->networkConsoleHost.used) {
+		    buildMyString((char *)0,
+				  &pCEmatch->networkConsoleHost);
+		    buildMyString(pCE->networkConsoleHost.string,
+				  &pCEmatch->networkConsoleHost);
+		    closeMatch = 0;
+		}
+		if (pCEmatch->networkConsolePort !=
+		    pCE->networkConsolePort) {
+		    pCEmatch->networkConsolePort = pCE->networkConsolePort;
+		    closeMatch = 0;
+		}
+		if (pCEmatch->telnetState != pCE->telnetState) {
+		    pCEmatch->telnetState = pCE->telnetState;
+		    closeMatch = 0;
+		}
+	    }
+	    if (pCE->fvirtual) {
+		if (pCEmatch->pccmd.used && pCEmatch->pccmd.used) {
+		    if (strcmp(pCEmatch->pccmd.string, pCE->pccmd.string)
+			!= 0) {
+			buildMyString((char *)0, &pCEmatch->pccmd);
+			buildMyString(pCE->pccmd.string, &pCEmatch->pccmd);
+			closeMatch = 0;
+		    }
+		} else if (pCEmatch->pccmd.used || pCE->pccmd.used) {
+		    buildMyString((char *)0, &pCEmatch->pccmd);
+		    buildMyString(pCE->pccmd.string, &pCEmatch->pccmd);
+		    closeMatch = 0;
+		}
+	    }
+	    pCEmatch->activitylog = pCE->activitylog;
+	    pCEmatch->mark = pCE->mark;
+	    pCEmatch->nextMark = pCE->nextMark;
+	    pCEmatch->breakType = pCE->breakType;
+
+	    if (!closeMatch && !isMaster) {
+		/* fdtty/fup/fronly/acslave/ipid */
+		SendClientsMsg(pCEmatch,
+			       "[-- Conserver reconfigured - console reset --]\r\n");
+		ConsDown(pCEmatch, &pGEtmp->rinit);
+	    }
+
+	    /* nuke the temp data structure */
+	    destroyConsent(pGE, pCE);
+	}
     }
+
+    /* go through and nuke groups (if a child or are empty) */
+    for (ppGE = &pGroups; *ppGE != (GRPENT *) 0;) {
+	if (!isMaster || (*ppGE)->imembers == 0) {
+	    pGEtmp = *ppGE;
+	    *ppGE = (*ppGE)->pGEnext;
+	    destroyGroup(pGEtmp);
+	} else {
+	    ppGE = &((*ppGE)->pGEnext);
+	}
+    }
+    /* now append the staged groups */
+    *ppGE = pGEstage;
+
+    /* nuke the old groups lists */
+    while (pGroupsOld != (GRPENT *) 0) {
+	pGEtmp = pGroupsOld->pGEnext;
+	destroyGroup(pGroupsOld);
+	pGroupsOld = pGEtmp;
+    }
+
+    /* nuke the old remote consoles */
+    while (pRCListOld != (REMOTE *) 0) {
+	pRCtmp = pRCListOld->pRCnext;
+	destroyString(&pRCListOld->rserver);
+	destroyString(&pRCListOld->rhost);
+	free(pRCListOld);
+	pRCListOld = pRCtmp;
+    }
+
     *ppRC = (REMOTE *) 0;
 
-    /* make a vector of access restrictions
+    /* clean out the access restrictions
      */
-    iG = iAccess = 0;
+    while (pACList != (ACCESS *) 0) {
+	if (pACList->pcwho != (char *)0)
+	    free(pACList->pcwho);
+	pACtmp = pACList->pACnext;
+	free(pACList);
+	pACList = pACtmp;
+    }
     pACList = (ACCESS *) 0;
+    ppAC = &pACList;
+
     while ((acIn = readLine(fp, &acInSave, &iLine)) != (unsigned char *)0) {
 	char *pcMach, *pcNext, *pcMem;
 	char cType;
@@ -640,34 +1004,103 @@ ReadCfg(pcFile, fp)
 		}
 	    }
 
-	    if (iAccess < iG) {
-		/* still have room */ ;
-	    } else if (0 != iG) {
-		iG += 8;
-		pACList =
-		    (ACCESS *) realloc((char *)pACList,
-				       iG * sizeof(ACCESS));
-	    } else {
-		iG = MAXGRP;
-		pACList = (ACCESS *) malloc(iG * sizeof(ACCESS));
-	    }
-	    if ((ACCESS *) 0 == pACList) {
+	    if ((ACCESS *) 0 ==
+		(pACtmp = (ACCESS *) calloc(1, sizeof(ACCESS)))) {
 		OutOfMem();
 	    }
-	    /* use loopback interface for local connections
-	       if (0 == strcmp(pcMach, acMyHost)) {
-	       pcMach = "127.0.0.1";
-	       }
-	     */
 	    iLen = strlen(pcMach);
 	    if ((char *)0 == (pcMem = malloc(iLen + 1))) {
 		OutOfMem();
 	    }
-	    pACList[iAccess].ctrust = cType;
-	    pACList[iAccess].ilen = iLen;
-	    pACList[iAccess].pcwho = strcpy(pcMem, pcMach);
-	    pACList[iAccess].isCIDR = isCIDR;
-	    ++iAccess;
+	    pACtmp->ctrust = cType;
+	    pACtmp->ilen = iLen;
+	    pACtmp->pcwho = strcpy(pcMem, pcMach);
+	    pACtmp->isCIDR = isCIDR;
+	    *ppAC = pACtmp;
+	    ppAC = &pACtmp->pACnext;
+	}
+    }
+
+    destroyString(&LogDirectory);
+    destroyString(&defMark);
+}
+
+/* Unless otherwise stated, returns the same values as send(2) */
+void
+#if USE_ANSI_PROTO
+ReReadCfg()
+#else
+ReReadCfg()
+#endif
+{
+    FILE *fpConfig;
+
+    if ((FILE *) 0 == (fpConfig = fopen(pcConfig, "r"))) {
+	Error("fopen: %s: %s", pcConfig, strerror(errno));
+	return;
+    }
+
+    ReadCfg(pcConfig, fpConfig);
+
+    fclose(fpConfig);
+
+    if (pGroups == (GRPENT *) 0 && pRCList == (REMOTE *) 0) {
+	if (isMaster) {
+	    Error("No consoles found in configuration file");
+	    kill(thepid, SIGTERM);	/* shoot myself in the head */
+	    return;
+	} else {
+	    Error("No consoles to manage after reconfiguration - exiting");
+	    exit(EX_OK);
+	}
+    }
+
+    /* if no one can use us we need to come up with a default
+     */
+    if (pACList == (ACCESS *) 0) {
+	SetDefAccess(&acMyAddr, acMyHost);
+    }
+
+    if (isMaster) {
+	GRPENT *pGE;
+	CONSENT *pCE;
+	/* spawn all the children, so fix kids has an initial pid
+	 */
+	for (pGE = pGroups; pGE != (GRPENT *) 0; pGE = pGE->pGEnext) {
+	    if (pGE->imembers == 0 || pGE->pid != -1)
+		continue;
+
+	    Spawn(pGE);
+
+	    if (fVerbose) {
+		Info("group #%d pid %d on port %u", pGE->id, pGE->pid,
+		     ntohs(pGE->port));
+	    }
+	    for (pCE = pGE->pCElist; pCE != (CONSENT *) 0;
+		 pCE = pCE->pCEnext) {
+		if (-1 != pCE->fdtty)
+		    (void)close(pCE->fdtty);
+	    }
+	}
+
+	if (fVerbose) {
+	    ACCESS *pACtmp;
+	    for (pACtmp = pACList; pACtmp != (ACCESS *) 0;
+		 pACtmp = pACtmp->pACnext) {
+		Info("access type '%c' for \"%s\"", pACtmp->ctrust,
+		     pACtmp->pcwho);
+	    }
+	}
+
+	pRCUniq = FindUniq(pRCList);
+
+	/* output unique console server peers?
+	 */
+	if (fVerbose) {
+	    REMOTE *pRC;
+	    for (pRC = pRCUniq; (REMOTE *) 0 != pRC; pRC = pRC->pRCuniq) {
+		Info("peer server on `%s'", pRC->rhost.string);
+	    }
 	}
     }
 }

@@ -1,6 +1,39 @@
 				CHANGES
 				=======
 
+version 7.2.0 (Mar 12, 2002):
+	- check for valid baud rates (invalid resulted in '0') -
+	  reported by Andrew Gallatin <gallatin@cs.duke.edu>
+	- a broadcast messages to others on your console can now be
+	  sent via ^Ecb
+
+version 7.2.0-beta3 (Feb 25, 2002):
+	- allow for 57600 and 115200 baud rates - patch by Andreas
+	  Wrede <andreas@planix.com>
+	- TCP traffic now escaped according to Telnet protocol
+	- the highly desired dynamic reconfiguration of conserver is
+	  here!  the HUP signal now triggers a read of the
+	  configuration file and adjustment of consoles
+	- configure flags shown in -V output
+
+version 7.2.0-beta2 (Feb 14, 2002):
+	- new -W client option for showing who's attached to a single
+	  conserver master - suggested by Dave Stuit <djs@gnac.com>
+	- maxfiles() clashes with HP-UX 11 'maxfiles' variable - patch
+	  by Adam Morris <AMorris@providence.org>
+	- removed use of socklen_t type for better compatibility
+	- removed TELCMD/TELOPT use for compatibility
+
+version 7.2.0-beta1 (Jan 29, 2002):
+	- static structures and strings are now dynamic in server
+	- MAXGRP (--with-maxgrp) has been removed as it's now dynamic
+	- new -m server option for setting the maximum consoles per
+	  process - the default is still set with --with-maxmemb
+	- new -i client option (and ^Eci) that displays console
+	  information in a machine-parseable format
+	- two debug levels (second level by using two -D options)
+	- ANSI prototypes and definitions (when available)
+
 version 7.1.4 (Jan 21, 2002):
 	- console -[PqQ] didn't work - patch by Han Pilmeyer
 	  <han@zk3.dec.com>
@@ -265,5 +298,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.52 2002-01-21 02:49:42-08 bryan Exp $
+#  $Id: CHANGES,v 1.57 2002-03-12 00:20:25-08 bryan Exp $
 #

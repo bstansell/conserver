@@ -1,4 +1,4 @@
-.\" $Id: console.man,v 1.16 2002-01-20 20:03:10-08 bryan Exp $
+.\" $Id: console.man,v 1.20 2002-03-11 18:06:31-08 bryan Exp $
 .TH CONSOLE 1 "Local"
 .SH NAME
 console \- console server client program
@@ -94,6 +94,9 @@ interactive sequence.
 .B \-h
 Display a brief help message.
 .TP
+.B \-i
+Display information in a machine-parseable format (see below for the details).
+.TP
 .BI \-l user
 Set the login name used for authentication to \fIuser\fP.
 By default, \fBconsole\fP uses $USER if its uid matches the user's real uid,
@@ -164,6 +167,58 @@ The \fB\-A\fP, \fB\-F\fP, or \fB\-S\fP options have the same effect as
 their lower-case variants.
 In addition, they each request the last 20 lines of the console output after
 making the connection (as if `\fB^Ecr\fP' were typed).
+.PP
+The \fB-i\fP option outputs information regarding each console in 
+ten colon-separated fields.
+.TP
+.B name
+The name of the console.
+.TP
+.B hostname,pid,socket
+The hostname, pid, and socket number of the child process managing
+the console.
+.TP
+.B type
+The type of console.  Values will be a `/' for a local device, `|' for
+a command, or `!' for a remote port.
+.TP
+.B console-details
+The details regarding the console.  The values here (all comma seperated)
+depend on the type of the console.  Local devices will have values of
+the device file, baud rate, and file descriptor for the device.
+Commands will have values of the command, the command's pid, the
+pseudo-tty, and file descriptor for the pseudo-tty.
+Remote ports will have values of the remote hostname, remote port number,
+and file descriptor for the socket connection.
+.TP
+.B users-list
+The details of each user connected to the console.  The details for each
+user are an `@' seperated list of `w', `r', or `s' (for read-write, read-only,
+or suspended), username, hostname the user is on, and the user's idle time.
+Each user bundle is seperated by commas.
+.TP
+.B state
+The state of the console.  Values with either be ``up'' or ``down''.
+.TP
+.B perm
+This value will either be ``rw'' or ``ro''.  It will only be ``ro'' if
+the console is a local device (`/' type) and the permissions are such
+that the server can open the file for read, but not write.
+.TP
+.B logfile-details
+The details regarding the logging for the console.  The comma seperated
+values will be the logfile, ``log'' or ``nolog'' (if logging is on
+or not - toggled via ^EcL), ``act'' or ``noact'' (if activity logging is
+enabled or not - the `a' timestamp option), the timestamp interval, and
+the file descriptor of the logfile.
+.TP
+.B break
+The default break sequence used for the console.
+.TP
+.B reup
+If the console is currently down and the automatic reconnection code
+is at work, it will have the value of ``autoup'', otherwise it
+will be ``noautoup''.
 .SH "ESCAPE SEQUENCES"
 The connection can be controlled by a two-character escape sequence, followed
 by a command.  The default escape sequence is ``control-E c''
@@ -176,6 +231,8 @@ Commands are:
 .PD 0
 .IP a
 attach read-write if nobody already is
+.IP b
+send broadcast message to all users on this console
 .IP c
 toggle flow control (don't do this)
 .IP d
@@ -219,7 +276,7 @@ display list of commands
 continue, ignore the escape sequence
 .IP "^R (ctrl-R)"
 replay the last line only
-.IP \\\\\fIooo\fP
+.IP \e\\fIooo\fP
 send character having octal code \fIooo\fP
 (must specify three octal digits)
 .IP \.

@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.73 2002-01-21 02:48:33-08 bryan Exp $
+ *  $Id: console.c,v 5.84 2002-03-11 18:10:27-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -29,7 +29,6 @@
 
 #include <config.h>
 
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -40,6 +39,7 @@
 #include <netdb.h>
 #include <pwd.h>
 #include <ctype.h>
+#include <sys/stat.h>
 
 #include <compat.h>
 #include <port.h>
@@ -55,17 +55,18 @@ char *pcInMaster =		/* which machine is current */
 char *pcPort = DEFPORT;
 unsigned short bindPort;
 
-#define LARGEBUFSIZE	8192 + 2
-
-static char
-  acMesg[LARGEBUFSIZE];		/* the buffer for startup negotiation   */
+static char acMesg[8192];	/* the buffer for startup negotiation   */
 
 /* output a control (or plain) character as a UNIX user would expect it	(ksb)
  */
 static void
+#if USE_ANSI_PROTO
+putCtlc(int c, FILE * fp)
+#else
 putCtlc(c, fp)
     int c;
     FILE *fp;
+#endif
 {
     if (0 != (0200 & c)) {
 	(void)putc('M', fp);
@@ -87,11 +88,12 @@ putCtlc(c, fp)
 static char *apcLong[] = {
     "7       strip the high bit of all console data",
     "a(A)    attach politely (and replay last 20 lines)",
-    "b       broadcast message",
+    "b       send broadcast message",
     "D       enable debug output, sent to stderr",
     "e esc   set the initial escape characters",
     "f(F)    force read/write connection (and replay)",
     "G       connect to the console group only",
+    "i       display information in machine-parseable form",
     "h       output this message",
     "l user  use username instead of current username",
     "M mach  master server to poll first",
@@ -103,7 +105,7 @@ static char *apcLong[] = {
     "u       show users on the various consoles",
     "v       be more verbose",
     "V       show version information",
-    "w       show who is on which console",
+    "w(W)    show who is on which console (on master)",
     "x       examine ports and baud rates",
     (char *)0
 };
@@ -111,8 +113,12 @@ static char *apcLong[] = {
 /* output a long message to the user
  */
 static void
+#if USE_ANSI_PROTO
+Usage(char **ppc)
+#else
 Usage(ppc)
     char **ppc;
+#endif
 {
     for ( /* passed */ ; (char *)0 != *ppc; ++ppc)
 	fprintf(stderr, "\t%s\n", *ppc);
@@ -121,7 +127,11 @@ Usage(ppc)
 /* expain who we are and which revision we are				(ksb)
  */
 static void
+#if USE_ANSI_PROTO
 Version()
+#else
+Version()
+#endif
 {
     int i;
 
@@ -150,6 +160,7 @@ Version()
 	    Info("on port %u (referenced as `%s')", bindPort, pcPort);
 	}
     }
+    Info("built with `%s'", CONFIGINVOCATION);
     if (fVerbose)
 	printf(COPYRIGHT);
 }
@@ -161,8 +172,12 @@ Version()
  *	c			a plain character
  */
 static int
+#if USE_ANSI_PROTO
+ParseChar(char **ppcSrc, char *pcOut)
+#else
 ParseChar(ppcSrc, pcOut)
     char **ppcSrc, *pcOut;
+#endif
 {
     int cvt, n;
     char *pcScan = *ppcSrc;
@@ -206,7 +221,11 @@ ParseChar(ppcSrc, pcOut)
 /*
  */
 static void
+#if USE_ANSI_PROTO
 ValidateEsc()
+#else
+ValidateEsc()
+#endif
 {
     unsigned char c1, c2;
 
@@ -229,8 +248,12 @@ ValidateEsc()
 /* find the two characters that makeup the users escape sequence	(ksb)
  */
 static void
+#if USE_ANSI_PROTO
+ParseEsc(char *pcText)
+#else
 ParseEsc(pcText)
     char *pcText;
+#endif
 {
     char *pcTemp;
     char c1, c2;
@@ -255,10 +278,14 @@ ParseEsc(pcText)
  * as a side effect we set ThisHost to a short name for this host
  */
 int
+#if USE_ANSI_PROTO
+GetPort(char *pcToHost, struct sockaddr_in *pPort, unsigned short sPort)
+#else
 GetPort(pcToHost, pPort, sPort)
     char *pcToHost;
     struct sockaddr_in *pPort;
     unsigned short sPort;
+#endif
 {
     int s;
     struct hostent *hp = (struct hostent *)0;
@@ -269,7 +296,8 @@ GetPort(pcToHost, pPort, sPort)
     (void)bzero((char *)pPort, sizeof(*pPort));
 #endif
 
-    if (-1 == (pPort->sin_addr.s_addr = inet_addr(pcToHost))) {
+    pPort->sin_addr.s_addr = inet_addr(pcToHost);
+    if ((in_addr_t) (-1) == pPort->sin_addr.s_addr) {
 	if ((struct hostent *)0 != (hp = gethostbyname(pcToHost))) {
 #if HAVE_MEMCPY
 	    memcpy((char *)&pPort->sin_addr.s_addr, (char *)hp->h_addr,
@@ -288,11 +316,12 @@ GetPort(pcToHost, pPort, sPort)
 
     if (fDebug) {
 	if ((struct hostent *)0 != hp && (char *)0 != hp->h_name)
-	    Debug("GetPort: hostname=%s, ip=%s, port=%u", hp->h_name,
-		  inet_ntoa(pPort->sin_addr), ntohs(sPort));
+	    Debug(1, "GetPort: hostname=%s (%s), ip=%s, port=%u",
+		  hp->h_name, pcToHost, inet_ntoa(pPort->sin_addr),
+		  ntohs(sPort));
 	else
-	    Debug("GetPort: hostname=<unresolved>, ip=%s, port=%u",
-		  inet_ntoa(pPort->sin_addr), ntohs(sPort));
+	    Debug(1, "GetPort: hostname=<unresolved> (%s), ip=%s, port=%u",
+		  pcToHost, inet_ntoa(pPort->sin_addr), ntohs(sPort));
     }
 
     /* set up the socket to talk to the server for all consoles
@@ -335,7 +364,11 @@ static struct ltchars o_ltchars;
  * we really use cbreak at PUCC because we need even parity...
  */
 static void
+#if USE_ANSI_PROTO
 c2raw()
+#else
+c2raw()
+#endif
 {
 #if HAVE_TERMIOS_H
     struct termios n_tios;
@@ -445,7 +478,11 @@ c2raw()
  * put the tty back as it was, however that was
  */
 static void
+#if USE_ANSI_PROTO
 c2cooked()
+#else
+c2cooked()
+#endif
 {
     if (!screwy)
 	return;
@@ -472,26 +509,20 @@ c2cooked()
 /* send out some data along the connection				(ksb)
  */
 static void
+#if USE_ANSI_PROTO
+SendOut(int fd, char *pcBuf, int iLen)
+#else
 SendOut(fd, pcBuf, iLen)
     int fd, iLen;
     char *pcBuf;
+#endif
 {
     int nr;
 
     if (fDebug) {
-	char *buf1, *buf2;
-	if ((char *)0 == (buf1 = malloc((iLen + 1) * sizeof(char)))) {
-	    OutOfMem();
-	}
-	if ((char *)0 == (buf2 = malloc(2 * (iLen + 1) * sizeof(char)))) {
-	    OutOfMem();
-	}
-	(void)strncpy(buf1, pcBuf, iLen);
-	buf1[iLen] = '\000';
-	FmtCtlStr(buf1, buf2);
-	Debug("SendOut: `%s'", buf2);
-	free(buf1);
-	free(buf2);
+	static STRING buf = { (char *)0, 0, 0 };
+	FmtCtlStr(pcBuf, &buf);
+	Debug(1, "SendOut: `%s'", buf.string);
     }
     while (0 != iLen) {
 	if (-1 == (nr = write(fd, pcBuf, iLen))) {
@@ -508,9 +539,13 @@ SendOut(fd, pcBuf, iLen)
  * if pcWnat == (char *)0 we strip \r\n from the end and return strlen
  */
 static int
+#if USE_ANSI_PROTO
+ReadReply(int fd, char *pcBuf, int iLen, char *pcWant)
+#else
 ReadReply(fd, pcBuf, iLen, pcWant)
     int fd, iLen;
     char *pcBuf, *pcWant;
+#endif
 {
     int nr, j, iKeep;
 
@@ -550,16 +585,16 @@ ReadReply(fd, pcBuf, iLen, pcWant)
 	while (0 != j && isspace((int)(pcBuf[j - 1]))) {
 	    pcBuf[--j] = '\000';
 	}
-	Debug("ReadReply: %s", pcBuf);
+	Debug(1, "ReadReply: %s", pcBuf);
 	return j;
     }
     if (fDebug) {
-	char buf[BUFSIZ];	/* None of the expected strings are that big */
-	FmtCtlStr(pcWant, buf);
+	static STRING buf = { (char *)0, 0, 0 };
+	FmtCtlStr(pcWant, &buf);
 	if (strcmp(pcBuf, pcWant))
-	    Debug("ReadReply: didn't match `%s'", buf);
+	    Debug(1, "ReadReply: didn't match `%s'", buf.string);
 	else
-	    Debug("ReadReply: matched `%s'", buf);
+	    Debug(1, "ReadReply: matched `%s'", buf.string);
     }
     return strcmp(pcBuf, pcWant);
 }
@@ -571,14 +606,19 @@ ReadReply(fd, pcBuf, iLen, pcWant)
  * and ask the machine master at pop.stat for more group leaders
  */
 static int
+#if USE_ANSI_PROTO
+Gather(int (*pfi) (), char *pcPorts, char *pcMaster, char *pcTo,
+       char *pcCmd, char *pcWho)
+#else
 Gather(pfi, pcPorts, pcMaster, pcTo, pcCmd, pcWho)
     int (*pfi) ();
     char *pcPorts, *pcMaster, *pcTo, *pcCmd, *pcWho;
+#endif
 {
     int s;
     unsigned short j;
     char *pcNext, *pcServer;
-    char acExcg[256];
+    STRING acExcg = { (char *)0, 0, 0 };
     struct sockaddr_in client_port;
     int iRet = 0;
 #if defined(__CYGWIN__)
@@ -592,11 +632,13 @@ Gather(pfi, pcPorts, pcMaster, pcTo, pcCmd, pcWho)
 	else
 	    *pcNext++ = '\000';
 
-	(void)strcpy(acExcg, pcMaster);
+	buildMyString((char *)0, &acExcg);
+	buildMyString(pcMaster, &acExcg);
 	if ((char *)0 != (pcServer = strchr(pcPorts, '@'))) {
 	    *pcServer++ = '\000';
 	    if ('\000' != *pcServer) {
-		(void)strcpy(acExcg, pcServer);
+		buildMyString((char *)0, &acExcg);
+		buildMyString(pcServer, &acExcg);
 	    }
 	}
 
@@ -609,17 +651,17 @@ Gather(pfi, pcPorts, pcMaster, pcTo, pcCmd, pcWho)
 	    j = htons((short)atoi(pcPorts));
 	}
 
-	s = GetPort(acExcg, &client_port, j);
+	s = GetPort(acExcg.string, &client_port, j);
 
 	if (0 != ReadReply(s, acMesg, sizeof(acMesg), "ok\r\n")) {
 	    int s = strlen(acMesg);
 	    if ((s > 0) && ('\n' == acMesg[s - 1]))
 		acMesg[s - 1] = '\000';
-	    Error("%s: %s", acExcg, acMesg);
+	    Error("%s: %s", acExcg.string, acMesg);
 	    exit(EX_UNAVAILABLE);
 	}
 
-	iRet += (*pfi) (s, acExcg, pcTo, pcCmd, pcWho);
+	iRet += (*pfi) (s, acExcg.string, pcTo, pcCmd, pcWho);
 
 #if defined(__CYGWIN__)
 	/* flush out the client socket - set it to blocking,
@@ -652,6 +694,7 @@ Gather(pfi, pcPorts, pcMaster, pcTo, pcCmd, pcWho)
 	    *pcServer = '@';
 	}
     }
+    destroyString(&acExcg);
     return iRet;
 }
 
@@ -663,8 +706,12 @@ static int SawUrg = 0;
  * routine we saw one
  */
 RETSIGTYPE
+#if USE_ANSI_PROTO
+oob(int sig)
+#else
 oob(sig)
     int sig;
+#endif
 {
     ++SawUrg;
 #if !HAVE_SIGACTION
@@ -675,20 +722,24 @@ oob(sig)
 }
 
 void
+#if USE_ANSI_PROTO
+processUrgentData(int s)
+#else
 processUrgentData(s)
     int s;
+#endif
 {
-    static char acCmd[64];
+    static char acCmd;
 
     SawUrg = 0;
 
     /* get the pending urgent message
      */
-    while (recv(s, acCmd, 1, MSG_OOB) < 0) {
+    while (recv(s, &acCmd, 1, MSG_OOB) < 0) {
 	switch (errno) {
 	    case EWOULDBLOCK:
 		/* clear any pending input to make room */
-		(void)read(s, acCmd, sizeof(acCmd));
+		(void)read(s, &acCmd, 1);
 		write(1, ".", 1);
 		continue;
 	    case EINVAL:
@@ -698,7 +749,7 @@ processUrgentData(s)
 		continue;
 	}
     }
-    switch (acCmd[0]) {
+    switch (acCmd) {
 	case OB_SUSP:
 #if defined(SIGSTOP)
 	    write(1, "stop]", 5);
@@ -709,7 +760,7 @@ processUrgentData(s)
 #else
 	    write(1,
 		  "stop not supported -- press any character to continue",
-		  51);
+		  53);
 #endif
 	    break;
 	case OB_DROP:
@@ -717,7 +768,7 @@ processUrgentData(s)
 	    c2cooked();
 	    exit(EX_UNAVAILABLE);
 	 /*NOTREACHED*/ default:
-	    Error("unknown out of band command `%c\'\r", acCmd[0]);
+	    Error("unknown out of band command `%c\'\r", acCmd);
 	    (void)fflush(stderr);
 	    break;
     }
@@ -726,14 +777,19 @@ processUrgentData(s)
 /* interact with a group server					(ksb)
  */
 static int
+#if USE_ANSI_PROTO
+CallUp(int s, char *pcMaster, char *pcMach, char *pcHow, char *pcUser)
+#else
 CallUp(s, pcMaster, pcMach, pcHow, pcUser)
     int s;
     char *pcMaster, *pcMach, *pcHow, *pcUser;
+#endif
 {
     int nc;
     int fIn = '-';
     fd_set rmask, rinit;
     int i;
+    int justProcessedUrg = 0;
 
     if (fVerbose) {
 	Info("%s to %s (%son %s)", pcHow, pcMach, fRaw ? "raw " : "",
@@ -775,7 +831,7 @@ CallUp(s, pcMaster, pcMach, pcHow, pcUser)
 	(void)sprintf(acMesg, "%c%ce%c%c", DEFATTN, DEFESC, chAttn, chEsc);
 	SendOut(s, acMesg, 5);
 	if (0 == ReadReply(s, acMesg, sizeof(acMesg), (char *)0)) {
-	    Error("protocol botch on redef on escape sequence");
+	    Error("protocol botch on redef of escape sequence");
 	    exit(EX_UNAVAILABLE);
 	}
     }
@@ -822,16 +878,17 @@ CallUp(s, pcMaster, pcMach, pcHow, pcUser)
 	SendOut(s, acMesg, strlen(acMesg));
 	(void)ReadReply(s, acMesg, sizeof(acMesg), (char *)0);
 	if (0 == strcmp(acMesg, "passwd:")) {
-	    char pass[256];
+	    static STRING pass = {(char *)0,0,0};
+	    buildMyString((char *)0, &pass);
 	    (void)sprintf(acMesg, "Enter %s@%s's password:", pcUser,
 			  pcMaster);
 #if defined(HAVE_GETPASSPHRASE)
-	    (void)strcpy(pass, getpassphrase(acMesg));
+	    buildMyString(getpassphrase(acMesg), &pass);
 #else
-	    (void)strcpy(pass, getpass(acMesg));
+	    buildMyString(getpass(acMesg), &pass);
 #endif
-	    (void)sprintf(acMesg, "%s\r\n", pass);
-	    SendOut(s, acMesg, strlen(acMesg));
+	    buildMyString("\r\n", &pass);
+	    SendOut(s, pass.string, strlen(pass.string));
 	    (void)ReadReply(s, acMesg, sizeof(acMesg), (char *)0);
 	}
 
@@ -912,8 +969,10 @@ CallUp(s, pcMaster, pcMach, pcHow, pcUser)
     FD_SET(s, &rinit);
     FD_SET(0, &rinit);
     for (;;) {
+	justProcessedUrg = 0;
 	if (SawUrg) {
 	    processUrgentData(s);
+	    justProcessedUrg = 1;
 	}
 	/* reset read mask and select on it
 	 */
@@ -924,12 +983,17 @@ CallUp(s, pcMaster, pcMach, pcHow, pcUser)
 	    rmask = rinit;
 	    if (SawUrg) {
 		processUrgentData(s);
+		justProcessedUrg = 1;
 	    }
 	}
 
 	/* anything from socket? */
 	if (FD_ISSET(s, &rmask)) {
 	    if ((nc = read(s, acMesg, sizeof(acMesg))) == 0) {
+		if (justProcessedUrg) {
+		    printf("\n");
+		    Error("lost connection");
+		}
 		break;
 	    }
 	    if (fStrip) {
@@ -938,6 +1002,7 @@ CallUp(s, pcMaster, pcMach, pcHow, pcUser)
 	    }
 	    SendOut(1, acMesg, nc);
 	}
+
 	/* anything from stdin? */
 	if (FD_ISSET(0, &rmask)) {
 	    if ((nc = read(0, acMesg, sizeof(acMesg))) == 0)
@@ -960,9 +1025,13 @@ CallUp(s, pcMaster, pcMach, pcHow, pcUser)
  * we use CallUp to start a session with each target, or forward it
  */
 static int
+#if USE_ANSI_PROTO
+Indir(int s, char *pcMaster, char *pcMach, char *pcCmd, char *pcWho)
+#else
 Indir(s, pcMaster, pcMach, pcCmd, pcWho)
     int s;
     char *pcMaster, *pcMach, *pcCmd, *pcWho;
+#endif
 {
     char acPorts[4097];
 
@@ -990,7 +1059,7 @@ Indir(s, pcMaster, pcMach, pcCmd, pcWho)
     return Gather(CallUp, acPorts, pcMaster, pcMach, pcCmd, pcWho);
 }
 
-#define BUF_G1		(MAXGRP*80)
+#define BUF_G1		1024
 #define BUF_MIN		80
 #define BUF_CHUNK	(2*132)
 
@@ -999,10 +1068,14 @@ Indir(s, pcMaster, pcMach, pcCmd, pcWho)
  * We trick lint because we have to be call compatible (prototype'd)
  * the same as all the other Gather functions.
  */
- /*ARGSUSED*/ static int
+static int
+#if USE_ANSI_PROTO
+Cmd(int s, char *pcMaster, char *pcMach, char *pcCmd, char *pcWho)
+#else
 Cmd(s, pcMaster, pcMach, pcCmd, pcWho)
     int s;
     char *pcMaster, *pcMach, *pcCmd, *pcWho;
+#endif
 {
     static int iMax = 0;
     static char *pcBuf = (char *)0;
@@ -1021,8 +1094,8 @@ Cmd(s, pcMaster, pcMach, pcCmd, pcWho)
      * before allowing a write
      */
     if (*pcCmd == 'b') {
-	(void)sprintf(acMesg, "%c%c%c%s\r\n%c%c.", DEFATTN, DEFESC, *pcCmd,
-		      pcMach, DEFATTN, DEFESC);
+	(void)sprintf(acMesg, "%c%c%c%s:%s\r%c%c.", DEFATTN, DEFESC,
+		      *pcCmd, pcWho, pcMach, DEFATTN, DEFESC);
 	SendOut(s, acMesg, strlen(acMesg));
     } else {
 	(void)sprintf(acMesg, "%c%c%c%c%c.", DEFATTN, DEFESC, *pcCmd,
@@ -1086,9 +1159,13 @@ Cmd(s, pcMaster, pcMach, pcCmd, pcWho)
 /* the masters tell us the group masters with a "groups" command	(ksb)
  */
 static int
+#if USE_ANSI_PROTO
+CmdGroup(int s, char *pcMaster, char *pcMach, char *pcCmd, char *pcWho)
+#else
 CmdGroup(s, pcMaster, pcMach, pcCmd, pcWho)
     int s;
     char *pcMaster, *pcMach, *pcCmd, *pcWho;
+#endif
 {
     char acPorts[4097];
 
@@ -1115,9 +1192,13 @@ CmdGroup(s, pcMaster, pcMach, pcCmd, pcWho)
  * we ask each of those for the group members
  */
 static int
+#if USE_ANSI_PROTO
+CmdMaster(int s, char *pcMaster, char *pcMach, char *pcCmd, char *pcWho)
+#else
 CmdMaster(s, pcMaster, pcMach, pcCmd, pcWho)
     int s;
     char *pcMaster, *pcMach, *pcCmd, *pcWho;
+#endif
 {
     char acPorts[4097];
 
@@ -1140,10 +1221,14 @@ CmdMaster(s, pcMaster, pcMach, pcCmd, pcWho)
  * We trick lint because we have to be call compatible (prototype'd)
  * the same as all the other Gather functions.
  */
- /*ARGSUSED*/ static int
+static int
+#if USE_ANSI_PROTO
+Ctl(int s, char *pcMaster, char *pcMach, char *pcCmd, char *pcWho)
+#else
 Ctl(s, pcMaster, pcMach, pcCmd, pcWho)
     int s;
     char *pcMaster, *pcMach, *pcCmd, *pcWho;
+#endif
 {
     char acPorts[4097];
 
@@ -1172,9 +1257,13 @@ Ctl(s, pcMaster, pcMach, pcCmd, pcWho)
  * we tell each of those the command we want them to do
  */
 static int
+#if USE_ANSI_PROTO
+CtlMaster(int s, char *pcMaster, char *pcMach, char *pcCmd, char *pcWho)
+#else
 CtlMaster(s, pcMaster, pcMach, pcCmd, pcWho)
     int s;
     char *pcMaster, *pcMach, *pcCmd, *pcWho;
+#endif
 {
     char acPorts[4097];
 
@@ -1201,19 +1290,23 @@ CtlMaster(s, pcMaster, pcMach, pcCmd, pcWho)
  * exit happy or sad
  */
 int
+#if USE_ANSI_PROTO
+main(int argc, char **argv)
+#else
 main(argc, argv)
     int argc;
     char **argv;
+#endif
 {
     char *ptr, *pcCmd, *pcTo;
     struct passwd *pwdMe;
     int opt;
     int fLocal;
-    char acPorts[1024];
+    STRING acPorts = { (char *)0, 0, 0 };
     char *pcUser = (char *)0;
     char *pcMsg = (char *)0;
     int (*pfiCall) ();
-    static char acOpts[] = "7aAb:De:fFGhl:M:p:PqQrRsSuvVwx";
+    static char acOpts[] = "7aAb:De:fFGhil:M:p:PqQrRsSuvVwWx";
     extern int optind;
     extern int optopt;
     extern char *optarg;
@@ -1250,7 +1343,7 @@ main(argc, argv)
 		break;
 
 	    case 'D':
-		fDebug = 1;
+		fDebug++;
 		break;
 
 	    case 'e':		/* set escape chars */
@@ -1269,6 +1362,10 @@ main(argc, argv)
 		if ((char *)0 == pcCmd) {
 		    pcCmd = "spy";
 		}
+		break;
+
+	    case 'i':
+		pcCmd = "info";
 		break;
 
 	    case 'l':
@@ -1312,6 +1409,9 @@ main(argc, argv)
 		pcCmd = "users";
 		break;
 
+	    case 'W':
+		fLocal = 1;
+		/*fallthrough */
 	    case 'w':		/* who */
 		pcCmd = "groups";
 		break;
@@ -1332,7 +1432,7 @@ main(argc, argv)
 		Error
 		    ("usage [-aAfFGsS] [-7Dv] [-M mach] [-p port] [-e esc] [-l username] console");
 		Error
-		    ("usage [-hPrRuVwx] [-7Dv] [-M mach] [-p port] [-b message]");
+		    ("usage [-hPrRuVwWx] [-7Dv] [-M mach] [-p port] [-b message]");
 		Error("usage [-qQ] [-7Dv] [-M mach] [-p port]");
 		Usage(apcLong);
 		exit(EX_OK);
@@ -1393,26 +1493,34 @@ main(argc, argv)
 	    exit(EX_UNAVAILABLE);
 	}
 	pcTo = argv[optind++];
+    } else if ('b' == *pcCmd) {
+	pcTo = pcMsg;
     } else {
 	pcTo = "*";
     }
+
     if (optind < argc) {
 	Error("extra garbage on command line? (%s...)", argv[optind]);
 	exit(EX_UNAVAILABLE);
     }
-    (void)sprintf(acPorts, "@%s", pcInMaster);
-    if ('b' == *pcCmd) {
-	pcTo = pcMsg;
-    }
+
+    buildMyString((char *)0, &acPorts);
+    buildMyStringChar('@', &acPorts);
+    buildMyString(pcInMaster, &acPorts);
+
     if ('q' == *pcCmd) {
-	char acPass[256];
+	static STRING acPass = { (char *)0, 0, 0 };
+	buildMyString((char *)0, &acPass);
 #if defined(HAVE_GETPASSPHRASE)
-	(void)strcpy(acPass, getpassphrase("Enter root password:"));
+	buildMyString(getpassphrase("Enter root password:"), &acPass);
 #else
-	(void)strcpy(acPass, getpass("Enter root password:"));
+	buildMyString(getpass("Enter root password:"), &acPass);
 #endif
 	pfiCall = fLocal ? Ctl : CtlMaster;
-	pcTo = acPass;
+	if (acPass.string == (char *)0)
+	    pcTo = "";
+	else
+	    pcTo = acPass.string;
     } else if ('v' == *pcCmd) {
 	pfiCall = fLocal ? Ctl : CtlMaster;
     } else if ('p' == *pcCmd) {
@@ -1420,8 +1528,10 @@ main(argc, argv)
     } else if ('a' == *pcCmd || 'f' == *pcCmd || 's' == *pcCmd) {
 	ValidateEsc();
 	pfiCall = Indir;
+    } else if ('g' == *pcCmd) {
+	pfiCall = fLocal ? CmdGroup : CmdMaster;
     } else {
 	pfiCall = CmdMaster;
     }
-    exit(Gather(pfiCall, acPorts, pcInMaster, pcTo, pcCmd, pcUser));
+    exit(Gather(pfiCall, acPorts.string, pcInMaster, pcTo, pcCmd, pcUser));
 }

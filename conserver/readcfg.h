@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.h,v 5.16 2002-01-21 02:48:33-08 bryan Exp $
+ *  $Id: readcfg.h,v 5.19 2002-02-25 14:00:38-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -38,16 +38,18 @@
  * from a file, into these structures
  */
 
-extern GRPENT aGroups[MAXGRP];	/* group info                   */
-extern CONSENT aConsoles[MAXGRP * MAXMEMB];	/* console list                 */
+extern GRPENT *pGroups;		/* group info                   */
 extern REMOTE *pRCList;		/* list of remote consoles we know about */
+extern REMOTE *pRCUniq;		/* list of uniq console servers */
 extern ACCESS *pACList;		/* `who do you love' (or trust)         */
+extern STRING *breakList;	/* list of break sequences              */
 
-extern int
-  iAccess;			/* how many access restrictions we have */
-extern int
-  iLocal;			/* how many local consoles we have      */
-extern STRING *breakList;	/* list of break sequences */
-
+#if USE_ANSI_PROTO
+extern void ReadCfg(char *, FILE *);
+extern char *pruneSpace(char *);
+extern void ReReadCfg();
+#else
 extern void ReadCfg();
 extern char *pruneSpace();
+extern void ReReadCfg();
+#endif

@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.40 2002-01-21 02:48:33-08 bryan Exp $
+ *  $Id: client.c,v 5.48 2002-03-11 18:27:04-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -36,7 +36,6 @@
 
 #include <config.h>
 
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/file.h>
@@ -61,8 +60,12 @@
 /* find the next guy who wants to write on the console			(ksb)
  */
 CONSCLIENT *
+#if USE_ANSI_PROTO
+FindWrite(CONSCLIENT * pCL)
+#else
 FindWrite(pCL)
     CONSCLIENT *pCL;
+#endif
 {
     /* return the first guy to have the `want write' bit set
      * (tell him of the promotion, too)  we could look for the
@@ -81,7 +84,7 @@ FindWrite(pCL)
 	} else {
 	    fileWrite(pCL->fd, "\r\n[attached]\r\n", -1);
 	}
-	tagLogfile(pCL->pCEto, "%s attached", pCL->acid);
+	tagLogfile(pCL->pCEto, "%s attached", pCL->acid.string);
 	return pCL;
     }
     return (CONSCLIENT *) 0;
@@ -93,35 +96,36 @@ FindWrite(pCL)
  * must pass us at least 16 characters to put fill with text
  */
 char *
+#if USE_ANSI_PROTO
+FmtCtl(int ci, STRING * pcIn)
+#else
 FmtCtl(ci, pcIn)
     int ci;
-    char *pcIn;
+    STRING *pcIn;
+#endif
 {
-    char *pcOut = pcIn;
     unsigned char c;
 
+    buildMyString((char *)0, pcIn);
     c = ci & 0xff;
     if (c > 127) {
 	c -= 128;
-	*pcOut++ = 'M';
-	*pcOut++ = '-';
+	buildMyString("M-", pcIn);
     }
 
     if (c < ' ' || c == '\177') {
-	*pcOut++ = '^';
-	*pcOut++ = c ^ 0100;
-	*pcOut = '\000';
+	buildMyStringChar('^', pcIn);
+	buildMyStringChar(c ^ 0100, pcIn);
     } else if (c == ' ') {
-	(void)strcpy(pcOut, "<space>");
+	buildMyString("<space>", pcIn);
     } else if (c == '^') {
-	(void)strcpy(pcOut, "<circumflex>");
+	buildMyString("<circumflex>", pcIn);
     } else if (c == '\\') {
-	(void)strcpy(pcOut, "<backslash>");
+	buildMyString("<backslash>", pcIn);
     } else {
-	*pcOut++ = c;
-	*pcOut = '\000';
+	buildMyStringChar(c, pcIn);
     }
-    return pcIn;
+    return pcIn->string;
 }
 
 /* replay last iBack lines of the log file upon connect to console	(ksb)
@@ -131,16 +135,20 @@ FmtCtl(ci, pcIn)
  * so we don't drop chars...
  */
 void
+#if USE_ANSI_PROTO
+Replay(CONSFILE * fdLog, CONSFILE * fdOut, int iBack)
+#else
 Replay(fdLog, fdOut, iBack)
     CONSFILE *fdLog;
     CONSFILE *fdOut;
     int iBack;
+#endif
 {
 
     off_t file_pos;
     off_t buf_pos;
     char *buf;
-    char *bp;
+    char *bp = (char *)0;
     char *s;
     int r;
     int ch;
@@ -393,19 +401,22 @@ Replay(fdLog, fdOut, iBack)
 #define WHEN_ALWAYS	0x40
 
 #define HALFLINE	40
+
 typedef struct HLnode {
     int iwhen;
-    char actext[HALFLINE];
+    char *actext;
 } HELP;
 
 static HELP aHLTable[] = {
     {WHEN_ALWAYS, ".    disconnect"},
     {WHEN_ALWAYS, "a    attach read/write"},
+    {WHEN_ALWAYS, "b    send broadcast message"},
     {WHEN_ATTACH, "c    toggle flow control"},
     {WHEN_ATTACH, "d    down a console"},
     {WHEN_ALWAYS, "e    change escape sequence"},
     {WHEN_ALWAYS, "f    force attach read/write"},
     {WHEN_ALWAYS, "g    group info"},
+    {WHEN_ALWAYS, "i    information dump"},
     {WHEN_ATTACH, "L    toggle logging on/off"},
     {WHEN_ATTACH, "l?   break sequence list"},
     {WHEN_ATTACH, "l0   send break per config file"},
@@ -421,7 +432,7 @@ static HELP aHLTable[] = {
     {WHEN_ALWAYS, "z    suspend the connection"},
     {WHEN_ALWAYS, "<cr> ignore/abort command"},
     {WHEN_ALWAYS, "?    print this message"},
-    {WHEN_ALWAYS, "^R   short replay"},
+    {WHEN_ALWAYS, "^R   replay the last line"},
     {WHEN_ATTACH, "\\ooo send character by octal code"},
     {WHEN_EXPERT, "^I   toggle tab expansion"},
     {WHEN_EXPERT, ";    change to another console"},
@@ -435,14 +446,18 @@ static HELP aHLTable[] = {
 /* list the commands we know for the user				(ksb)
  */
 void
+#if USE_ANSI_PROTO
+HelpUser(CONSCLIENT * pCL)
+#else
 HelpUser(pCL)
     CONSCLIENT *pCL;
+#endif
 {
     int i, j, iCmp;
     static char
       acH1[] = "help]\r\n", acH2[] = "help spy mode]\r\n", acEoln[] =
 	"\r\n";
-    char acLine[HALFLINE * 2 + 3];
+    static STRING acLine = { (char *)0, 0, 0 };
 
     iCmp = WHEN_ALWAYS | WHEN_SPY;
     if (pCL->fwr) {
@@ -455,26 +470,39 @@ HelpUser(pCL)
 	iCmp |= WHEN_VT100;
     }
 
-    acLine[0] = '\000';
+    buildMyString((char *)0, &acLine);
     for (i = 0; i < sizeof(aHLTable) / sizeof(HELP); ++i) {
 	if (0 == (aHLTable[i].iwhen & iCmp)) {
 	    continue;
 	}
-	if ('\000' == acLine[0]) {
-	    acLine[0] = ' ';
-	    (void)strcpy(acLine + 1, aHLTable[i].actext);
-	    continue;
+	if (acLine.used != 0) {	/* second part of line */
+	    if (strlen(aHLTable[i].actext) < HALFLINE) {
+		for (j = acLine.used; j <= HALFLINE; ++j) {
+		    buildMyStringChar(' ', &acLine);
+		}
+		buildMyString(aHLTable[i].actext, &acLine);
+		buildMyString(acEoln, &acLine);
+		(void)fileWrite(pCL->fd, acLine.string, -1);
+		buildMyString((char *)0, &acLine);
+		continue;
+	    } else {
+		buildMyString(acEoln, &acLine);
+		(void)fileWrite(pCL->fd, acLine.string, -1);
+		buildMyString((char *)0, &acLine);
+	    }
 	}
-	for (j = strlen(acLine); j < HALFLINE + 1; ++j) {
-	    acLine[j] = ' ';
+	if (acLine.used == 0) {	/* at new line */
+	    buildMyStringChar(' ', &acLine);
+	    buildMyString(aHLTable[i].actext, &acLine);
+	    if (acLine.used > HALFLINE) {
+		buildMyString(acEoln, &acLine);
+		(void)fileWrite(pCL->fd, acLine.string, -1);
+		buildMyString((char *)0, &acLine);
+	    }
 	}
-	(void)strcpy(acLine + j, aHLTable[i].actext);
-	(void)strcat(acLine + j, acEoln);
-	(void)fileWrite(pCL->fd, acLine, -1);
-	acLine[0] = '\000';
     }
-    if ('\000' != acLine[0]) {
-	(void)strcat(acLine, acEoln);
-	(void)fileWrite(pCL->fd, acLine, -1);
+    if (acLine.used != 0) {
+	buildMyString(acEoln, &acLine);
+	(void)fileWrite(pCL->fd, acLine.string, -1);
     }
 }

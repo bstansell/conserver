@@ -1,7 +1,9 @@
 dnl ### Normal initialization. ######################################
-AC_INIT(conserver/main.c)
+AC_INIT
+AC_CONFIG_SRCDIR([conserver/main.c])
 AC_CONFIG_HEADER(config.h)
 
+AC_DEFINE_UNQUOTED(CONFIGINVOCATION, "$0 $@")
 
 dnl ### Set some option defaults. ###################################
 if test -z "$CFLAGS"; then
@@ -12,6 +14,15 @@ AC_SUBST(MKDIR)
 
 
 dnl ### Custom settings. ############################################
+ac_cv_allow_64bit=no
+AC_MSG_CHECKING(whether to allow 64bit compilation)
+AC_ARG_WITH(64bit,
+	AC_HELP_STRING([--with-64bit],[Allow 64bit compilation]),
+	[if test "$withval" = yes; then
+		ac_cv_allow_64bit=yes
+	fi])
+AC_MSG_RESULT($ac_cv_allow_64bit)
+
 AC_MSG_CHECKING(for port number specification)
 AC_ARG_WITH(port,
 	AC_HELP_STRING([--with-port=PORT],[Specify port number @<:@conserver@:>@]),
@@ -56,26 +67,26 @@ AC_ARG_WITH(cffile,
 	AC_HELP_STRING([--with-cffile=CFFILE],[Specify config filename @<:@conserver.cf@:>@]),
 	[if test "$withval" != yes; then
 		AC_DEFINE_UNQUOTED(CONFIGFILE, "$withval")
-		AC_MSG_RESULT('$withval')
+		AC_MSG_RESULT('$sysconfdir/$withval')
 	else
 		AC_DEFINE_UNQUOTED(CONFIGFILE, "conserver.cf")
-		AC_MSG_RESULT('conserver.cf')
+		AC_MSG_RESULT('$sysconfdir/conserver.cf')
 	fi],
 	[AC_DEFINE_UNQUOTED(CONFIGFILE, "conserver.cf")
-	AC_MSG_RESULT('conserver.cf')])
+	AC_MSG_RESULT('$sysconfdir/conserver.cf')])
 
 AC_MSG_CHECKING(for password filename)
 AC_ARG_WITH(pwdfile,
 	AC_HELP_STRING([--with-pwdfile=PWDFILE],[Specify password filename @<:@conserver.passwd@:>@]),
 	[if test "$withval" != yes; then
 		AC_DEFINE_UNQUOTED(PASSWDFILE, "$withval")
-		AC_MSG_RESULT('$withval')
+		AC_MSG_RESULT('$sysconfdir/$withval')
 	else
 		AC_DEFINE_UNQUOTED(PASSWDFILE, "conserver.passwd")
-		AC_MSG_RESULT('conserver.passwd')
+		AC_MSG_RESULT('$sysconfdir/conserver.passwd')
 	fi],
 	[AC_DEFINE_UNQUOTED(PASSWDFILE, "conserver.passwd")
-	AC_MSG_RESULT('conserver.passwd')])
+	AC_MSG_RESULT('$sysconfdir/conserver.passwd')])
 
 AC_MSG_CHECKING(for log filename)
 AC_ARG_WITH(logfile,
@@ -116,19 +127,6 @@ AC_ARG_WITH(maxmemb,
 	[AC_DEFINE_UNQUOTED(MAXMEMB, 16)
 	AC_MSG_RESULT(16)])
 
-AC_MSG_CHECKING(for MAXGRP setting)
-AC_ARG_WITH(maxgrp,
-	AC_HELP_STRING([--with-maxgrp=MAXGRP],[Specify maximum number of processes @<:@32@:>@]),
-	[if test "$withval" != yes; then
-		AC_DEFINE_UNQUOTED(MAXGRP, $withval)
-		AC_MSG_RESULT($withval)
-	else
-		AC_DEFINE_UNQUOTED(MAXGRP, 32)
-		AC_MSG_RESULT(32)
-	fi],
-	[AC_DEFINE_UNQUOTED(MAXGRP, 32)
-	AC_MSG_RESULT(32)])
-
 AC_MSG_CHECKING(for connect() timeout)
 AC_ARG_WITH(timeout,
 	AC_HELP_STRING([--with-timeout=TIMEOUT],[Specify connect() timeout in seconds @<:@10@:>@]),
@@ -147,12 +145,23 @@ AC_PROG_CC
 AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
-
-
 dnl ### Compiler characteristics. ##################################
 AC_AIX
+AC_PROG_CC_STDC
 AC_C_CONST
 
+AC_CHECK_SIZEOF(long)
+if test "$ac_cv_sizeof_long" -gt 4; then
+    if test "$ac_cv_allow_64bit" != "yes"; then
+	AC_MSG_ERROR([cannot build on >32bit systems (to override use --with-64bit)])
+    else
+	AC_MSG_WARN([building a 64bit version of conserver - good luck!])
+    fi
+fi
+
+if test "$ac_cv_prog_cc_stdc" != "no"; then
+    AC_DEFINE_UNQUOTED(USE_ANSI_PROTO, 1)
+fi
 
 dnl ### Checks for header files. ###################################
 AC_HEADER_STDC
@@ -193,22 +202,8 @@ if test "$ac_cv_type_sig_atomic_t" != "yes"; then
   AC_DEFINE(sig_atomic_t, volatile int, [Define if <signal.h> does not define sig_atomic_t])
 fi
 
-AC_CACHE_CHECK([if socklen_t is defined], ac_cv_type_socklen_t,
-  AC_TRY_LINK([
-    #include <sys/types.h>
-    #include <sys/socket.h>
-  ], [
-    socklen_t len = 0;
-    printf("len == %d\n", len);
-  ],
-    ac_cv_type_socklen_t=yes,
-    ac_cv_type_socklen_t=no
-  )
-)
-if test "$ac_cv_type_socklen_t" != "yes"; then
-  AC_DEFINE(socklen_t, int, [Define if <sys/socket.h> does not define socklen_t])
-fi
-
+AC_CHECK_TYPES(in_addr_t,,,[$ac_includes_default
+#include <netinet/in.h>])
 
 
 dnl ### Check for libraries. #######################################
@@ -265,4 +260,5 @@ AC_FUNC_SETPGRP
 
 dnl ### Create output files. #######################################
 AC_SUBST(LIBOBJS)
-AC_OUTPUT(Makefile conserver/Makefile conserver.cf/Makefile console/Makefile autologin/Makefile)
+AC_CONFIG_FILES([Makefile conserver/Makefile conserver.cf/Makefile console/Makefile autologin/Makefile])
+AC_OUTPUT

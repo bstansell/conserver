@@ -3,7 +3,8 @@
 
 Warning to those who aren't me: this is an unorganized list of things
 that might be classified as bugs, improvements, random thoughts or
-suggestions.  Hopefully it will get cleaned up over time.
+suggestions.  Hopefully it will get cleaned up over time (yeah,
+right!).
 
 Bryan Stansell
 
@@ -14,16 +15,8 @@ Bryan Stansell
 
 - Telnet protocol should be improved
     - Not even RFC 854 compliant
-    - Data sent to terminal server not encapsulated
     - Option negotiation ignored - should we negotiate anything?
     - Others?
-
-- reread of conserver.cf - totally difficult
-    - non-dynamic memory allocation
-    - no IPC for coordinated updates
-    - additions only may work
-    - deletions only may work
-    - reimplement the whole thing *would* work
 
 - better shadow file support
 
@@ -43,6 +36,7 @@ Bryan Stansell
 - flow control configuration (hardcoded on, i think)
 
 - pipe input/output (console <-> program) via 'console'
+    - some apps (net-ups thing, gdb) might need to talk to user
 
 - group permissions (better user management in general)
 
@@ -52,10 +46,7 @@ Bryan Stansell
 
 - "listen" capability (watch all/multiple consoles)
 
-- alternate break (^ecl2) sends 'CR-~-^B' sequence (solaris 8 default)
-    - probably should be able to redefine it like the escape sequence
-    - to support older alt-break code it would need .5 second delays
-    - ^ecl1 should really just "do the right thing" based on config file
+- break sequences - need .5 second delays (or delays in general?)
 
 - aliases for console entries
 
@@ -69,10 +60,6 @@ Bryan Stansell
     - the whole thing needs some serious help
 
 - cyclades ts1000/2000 port : "Moses, Joel" <jmoses@deloitte.com>
-
-- dynamic memory allocation
-    - buf[BUFSIZ] in conserver/group.c CheckPasswd().
-    - kill --with-maxgrp
 
 - config file for client (list of masters, for example)
 
@@ -111,9 +98,6 @@ Bryan Stansell
 - support 2 stop bits (as well as other stty-type options in console
   definitions) : Kelly Setzer <setzer@placemark.com>
 
-- try to reopen downed console (from loss of carrier, maybe other
-  things) once instead of leaving it down.
-
 #
-#  $Id: TODO,v 1.17 2002-01-18 09:56:57-08 bryan Exp $
+#  $Id: TODO,v 1.22 2002-03-11 18:11:48-08 bryan Exp $
 #

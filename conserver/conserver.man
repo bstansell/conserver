@@ -1,10 +1,11 @@
 .\" @(#)conserver.8 01/06/91 OSU CIS; Thomas A. Fine
-.\" $Id: conserver.man,v 1.19 2002-01-20 20:02:49-08 bryan Exp $
+.\" $Id: conserver.man,v 1.23 2002-02-25 13:58:45-08 bryan Exp $
 .TH CONSERVER 8 "Local"
 .SH NAME
 conserver \- console server daemon
 .SH SYNOPSIS
 \fBconserver\fP [\fB\-7dDhinouvV\fP] [\fB\-a\fP \fItype\fP]
+[\fB\-m\fP \fImax\fP]
 [\fB\-M\fP \fIaddr\fP] [\fB\-p\fP \fIport\fP] [\fB\-b\fP \fIport\fP]
 [\fB\-C\fP \fIconfig\fP] [\fB\-P\fP \fIpasswd\fP]
 [\fB\-L\fP \fIlogfile\fP] [\fB\-O\fP \fImin\fP]
@@ -33,21 +34,28 @@ distribution of consoles among servers.)
 .B Conserver
 forks a child for each group of consoles it must manage
 and assigns each process a port number to listen on.
-(The maximum number of consoles managed by each child process,
-as well as the maximum number of children created, is set at compile time.)
+The maximum number of consoles managed by each child process is set using
+\fB-m\fP option.
 The
 .BR console (1)
 client program communicates with the master console server process to find
 the port (and host, in a multi-server configuration)
 on which the appropriate child is listening.
 The master conserver process forks a new process to handle each
-incoming client connection.
+incoming client connection (which should be very short-lived, since it's
+duty is to redirect the client to a child).
 .B Conserver
 restricts connections from clients based on the host access section of its
 .BR conserver.cf (5)
 and authenticates users against its
 .BR conserver.passwd (5)
 file.
+.B Conserver
+can also restrict clients using the tcp-wrappers package (enabled
+using \fB--with-libwrap\fP).  This authentication is done before consulting
+the
+.BR conserver.cf (5)
+access list.
 .PP
 .B Conserver
 completely controls any connection to a controlled host.
@@ -66,10 +74,14 @@ SIGTERM
 close all connections and exit.
 .TP
 SIGHUP
-close and reopen all console logfiles
+reread the configuration file.  new consoles are managed by
+forking off new childen, deleted consoles (and their clients) are dropped,
+and changes to consoles are done "in place", resetting the console
+port (bringing it down and up) only when necessary.  the console name is
+used to determine when consoles have been added/removed/changed.  all 
+console logfiles are closed and reopened
 and, if in daemon mode (\fB\-d\fP option),
 the error logfile (see the \fB\-L\fP option).
-(No reread of the configuration file is done.)
 .TP
 SIGUSR1
 try to connect to any consoles marked as
@@ -136,7 +148,8 @@ Become a daemon.  Disconnects from the controlling terminal and sends
 all output to the logfile (see \fB\-L\fP).
 .TP
 .B \-D
-Enable debugging output, sent to stderr.
+Enable debugging output, sent to stderr.  Multiple \fB-D\fP options
+increases debug output.
 .TP
 .B \-h
 Output a brief help message.
@@ -150,6 +163,11 @@ after startup in daemon mode (\fB\-d\fP).
 This option does not apply when not running in daemon mode.
 The default \fIlogfile\fP may be changed at compile time using the
 \fB--with-logfile\fP option.
+.TP
+.BI \-m max
+Set the maximum consoles managed per process.
+The default \fImax\fP may be changed at compile time using the
+\fB--with-maxmemb\fP option.
 .TP
 .BI \-M addr
 Set the address to listen on.  This allows conserver to bind to a

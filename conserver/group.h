@@ -1,5 +1,5 @@
 /*
- *  $Id: group.h,v 5.20 2002-01-21 02:48:33-08 bryan Exp $
+ *  $Id: group.h,v 5.23 2002-02-25 14:00:38-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -34,19 +34,35 @@
  * 4. This notice may not be removed or altered.
  */
 
-#define MAXPSWDLEN	16	/* max length of encrypted password     */
-
 typedef struct grpent {		/* group info                           */
+    unsigned int id;		/* uniqueue group id                    */
     unsigned short port;	/* port group listens on                */
     int pid;			/* pid of server for group              */
     int imembers;		/* number of consoles in this group     */
+    fd_set rinit;		/* descriptor list                      */
     CONSENT *pCElist;		/* list of consoles in this group       */
+    CONSENT *pCEctl;		/* our control `console'                */
     CONSCLIENT *pCLall;		/* all clients to scan after select     */
+    CONSCLIENT *pCLfree;	/* head of free list                    */
+    struct grpent *pGEnext;	/* next group entry                     */
 } GRPENT;
 
-
+#if USE_ANSI_PROTO
+extern void Spawn(GRPENT *);
+extern int CheckPass(struct passwd *, char *);
+extern const char *strtime(time_t *);
+extern void tagLogfile(const CONSENT *, const char *, ...);
+extern void cleanupBreak(short int);
+extern void destroyGroup(GRPENT *);
+extern void destroyConsent(GRPENT *, CONSENT *);
+extern void SendClientsMsg(CONSENT *, char *);
+#else
 extern void Spawn();
 extern int CheckPass();
 extern const char *strtime();
 extern void tagLogfile();
 extern void cleanupBreak();
+extern void destroyGroup();
+extern void destroyConsent();
+extern void SendClientsMsg();
+#endif

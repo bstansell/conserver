@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.151 2002-01-21 02:48:33-08 bryan Exp $
+ *  $Id: group.c,v 5.168 2002-03-11 18:05:40-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -54,7 +54,6 @@
 
 #include <config.h>
 
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/file.h>
@@ -67,9 +66,11 @@
 #include <ctype.h>
 #include <signal.h>
 #include <pwd.h>
+#if USE_ANSI_PROTO
+#include <stdarg.h>
+#else
 #include <varargs.h>
-#define TELCMDS
-#define TELOPTS
+#endif
 #include <arpa/telnet.h>
 
 #if defined(USE_LIBWRAP)
@@ -94,14 +95,200 @@
 static sig_atomic_t fSawReOpen = 0, fSawReUp = 0, fSawMark =
     0, fSawGoAway = 0, fSawReapVirt = 0;
 
+void
+#if USE_ANSI_PROTO
+SendClientsMsg(CONSENT * pCE, char *message)
+#else
+SendClientsMsg(pCE, message)
+    CONSENT *pCE;
+    char *message;
+#endif
+{
+    CONSCLIENT *pCL;
+
+    if ((CONSENT *) 0 == pCE) {
+	return;
+    }
+
+    for (pCL = pCE->pCLon; (CONSCLIENT *) 0 != pCL; pCL = pCL->pCLnext) {
+	if (pCL->fcon) {
+	    (void)fileWrite(pCL->fd, message, -1);
+	}
+    }
+}
+
+void
+#if USE_ANSI_PROTO
+SendAllClientsMsg(GRPENT * pGE, char *message)
+#else
+SendAllClientsMsg(pGE, message)
+    GRPENT *pGE;
+    char *message;
+#endif
+{
+    CONSCLIENT *pCL;
+
+    if ((GRPENT *) 0 == pGE) {
+	return;
+    }
+
+    for (pCL = pGE->pCLall; (CONSCLIENT *) 0 != pCL; pCL = pCL->pCLscan) {
+	if (pCL->fcon) {
+	    (void)fileWrite(pCL->fd, message, -1);
+	}
+    }
+}
+
+void
+#if USE_ANSI_PROTO
+destroyClient(CONSCLIENT * pCL)
+#else
+destroyClient(pCL)
+    CONSCLIENT *pCL;
+#endif
+{
+    destroyString(&pCL->acid);
+    destroyString(&pCL->peername);
+    destroyString(&pCL->accmd);
+    destroyString(&pCL->msg);
+    fileClose(&pCL->fd);
+    free(pCL);
+}
+
+void
+#if USE_ANSI_PROTO
+destroyConsent(GRPENT * pGE, CONSENT * pCE)
+#else
+destroyConsent(pGE, pCE)
+    GRPENT *pGE;
+    CONSENT *pCE;
+#endif
+{
+    CONSCLIENT *pCL;
+    CONSENT **ppCE;
+
+    if (pCE == (CONSENT *) 0)
+	return;
+
+    Debug(1, "Destroying console (%s)", pCE->server.string);
+
+    /* must loop using pCLall and pCLscan for the same reason as the
+     * drop: code.  this is basically the same set of code, but modified
+     * since we know we're going to nuke the console itself.
+     */
+    for (pCL = pGE->pCLall; pCL != (CONSCLIENT *) 0; pCL = pCL->pCLscan) {
+	if (pCL->pCEto != pCE)
+	    continue;
+	if (pCL->fcon) {
+	    (void)fileWrite(pCL->fd,
+			    "[-- Conserver reconfigured - console has been (re)moved --]\r\n",
+			    -1);
+	}
+	Info("%s: logout %s [%s]", pCE->server.string, pCL->acid.string,
+	     strtime(NULL));
+	FD_CLR(fileFDNum(pCL->fd), &pGE->rinit);
+	fileClose(&pCL->fd);
+	if (pCL->fwr) {
+	    tagLogfile(pCE, "%s detached", pCL->acid.string);
+	    if (pCE->nolog) {
+		pCE->nolog = 0;
+		fileWrite(pCE->fdlog,
+			  "[-- Console logging restored (logout) --]\r\n",
+			  -1);
+	    }
+	}
+	/* mark as unconnected and remove from both
+	 * lists (all clients, and this console)
+	 */
+	if ((CONSCLIENT *) 0 != pCL->pCLnext) {
+	    pCL->pCLnext->ppCLbnext = pCL->ppCLbnext;
+	}
+	*(pCL->ppCLbnext) = pCL->pCLnext;
+	if ((CONSCLIENT *) 0 != pCL->pCLscan) {
+	    pCL->pCLscan->ppCLbscan = pCL->ppCLbscan;
+	}
+	*(pCL->ppCLbscan) = pCL->pCLscan;
+
+	pCL->pCLnext = pGE->pCLfree;
+	pGE->pCLfree = pCL;
+    }
+
+    ConsDown(pCE, &pGE->rinit);
+
+    for (ppCE = &(pGE->pCElist); *ppCE != (CONSENT *) 0;
+	 ppCE = &((*ppCE)->pCEnext)) {
+	if (*ppCE == pCE) {
+	    *ppCE = pCE->pCEnext;
+	    break;
+	}
+    }
+
+    destroyString(&pCE->server);
+    destroyString(&pCE->dfile);
+    destroyString(&pCE->lfile);
+    destroyString(&pCE->networkConsoleHost);
+    destroyString(&pCE->acslave);
+    destroyString(&pCE->pccmd);
+    fileClose(&pCE->fdlog);
+    free(pCE);
+
+    pGE->imembers--;
+}
+
+void
+#if USE_ANSI_PROTO
+destroyGroup(GRPENT * pGE)
+#else
+destroyGroup(pGE)
+    GRPENT *pGE;
+#endif
+{
+    CONSENT *pCEtmp, *pCE;
+    CONSCLIENT *pCLtmp, *pCL;
+
+    if (pGE == (GRPENT *) 0)
+	return;
+
+    Debug(1, "Destroying group (%d members)", pGE->imembers);
+
+    /* nuke each console (which kicks off clients) */
+    destroyConsent(pGE, pGE->pCEctl);
+    pCE = pGE->pCElist;
+    while (pCE != (CONSENT *) 0) {
+	pCEtmp = pCE->pCEnext;
+	destroyConsent(pGE, pCE);
+	pCE = pCEtmp;
+    }
+
+    /* now we can nuke the client structures */
+    pCL = pGE->pCLall;
+    while (pCL != (CONSCLIENT *) 0) {
+	pCLtmp = pCL->pCLscan;
+	destroyClient(pCL);
+	pCL = pCLtmp;
+    }
+    pCL = pGE->pCLfree;
+    while (pCL != (CONSCLIENT *) 0) {
+	pCLtmp = pCL->pCLnext;
+	destroyClient(pCL);
+	pCL = pCLtmp;
+    }
+
+    free(pGE);
+}
+
 /* Is this passwd a match for this user's passwd? 		(gregf/ksb)
  * look up passwd in shadow file if we have to, if we are
  * given a special epass try it first.
  */
 int
+#if USE_ANSI_PROTO
+CheckPass(struct passwd *pwd, char *pcWord)
+#else
 CheckPass(pwd, pcWord)
     struct passwd *pwd;
     char *pcWord;
+#endif
 {
 #if HAVE_GETSPNAM
     struct spwd *spwd;
@@ -123,12 +310,15 @@ CheckPass(pwd, pcWord)
  * optionally returns the time in time_t form (pass in NULL if you don't care).
  * It's overwritten each time, so use it and forget it.
  */
-char curtime[25];
-
 const char *
+#if USE_ANSI_PROTO
+strtime(time_t * ltime)
+#else
 strtime(ltime)
     time_t *ltime;
+#endif
 {
+    static char curtime[25];
     time_t tyme;
 
     tyme = time((time_t *) 0);
@@ -143,8 +333,12 @@ strtime(ltime)
  * lucky for us: log file fd's can change async from the group driver!
  */
 static RETSIGTYPE
+#if USE_ANSI_PROTO
+FlagReOpen(int sig)
+#else
 FlagReOpen(sig)
     int sig;
+#endif
 {
     fSawReOpen = 1;
 #if !HAVE_SIGACTION
@@ -153,34 +347,41 @@ FlagReOpen(sig)
 }
 
 static void
-ReOpen(pGE, prinit)
+#if USE_ANSI_PROTO
+ReOpen(GRPENT * pGE)
+#else
+ReOpen(pGE)
     GRPENT *pGE;
-    fd_set *prinit;
+#endif
 {
-    int i;
     CONSENT *pCE;
 
     if ((GRPENT *) 0 == pGE) {
 	return;
     }
 
-    for (i = 0, pCE = pGE->pCElist; i < pGE->imembers; ++i, ++pCE) {
+    for (pCE = pGE->pCElist; pCE != (CONSENT *) 0; pCE = pCE->pCEnext) {
 	if ((CONSFILE *) 0 == pCE->fdlog) {
 	    continue;
 	}
-	(void)fileClose(pCE->fdlog);
+	(void)fileClose(&pCE->fdlog);
 	if ((CONSFILE *) 0 ==
 	    (pCE->fdlog =
-	     fileOpen(pCE->lfile, O_RDWR | O_CREAT | O_APPEND, 0666))) {
-	    Error("Cannot reopen log file: %s", pCE->lfile);
+	     fileOpen(pCE->lfile.string, O_RDWR | O_CREAT | O_APPEND,
+		      0666))) {
+	    Error("Cannot reopen log file: %s", pCE->lfile.string);
 	    continue;
 	}
     }
 }
 
 static RETSIGTYPE
+#if USE_ANSI_PROTO
+FlagReUp(int sig)
+#else
 FlagReUp(sig)
     int sig;
+#endif
 {
     fSawReUp = 1;
 #if !HAVE_SIGACTION
@@ -189,30 +390,37 @@ FlagReUp(sig)
 }
 
 static void
-ReUp(pGE, automatic, prinit)
+#if USE_ANSI_PROTO
+ReUp(GRPENT * pGE, short int automatic)
+#else
+ReUp(pGE, automatic)
     GRPENT *pGE;
-    fd_set *prinit;
+    short int automatic;
+#endif
 {
-    int i;
     CONSENT *pCE;
 
     if ((GRPENT *) 0 == pGE) {
 	return;
     }
 
-    for (i = 0, pCE = pGE->pCElist; i < pGE->imembers; ++i, ++pCE) {
+    for (pCE = pGE->pCElist; pCE != (CONSENT *) 0; pCE = pCE->pCEnext) {
 	if (pCE->fup || fNoinit || (automatic == 1 && !pCE->autoReUp))
 	    continue;
 	if (automatic)
-	    Info("%s: automatic reinitialization [%s]", pCE->server,
+	    Info("%s: automatic reinitialization [%s]", pCE->server.string,
 		 strtime(NULL));
-	ConsInit(pCE, prinit, 1);
+	ConsInit(pCE, &pGE->rinit, 1);
     }
 }
 
 static RETSIGTYPE
+#if USE_ANSI_PROTO
+FlagMark(int sig)
+#else
 FlagMark(sig)
     int sig;
+#endif
 {
     fSawMark = 1;
 #if !HAVE_SIGACTION
@@ -221,32 +429,41 @@ FlagMark(sig)
 }
 
 void
+#if USE_ANSI_PROTO
+tagLogfile(const CONSENT * pCE, const char *fmt, ...)
+#else
 tagLogfile(pCE, fmt, va_alist)
     const CONSENT *pCE;
     const char *fmt;
     va_dcl
+#endif
 {
-    char ac[BUFSIZ];
-    char acOut[BUFSIZ];
     va_list ap;
+#if USE_ANSI_PROTO
+    va_start(ap, fmt);
+#else
     va_start(ap);
+#endif
 
     if ((pCE == (CONSENT *) 0) || (pCE->fdlog == (CONSFILE *) 0) ||
 	(pCE->activitylog == 0))
 	return;
 
-    vsprintf(ac, fmt, ap);
-    sprintf(acOut, "[-- %s -- %s]\r\n", ac, strtime(NULL));
-    (void)fileWrite(pCE->fdlog, acOut, -1);
+    (void)fileWrite(pCE->fdlog, "[-- ", -1);
+    fileVwrite(pCE->fdlog, fmt, ap);
+    filePrint(pCE->fdlog, " -- %s]\r\n", strtime(NULL));
     va_end(ap);
 }
 
 static void
-Mark(pGE, prinit)
+#if USE_ANSI_PROTO
+Mark(GRPENT * pGE)
+#else
+Mark(pGE)
     GRPENT *pGE;
-    fd_set *prinit;
+#endif
 {
-    char acOut[BUFSIZ];
+    char acOut[100];		/* MARK spec ~ 40 chars */
     time_t tyme;
     int i;
     CONSENT *pCE;
@@ -258,12 +475,12 @@ Mark(pGE, prinit)
     /* [-- MARK -- `date`] */
     sprintf(acOut, "[-- MARK -- %s]\r\n", strtime(&tyme));
 
-    for (i = 0, pCE = pGE->pCElist; i < pGE->imembers; ++i, ++pCE) {
+    for (pCE = pGE->pCElist; pCE != (CONSENT *) 0; pCE = pCE->pCEnext) {
 	if ((CONSFILE *) 0 == pCE->fdlog) {
 	    continue;
 	}
 	if ((pCE->nextMark > 0) && (tyme >= pCE->nextMark)) {
-	    Debug("[-- MARK --] stamp added to %s", pCE->lfile);
+	    Debug(1, "[-- MARK --] stamp added to %s", pCE->lfile.string);
 	    (void)fileWrite(pCE->fdlog, acOut, -1);
 	    pCE->nextMark += pCE->mark;
 	}
@@ -275,12 +492,16 @@ Mark(pGE, prinit)
 }
 
 void
+#if USE_ANSI_PROTO
+writeLog(CONSENT * pCE, char *s, int len)
+#else
 writeLog(pCE, s, len)
     CONSENT *pCE;
     char *s;
     int len;
+#endif
 {
-    char acOut[BUFSIZ];
+    char acOut[100];		/* [%s], time ~ 30 chars */
     int i = 0;
     int j;
 
@@ -303,8 +524,8 @@ writeLog(pCE, s, len)
 	    pCE->nextMark = pCE->mark;
 	}
 	if (s[j] == '\n') {
-	    Debug("Found newline for %s (nextMark=%d, mark=%d)",
-		  pCE->server, pCE->nextMark, pCE->mark);
+	    Debug(1, "Found newline for %s (nextMark=%d, mark=%d)",
+		  pCE->server.string, pCE->nextMark, pCE->mark);
 	    pCE->nextMark++;
 	}
     }
@@ -313,34 +534,13 @@ writeLog(pCE, s, len)
     }
 }
 
-void
-SendClientsMsg(pGE, message)
-    GRPENT *pGE;
-    char *message;
-{
-    CONSCLIENT *pCL;
-
-    if ((GRPENT *) 0 == pGE) {
-	return;
-    }
-
-    for (pCL = pGE->pCLall; (CONSCLIENT *) 0 != pCL; pCL = pCL->pCLscan) {
-	if (pCL->fcon) {
-	    (void)fileWrite(pCL->fd, message, -1);
-	}
-    }
-}
-
-void
-SendShutdownMsg(pGE)
-    GRPENT *pGE;
-{
-    SendClientsMsg(pGE, "[-- Console server shutting down --]\r\n");
-}
-
 static RETSIGTYPE
+#if USE_ANSI_PROTO
+FlagGoAway(int sig)
+#else
 FlagGoAway(sig)
     int sig;
+#endif
 {
     fSawGoAway = 1;
 #if !HAVE_SIGACTION
@@ -350,8 +550,12 @@ FlagGoAway(sig)
 
 /* yep, basically the same...ah well, maybe someday */
 static RETSIGTYPE
+#if USE_ANSI_PROTO
+FlagGoAwayAlso(int sig)
+#else
 FlagGoAwayAlso(sig)
     int sig;
+#endif
 {
     fSawGoAway = 1;
 #if !HAVE_SIGACTION
@@ -363,8 +567,12 @@ FlagGoAwayAlso(sig)
 static
 #endif
   RETSIGTYPE
+#if USE_ANSI_PROTO
+FlagReapVirt(int sig)
+#else
 FlagReapVirt(sig)
     int sig;
+#endif
 {
     fSawReapVirt = 1;
 #if !HAVE_SIGACTION
@@ -375,22 +583,23 @@ FlagReapVirt(sig)
 /* on a TERM we have to cleanup utmp entries (ask ptyd to do it)	(ksb)
  */
 static void
-DeUtmp(pGE, prinit)
+#if USE_ANSI_PROTO
+DeUtmp(GRPENT * pGE)
+#else
+DeUtmp(pGE)
     GRPENT *pGE;
-    fd_set *prinit;
+#endif
 {
-    int i;
     CONSENT *pCE;
 
-    if ((GRPENT *) 0 == pGE) {
-	return;
-    }
+    if ((GRPENT *) 0 != pGE) {
+	SendAllClientsMsg(pGE, "[-- Console server shutting down --]\r\n");
 
-    SendShutdownMsg(pGE);
-
-    for (i = 0, pCE = pGE->pCElist; i < pGE->imembers; ++i, ++pCE) {
-	ConsDown(pCE, prinit);
+	for (pCE = pGE->pCElist; pCE != (CONSENT *) 0; pCE = pCE->pCEnext) {
+	    ConsDown(pCE, &pGE->rinit);
+	}
     }
+    dumpDataStructures();
     exit(EX_OK);
 }
 
@@ -399,13 +608,15 @@ DeUtmp(pGE, prinit)
  * reader on the pseudo will cause us to notice the death in Kiddie...
  */
 static void
-ReapVirt(pGE, prinit)
+#if USE_ANSI_PROTO
+ReapVirt(GRPENT * pGE)
+#else
+ReapVirt(pGE)
     GRPENT *pGE;
-    fd_set *prinit;
+#endif
 {
     int pid;
     int UWbuf;
-    int i;
     CONSENT *pCE;
 
     while (-1 != (pid = waitpid(-1, &UWbuf, WNOHANG))) {
@@ -422,29 +633,28 @@ ReapVirt(pGE, prinit)
 	    continue;
 	}
 
-	for (i = 0, pCE = pGE->pCElist; i < pGE->imembers; ++i, ++pCE) {
-
+	for (pCE = pGE->pCElist; pCE != (CONSENT *) 0; pCE = pCE->pCEnext) {
 	    if (pid != pCE->ipid)
 		continue;
 
 	    if (WIFEXITED(UWbuf))
-		Info("%s: exit(%d) [%s]", pCE->server, WEXITSTATUS(UWbuf),
-		     strtime(NULL));
+		Info("%s: exit(%d) [%s]", pCE->server.string,
+		     WEXITSTATUS(UWbuf), strtime(NULL));
 	    if (WIFSIGNALED(UWbuf))
-		Info("%s: signal(%d) [%s]", pCE->server, WTERMSIG(UWbuf),
-		     strtime(NULL));
+		Info("%s: signal(%d) [%s]", pCE->server.string,
+		     WTERMSIG(UWbuf), strtime(NULL));
 
 	    /* If someone was writing, they fall back to read-only */
 	    if (pCE->pCLwr != (CONSCLIENT *) 0) {
 		pCE->pCLwr->fwr = 0;
-		tagLogfile(pCE, "%s detached", pCE->pCLwr->acid);
+		tagLogfile(pCE, "%s detached", pCE->pCLwr->acid.string);
 		pCE->pCLwr = (CONSCLIENT *) 0;
 	    }
 
 	    /* Try an initial reconnect */
-	    Info("%s: automatic reinitialization [%s]", pCE->server,
+	    Info("%s: automatic reinitialization [%s]", pCE->server.string,
 		 strtime(NULL));
-	    ConsInit(pCE, prinit, 0);
+	    ConsInit(pCE, &pGE->rinit, 0);
 
 	    /* If we didn't succeed, try again later */
 	    if (!pCE->fup)
@@ -454,25 +664,30 @@ ReapVirt(pGE, prinit)
 }
 
 static char acStop[] = {	/* buffer for oob stop command          */
-    OB_SUSP, 0
+    OB_SUSP
 };
 
 int
+#if USE_ANSI_PROTO
+CheckPasswd(CONSCLIENT * pCLServing, char *pw_string)
+#else
 CheckPasswd(pCLServing, pw_string)
     CONSCLIENT *pCLServing;
     char *pw_string;
+#endif
 {
     struct passwd *pwd;
     FILE *fp;
     int iLine = 0;
     char *server, *servers, *this_pw, *user;
-    char username[64];		/* same as acid */
+    static STRING username = { (char *)0, 0, 0 };
 #if HAVE_GETSPNAM
     struct spwd *spwd;
 #endif
 
-    strcpy(username, pCLServing->acid);
-    if ((user = strchr(username, '@')))
+    buildMyString((char *)0, &username);
+    buildMyString(pCLServing->acid.string, &username);
+    if ((user = strchr(username.string, '@')))
 	*user = '\000';
 
     if ((fp = fopen(pcPasswd, "r")) == (FILE *) 0) {
@@ -486,7 +701,8 @@ CheckPasswd(pCLServing, pw_string)
 	if (0 != CheckPass(pwd, pw_string)) {
 	    if (fVerbose)
 		Info("User %s logging into server %s via root passwd",
-		     pCLServing->acid, pCLServing->pCEwant->server);
+		     pCLServing->acid.string,
+		     pCLServing->pCEwant->server.string);
 	    (void)endpwent();
 	    return 1;
 	}
@@ -512,12 +728,14 @@ CheckPasswd(pCLServing, pw_string)
 	    this_pw = pruneSpace(this_pw);
 	    servers = pruneSpace(servers);
 
-	    if (strcmp(user, "*any*") != 0 && strcmp(user, username) != 0)
+	    if (strcmp(user, "*any*") != 0 &&
+		strcmp(user, username.string) != 0)
 		continue;
 
 	    if (strcmp(this_pw, "*passwd*") == 0) {
 		this_pw = (char *)0;
-		if ((struct passwd *)0 != (pwd = getpwnam(username))) {
+		if ((struct passwd *)0 !=
+		    (pwd = getpwnam(username.string))) {
 #if HAVE_GETSPNAM
 		    if ('x' == pwd->pw_passwd[0] &&
 			'\000' == pwd->pw_passwd[1]) {
@@ -539,7 +757,7 @@ CheckPasswd(pCLServing, pw_string)
 	    /*
 	       printf
 	       ("Got servers <%s> passwd <%s> user <%s>, want <%s>\n",
-	       servers, this_pw, user, pCLServing->pCEwant->server);
+	       servers, this_pw, user, pCLServing->pCEwant->server.string);
 	     */
 
 	    /* If one is empty and the other isn't, instant failure */
@@ -555,8 +773,8 @@ CheckPasswd(pCLServing, pw_string)
 		    if (strcmp(server, "any") == 0) {
 			if (fVerbose) {
 			    Info("User %s logging into server %s",
-				 pCLServing->acid,
-				 pCLServing->pCEwant->server);
+				 pCLServing->acid.string,
+				 pCLServing->pCEwant->server.string);
 			}
 			fclose(fp);
 			(void)endpwent();
@@ -565,13 +783,14 @@ CheckPasswd(pCLServing, pw_string)
 			char *p;
 			int max;
 			max = strlen(server);
-			p = pCLServing->pCEwant->server;
+			p = pCLServing->pCEwant->server.string;
 			while (strlen(p) >= max) {
 			    if (strcmp(server, p) == 0) {
 				if (fVerbose) {
 				    Info("User %s logging into server %s",
-					 pCLServing->acid,
-					 pCLServing->pCEwant->server);
+					 pCLServing->acid.string,
+					 pCLServing->pCEwant->server.
+					 string);
 				}
 				fclose(fp);
 				(void)endpwent();
@@ -601,10 +820,14 @@ CheckPasswd(pCLServing, pw_string)
 }
 
 static char *
+#if USE_ANSI_PROTO
+IdleTyme(long tyme)
+#else
 IdleTyme(tyme)
     long tyme;
+#endif
 {
-    static char timestr[256];	/* Don't want to overrun the array... */
+    static char timestr[100];	/* Don't want to overrun the array... */
     long hours, minutes;
 
     minutes = tyme / 60;
@@ -612,21 +835,41 @@ IdleTyme(tyme)
     minutes = minutes % 60;
 
     if (hours < 24)
-	sprintf(timestr, "%2ld:%02ld", hours, minutes);
-    else if (hours < 48)
-	sprintf(timestr, "%ld day", hours / 24);
+	sprintf(timestr, " %2ld:%02ld", hours, minutes);
+    else if (hours < 24 * 2)
+	sprintf(timestr, " 1 day");
+    else if (hours < 24 * 10)
+	sprintf(timestr, "%1ld days", hours / 24);
     else
-	sprintf(timestr, "%lddays", hours / 24);
+	sprintf(timestr, "%2lddays", hours / 24);
 
     return timestr;
 }
 
 void
+#if USE_ANSI_PROTO
+putConsole(CONSENT * pCEServing, unsigned char c)
+#else
+putConsole(pCEServing, c)
+    CONSENT *pCEServing;
+    unsigned char c;
+#endif
+{
+    if (pCEServing->isNetworkConsole && (c == IAC))
+	(void)write(pCEServing->fdtty, &c, 1);
+    (void)write(pCEServing->fdtty, &c, 1);
+}
+
+void
+#if USE_ANSI_PROTO
+sendRealBreak(CONSCLIENT * pCLServing, CONSENT * pCEServing)
+#else
 sendRealBreak(pCLServing, pCEServing)
     CONSCLIENT *pCLServing;
     CONSENT *pCEServing;
+#endif
 {
-    Debug("Sending a break to %s", pCEServing->server);
+    Debug(1, "Sending a break to %s", pCEServing->server.string);
     if (pCEServing->isNetworkConsole) {
 	char haltseq[2];
 
@@ -664,55 +907,25 @@ sendRealBreak(pCLServing, pCEServing)
 }
 
 void
-prettyPrintBreak(fd, str)
-    CONSFILE *fd;
-    STRING *str;
-{
-    static STRING output = { (char *)0, 0, 0 };
-    unsigned char c;
-    char *p;
-
-    if (str->used == 0)
-	return;
-
-    buildMyString((char *)0, &output);
-    for (p = str->string; *p != '\000'; p++) {
-	c = *p & 0xff;
-	if (c > 127) {
-	    char oct[5];
-	    oct[4] = '\000';
-	    oct[3] = c % 8;
-	    c /= 8;
-	    oct[2] = c % 8;
-	    c /= 8;
-	    oct[1] = c % 8;
-	    oct[0] = '\\';
-	    buildMyString(oct, &output);
-	} else if (c < ' ' || c == '\177') {
-	    buildMyStringChar('^', &output);
-	    buildMyStringChar(c ^ 0100, &output);
-	} else {
-	    buildMyStringChar(c, &output);
-	}
-    }
-
-    if (output.used != 0)
-	(void)fileWrite(fd, output.string, -1);
-}
-
-void
+#if USE_ANSI_PROTO
+doBreakWork(CONSCLIENT * pCLServing, CONSENT * pCEServing, short int bt,
+	    short int cleanup)
+#else
 doBreakWork(pCLServing, pCEServing, bt, cleanup)
     CONSCLIENT *pCLServing;
     CONSENT *pCEServing;
     short int bt;
     short int cleanup;
+#endif
 {
     char *p, s;
     short int backslash;
     short int cntrl;
     char oct[3];
     short int octs = -1;
-    STRING cleaned = { (char *)0, 0, 0 };
+    static STRING cleaned = { (char *)0, 0, 0 };
+
+    buildMyString((char *)0, &cleaned);
 
     if (cleanup && (bt < 1 || bt > 9))
 	return;
@@ -755,7 +968,7 @@ doBreakWork(pCLServing, pCEServing, bt, cleanup)
 			c = oct[0] - '0';
 			for (i = 1; i <= octs; i++)
 			    c = c * 8 + (oct[i] - '0');
-			(void)write(pCEServing->fdtty, &c, 1);
+			putConsole(pCEServing, c);
 		    }
 		}
 		octs = -1;
@@ -766,7 +979,7 @@ doBreakWork(pCLServing, pCEServing, bt, cleanup)
 		if (cleanup)
 		    buildMyString("\\\\", &cleaned);
 		else
-		    (void)write(pCEServing->fdtty, &s, 1);
+		    putConsole(pCEServing, s);
 		backslash = 0;
 	    } else
 		backslash = 1;
@@ -806,7 +1019,7 @@ doBreakWork(pCLServing, pCEServing, bt, cleanup)
 		    if (cleanup)
 			buildMyStringChar(o, &cleaned);
 		    else
-			(void)write(pCEServing->fdtty, &s, 1);
+			putConsole(pCEServing, s);
 		    s = '\000';
 		} else if (octs > 2) {
 		    Error("octal number too large in BREAK%d sequence",
@@ -823,7 +1036,7 @@ doBreakWork(pCLServing, pCEServing, bt, cleanup)
 			c = oct[0] - '0';
 			for (i = 1; i <= octs; i++)
 			    c = c * 8 + (oct[i] - '0');
-			(void)write(pCEServing->fdtty, &c, 1);
+			putConsole(pCEServing, c);
 		    }
 		    octs = -1;
 		}
@@ -833,7 +1046,7 @@ doBreakWork(pCLServing, pCEServing, bt, cleanup)
 		    buildMyStringChar('\\', &cleaned);
 		    buildMyStringChar(o, &cleaned);
 		} else
-		    (void)write(pCEServing->fdtty, &s, 1);
+		    putConsole(pCEServing, s);
 	    }
 	    backslash = 0;
 	    continue;
@@ -844,7 +1057,7 @@ doBreakWork(pCLServing, pCEServing, bt, cleanup)
 		    buildMyString("^^", &cleaned);
 		else {
 		    s = s & 0x1f;
-		    (void)write(pCEServing->fdtty, &s, 1);
+		    putConsole(pCEServing, s);
 		}
 		cntrl = 0;
 	    } else
@@ -857,7 +1070,7 @@ doBreakWork(pCLServing, pCEServing, bt, cleanup)
 		    buildMyString("^?", &cleaned);
 		else {
 		    s = 0x7f;	/* delete */
-		    (void)write(pCEServing->fdtty, &s, 1);
+		    putConsole(pCEServing, s);
 		}
 		continue;
 	    }
@@ -866,7 +1079,7 @@ doBreakWork(pCLServing, pCEServing, bt, cleanup)
 		buildMyStringChar(s, &cleaned);
 	    } else {
 		s = s & 0x1f;
-		(void)write(pCEServing->fdtty, &s, 1);
+		putConsole(pCEServing, s);
 	    }
 	    cntrl = 0;
 	    continue;
@@ -874,7 +1087,7 @@ doBreakWork(pCLServing, pCEServing, bt, cleanup)
 	if (cleanup)
 	    buildMyStringChar(s, &cleaned);
 	else
-	    (void)write(pCEServing->fdtty, &s, 1);
+	    putConsole(pCEServing, s);
     }
 
     if (octs > 2) {
@@ -892,7 +1105,7 @@ doBreakWork(pCLServing, pCEServing, bt, cleanup)
 	    c = oct[0] - '0';
 	    for (i = 1; i <= octs; i++)
 		c = c * 8 + (oct[i] - '0');
-	    (void)write(pCEServing->fdtty, &c, 1);
+	    putConsole(pCEServing, c);
 	}
     }
 
@@ -902,24 +1115,32 @@ doBreakWork(pCLServing, pCEServing, bt, cleanup)
 	Error("trailing circumflex ignored in BREAK%d sequence", bt);
 
     if (cleanup) {
-	free(breakList[bt - 1].string);
-	breakList[bt - 1] = cleaned;
+	buildMyString((char *)0, &breakList[bt - 1]);
+	buildMyString(cleaned.string, &breakList[bt - 1]);
     } else
 	fileWrite(pCLServing->fd, "sent]\r\n", -1);
 }
 
 void
+#if USE_ANSI_PROTO
+sendBreak(CONSCLIENT * pCLServing, CONSENT * pCEServing, short int bt)
+#else
 sendBreak(pCLServing, pCEServing, bt)
     CONSCLIENT *pCLServing;
     CONSENT *pCEServing;
     short int bt;
+#endif
 {
     doBreakWork(pCLServing, pCEServing, bt, 0);
 }
 
 void
+#if USE_ANSI_PROTO
+cleanupBreak(short int bt)
+#else
 cleanupBreak(bt)
     short int bt;
+#endif
 {
     doBreakWork((CONSCLIENT *) 0, (CONSENT *) 0, bt, 1);
 }
@@ -954,28 +1175,29 @@ cleanupBreak(bt)
  *		
  */
 static void
+#if USE_ANSI_PROTO
+Kiddie(GRPENT * pGE, CONSFILE * sfd)
+#else
 Kiddie(pGE, sfd)
     GRPENT *pGE;
     CONSFILE *sfd;
+#endif
 {
     CONSCLIENT *pCL,		/* console we must scan/notify          */
-     *pCLServing,		/* client we are serving                */
-     *pCLFree;			/* head of free list                    */
+     *pCLServing;		/* client we are serving                */
     CONSENT *pCEServing,	/* console we are talking to            */
      *pCE;			/* the base of our console list         */
-    int iConsole;
+    GRPENT *pGEtmp;
+    REMOTE *pRCtmp;
     int i, nr;
     struct hostent *hpPeer;
     time_t tyme;
     time_t lastup = time(NULL);	/* last time we tried to up all downed  */
     int fd;
-    CONSENT CECtl;		/* our control `console'        */
     char cType;
     int maxfd, so;
-    fd_set rmask, rinit;
-    unsigned char acOut[BUFSIZ], acIn[BUFSIZ], acInOrig[BUFSIZ],
-	acNote[132 * 2];
-    CONSCLIENT dude[MAXMEMB];	/* alloc one set per console    */
+    fd_set rmask;
+    unsigned char acOut[BUFSIZ], acIn[BUFSIZ], acInOrig[BUFSIZ];
 #if HAVE_TERMIOS_H
     struct termios sbuf;
 #else
@@ -983,6 +1205,34 @@ Kiddie(pGE, sfd)
     struct sgttyb sty;
 # endif
 #endif
+
+    /* nuke the other group lists - of no use in the child */
+    while (pGroups != (GRPENT *) 0) {
+	pGEtmp = pGroups->pGEnext;
+	if (pGroups != pGE)
+	    destroyGroup(pGroups);
+	pGroups = pGEtmp;
+    }
+    pGroups = pGE;
+    pGE->pGEnext = (GRPENT *) 0;
+
+    /* nuke the remote consoles - of no use in the child */
+    while (pRCList != (REMOTE *) 0) {
+	pRCtmp = pRCList->pRCnext;
+	destroyString(&pRCList->rserver);
+	destroyString(&pRCList->rhost);
+	free(pRCList);
+	pRCList = pRCtmp;
+    }
+
+    pGE->pCEctl = (CONSENT *) calloc(1, sizeof(CONSENT));
+    if (pGE->pCEctl == (CONSENT *) 0)
+	OutOfMem();
+    initString(&pGE->pCEctl->server);
+    initString(&pGE->pCEctl->dfile);
+    initString(&pGE->pCEctl->lfile);
+    initString(&pGE->pCEctl->networkConsoleHost);
+    initString(&pGE->pCEctl->acslave);
 
     /* turn off signals that master() might have turned on
      * (only matters if respawned)
@@ -993,30 +1243,21 @@ Kiddie(pGE, sfd)
     if (!fDaemon)
 	simpleSignal(SIGINT, FlagGoAwayAlso);
 
-    /* setup our local data structures and fields, and control line
-     */
-    pCE = pGE->pCElist;
-    for (iConsole = 0; iConsole < pGE->imembers; ++iConsole) {
-	pCE[iConsole].fup = 0;
-	pCE[iConsole].pCLon = pCE[iConsole].pCLwr = (CONSCLIENT *) 0;
-	pCE[iConsole].fdlog = (CONSFILE *) 0;
-	pCE[iConsole].fdtty = -1;
-	pCE[iConsole].autoReUp = 0;
-    }
-    sprintf(CECtl.server, "ctl_%d", pGE->port);
-    CECtl.inamelen = strlen(CECtl.server);	/* bogus, of course     */
-    CECtl.acline[CECtl.inamelen++] = ':';
-    CECtl.acline[CECtl.inamelen++] = ' ';
-    CECtl.iend = CECtl.inamelen;
-    (void)strcpy(CECtl.dfile, strcpy(CECtl.lfile, "/dev/null"));
+    sprintf(acOut, "ctl_%d", pGE->port);
+    buildMyString(acOut, &pGE->pCEctl->server);
+    pGE->pCEctl->iend = 0;
+    buildMyString((char *)0, &pGE->pCEctl->lfile);
+    buildMyString("/dev/null", &pGE->pCEctl->lfile);
+    buildMyString((char *)0, &pGE->pCEctl->dfile);
+    buildMyString("/dev/null", &pGE->pCEctl->dfile);
     /* below "" gets us the default parity and baud structs
      */
-    CECtl.pbaud = FindBaud("");
-    CECtl.pparity = FindParity("");
-    CECtl.fdlog = (CONSFILE *) 0;
-    CECtl.fdtty = -1;
-    CECtl.fup = 0;
-    CECtl.pCLon = CECtl.pCLwr = (CONSCLIENT *) 0;
+    pGE->pCEctl->pbaud = FindBaud("");
+    pGE->pCEctl->pparity = FindParity("");
+    pGE->pCEctl->fdlog = (CONSFILE *) 0;
+    pGE->pCEctl->fdtty = pGE->pCEctl->ipid = -1;
+    pGE->pCEctl->fup = 0;
+    pGE->pCEctl->pCLon = pGE->pCEctl->pCLwr = (CONSCLIENT *) 0;
 
     /* set up stuff for the select() call once, then just copy it
      * rinit is all the fd's we might get data on, we copy it
@@ -1024,25 +1265,25 @@ Kiddie(pGE, sfd)
      * we used to do in the loop, but we have to mod rinit whenever
      * we add a connection or drop one...   (ksb)
      */
-    maxfd = maxfiles();
-    FD_ZERO(&rinit);
-    FD_SET(fileFDNum(sfd), &rinit);
+    maxfd = cmaxfiles();
+    FD_ZERO(&pGE->rinit);
+    FD_SET(fileFDNum(sfd), &pGE->rinit);
     /* open all the files we need for the consoles in our group
      * if we can't get one (bitch and) flag as down
      */
     if (!fNoinit)
-	for (iConsole = 0; iConsole < pGE->imembers; ++iConsole) {
-	    ConsInit(&pCE[iConsole], &rinit, 1);
+	for (pCE = pGE->pCElist; pCE != (CONSENT *) 0; pCE = pCE->pCEnext) {
+	    ConsInit(pCE, &pGE->rinit, 1);
 	}
 
-    /* set up the list of free connection slots, we could just calloc
-     * them, but the stack pages are already in core...
+    /* set up the list of free connection slots
      */
-    pCLFree = dude;
-    for (i = 0; i < MAXMEMB - 1; ++i) {
-	dude[i].pCLnext = &dude[i + 1];
+    pGE->pCLfree = (CONSCLIENT *) calloc(cMaxMemb, sizeof(CONSCLIENT));
+    if ((CONSCLIENT *) 0 == pGE->pCLfree)
+	OutOfMem();
+    for (i = 0; i < cMaxMemb - 1; ++i) {
+	pGE->pCLfree[i].pCLnext = &pGE->pCLfree[i + 1];
     }
-    dude[MAXMEMB - 1].pCLnext = (CONSCLIENT *) 0;
 
     /* on a SIGHUP we should close and reopen our log files
      */
@@ -1062,20 +1303,24 @@ Kiddie(pGE, sfd)
 	/* check signal flags */
 	if (fSawGoAway) {
 	    fSawGoAway = 0;
-	    DeUtmp(pGE, &rinit);
+	    DeUtmp(pGE);
 	}
 	if (fSawReapVirt) {
 	    fSawReapVirt = 0;
-	    ReapVirt(pGE, &rinit);
+	    ReapVirt(pGE);
 	}
 	if (fSawReOpen) {
 	    fSawReOpen = 0;
 	    reopenLogfile();
-	    ReOpen(pGE, &rinit);
+	    ReReadCfg();
+	    pGE = pGroups;
+	    FD_SET(fileFDNum(sfd), &pGE->rinit);
+	    ReOpen(pGE);
+	    ReUp(pGE, 0);
 	}
 	if (fSawReUp) {
 	    fSawReUp = 0;
-	    ReUp(pGE, 0, &rinit);
+	    ReUp(pGE, 0);
 
 	    if (fReopenall > 0) {
 		lastup = time(NULL);
@@ -1083,8 +1328,8 @@ Kiddie(pGE, sfd)
 	}
 	if (fSawMark) {
 	    fSawMark = 0;
-	    Mark(pGE, &rinit);
-	    ReUp(pGE, 1, &rinit);
+	    Mark(pGE);
+	    ReUp(pGE, 1);
 	}
 
 	/* Is it time to reup everything? */
@@ -1092,11 +1337,11 @@ Kiddie(pGE, sfd)
 	    ((time(NULL) - lastup) > (fReopenall * 60))) {
 	    /* Note the new lastup time only after we finish.
 	     */
-	    ReUp(pGE, 2, &rinit);
+	    ReUp(pGE, 2);
 	    lastup = time(NULL);
 	}
 
-	rmask = rinit;
+	rmask = pGE->rinit;
 
 	if (-1 ==
 	    select(maxfd, &rmask, (fd_set *) 0, (fd_set *) 0,
@@ -1109,8 +1354,8 @@ Kiddie(pGE, sfd)
 
 	/* anything from any console?
 	 */
-	for (iConsole = 0; iConsole < pGE->imembers; ++iConsole) {
-	    pCEServing = pCE + iConsole;
+	for (pCEServing = pGE->pCElist; pCEServing != (CONSENT *) 0;
+	     pCEServing = pCEServing->pCEnext) {
 	    if (!pCEServing->fup || !FD_ISSET(pCEServing->fdtty, &rmask)) {
 		continue;
 	    }
@@ -1119,22 +1364,23 @@ Kiddie(pGE, sfd)
 		 read(pCEServing->fdtty, acInOrig,
 		      sizeof(acInOrig))) <= 0) {
 		/* carrier lost */
-		Error("lost carrier on %s (%s)! [%s]", pCEServing->server,
-		      pCEServing->fvirtual ? pCEServing->
-		      acslave : pCEServing->dfile, strtime(NULL));
+		Error("lost carrier on %s (%s)! [%s]",
+		      pCEServing->server.string,
+		      pCEServing->fvirtual ? pCEServing->acslave.
+		      string : pCEServing->dfile.string, strtime(NULL));
 
 		/* If someone was writing, they fall back to read-only */
 		if (pCEServing->pCLwr != (CONSCLIENT *) 0) {
 		    pCEServing->pCLwr->fwr = 0;
 		    tagLogfile(pCEServing, "%s detached",
-			       pCEServing->pCLwr->acid);
+			       pCEServing->pCLwr->acid.string);
 		    pCEServing->pCLwr = (CONSCLIENT *) 0;
 		}
 
 		/* Try an initial reconnect */
 		Info("%s: automatic reinitialization [%s]",
-		     pCEServing->server, strtime(NULL));
-		ConsInit(pCEServing, &rinit, 0);
+		     pCEServing->server.string, strtime(NULL));
+		ConsInit(pCEServing, &pGE->rinit, 0);
 
 		/* If we didn't succeed, try again later */
 		if (!pCEServing->fup)
@@ -1142,7 +1388,7 @@ Kiddie(pGE, sfd)
 
 		continue;
 	    }
-	    Debug("Read %d bytes from fd %d", nr, pCEServing->fdtty);
+	    Debug(1, "Read %d bytes from fd %d", nr, pCEServing->fdtty);
 
 	    if (pCEServing->isNetworkConsole) {
 		/* Do a little Telnet Protocol interpretation
@@ -1155,27 +1401,20 @@ Kiddie(pGE, sfd)
 		state = pCEServing->telnetState;
 		for (i = 0; i < nr; ++i) {
 		    if (state == 0 && acInOrig[i] == IAC) {
-			Debug("%s: Got telnet `IAC'", pCEServing->server);
+			Debug(1, "%s: Got telnet `IAC'",
+			      pCEServing->server.string);
 			state = 1;
 		    } else if (state == 1 && acInOrig[i] != IAC) {
-			if (TELCMD_OK(acInOrig[i]))
-			    Debug("%s: Got telnet cmd `%s'",
-				  pCEServing->server, TELCMD(acInOrig[i]));
-			else
-			    Debug("%s: Got unknown telnet cmd `%u'",
-				  pCEServing->server, acInOrig[i]);
+			Debug(1, "%s: Got telnet cmd `%u'",
+			      pCEServing->server.string, acInOrig[i]);
 			if (acInOrig[i] == DONT || acInOrig[i] == DO ||
 			    acInOrig[i] == WILL || acInOrig[i] == WONT)
 			    state = 2;
 			else
 			    state = 0;
 		    } else if (state == 2) {
-			if (TELOPT_OK(acInOrig[i]))
-			    Debug("%s: Got telnet option `%s'",
-				  pCEServing->server, TELOPT(acInOrig[i]));
-			else
-			    Debug("%s: Got unknown telnet option `%u'",
-				  pCEServing->server, acInOrig[i]);
+			Debug(1, "%s: Got telnet option `%u'",
+			      pCEServing->server.string, acInOrig[i]);
 			state = 0;
 		    } else {
 			if (state == 5) {
@@ -1184,7 +1423,8 @@ Kiddie(pGE, sfd)
 				continue;
 			}
 			if (acInOrig[i] == IAC)
-			    Debug("%s: Quoted `IAC'", pCEServing->server);
+			    Debug(1, "%s: Quoted `IAC'",
+				  pCEServing->server.string);
 			if (fStrip)
 			    acIn[new++] = acInOrig[i] & 127;
 			else
@@ -1228,8 +1468,12 @@ Kiddie(pGE, sfd)
 			'\n' != acIn[i]) {
 			continue;
 		    }
+		    if (pCEServing->server.used)
+			write(1, pCEServing->server.string,
+			      pCEServing->server.used - 1);
+		    write(1, ": ", 2);
 		    write(1, pCEServing->acline, pCEServing->iend);
-		    pCEServing->iend = pCEServing->inamelen;
+		    pCEServing->iend = 0;
 		}
 	    }
 
@@ -1262,17 +1506,16 @@ Kiddie(pGE, sfd)
 		 * log it, drop from select list,
 		 * close gap in table, restart loop
 		 */
-		if (&CECtl != pCEServing) {
-		    Info("%s: logout %s [%s]", pCEServing->server,
-			 pCLServing->acid, strtime(NULL));
+		if (pGE->pCEctl != pCEServing) {
+		    Info("%s: logout %s [%s]", pCEServing->server.string,
+			 pCLServing->acid.string, strtime(NULL));
 		}
 		if (fNoinit &&
-		    (CONSCLIENT *) 0 == pCLServing->pCEto->pCLon->pCLnext)
-		    ConsDown(pCLServing->pCEto, &rinit);
+		    (CONSCLIENT *) 0 == pCEServing->pCLon->pCLnext)
+		    ConsDown(pCEServing, &pGE->rinit);
 
-		FD_CLR(fileFDNum(pCLServing->fd), &rinit);
-		(void)fileClose(pCLServing->fd);
-		pCLServing->fd = (CONSFILE *) 0;
+		FD_CLR(fileFDNum(pCLServing->fd), &pGE->rinit);
+		fileClose(&pCLServing->fd);
 
 		/* mark as not writer, if he is
 		 * and turn logging back on...
@@ -1281,12 +1524,12 @@ Kiddie(pGE, sfd)
 		    pCLServing->fwr = 0;
 		    pCLServing->fwantwr = 0;
 		    tagLogfile(pCEServing, "%s detached",
-			       pCLServing->acid);
+			       pCLServing->acid.string);
 		    if (pCEServing->nolog) {
 			pCEServing->nolog = 0;
-			sprintf(acOut,
-				"[-- Console logging restored (logout) --]\r\n");
-			(void)fileWrite(pCEServing->fdlog, acOut, -1);
+			fileWrite(pCEServing->fdlog,
+				  "[-- Console logging restored (logout) --]\r\n",
+				  -1);
 		    }
 		    pCEServing->pCLwr = FindWrite(pCEServing->pCLon);
 		}
@@ -1309,8 +1552,8 @@ Kiddie(pGE, sfd)
 		 * and in the fre list becasue pCLscan is used
 		 * for the free list
 		 */
-		pCLServing->pCLnext = pCLFree;
-		pCLFree = pCLServing;
+		pCLServing->pCLnext = pGE->pCLfree;
+		pGE->pCLfree = pCLServing;
 		continue;
 	    }
 
@@ -1327,75 +1570,88 @@ Kiddie(pGE, sfd)
 
 	    for (i = 0; i < nr; ++i)
 		switch (pCLServing->iState) {
+			static STRING bcast = { (char *)0, 0, 0 };
+			static STRING acA1 = { (char *)0, 0, 0 };
+			static STRING acA2 = { (char *)0, 0, 0 };
 		    case S_BCAST:
 			/* gather message */
-			if (pCLServing->icursor == sizeof(pCLServing->msg)) {
-			    fileWrite(pCLServing->fd,
-				      "Message too long.\r\n", -1);
-			    goto drop;
-			}
-			if (&CECtl != pCLServing->pCEto) {
-			    fileWrite(pCLServing->fd, &acIn[i], 1);
-			}
-			if ('\n' != acIn[i]) {
-			    pCLServing->msg[pCLServing->icursor++] =
-				acIn[i];
+			if ('\r' != acIn[i]) {
+			    if (acIn[i] == '\a' ||
+				(acIn[i] >= ' ' && acIn[i] <= '~')) {
+				buildMyStringChar(acIn[i],
+						  &pCLServing->msg);
+				if (pGE->pCEctl != pCEServing)
+				    fileWrite(pCLServing->fd, &acIn[i], 1);
+			    } else if ((acIn[i] == '\b' || acIn[i] == 0x7f)
+				       && pCLServing->msg.used > 1) {
+				if (pCLServing->msg.
+				    string[pCLServing->msg.used - 2] !=
+				    '\a' && pGE->pCEctl != pCEServing) {
+				    fileWrite(pCLServing->fd, "\b \b", 3);
+				}
+				pCLServing->msg.string[pCLServing->msg.
+						       used - 2] = '\000';
+				pCLServing->msg.used--;
+			    }
 			    continue;
 			}
-			pCLServing->msg[pCLServing->icursor] = '\000';
-			if ((pCLServing->icursor > 0) &&
-			    ('\r' ==
-			     pCLServing->msg[pCLServing->icursor - 1])) {
-			    pCLServing->msg[pCLServing->icursor - 1] =
-				'\000';
+			fileWrite(pCLServing->fd, "]\r\n", 3);
+			buildMyString((char *)0, &bcast);
+			buildMyString("[", &bcast);
+			if (pGE->pCEctl != pCEServing) {
+			    buildMyString(pCLServing->acid.string, &bcast);
+			    buildMyString(": ", &bcast);
+			    buildMyString(pCLServing->msg.string, &bcast);
+			} else {
+			    char *msg;
+			    if ((msg =
+				 strchr(pCLServing->msg.string,
+					':')) == (char *)0) {
+				buildMyString(pCLServing->acid.string,
+					      &bcast);
+				msg = pCLServing->msg.string;
+			    } else {
+				*msg++ = '\000';
+				buildMyString(pCLServing->msg.string,
+					      &bcast);
+				buildMyStringChar('@', &bcast);
+				buildMyString(pCLServing->peername.string,
+					      &bcast);
+			    }
+			    buildMyString("?: ", &bcast);
+			    buildMyString(msg, &bcast);
 			}
-			pCLServing->icursor = 0;
+			buildMyString("]\r\n", &bcast);
+			if (pGE->pCEctl != pCEServing)
+			    SendClientsMsg(pCEServing, bcast.string);
+			else
+			    SendAllClientsMsg(pGE, bcast.string);
 
-			sprintf(acOut, "[Broadcast: %s]\r\n",
-				pCLServing->msg);
-			SendClientsMsg(pGE, acOut);
-
+			buildMyString((char *)0, &pCLServing->msg);
 			pCLServing->iState = S_NORMAL;
 			continue;
 
 		    case S_IDENT:
 			/* append chars to acid until [\r]\n
 			 */
-			if (pCLServing->icursor ==
-			    sizeof(pCLServing->acid)) {
-			    fileWrite(pCLServing->fd, "Name too long.\r\n",
-				      -1);
-			    goto drop;
-			}
 			if ('\n' != acIn[i]) {
-			    pCLServing->acid[pCLServing->icursor++] =
-				acIn[i];
+			    buildMyStringChar(acIn[i], &pCLServing->acid);
 			    continue;
 			}
-			pCLServing->acid[pCLServing->icursor] = '\000';
-			if ((pCLServing->icursor > 0) &&
+			if ((pCLServing->acid.used > 1) &&
 			    ('\r' ==
-			     pCLServing->acid[pCLServing->icursor - 1])) {
-			    pCLServing->acid[--pCLServing->icursor] =
-				'\000';
+			     pCLServing->acid.string[pCLServing->acid.
+						     used - 2])) {
+			    pCLServing->acid.string[pCLServing->acid.used -
+						    2] = '\000';
+			    pCLServing->acid.used--;
 			}
-			if (pCLServing->icursor <
-			    (sizeof(pCLServing->acid) - 1)) {
-			    int j;
-
-			    pCLServing->acid[pCLServing->icursor++] = '@';
-			    for (j = 0;
-				 pCLServing->icursor <
-				 (sizeof(pCLServing->acid) - 1) &&
-				 pCLServing->peername[j] != '\000';) {
-				pCLServing->acid[pCLServing->icursor++] =
-				    pCLServing->peername[j++];
-			    }
-			    pCLServing->acid[pCLServing->icursor] = '\000';
-			}
-			Debug("Client acid reinitialized to `%s'",
-			      pCLServing->acid);
-			pCLServing->icursor = 0;
+			buildMyStringChar('@', &pCLServing->acid);
+			buildMyString(pCLServing->peername.string,
+				      &pCLServing->acid);
+			Debug(1, "Client acid reinitialized to `%s'",
+			      pCLServing->acid.string);
+			buildMyString((char *)0, &pCLServing->accmd);
 			fileWrite(pCLServing->fd, "host:\r\n", -1);
 			pCLServing->iState = S_HOST;
 			continue;
@@ -1405,56 +1661,55 @@ Kiddie(pGE, sfd)
 			 * continue if incomplete
 			 * else switch to new host
 			 */
-			if (pCLServing->icursor ==
-			    sizeof(pCLServing->accmd)) {
-			    fileWrite(pCLServing->fd, "Host too long.\r\n",
-				      -1);
-			    goto drop;
-			}
 			if ('\n' != acIn[i]) {
-			    pCLServing->accmd[pCLServing->icursor++] =
-				acIn[i];
+			    buildMyStringChar(acIn[i], &pCLServing->accmd);
 			    continue;
 			}
-			pCLServing->accmd[pCLServing->icursor] = '\000';
-			if ((pCLServing->icursor > 0) &&
+			if ((pCLServing->accmd.used > 1) &&
 			    ('\r' ==
-			     pCLServing->accmd[pCLServing->icursor - 1])) {
-			    pCLServing->accmd[pCLServing->icursor - 1] =
-				'\000';
+			     pCLServing->accmd.string[pCLServing->accmd.
+						      used - 2])) {
+			    pCLServing->accmd.string[pCLServing->accmd.
+						     used - 2] = '\000';
+			    pCLServing->accmd.used--;
 			}
-			pCLServing->icursor = 0;
 
 			/* try to move to the given console
 			 */
 			pCLServing->pCEwant = (CONSENT *) 0;
-			for (iConsole = 0; iConsole < pGE->imembers;
-			     ++iConsole) {
+			for (pCE = pGE->pCElist; pCE != (CONSENT *) 0;
+			     pCE = pCE->pCEnext) {
 			    if (0 ==
-				strcmp(pCLServing->accmd,
-				       pCE[iConsole].server)) {
-				pCLServing->pCEwant = &pCE[iConsole];
+				strcmp(pCLServing->accmd.string,
+				       pCE->server.string)) {
+				pCLServing->pCEwant = pCE;
+				buildMyString((char *)0,
+					      &pCLServing->accmd);
 				break;
 			    }
 			}
 			if ((CONSENT *) 0 == pCLServing->pCEwant) {
-			    for (iConsole = 0; iConsole < pGE->imembers;
-				 ++iConsole) {
+			    for (pCE = pGE->pCElist; pCE != (CONSENT *) 0;
+				 pCE = pCE->pCEnext) {
 				if (0 ==
-				    strncmp(pCLServing->accmd,
-					    pCE[iConsole].server,
-					    strlen(pCLServing->accmd))) {
-				    pCLServing->pCEwant = &pCE[iConsole];
+				    strncmp(pCLServing->accmd.string,
+					    pCE->server.string,
+					    pCLServing->accmd.used - 1)) {
+				    pCLServing->pCEwant = pCE;
+				    buildMyString((char *)0,
+						  &pCLServing->accmd);
 				    break;
 				}
 			    }
 			}
 			if ((CONSENT *) 0 == pCLServing->pCEwant) {
-			    sprintf(acOut, "%s: no such console\r\n",
-				    pCLServing->accmd);
-			    (void)fileWrite(pCLServing->fd, acOut, -1);
+			    filePrint(pCLServing->fd,
+				      "%s: no such console\r\n",
+				      pCLServing->accmd.string);
+			    buildMyString((char *)0, &pCLServing->accmd);
 			    goto drop;
 			}
+			buildMyString((char *)0, &pCLServing->accmd);
 
 			if (('t' == pCLServing->caccess) ||
 			    (0 != CheckPasswd(pCLServing, ""))) {
@@ -1468,34 +1723,30 @@ Kiddie(pGE, sfd)
 			/* gather passwd, check and drop or
 			 * set new state
 			 */
-			if (pCLServing->icursor ==
-			    sizeof(pCLServing->accmd)) {
-			    fileWrite(pCLServing->fd,
-				      "Passwd too long.\r\n", -1);
-			    goto drop;
-			}
 			if ('\n' != acIn[i]) {
-			    pCLServing->accmd[pCLServing->icursor++] =
-				acIn[i];
+			    buildMyStringChar(acIn[i], &pCLServing->accmd);
 			    continue;
 			}
-			pCLServing->accmd[pCLServing->icursor] = '\000';
-			if ((pCLServing->icursor > 0) &&
+			if ((pCLServing->accmd.used > 1) &&
 			    ('\r' ==
-			     pCLServing->accmd[pCLServing->icursor - 1])) {
-			    pCLServing->accmd[pCLServing->icursor - 1] =
-				'\000';
+			     pCLServing->accmd.string[pCLServing->accmd.
+						      used - 2])) {
+			    pCLServing->accmd.string[pCLServing->accmd.
+						     used - 2] = '\000';
+			    pCLServing->accmd.used--;
 			}
-			pCLServing->icursor = 0;
 
 			if (0 ==
-			    CheckPasswd(pCLServing, pCLServing->accmd)) {
+			    CheckPasswd(pCLServing,
+					pCLServing->accmd.string)) {
 			    fileWrite(pCLServing->fd, "Sorry.\r\n", -1);
 			    Info("%s: %s: bad passwd",
-				 pCLServing->pCEwant->server,
-				 pCLServing->acid);
+				 pCLServing->pCEwant->server.string,
+				 pCLServing->acid.string);
+			    buildMyString((char *)0, &pCLServing->accmd);
 			    goto drop;
 			}
+			buildMyString((char *)0, &pCLServing->accmd);
 		      shift_console:
 			/* remove from current host
 			 */
@@ -1508,25 +1759,24 @@ Kiddie(pGE, sfd)
 			    pCLServing->fwr = 0;
 			    pCLServing->fwantwr = 0;
 			    tagLogfile(pCEServing, "%s detached",
-				       pCLServing->acid);
+				       pCLServing->acid.string);
 			    pCEServing->pCLwr =
 				FindWrite(pCEServing->pCLon);
 			}
 
 			/* inform operators of the change
 			 */
-/*				if (fVerbose) { */
-			if (&CECtl == pCEServing) {
+			if (pGE->pCEctl == pCEServing) {
 			    Info("%s: login %s [%s]",
-				 pCLServing->pCEwant->server,
-				 pCLServing->acid, strtime(NULL));
+				 pCLServing->pCEwant->server.string,
+				 pCLServing->acid.string, strtime(NULL));
 			} else {
 			    Info("%s moves from %s to %s [%s]",
-				 pCLServing->acid, pCEServing->server,
-				 pCLServing->pCEwant->server,
+				 pCLServing->acid.string,
+				 pCEServing->server.string,
+				 pCLServing->pCEwant->server.string,
 				 strtime(NULL));
 			}
-/*				} */
 
 			/* set new host and link into new host list
 			 */
@@ -1543,7 +1793,7 @@ Kiddie(pGE, sfd)
 			/* try to reopen line if specified at server startup
 			 */
 			if ((fNoinit || fReopen) && !pCEServing->fup)
-			    ConsInit(pCEServing, &rinit, 0);
+			    ConsInit(pCEServing, &pGE->rinit, 0);
 
 			/* try for attach on new console
 			 */
@@ -1558,9 +1808,9 @@ Kiddie(pGE, sfd)
 			    pCLServing->fwr = 1;
 			    fileWrite(pCLServing->fd, "attached]\r\n", -1);
 			    /* this keeps the ops console neat */
-			    pCEServing->iend = pCEServing->inamelen;
+			    pCEServing->iend = 0;
 			    tagLogfile(pCEServing, "%s attached",
-				       pCLServing->acid);
+				       pCLServing->acid.string);
 			} else {
 			    fileWrite(pCLServing->fd, "spy]\r\n", -1);
 			}
@@ -1570,19 +1820,23 @@ Kiddie(pGE, sfd)
 
 		    case S_QUOTE:	/* send octal code              */
 			/* must type in 3 octal digits */
-			if (isdigit((int)(acIn[i]))) {
-			    pCLServing->accmd[0] *= 8;
-			    pCLServing->accmd[0] += acIn[i] - '0';
-			    if (++(pCLServing->icursor) < 3) {
+			if (acIn[i] >= '0' && acIn[i] <= '7') {
+			    buildMyStringChar(acIn[i], &pCLServing->accmd);
+			    if (pCLServing->accmd.used < 4) {
 				fileWrite(pCLServing->fd, &acIn[i], 1);
 				continue;
 			    }
-			    pCLServing->accmd[1] = acIn[i];
-			    pCLServing->accmd[2] = ']';
-			    fileWrite(pCLServing->fd,
-				      pCLServing->accmd + 1, 2);
-			    (void)write(pCEServing->fdtty,
-					pCLServing->accmd, 1);
+			    fileWrite(pCLServing->fd, &acIn[i], 1);
+			    fileWrite(pCLServing->fd, "]", 1);
+
+			    pCLServing->accmd.string[0] =
+				(((pCLServing->accmd.string[0] - '0') * 8 +
+				  (pCLServing->accmd.string[1] -
+				   '0')) * 8) +
+				(pCLServing->accmd.string[2] - '0');
+			    putConsole(pCEServing,
+				       pCLServing->accmd.string[0]);
+			    buildMyString((char *)0, &pCLServing->accmd);
 			} else {
 			    fileWrite(pCLServing->fd, " aborted]\r\n", -1);
 			}
@@ -1608,7 +1862,7 @@ Kiddie(pGE, sfd)
 					  " -- attached]\r\n", -1);
 			    }
 			    tagLogfile(pCEServing, "%s attached",
-				       pCLServing->acid);
+				       pCLServing->acid.string);
 			} else {
 			    fileWrite(pCLServing->fd, " -- spy mode]\r\n",
 				      -1);
@@ -1627,7 +1881,7 @@ Kiddie(pGE, sfd)
 			/* if we can write, write to slave tty
 			 */
 			if (pCLServing->fwr) {
-			    (void)write(pCEServing->fdtty, &acIn[i], 1);
+			    putConsole(pCEServing, acIn[i]);
 			    continue;
 			}
 			/* if the client is stuck in spy mode
@@ -1636,12 +1890,10 @@ Kiddie(pGE, sfd)
 			 * than octal escapes, but....)
 			 */
 			if ('\r' == acIn[i] || '\n' == acIn[i]) {
-			    static char acA1[16], acA2[16];
-			    sprintf(acOut,
-				    "[read-only -- use %s %s ? for help]\r\n",
-				    FmtCtl(pCLServing->ic[0], acA1),
-				    FmtCtl(pCLServing->ic[1], acA2));
-			    (void)fileWrite(pCLServing->fd, acOut, -1);
+			    filePrint(pCLServing->fd,
+				      "[read-only -- use %s %s ? for help]\r\n",
+				      FmtCtl(pCLServing->ic[0], &acA1),
+				      FmtCtl(pCLServing->ic[1], &acA2));
 			}
 			continue;
 
@@ -1661,22 +1913,14 @@ Kiddie(pGE, sfd)
 				(void)fileWrite(pCLServing->fd,
 						" 0  <undefined>\r\n", -1);
 			    else {
-				(void)fileWrite(pCLServing->fd, " 0  `",
-						-1);
-				prettyPrintBreak(pCLServing->fd,
-						 &breakList[i - 1].string);
-				(void)fileWrite(pCLServing->fd, "'\r\n",
-						-1);
+				filePrint(pCLServing->fd, " 0  `%s'\r\n",
+					  breakList[i - 1].string);
 			    }
 			    for (i = 0; i < 9; i++) {
 				if (breakList[i].used) {
-				    sprintf(acOut, " %d  `", i + 1);
-				    (void)fileWrite(pCLServing->fd, acOut,
-						    -1);
-				    prettyPrintBreak(pCLServing->fd,
-						     &breakList[i].string);
-				    (void)fileWrite(pCLServing->fd,
-						    "'\r\n", -1);
+				    filePrint(pCLServing->fd,
+					      " %d  `%s'\r\n", i + 1,
+					      breakList[i].string);
 				}
 			    }
 			} else {
@@ -1687,18 +1931,17 @@ Kiddie(pGE, sfd)
 
 		    case S_CATTN:	/* redef escape sequence? */
 			pCLServing->ic[0] = acInOrig[i];
-			sprintf(acOut, "%s ",
-				FmtCtl(acInOrig[i], pCLServing->accmd));
-			(void)fileWrite(pCLServing->fd, acOut, -1);
+			FmtCtl(acInOrig[i], &acA1);
+			filePrint(pCLServing->fd, "%s ", acA1.string);
 			pCLServing->iState = S_CESC;
 			continue;
 
 		    case S_CESC:	/* escape sequent 2 */
 			pCLServing->ic[1] = acInOrig[i];
 			pCLServing->iState = S_NORMAL;
-			sprintf(acOut, "%s  ok]\r\n",
-				FmtCtl(acInOrig[i], pCLServing->accmd));
-			(void)fileWrite(pCLServing->fd, acOut, -1);
+			FmtCtl(acInOrig[i], &acA1);
+			filePrint(pCLServing->fd, "%s  ok]\r\n",
+				  acA1.string);
 			continue;
 
 		    case S_ESC1:	/* first char in escape sequence */
@@ -1716,8 +1959,7 @@ Kiddie(pGE, sfd)
 			 */
 			if (acInOrig[i] == pCLServing->ic[0]) {
 			    if (pCLServing->fwr) {
-				(void)write(pCEServing->fdtty, &acIn[i],
-					    1);
+				putConsole(pCEServing, acIn[i]);
 			    }
 			    continue;
 			}
@@ -1729,8 +1971,8 @@ Kiddie(pGE, sfd)
 			    char c = pCLServing->ic[0];
 			    if (fStrip)
 				c = c & 127;
-			    (void)write(pCEServing->fdtty, &c, 1);
-			    (void)write(pCEServing->fdtty, &acIn[i], 1);
+			    putConsole(pCEServing, c);
+			    putConsole(pCEServing, acIn[i]);
 			}
 			continue;
 
@@ -1749,60 +1991,65 @@ Kiddie(pGE, sfd)
 				break;
 
 			    case ';':	/* ;login: */
-				if (&CECtl != pCLServing->pCEto) {
+				if (pGE->pCEctl != pCLServing->pCEto) {
 				    goto unknown;
 				}
 				fileWrite(pCLServing->fd, "login:\r\n",
 					  -1);
+				buildMyString((char *)0,
+					      &pCLServing->acid);
 				pCLServing->iState = S_IDENT;
 				break;
 
 			    case 'b':	/* broadcast message */
 			    case 'B':
-				if (&CECtl != pCLServing->pCEto) {
-				    goto unknown;
-				}
 				fileWrite(pCLServing->fd,
-					  "Enter message]\r\n", -1);
+					  "Enter message: ", -1);
 				pCLServing->iState = S_BCAST;
 				break;
 
 			    case 'a':	/* attach */
 			    case 'A':
-				if (&CECtl == pCEServing) {
-				    sprintf(acOut, "no -- on ctl]\r\n");
+				if (pGE->pCEctl == pCEServing) {
+				    fileWrite(pCLServing->fd,
+					      "no -- on ctl]\r\n", -1);
 				} else if (!pCEServing->fup) {
-				    sprintf(acOut,
-					    "line to host is down]\r\n");
+				    fileWrite(pCLServing->fd,
+					      "line to host is down]\r\n",
+					      -1);
 				} else if (pCEServing->fronly) {
-				    sprintf(acOut,
-					    "host is read-only]\r\n");
+				    fileWrite(pCLServing->fd,
+					      "host is read-only]\r\n",
+					      -1);
 				} else if ((CONSCLIENT *) 0 ==
 					   (pCL = pCEServing->pCLwr)) {
 				    pCEServing->pCLwr = pCLServing;
 				    pCLServing->fwr = 1;
 				    if (pCEServing->nolog) {
-					sprintf(acOut,
-						"attached (nologging)]\r\n");
+					fileWrite(pCLServing->fd,
+						  "attached (nologging)]\r\n",
+						  -1);
 				    } else {
-					sprintf(acOut, "attached]\r\n");
+					fileWrite(pCLServing->fd,
+						  "attached]\r\n", -1);
 				    }
 				    tagLogfile(pCEServing, "%s attached",
-					       pCLServing->acid);
+					       pCLServing->acid.string);
 				} else if (pCL == pCLServing) {
 				    if (pCEServing->nolog) {
-					sprintf(acOut,
-						"ok (nologging)]\r\n");
+					fileWrite(pCLServing->fd,
+						  "ok (nologging)]\r\n",
+						  -1);
 				    } else {
-					sprintf(acOut, "ok]\r\n");
+					fileWrite(pCLServing->fd,
+						  "ok]\r\n", -1);
 				    }
 				} else {
 				    pCLServing->fwantwr = 1;
-				    sprintf(acOut,
-					    "no, %s is attached]\r\n",
-					    pCL->acid);
+				    filePrint(pCLServing->fd,
+					      "no, %s is attached]\r\n",
+					      pCL->acid.string);
 				}
-				(void)fileWrite(pCLServing->fd, acOut, -1);
 				break;
 
 			    case 'c':
@@ -1860,7 +2107,7 @@ Kiddie(pGE, sfd)
 
 			    case 'd':	/* down a console       */
 			    case 'D':
-				if (&CECtl == pCEServing) {
+				if (pGE->pCEctl == pCEServing) {
 				    fileWrite(pCLServing->fd,
 					      "no -- on ctl]\r\n", -1);
 				    continue;
@@ -1881,22 +2128,21 @@ Kiddie(pGE, sfd)
 				pCLServing->fwr = 0;
 				pCEServing->pCLwr = (CONSCLIENT *) 0;
 				tagLogfile(pCEServing, "%s detached",
-					   pCLServing->acid);
-				ConsDown(pCEServing, &rinit);
+					   pCLServing->acid.string);
+				ConsDown(pCEServing, &pGE->rinit);
 				fileWrite(pCLServing->fd, "line down]\r\n",
 					  -1);
 
 				/* tell all who closed it */
-				sprintf(acOut, "[line down by %s]\r\n",
-					pCLServing->acid);
 				for (pCL = pCEServing->pCLon;
 				     (CONSCLIENT *) 0 != pCL;
 				     pCL = pCL->pCLnext) {
 				    if (pCL == pCLServing)
 					continue;
 				    if (pCL->fcon) {
-					(void)fileWrite(pCL->fd, acOut,
-							-1);
+					filePrint(pCL->fd,
+						  "[line down by %s]\r\n",
+						  pCLServing->acid.string);
 				    }
 				}
 				break;
@@ -1909,7 +2155,7 @@ Kiddie(pGE, sfd)
 
 			    case 'f':	/* force attach */
 			    case 'F':
-				if (&CECtl == pCEServing) {
+				if (pGE->pCEctl == pCEServing) {
 				    fileWrite(pCLServing->fd,
 					      "no -- on ctl]\r\n", -1);
 				    continue;
@@ -1923,12 +2169,6 @@ Kiddie(pGE, sfd)
 					      "line to host is down]\r\n",
 					      -1);
 				    continue;
-				}
-				if (pCEServing->nolog) {
-				    sprintf(acOut,
-					    "attached (nologging)]\r\n");
-				} else {
-				    sprintf(acOut, "attached]\r\n");
 				}
 				if ((CONSCLIENT *) 0 !=
 				    (pCL = pCEServing->pCLwr)) {
@@ -1946,27 +2186,38 @@ Kiddie(pGE, sfd)
 				    pCL->fwr = 0;
 				    pCL->fwantwr = 1;
 				    if (pCEServing->nolog) {
-					sprintf(acOut,
-						"bumped %s (nologging)]\r\n",
-						pCL->acid);
+					filePrint(pCLServing->fd,
+						  "bumped %s (nologging)]\r\n",
+						  pCL->acid.string);
 				    } else {
-					sprintf(acOut, "bumped %s]\r\n",
-						pCL->acid);
+					filePrint(pCLServing->fd,
+						  "bumped %s]\r\n",
+						  pCL->acid.string);
 				    }
-				    sprintf(acNote,
-					    "\r\n[forced to `spy\' mode by %s]\r\n",
-					    pCLServing->acid);
-				    (void)fileWrite(pCL->fd, acNote, -1);
+				    (void)fileWrite(pCL->fd,
+						    "\r\n[forced to `spy\' mode by ",
+						    -1);
+				    (void)fileWrite(pCL->fd,
+						    pCLServing->acid.
+						    string, -1);
+				    (void)fileWrite(pCL->fd, "]\r\n", -1);
 				    tagLogfile(pCEServing, "%s bumped %s",
-					       pCLServing->acid,
-					       pCL->acid);
+					       pCLServing->acid.string,
+					       pCL->acid.string);
 				} else {
+				    if (pCEServing->nolog) {
+					fileWrite(pCLServing->fd,
+						  "attached (nologging)]\r\n",
+						  -1);
+				    } else {
+					fileWrite(pCLServing->fd,
+						  "attached]\r\n", -1);
+				    }
 				    tagLogfile(pCEServing, "%s attached",
-					       pCLServing->acid);
+					       pCLServing->acid.string);
 				}
 				pCEServing->pCLwr = pCLServing;
 				pCLServing->fwr = 1;
-				(void)fileWrite(pCLServing->fd, acOut, -1);
 				break;
 
 			    case 'g':	/* group info */
@@ -1974,26 +2225,25 @@ Kiddie(pGE, sfd)
 				/* we do not show the ctl console
 				 * else we'd get the client always
 				 */
-				sprintf(acOut, "group %s]\r\n",
-					CECtl.server);
-				(void)fileWrite(pCLServing->fd, acOut, -1);
+				filePrint(pCLServing->fd, "group %s]\r\n",
+					  pGE->pCEctl->server.string);
 				for (pCL = pGE->pCLall;
 				     (CONSCLIENT *) 0 != pCL;
 				     pCL = pCL->pCLscan) {
-				    if (&CECtl == pCL->pCEto)
+				    if (pGE->pCEctl == pCL->pCEto)
 					continue;
 				    sprintf(acOut,
-					    " %-32.32s %c %-7.7s %5s %s\r\n",
-					    pCL->acid,
+					    " %-32.32s %c %-7.7s %6s ",
+					    pCL->acid.string,
 					    pCL == pCLServing ? '*' : ' ',
 					    pCL->fcon ? (pCL->
 							 fwr ? "attach" :
 							 "spy") :
 					    "stopped",
-					    IdleTyme(tyme - pCL->typetym),
-					    pCL->pCEto->server);
-				    (void)fileWrite(pCLServing->fd, acOut,
-						    -1);
+					    IdleTyme(tyme - pCL->typetym));
+				    fileWrite(pCLServing->fd, acOut, -1);
+				    filePrint(pCLServing->fd, "%s\r\n",
+					      pCL->pCEto->server.string);
 				}
 				break;
 
@@ -2004,36 +2254,111 @@ Kiddie(pGE, sfd)
 				HelpUser(pCLServing);
 				break;
 
+			    case 'i':
+			    case 'I':
+				fileWrite(pCLServing->fd, "info]\r\n", -1);
+				for (pCE = pGE->pCElist;
+				     pCE != (CONSENT *) 0;
+				     pCE = pCE->pCEnext) {
+				    int comma = 0;
+				    filePrint(pCLServing->fd,
+					      "%s:%s,%d,%d:",
+					      pCE->server.string, acMyHost,
+					      thepid, pGE->port);
+				    if (pCE->fvirtual) {
+					filePrint(pCLServing->fd,
+						  "|:%s,%d,%s",
+						  ((pCE->pccmd.used ==
+						    0) ? "/bin/sh" : pCE->
+						   pccmd.string),
+						  pCE->ipid,
+						  pCE->acslave.string);
+				    } else if (pCE->isNetworkConsole) {
+					filePrint(pCLServing->fd,
+						  "!:%s,%d",
+						  pCE->networkConsoleHost.
+						  string,
+						  pCE->networkConsolePort);
+				    } else {
+					filePrint(pCLServing->fd,
+						  "/:%s,%s%c",
+						  pCE->dfile.string,
+						  (pCE->pbaud ? pCE->
+						   pbaud->acrate : ""),
+						  (pCE->pparity ? pCE->
+						   pparity->ckey : ' '));
+				    }
+				    filePrint(pCLServing->fd, ",%d:",
+					      pCE->fdtty);
+				    if (pCE->pCLwr) {
+					filePrint(pCLServing->fd,
+						  "w@%s@%ld",
+						  pCE->pCLwr->acid.string,
+						  tyme -
+						  pCE->pCLwr->typetym);
+					comma = 1;
+				    }
+
+				    for (pCL = pCE->pCLon;
+					 (CONSCLIENT *) 0 != pCL;
+					 pCL = pCL->pCLnext) {
+					if (pCL == pCE->pCLwr)
+					    continue;
+					if (comma)
+					    filePrint(pCLServing->fd, ",");
+					if (pCL->fcon)
+					    filePrint(pCLServing->fd,
+						      "r@%s@%ld",
+						      pCL->acid.string,
+						      tyme - pCL->typetym);
+					else
+					    filePrint(pCLServing->fd,
+						      "s@%s@%ld",
+						      pCL->acid.string,
+						      tyme - pCL->typetym);
+					comma = 1;
+				    }
+
+				    filePrint(pCLServing->fd,
+					      ":%s:%s:%s,%s,%s,%d,%d:%d:%s\r\n",
+					      (pCE->fup ? "up" : "down"),
+					      (pCE->fronly ? "ro" : "rw"),
+					      pCE->lfile.string,
+					      (pCE->
+					       nolog ? "nolog" : "log"),
+					      (pCE->
+					       activitylog ? "act" :
+					       "noact"), pCE->mark,
+					      (pCE->fdlog ? pCE->fdlog->
+					       fd : -1), pCE->breakType,
+					      (pCE->
+					       autoReUp ? "autoup" :
+					       "noautoup"));
+				}
+				break;
 			    case 'L':
 				if (pCLServing->fwr) {
 				    pCEServing->nolog = !pCEServing->nolog;
 				    if (pCEServing->nolog) {
 					fileWrite(pCLServing->fd,
 						  "logging off]\r\n", -1);
-					sprintf(acOut,
-						"[-- Console logging disabled by %s --]\r\n",
-						pCLServing->acid);
-					(void)fileWrite(pCEServing->fdlog,
-							acOut, -1);
+					filePrint(pCEServing->fdlog,
+						  "[-- Console logging disabled by %s --]\r\n",
+						  pCLServing->acid.string);
 				    } else {
 					fileWrite(pCLServing->fd,
 						  "logging on]\r\n", -1);
-					sprintf(acOut,
-						"[-- Console logging restored by %s --]\r\n",
-						pCLServing->acid);
-					(void)fileWrite(pCEServing->fdlog,
-							acOut, -1);
+					filePrint(pCEServing->fdlog,
+						  "[-- Console logging restored by %s --]\r\n",
+						  pCLServing->acid.string);
 				    }
 				} else {
-				    static char acA1[16], acA2[16];
-				    sprintf(acOut,
-					    "read-only -- use %s %s ? for help]\r\n",
-					    FmtCtl(pCLServing->ic[0],
-						   acA1),
-					    FmtCtl(pCLServing->ic[1],
-						   acA2));
-				    (void)fileWrite(pCLServing->fd, acOut,
-						    -1);
+				    filePrint(pCLServing->fd,
+					      "read-only -- use %s %s ? for help]\r\n",
+					      FmtCtl(pCLServing->ic[0],
+						     &acA1),
+					      FmtCtl(pCLServing->ic[1],
+						     &acA2));
 				}
 				break;
 
@@ -2055,7 +2380,7 @@ Kiddie(pGE, sfd)
 
 			    case 'o':	/* close and re-open line */
 			    case 'O':
-				if (&CECtl == pCEServing) {
+				if (pGE->pCEctl == pCEServing) {
 				    fileWrite(pCLServing->fd,
 					      "no -- on ctl]\r\n", -1);
 				    continue;
@@ -2063,44 +2388,38 @@ Kiddie(pGE, sfd)
 				/* with a close/re-open we might
 				 * change fd's
 				 */
-				ConsInit(pCEServing, &rinit, 0);
+				ConsInit(pCEServing, &pGE->rinit, 0);
 				if (!pCEServing->fup) {
-				    sprintf(acOut,
-					    "line to host is down]\r\n");
+				    fileWrite(pCLServing->fd,
+					      "line to host is down]\r\n",
+					      -1);
 				} else if (pCEServing->fronly) {
-				    sprintf(acOut, "up read-only]\r\n");
+				    fileWrite(pCLServing->fd,
+					      "up read-only]\r\n", -1);
 				} else if ((CONSCLIENT *) 0 ==
 					   (pCL = pCEServing->pCLwr)) {
 				    pCEServing->pCLwr = pCLServing;
 				    pCLServing->fwr = 1;
-				    sprintf(acOut, "up -- attached]\r\n");
+				    fileWrite(pCLServing->fd,
+					      "up -- attached]\r\n", -1);
 				    tagLogfile(pCEServing, "%s attached",
-					       pCLServing->acid);
+					       pCLServing->acid.string);
 				} else if (pCL == pCLServing) {
-				    sprintf(acOut, "up]\r\n");
+				    fileWrite(pCLServing->fd, "up]\r\n",
+					      -1);
 				    tagLogfile(pCEServing, "%s attached",
-					       pCLServing->acid);
+					       pCLServing->acid.string);
 				} else {
-				    sprintf(acOut,
-					    "up, %s is attached]\r\n",
-					    pCL->acid);
+				    filePrint(pCLServing->fd,
+					      "up, %s is attached]\r\n",
+					      pCL->acid.string);
 				}
-				(void)fileWrite(pCLServing->fd, acOut, -1);
 				break;
 
 			    case '\022':	/* ^R */
 				fileWrite(pCLServing->fd, "^R]\r\n", -1);
-				if (pCEServing->iend ==
-				    pCEServing->inamelen) {
-				    Replay(pCEServing->fdlog,
-					   pCLServing->fd, 1);
-				} else {
-				    fileWrite(pCLServing->fd,
-					      pCEServing->acline +
-					      pCEServing->inamelen,
-					      pCEServing->iend -
-					      pCEServing->inamelen);
-				}
+				Replay(pCEServing->fdlog, pCLServing->fd,
+				       1);
 				break;
 
 			    case 'R':	/* DEC vt100 pf3 */
@@ -2128,7 +2447,7 @@ Kiddie(pGE, sfd)
 				}
 				pCLServing->fwr = 0;
 				tagLogfile(pCEServing, "%s detached",
-					   pCLServing->acid);
+					   pCLServing->acid.string);
 				pCEServing->pCLwr =
 				    FindWrite(pCEServing->pCLon);
 				fileWrite(pCLServing->fd, "spying]\r\n",
@@ -2139,19 +2458,16 @@ Kiddie(pGE, sfd)
 			    case 'U':
 				fileWrite(pCLServing->fd, "hosts]\r\n",
 					  -1);
-				for (iConsole = 0;
-				     iConsole < pGE->imembers;
-				     ++iConsole) {
+				for (pCE = pGE->pCElist;
+				     pCE != (CONSENT *) 0;
+				     pCE = pCE->pCEnext) {
 				    sprintf(acOut,
 					    " %-24.24s %c %-4.4s %-.40s\r\n",
-					    pCE[iConsole].server,
-					    pCE + iConsole ==
-					    pCEServing ? '*' : ' ',
-					    pCE[iConsole].
-					    fup ? "up" : "down",
-					    pCE[iConsole].
-					    pCLwr ? pCE[iConsole].pCLwr->
-					    acid : pCE[iConsole].
+					    pCE->server.string,
+					    pCE == pCEServing ? '*' : ' ',
+					    pCE->fup ? "up" : "down",
+					    pCE->pCLwr ? pCE->pCLwr->acid.
+					    string : pCE->
 					    pCLon ? "<spies>" : "<none>");
 				    (void)fileWrite(pCLServing->fd, acOut,
 						    -1);
@@ -2160,22 +2476,21 @@ Kiddie(pGE, sfd)
 
 			    case 'v':	/* version */
 			    case 'V':
-				sprintf(acOut, "version `%s\']\r\n",
-					THIS_VERSION);
-				(void)fileWrite(pCLServing->fd, acOut, -1);
+				filePrint(pCLServing->fd,
+					  "version `%s\']\r\n",
+					  THIS_VERSION);
 				break;
 
 			    case 'w':	/* who */
 			    case 'W':
-				sprintf(acOut, "who %s]\r\n",
-					pCEServing->server);
-				(void)fileWrite(pCLServing->fd, acOut, -1);
+				filePrint(pCLServing->fd, "who %s]\r\n",
+					  pCEServing->server.string);
 				for (pCL = pCEServing->pCLon;
 				     (CONSCLIENT *) 0 != pCL;
 				     pCL = pCL->pCLnext) {
 				    sprintf(acOut,
-					    " %-32.32s %c %-7.7s %5s %s\r\n",
-					    pCL->acid,
+					    " %-32.32s %c %-7.7s %6s %s\r\n",
+					    pCL->acid.string,
 					    pCL == pCLServing ? '*' : ' ',
 					    pCL->fcon ? (pCL->
 							 fwr ? "attach" :
@@ -2192,17 +2507,16 @@ Kiddie(pGE, sfd)
 			    case 'X':
 				fileWrite(pCLServing->fd, "examine]\r\n",
 					  -1);
-				for (iConsole = 0;
-				     iConsole < pGE->imembers;
-				     ++iConsole) {
+				for (pCE = pGE->pCElist;
+				     pCE != (CONSENT *) 0;
+				     pCE = pCE->pCEnext) {
 				    sprintf(acOut,
 					    " %-24.24s on %-32.32s at %5.5s%c\r\n",
-					    pCE[iConsole].server,
-					    pCE[iConsole].
-					    fvirtual ? pCE[iConsole].
-					    acslave : pCE[iConsole].dfile,
-					    pCE[iConsole].pbaud->acrate,
-					    pCE[iConsole].pparity->ckey);
+					    pCE->server.string,
+					    pCE->fvirtual ? pCE->acslave.
+					    string : pCE->dfile.string,
+					    pCE->pbaud->acrate,
+					    pCE->pparity->ckey);
 				    (void)fileWrite(pCLServing->fd, acOut,
 						    -1);
 				}
@@ -2223,7 +2537,7 @@ Kiddie(pGE, sfd)
 				    pCLServing->fwantwr = 0;
 				    pCEServing->pCLwr = (CONSCLIENT *) 0;
 				    tagLogfile(pCEServing, "%s detached",
-					       pCLServing->acid);
+					       pCLServing->acid.string);
 				}
 				break;
 
@@ -2322,11 +2636,12 @@ Kiddie(pGE, sfd)
 					      -1);
 				    continue;
 				}
-				pCLServing->icursor = 0;
-				pCLServing->accmd[0] = '\000';
+				buildMyString((char *)0,
+					      &pCLServing->accmd);
 				pCLServing->iState = S_QUOTE;
 				fileWrite(pCLServing->fd, "quote \\", -1);
 				break;
+
 			    default:	/* unknown sequence */
 			      unknown:
 				fileWrite(pCLServing->fd,
@@ -2347,15 +2662,15 @@ Kiddie(pGE, sfd)
 	/* accept new connections and deal with them
 	 */
 	so = sizeof(struct sockaddr_in);
-	fd = accept(fileFDNum(sfd), (struct sockaddr *)&pCLFree->cnct_port,
-		    (socklen_t *) & so);
+	fd = accept(fileFDNum(sfd),
+		    (struct sockaddr *)&pGE->pCLfree->cnct_port, &so);
 	if (fd < 0) {
 	    Error("accept: %s", strerror(errno));
 	    continue;
 	}
 
-	pCLFree->fd = fileOpenFD(fd, simpleSocket);
-	if (pCLFree->fd < 0) {
+	pGE->pCLfree->fd = fileOpenFD(fd, simpleSocket);
+	if (pGE->pCLfree->fd < 0) {
 	    Error("fileOpenFD: %s", strerror(errno));
 	    close(fd);
 	    continue;
@@ -2366,9 +2681,9 @@ Kiddie(pGE, sfd)
 	    request_init(&request, RQ_DAEMON, progname, RQ_FILE, fd, 0);
 	    fromhost(&request);
 	    if (!hosts_access(&request)) {
-		fileWrite(pCLFree->fd, "access from your host refused\r\n",
-			  -1);
-		(void)fileClose(pCLFree->fd);
+		fileWrite(pGE->pCLfree->fd,
+			  "access from your host refused\r\n", -1);
+		fileClose(&pGE->pCLfree->fd);
 		continue;
 	    }
 	}
@@ -2378,11 +2693,9 @@ Kiddie(pGE, sfd)
 	 * the source machine as being local.
 	 */
 	so = sizeof(in_port);
-	if (-1 ==
-	    getpeername(fd, (struct sockaddr *)&in_port,
-			(socklen_t *) & so)) {
-	    fileWrite(pCLFree->fd, "getpeername failed\r\n", -1);
-	    (void)fileClose(pCLFree->fd);
+	if (-1 == getpeername(fd, (struct sockaddr *)&in_port, &so)) {
+	    fileWrite(pGE->pCLfree->fd, "getpeername failed\r\n", -1);
+	    fileClose(&pGE->pCLfree->fd);
 	    continue;
 	}
 	so = sizeof(in_port.sin_addr);
@@ -2394,42 +2707,41 @@ Kiddie(pGE, sfd)
 	    cType = AccType(&in_port.sin_addr, hpPeer->h_name);
 	}
 	if ('r' == cType) {
-	    fileWrite(pCLFree->fd, "access from your host refused\r\n",
-		      -1);
-	    (void)fileClose(pCLFree->fd);
+	    fileWrite(pGE->pCLfree->fd,
+		      "access from your host refused\r\n", -1);
+	    fileClose(&pGE->pCLfree->fd);
 	    continue;
 	}
 
 	/* save pCL so we can advance to the next free one
 	 */
-	pCL = pCLFree;
-	pCLFree = pCL->pCLnext;
+	pCL = pGE->pCLfree;
+	pGE->pCLfree = pCL->pCLnext;
 
 	/* init the identification stuff
 	 */
+	buildMyString((char *)0, &pCL->peername);
 	if (hpPeer == (struct hostent *)0) {
-	    sprintf(pCL->peername, "%.*s",
-		    (int)(sizeof(pCL->peername) - 1),
-		    inet_ntoa(in_port.sin_addr));
+	    buildMyString(inet_ntoa(in_port.sin_addr), &pCL->peername);
 	} else {
-	    sprintf(pCL->peername, "%.*s",
-		    (int)(sizeof(pCL->peername) - 1), hpPeer->h_name);
+	    buildMyString(hpPeer->h_name, &pCL->peername);
 	}
-	sprintf(pCL->acid, "<unknown>@%.*s", (int)(sizeof(pCL->acid) - 12),
-		pCL->peername);
-	Debug("Client acid initialized to `%s'", pCL->acid);
+	buildMyString((char *)0, &pCL->acid);
+	buildMyString("<unknown>@", &pCL->acid);
+	buildMyString(pCL->peername.string, &pCL->acid);
+	Debug(1, "Client acid initialized to `%s'", pCL->acid.string);
 	(void)strcpy(pCL->actym, strtime(&(pCL->tym)));
 	pCL->typetym = pCL->tym;
 
 	/* link into the control list for the dummy console
 	 */
-	pCL->pCEto = &CECtl;
-	pCL->pCLnext = CECtl.pCLon;
-	pCL->ppCLbnext = &CECtl.pCLon;
+	pCL->pCEto = pGE->pCEctl;
+	pCL->pCLnext = pGE->pCEctl->pCLon;
+	pCL->ppCLbnext = &pGE->pCEctl->pCLon;
 	if ((CONSCLIENT *) 0 != pCL->pCLnext) {
 	    pCL->pCLnext->ppCLbnext = &pCL->pCLnext;
 	}
-	CECtl.pCLon = pCL;
+	pGE->pCEctl->pCLon = pCL;
 
 	/* link into all clients list
 	 */
@@ -2440,7 +2752,7 @@ Kiddie(pGE, sfd)
 	}
 	pGE->pCLall = pCL;
 
-	FD_SET(fileFDNum(pCL->fd), &rinit);
+	FD_SET(fileFDNum(pCL->fd), &pGE->rinit);
 
 	/* init the fsm
 	 */
@@ -2449,7 +2761,6 @@ Kiddie(pGE, sfd)
 	pCL->ic[0] = DEFATTN;
 	pCL->ic[1] = DEFESC;
 	pCL->caccess = cType;
-	pCL->icursor = 0;
 
 	/* mark as stopped (no output from console)
 	 * and spy only (on chars to console)
@@ -2462,12 +2773,12 @@ Kiddie(pGE, sfd)
 	/* remove from the free list
 	 * if we ran out of static connections calloc some...
 	 */
-	if ((CONSCLIENT *) 0 == pCLFree) {
-	    pCLFree = (CONSCLIENT *) calloc(2, sizeof(CONSCLIENT));
-	    if ((CONSCLIENT *) 0 == pCLFree) {
+	if ((CONSCLIENT *) 0 == pGE->pCLfree) {
+	    pGE->pCLfree = (CONSCLIENT *) calloc(2, sizeof(CONSCLIENT));
+	    if ((CONSCLIENT *) 0 == pGE->pCLfree) {
 		OutOfMem();
 	    } else {
-		pCLFree->pCLnext = &pCLFree[1];
+		pGE->pCLfree->pCLnext = &pGE->pCLfree[1];
 	    }
 	}
     }
@@ -2477,8 +2788,12 @@ Kiddie(pGE, sfd)
  * fork off a process for each group with an open socket for connections
  */
 void
+#if USE_ANSI_PROTO
+Spawn(GRPENT * pGE)
+#else
 Spawn(pGE)
     GRPENT *pGE;
+#endif
 {
     int pid, sfd;
     int so;
@@ -2518,8 +2833,7 @@ Spawn(pGE)
 #if defined(EADDRINUSE)
 				(errno == EADDRINUSE) ||
 #endif
-				(errno == EACCES)) &&
-	    (portInc++ < MAXGRP * 2)) {
+				(errno == EACCES))) {
 	    lstn_port.sin_port = htons(bindBasePort + portInc);
 	} else {
 	    Error("bind: %s", strerror(errno));
@@ -2528,9 +2842,7 @@ Spawn(pGE)
     }
     so = sizeof(lstn_port);
 
-    if (-1 ==
-	getsockname(sfd, (struct sockaddr *)&lstn_port,
-		    (socklen_t *) & so)) {
+    if (-1 == getsockname(sfd, (struct sockaddr *)&lstn_port, &so)) {
 	Error("getsockname: %s", strerror(errno));
 	exit(EX_UNAVAILABLE);
     }
@@ -2559,7 +2871,8 @@ Spawn(pGE)
 	    pGE->pid = pid;
 	    return;
 	case 0:
-	    thepid = getpid();
+	    pGE->pid = thepid = getpid();
+	    isMaster = 0;
 	    break;
     }
     if (listen(sfd, SOMAXCONN) < 0) {
@@ -2576,7 +2889,7 @@ Spawn(pGE)
 
     /* should never get here...
      */
-    (void)fileClose(ssocket);
+    fileClose(&ssocket);
     Error("internal flow error");
     exit(EX_UNAVAILABLE);
 }

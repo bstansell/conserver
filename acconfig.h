@@ -1,4 +1,9 @@
 /*
+ * ./configure invocation
+ */
+#undef CONFIGINVOCATION
+
+/*
  * Socket used to communicate
  */
 #undef DEFPORT
@@ -34,11 +39,6 @@
 #undef MAXMEMB
 
 /*
- * Number of child processes
- */
-#undef MAXGRP
-
-/*
  * TCP connection timeout
  */
 #undef CONNECTTIMEOUT
@@ -52,3 +52,8 @@
  * use tcp_wrappers libwrap
  */
 #undef USE_LIBWRAP
+
+/*
+ * use ansi prototypes/decls
+ */
+#undef USE_ANSI_PROTO

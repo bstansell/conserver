@@ -1,5 +1,5 @@
 /*
- *  $Id: main.h,v 5.29 2002-01-21 02:48:33-08 bryan Exp $
+ *  $Id: main.h,v 5.33 2002-02-26 16:12:49-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -40,13 +40,21 @@ extern char rcsid[];
 extern int fAll, fVerbose, fSoftcar, fNoinit, fInteractive, fStrip,
     fDaemon, fReopen, fReopenall;
 extern char chDefAcc;
-extern unsigned long bindAddr;
+extern in_addr_t bindAddr;
 extern unsigned int bindPort, bindBasePort;
 extern char *pcLogfile;
 extern char *pcConfig;
 extern char *pcPasswd;
+extern int cMaxMemb;
 extern struct sockaddr_in in_port;
 extern char acMyHost[];
 extern struct in_addr acMyAddr;
 extern int domainHack;
+extern int isMaster;
+#if USE_ANSI_PROTO
 extern void reopenLogfile();
+extern void dumpDataStructures();
+#else
+extern void reopenLogfile();
+extern void dumpDataStructures();
+#endif

@@ -1,5 +1,10 @@
 /* config.h.in.  Generated automatically from configure.in by autoheader.  */
 /*
+ * ./configure invocation
+ */
+#undef CONFIGINVOCATION
+
+/*
  * Socket used to communicate
  */
 #undef DEFPORT
@@ -35,11 +40,6 @@
 #undef MAXMEMB
 
 /*
- * Number of child processes
- */
-#undef MAXGRP
-
-/*
  * TCP connection timeout
  */
 #undef CONNECTTIMEOUT
@@ -53,6 +53,11 @@
  * use tcp_wrappers libwrap
  */
 #undef USE_LIBWRAP
+
+/*
+ * use ansi prototypes/decls
+ */
+#undef USE_ANSI_PROTO
 
 /* Define if you have the <crypt.h> header file. */
 #undef HAVE_CRYPT_H
@@ -95,6 +100,9 @@
 
 /* Define if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
+
+/* Define if the system has the type `in_addr_t'. */
+#undef HAVE_IN_ADDR_T
 
 /* Define if you have the `memcmp' function. */
 #undef HAVE_MEMCMP
@@ -144,6 +152,9 @@
 /* Define if you have the `sigaction' function. */
 #undef HAVE_SIGACTION
 
+/* Define if you have the <stdint.h> header file. */
+#undef HAVE_STDINT_H
+
 /* Define if you have the <stdlib.h> header file. */
 #undef HAVE_STDLIB_H
 
@@ -183,11 +194,17 @@
 /* Define if you have the <sys/select.h> header file. */
 #undef HAVE_SYS_SELECT_H
 
+/* Define if you have the <sys/stat.h> header file. */
+#undef HAVE_SYS_STAT_H
+
 /* Define if you have the <sys/time.h> header file. */
 #undef HAVE_SYS_TIME_H
 
 /* Define if you have the <sys/ttold.h> header file. */
 #undef HAVE_SYS_TTOLD_H
+
+/* Define if you have the <sys/types.h> header file. */
+#undef HAVE_SYS_TYPES_H
 
 /* Define if you have the <sys/uio.h> header file. */
 #undef HAVE_SYS_UIO_H
@@ -240,6 +257,9 @@
 /* Define if the `setpgrp' function takes no argument. */
 #undef SETPGRP_VOID
 
+/* The size of a `long', as computed by sizeof. */
+#undef SIZEOF_LONG
+
 /* Define if you have the ANSI C header files. */
 #undef STDC_HEADERS
 
@@ -261,6 +281,3 @@
 
 /* Define if <signal.h> does not define sig_atomic_t */
 #undef sig_atomic_t
-
-/* Define if <sys/socket.h> does not define socklen_t */
-#undef socklen_t

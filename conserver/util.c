@@ -1,21 +1,19 @@
 /*
- *  $Id: util.c,v 1.31 2002-01-21 02:48:33-08 bryan Exp $
+ *  $Id: util.c,v 1.46 2002-03-11 18:26:51-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  */
+#include <config.h>
+
 #include <stdio.h>
-#include <varargs.h>
 #include <sys/param.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <signal.h>
-#include <config.h>
 #include <sys/socket.h>
 #include <ctype.h>
-#include <sys/select.h>
 
 #include <compat.h>
 #include <port.h>
@@ -29,7 +27,11 @@ int fDebug = 0;
 /* in the routines below (the init code) we can bomb if malloc fails	(ksb)
  */
 void
+#if USE_ANSI_PROTO
 OutOfMem()
+#else
+OutOfMem()
+#endif
 {
     static char acNoMem[] = ": out of memory\n";
 
@@ -39,9 +41,13 @@ OutOfMem()
 }
 
 char *
+#if USE_ANSI_PROTO
+buildMyStringChar(const char ch, STRING * msg)
+#else
 buildMyStringChar(ch, msg)
-    const int ch;
+    const char ch;
     STRING *msg;
+#endif
 {
     if (msg->used + 1 >= msg->allocated) {
 	if (0 == msg->allocated) {
@@ -51,7 +57,7 @@ buildMyStringChar(ch, msg)
 	    msg->allocated += 1024 * sizeof(char);
 	    msg->string = (char *)realloc(msg->string, msg->allocated);
 	}
-	Debug("buildMyStringChar: tried allocating %lu bytes",
+	Debug(2, "buildMyStringChar: tried allocating %lu bytes",
 	      msg->allocated);
 	if (msg->string == (char *)0)
 	    OutOfMem();
@@ -59,21 +65,25 @@ buildMyStringChar(ch, msg)
     if (msg->used) {
 	msg->string[msg->used - 1] = ch;	/* overwrite NULL and */
 	msg->string[msg->used++] = '\000';	/* increment by one */
-	Debug("buildMyStringChar: added 1 char (%d/%d now)", msg->used,
+	Debug(2, "buildMyStringChar: added 1 char (%d/%d now)", msg->used,
 	      msg->allocated);
     } else {
 	msg->string[msg->used++] = ch;	/* no NULL, so store stuff */
 	msg->string[msg->used++] = '\000';	/* and increment by two */
-	Debug("buildMyStringChar: added 2 chars (%d/%d now)", msg->used,
+	Debug(2, "buildMyStringChar: added 2 chars (%d/%d now)", msg->used,
 	      msg->allocated);
     }
     return msg->string;
 }
 
 char *
+#if USE_ANSI_PROTO
+buildMyString(const char *str, STRING * msg)
+#else
 buildMyString(str, msg)
     const char *str;
     STRING *msg;
+#endif
 {
     int len;
 
@@ -81,7 +91,7 @@ buildMyString(str, msg)
 	msg->used = 0;
 	if (msg->string != (char *)0)
 	    msg->string[0] = '\000';
-	Debug("buildMyString: reset", len);
+	Debug(2, "buildMyString: reset");
 	return msg->string;
     }
     len = strlen(str) + 1;
@@ -93,7 +103,8 @@ buildMyString(str, msg)
 	    msg->allocated += (len / 1024 + 1) * 1024 * sizeof(char);
 	    msg->string = (char *)realloc(msg->string, msg->allocated);
 	}
-	Debug("buildMyString: tried allocating %lu bytes", msg->allocated);
+	Debug(2, "buildMyString: tried allocating %lu bytes",
+	      msg->allocated);
 	if (msg->string == (char *)0)
 	    OutOfMem();
     }
@@ -105,29 +116,73 @@ buildMyString(str, msg)
     if (msg->used)
 	len--;
     msg->used += len;
-    Debug("buildMyString: added %d chars (%d/%d now)", len, msg->used,
+    Debug(2, "buildMyString: added %d chars (%d/%d now)", len, msg->used,
 	  msg->allocated);
     return msg->string;
 }
 
+void
+#if USE_ANSI_PROTO
+initString(STRING * msg)
+#else
+initString(msg)
+    STRING *msg;
+#endif
+{
+    msg->string = (char *)0;
+    msg->used = msg->allocated = 0;
+}
+
+void
+#if USE_ANSI_PROTO
+destroyString(STRING * msg)
+#else
+destroyString(msg)
+    STRING *msg;
+#endif
+{
+    if (msg->allocated)
+	free(msg->string);
+    initString(msg);
+}
+
+static STRING mymsg = { (char *)0, 0, 0 };
+
 char *
+#if USE_ANSI_PROTO
+buildString(const char *str)
+#else
 buildString(str)
     const char *str;
+#endif
 {
-    static STRING msg = { (char *)0, 0, 0 };
-
-    return buildMyString(str, &msg);
+    return buildMyString(str, &mymsg);
 }
 
 char *
+#if USE_ANSI_PROTO
+buildStringChar(const char c)
+#else
+buildStringChar(c)
+    const char c;
+#endif
+{
+    return buildMyStringChar(c, &mymsg);
+}
+
+char *
+#if USE_ANSI_PROTO
+readLine(FILE * fp, STRING * save, int *iLine)
+#else
 readLine(fp, save, iLine)
     FILE *fp;
     STRING *save;
     int *iLine;
+#endif
 {
     static char buf[1024];
     char *wholeline = (char *)0;
-    char *ret;
+    char *ret = (char *)0;
     int i, buflen, peek, commentCheck = 1, comment = 0;
     static STRING bufstr = { (char *)0, 0, 0 };
     static STRING wholestr = { (char *)0, 0, 0 };
@@ -203,44 +258,56 @@ readLine(fp, save, iLine)
 	wholeline = buildMyString(bufstr.string, &wholestr);
     }
 
-    Debug("readLine: returning <%s>",
+    Debug(1, "readLine: returning <%s>",
 	  (wholeline != (char *)0) ? wholeline : "<NULL>");
     return wholeline;
 }
 
 void
+#if USE_ANSI_PROTO
+FmtCtlStr(char *pcIn, STRING * pcOut)
+#else
 FmtCtlStr(pcIn, pcOut)
     char *pcIn;
-    char *pcOut;
+    STRING *pcOut;
+#endif
 {
     unsigned char c;
 
+    buildMyString((char *)0, pcOut);
     for (; *pcIn != '\000'; pcIn++) {
 	c = *pcIn & 0xff;
 	if (c > 127) {
 	    c -= 128;
-	    *pcOut++ = 'M';
-	    *pcOut++ = '-';
+	    buildMyString("M-", pcOut);
 	}
 
 	if (c < ' ' || c == '\177') {
-	    *pcOut++ = '^';
-	    *pcOut++ = c ^ 0100;
+	    buildMyStringChar('^', pcOut);
+	    buildMyStringChar(c ^ 0100, pcOut);
 	} else {
-	    *pcOut++ = c;
+	    buildMyStringChar(c, pcOut);
 	}
     }
-    *pcOut = '\000';
 }
 
 void
-Debug(fmt, va_alist)
+#if USE_ANSI_PROTO
+Debug(int level, char *fmt, ...)
+#else
+Debug(level, fmt, va_alist)
+    int level;
     char *fmt;
     va_dcl
+#endif
 {
     va_list ap;
+#if USE_ANSI_PROTO
+    va_start(ap, fmt);
+#else
     va_start(ap);
-    if (!fDebug)
+#endif
+    if (fDebug < level)
 	return;
     if (outputPid)
 	fprintf(stderr, "%s (%d): DEBUG: ", progname, thepid);
@@ -252,12 +319,20 @@ Debug(fmt, va_alist)
 }
 
 void
+#if USE_ANSI_PROTO
+Error(char *fmt, ...)
+#else
 Error(fmt, va_alist)
     char *fmt;
     va_dcl
+#endif
 {
     va_list ap;
+#if USE_ANSI_PROTO
+    va_start(ap, fmt);
+#else
     va_start(ap);
+#endif
     if (outputPid)
 	fprintf(stderr, "%s (%d): ", progname, thepid);
     else
@@ -268,12 +343,20 @@ Error(fmt, va_alist)
 }
 
 void
+#if USE_ANSI_PROTO
+Info(char *fmt, ...)
+#else
 Info(fmt, va_alist)
     char *fmt;
     va_dcl
+#endif
 {
     va_list ap;
+#if USE_ANSI_PROTO
+    va_start(ap, fmt);
+#else
     va_start(ap);
+#endif
     if (outputPid)
 	fprintf(stdout, "%s (%d): ", progname, thepid);
     else
@@ -284,9 +367,13 @@ Info(fmt, va_alist)
 }
 
 void
+#if USE_ANSI_PROTO
+simpleSignal(int sig, RETSIGTYPE(*disp) (int))
+#else
 simpleSignal(sig, disp)
     int sig;
 RETSIGTYPE(*disp) (int);
+#endif
 {
 #if HAVE_SIGACTION
     struct sigaction sa;
@@ -301,7 +388,11 @@ RETSIGTYPE(*disp) (int);
 }
 
 int
-maxfiles()
+#if USE_ANSI_PROTO
+cmaxfiles()
+#else
+cmaxfiles()
+#endif
 {
     int mf;
 #ifdef HAVE_SYSCONF
@@ -328,7 +419,7 @@ maxfiles()
 	mf = (FD_SETSIZE - 1);
     }
 #endif
-    Debug("maxfiles=%d", mf);
+    Debug(1, "maxfiles=%d", mf);
     return mf;
 }
 
@@ -340,9 +431,13 @@ maxfiles()
  * object.  Returns a CONSFILE pointer to that object.
  */
 CONSFILE *
+#if USE_ANSI_PROTO
+fileOpenFD(int fd, enum consFileType type)
+#else
 fileOpenFD(fd, type)
     int fd;
     enum consFileType type;
+#endif
 {
     CONSFILE *cfp;
 
@@ -352,16 +447,20 @@ fileOpenFD(fd, type)
     cfp->ftype = type;
     cfp->fd = fd;
 
-    Debug("File I/O: Encapsulated fd %d type %d", fd, type);
+    Debug(1, "File I/O: Encapsulated fd %d type %d", fd, type);
     return cfp;
 }
 
 /* This is to "unencapsulate" the file descriptor */
 int
+#if USE_ANSI_PROTO
+fileUnopen(CONSFILE * cfp)
+#else
 fileUnopen(cfp)
     CONSFILE *cfp;
+#endif
 {
-    int retval;
+    int retval = 0;
 
     switch (cfp->ftype) {
 	case simpleFile:
@@ -376,7 +475,7 @@ fileUnopen(cfp)
 	    break;
 #endif
     }
-    Debug("File I/O: Unopened fd %d", cfp->fd);
+    Debug(1, "File I/O: Unopened fd %d", cfp->fd);
     free(cfp);
 
     return retval;
@@ -386,16 +485,20 @@ fileUnopen(cfp)
  * or a (CONSFILE *)0 on error
  */
 CONSFILE *
+#if USE_ANSI_PROTO
+fileOpen(const char *path, int flag, int mode)
+#else
 fileOpen(path, flag, mode)
     const char *path;
     int flag;
     int mode;
+#endif
 {
     CONSFILE *cfp;
     int fd;
 
     if (-1 == (fd = open(path, flag, mode))) {
-	Debug("File I/O: Failed to open `%s'", path);
+	Debug(1, "File I/O: Failed to open `%s'", path);
 	return (CONSFILE *) 0;
     }
     cfp = (CONSFILE *) calloc(1, sizeof(CONSFILE));
@@ -404,7 +507,7 @@ fileOpen(path, flag, mode)
     cfp->ftype = simpleFile;
     cfp->fd = fd;
 
-    Debug("File I/O: Opened `%s' as fd %d", path, fd);
+    Debug(1, "File I/O: Opened `%s' as fd %d", path, fd);
     return cfp;
 }
 
@@ -413,14 +516,23 @@ fileOpen(path, flag, mode)
  * this function - even if there was an error.
  */
 int
+#if USE_ANSI_PROTO
+fileClose(CONSFILE ** pcfp)
+#else
 fileClose(cfp)
-    CONSFILE *cfp;
+    CONSFILE **pcfp;
+#endif
 {
-    int retval;
+    CONSFILE *cfp;
+    int retval = 0;
 #if defined(__CYGWIN__)
     int client_sock_flags;
     struct linger lingeropt;
 #endif
+
+    cfp = *pcfp;
+    if (cfp == (CONSFILE *) 0)
+	return 0;
 
     switch (cfp->ftype) {
 	case simpleFile:
@@ -461,18 +573,23 @@ fileClose(cfp)
 	    break;
 #endif
     }
-    Debug("File I/O: Closed fd %d", cfp->fd);
+    Debug(1, "File I/O: Closed fd %d", cfp->fd);
     free(cfp);
+    *pcfp = (CONSFILE *) 0;
 
     return retval;
 }
 
 /* Unless otherwise stated, returns the same values as read(2) */
 int
+#if USE_ANSI_PROTO
+fileRead(CONSFILE * cfp, void *buf, int len)
+#else
 fileRead(cfp, buf, len)
     CONSFILE *cfp;
     void *buf;
     int len;
+#endif
 {
     int retval = 0;
 
@@ -489,10 +606,10 @@ fileRead(cfp, buf, len)
     }
 
     if (retval >= 0) {
-	Debug("File I/O: Read %d byte%s from fd %d", retval,
+	Debug(1, "File I/O: Read %d byte%s from fd %d", retval,
 	      (retval == 1) ? "" : "s", cfp->fd);
     } else {
-	Debug("File I/O: Read of %d byte%s from fd %d: %s", len,
+	Debug(1, "File I/O: Read of %d byte%s from fd %d: %s", len,
 	      (retval == 1) ? "" : "s", cfp->fd, strerror(errno));
     }
     return retval;
@@ -500,17 +617,27 @@ fileRead(cfp, buf, len)
 
 /* Unless otherwise stated, returns the same values as write(2) */
 int
+#if USE_ANSI_PROTO
+fileWrite(CONSFILE * cfp, const char *buf, int len)
+#else
 fileWrite(cfp, buf, len)
     CONSFILE *cfp;
     const char *buf;
     int len;
+#endif
 {
     int len_orig = len;
     int len_out = 0;
     int retval = 0;
 
+    if (buf == (char *)0)
+	return 0;
+
     if (len < 0)
 	len = strlen(buf);
+
+    if (len == 0)
+	return 0;
 
     switch (cfp->ftype) {
 	case simpleFile:
@@ -531,23 +658,144 @@ fileWrite(cfp, buf, len)
 #endif
     }
 
-    if (retval >= 0) {
-	Debug("File I/O: Wrote %d byte%s to fd %d", len_out,
-	      (retval == 1) ? "" : "s", cfp->fd);
+    if (len_out >= 0) {
+	Debug(1, "File I/O: Wrote %d byte%s to fd %d", len_out,
+	      (len_out == 1) ? "" : "s", cfp->fd);
     } else {
-	Debug("File I/O: Write of %d byte%s to fd %d: %s", len_orig,
-	      (retval == 1) ? "" : "s", cfp->fd, strerror(errno));
+	Debug(1, "File I/O: Write of %d byte%s to fd %d: %s", len_orig,
+	      (len_out == 1) ? "" : "s", cfp->fd, strerror(errno));
     }
-    return retval;
+    return len_out;
+}
+
+void
+#if USE_ANSI_PROTO
+fileVwrite(CONSFILE * cfp, const char *fmt, va_list ap)
+#else
+fileVwrite(cfp, fmt, ap)
+    CONSFILE *cfp;
+    const char *fmt;
+    va_list ap;
+#endif
+{
+    int s, l, e;
+    char c;
+    static STRING msg = { (char *)0, 0, 0 };
+    static short int flong, fneg;
+
+    if (fmt == (char *)0)
+	return;
+
+    fneg = flong = 0;
+    for (e = s = l = 0; (c = fmt[s + l]) != '\000'; l++) {
+	if (c == '%') {
+	    if (e) {
+		e = 0;
+		fileWrite(cfp, "%", 1);
+	    } else {
+		e = 1;
+		fileWrite(cfp, fmt + s, l);
+		s += l;
+		l = 0;
+	    }
+	    continue;
+	}
+	if (e) {
+	    unsigned long i;
+	    int u;
+	    char *p;
+	    char cc;
+	    switch (c) {
+		case 'l':
+		    flong = 1;
+		    continue;
+		case 'c':
+		    cc = (char)va_arg(ap, int);
+		    fileWrite(cfp, &cc, 1);
+		    break;
+		case 's':
+		    p = va_arg(ap, char *);
+		    fileWrite(cfp, p, -1);
+		    break;
+		case 'd':
+		    i = (flong ? va_arg(ap, long) : (long)va_arg(ap, int));
+		    if ((long)i < 0) {
+			fneg = 1;
+			i = -i;
+		    }
+		    goto number;
+		case 'u':
+		    i = (flong ? va_arg(ap, unsigned long)
+			 : (unsigned long)va_arg(ap, unsigned int));
+		  number:
+		    buildMyString((char *)0, &msg);
+		    while (i >= 10) {
+			buildMyStringChar((i % 10) + '0', &msg);
+			i /= 10;
+		    }
+		    buildMyStringChar(i + '0', &msg);
+		    /* reverse the text to put it in forward order
+		     */
+		    u = msg.used - 1;
+		    for (i = 0; i < u / 2; i++) {
+			char temp;
+
+			temp = msg.string[i];
+			msg.string[i]
+			    = msg.string[u - i - 1];
+			msg.string[u - i - 1] = temp;
+		    }
+		    if (fneg) {
+			fileWrite(cfp, "-", 1);
+			fneg = 0;
+		    }
+		    fileWrite(cfp, msg.string, msg.used - 1);
+		    break;
+		default:
+		    Error("unknown conversion character `%c' in `%s'", c,
+			  fmt);
+		    break;
+	    }
+	    s += l + 1;
+	    l = -1;
+	    e = flong = 0;
+	}
+    }
+    if (l)
+	fileWrite(cfp, fmt + s, l);
+}
+
+void
+#if USE_ANSI_PROTO
+filePrint(CONSFILE * cfp, const char *fmt, ...)
+#else
+filePrint(cfp, fmt, va_alist)
+    CONSFILE *cfp;
+    const char *fmt;
+    va_dcl
+#endif
+{
+    va_list ap;
+#if USE_ANSI_PROTO
+    va_start(ap, fmt);
+#else
+    va_start(ap);
+#endif
+    fileVwrite(cfp, fmt, ap);
+    va_end(ap);
 }
 
 /* Unless otherwise stated, returns the same values as fstat(2) */
 int
+#if USE_ANSI_PROTO
+fileStat(CONSFILE * cfp, struct stat *buf)
+#else
 fileStat(cfp, buf)
     CONSFILE *cfp;
     struct stat *buf;
+#endif
 {
-    int retval;
+    int retval = 0;
 
     switch (cfp->ftype) {
 	case simpleFile:
@@ -568,12 +816,16 @@ fileStat(cfp, buf)
 
 /* Unless otherwise stated, returns the same values as lseek(2) */
 int
+#if USE_ANSI_PROTO
+fileSeek(CONSFILE * cfp, off_t offset, int whence)
+#else
 fileSeek(cfp, offset, whence)
     CONSFILE *cfp;
     off_t offset;
     int whence;
+#endif
 {
-    int retval;
+    int retval = 0;
 
     switch (cfp->ftype) {
 	case simpleFile:
@@ -594,10 +846,14 @@ fileSeek(cfp, offset, whence)
 
 /* Unless otherwise stated, returns the same values as lseek(2) */
 int
+#if USE_ANSI_PROTO
+fileFDNum(CONSFILE * cfp)
+#else
 fileFDNum(cfp)
     CONSFILE *cfp;
+#endif
 {
-    int retval;
+    int retval = 0;
 
     switch (cfp->ftype) {
 	case simpleFile:
@@ -618,13 +874,17 @@ fileFDNum(cfp)
 
 /* Unless otherwise stated, returns the same values as send(2) */
 int
+#if USE_ANSI_PROTO
+fileSend(CONSFILE * cfp, const void *msg, size_t len, int flags)
+#else
 fileSend(cfp, msg, len, flags)
     CONSFILE *cfp;
     const void *msg;
     size_t len;
     int flags;
+#endif
 {
-    int retval;
+    int retval = 0;
 
     switch (cfp->ftype) {
 	case simpleFile:

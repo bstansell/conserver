@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.74 2002-01-21 02:48:33-08 bryan Exp $
+ *  $Id: consent.c,v 5.85 2002-02-25 14:00:38-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -40,7 +40,6 @@
 
 #include <config.h>
 
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/file.h>
@@ -67,6 +66,13 @@ struct hostcache *hostcachelist = NULL;
 
 BAUD baud[] = {
     {"Netwk", 0},
+    {"Local", 0},
+#if defined(B115200)
+    {"115200", B115200},
+#endif
+#if defined(B57600)
+    {"57600", B57600},
+#endif
 #if defined(B38400)
     {"38400", B38400},
 #endif
@@ -89,8 +95,12 @@ BAUD baud[] = {
 /* find a baud rate for the string "9600x" -> B9600			(ksb)
  */
 BAUD *
+#if USE_ANSI_PROTO
+FindBaud(char *pcMode)
+#else
 FindBaud(pcMode)
     char *pcMode;
+#endif
 {
     int i;
 
@@ -138,8 +148,12 @@ PARITY parity[] = {
 /* find a parity on the end of a baud "9600even" -> EVEN		(ksb)
  */
 PARITY *
+#if USE_ANSI_PROTO
+FindParity(char *pcMode)
+#else
 FindParity(pcMode)
     char *pcMode;
+#endif
 {
     int i;
     char acFirst;
@@ -163,8 +177,12 @@ FindParity(pcMode)
 /* setup a tty device							(ksb)
  */
 static int
+#if USE_ANSI_PROTO
+TtyDev(CONSENT * pCE)
+#else
 TtyDev(pCE)
     CONSENT *pCE;
+#endif
 {
     struct termios termp;
     struct stat stPerm;
@@ -172,7 +190,7 @@ TtyDev(pCE)
     /* here we should fstat for `read-only' checks
      */
     if (-1 == fstat(pCE->fdtty, &stPerm)) {
-	Error("fstat: %s: %s", pCE->dfile, strerror(errno));
+	Error("fstat: %s: %s", pCE->dfile.string, strerror(errno));
     } else if (0 == (stPerm.st_mode & 0222)) {
 	/* any device that is read-only we won't write to
 	 */
@@ -183,7 +201,7 @@ TtyDev(pCE)
      * Get terminal attributes
      */
     if (-1 == tcgetattr(pCE->fdtty, &termp)) {
-	Error("tcgetattr: %s(%d): %s", pCE->dfile, pCE->fdtty,
+	Error("tcgetattr: %s(%d): %s", pCE->dfile.string, pCE->fdtty,
 	      strerror(errno));
 	return -1;
     }
@@ -213,12 +231,12 @@ TtyDev(pCE)
     termp.c_cc[VTIME] = 1;
 
     if (-1 == cfsetospeed(&termp, pCE->pbaud->irate)) {
-	Error("cfsetospeed: %s(%d): %s", pCE->dfile, pCE->fdtty,
+	Error("cfsetospeed: %s(%d): %s", pCE->dfile.string, pCE->fdtty,
 	      strerror(errno));
 	return -1;
     }
     if (-1 == cfsetispeed(&termp, pCE->pbaud->irate)) {
-	Error("cfsetispeed: %s(%d): %s", pCE->dfile, pCE->fdtty,
+	Error("cfsetispeed: %s(%d): %s", pCE->dfile.string, pCE->fdtty,
 	      strerror(errno));
 	return -1;
     }
@@ -227,7 +245,7 @@ TtyDev(pCE)
      * Set terminal attributes
      */
     if (-1 == tcsetattr(pCE->fdtty, TCSADRAIN, &termp)) {
-	Error("tcsetattr: %s(%d): %s", pCE->dfile, pCE->fdtty,
+	Error("tcsetattr: %s(%d): %s", pCE->dfile.string, pCE->fdtty,
 	      strerror(errno));
 	return -1;
     }
@@ -250,8 +268,12 @@ TtyDev(pCE)
 /* setup a tty device							(ksb)
  */
 static int
+#if USE_ANSI_PROTO
+TtyDev(CONSENT * pCE)
+#else
 TtyDev(pCE)
     CONSENT *pCE;
+#endif
 {
     struct sgttyb sty;
     struct tchars m_tchars;
@@ -261,7 +283,7 @@ TtyDev(pCE)
     /* here we should fstat for `read-only' checks
      */
     if (-1 == fstat(pCE->fdtty, &stPerm)) {
-	Error("fstat: %s: %s", pCE->dfile, strerror(errno));
+	Error("fstat: %s: %s", pCE->dfile.string, strerror(errno));
     } else if (0 == (stPerm.st_mode & 0222)) {
 	/* any device that is read-only we won't write to
 	 */
@@ -277,7 +299,7 @@ TtyDev(pCE)
     /* stty 9600 raw cs7
      */
     if (-1 == ioctl(pCE->fdtty, TIOCGETP, (char *)&sty)) {
-	Error("ioctl1: %s(%d): %s", pCE->dfile, pCE->fdtty,
+	Error("ioctl1: %s(%d): %s", pCE->dfile.string, pCE->fdtty,
 	      strerror(errno));
 	return -1;
     }
@@ -340,8 +362,12 @@ TtyDev(pCE)
 /* setup a virtual device						(ksb)
  */
 static int
+#if USE_ANSI_PROTO
+VirtDev(CONSENT * pCE)
+#else
 VirtDev(pCE)
     CONSENT *pCE;
+#endif
 {
 # if HAVE_TERMIOS_H
     static struct termios n_tio;
@@ -367,8 +393,8 @@ VirtDev(pCE)
 	    break;
 	default:
 	    if (fVerbose)
-		Error("%s has pid %d on %s", pCE->server, pCE->ipid,
-		      pCE->acslave);
+		Error("%s has pid %d on %s", pCE->server.string, pCE->ipid,
+		      pCE->acslave.string);
 	    (void)fflush(stderr);
 	    pCE->fup = 1;
 	    return 0;
@@ -382,7 +408,7 @@ VirtDev(pCE)
 
     /* setup new process with clean filew descriptors
      */
-    i = maxfiles();
+    i = cmaxfiles();
     for ( /* i above */ ; i-- > 2;) {
 	close(i);
     }
@@ -394,15 +420,15 @@ VirtDev(pCE)
 # if HAVE_SETSID
     iNewGrp = setsid();
     if (-1 == iNewGrp) {
-	Error("%s: setsid: %s", pCE->server, strerror(errno));
+	Error("%s: setsid: %s", pCE->server.string, strerror(errno));
 	iNewGrp = getpid();
     }
 # else
     iNewGrp = getpid();
 # endif
 
-    if (0 != open(pCE->acslave, O_RDWR, 0) || 1 != dup(0)) {
-	Error("%s: fd sync error", pCE->server);
+    if (0 != open(pCE->acslave.string, O_RDWR, 0) || 1 != dup(0)) {
+	Error("%s: fd sync error", pCE->server.string);
 	exit(EX_UNAVAILABLE);
     }
 # if HAVE_STROPTS_H
@@ -521,7 +547,7 @@ VirtDev(pCE)
      * if we can't find root's shell run /bin/sh
      */
     pcShell = "/bin/sh";
-    if ('\000' == pCE->pccmd[0]) {
+    if (pCE->pccmd.used == 0 || pCE->pccmd.string[0] == '\000') {
 	static char *apcArgv[] = {
 	    "-shell", "-i", (char *)0
 	};
@@ -537,7 +563,7 @@ VirtDev(pCE)
 	    "/bin/sh", "-ce", (char *)0, (char *)0
 	};
 
-	apcArgv[2] = pCE->pccmd;
+	apcArgv[2] = pCE->pccmd.string;
 	ppcArgv = apcArgv;
     }
     execve(pcShell, ppcArgv, environ);
@@ -548,14 +574,16 @@ VirtDev(pCE)
 /* down a console, virtual or real					(ksb)
  */
 void
+#if USE_ANSI_PROTO
+ConsDown(CONSENT * pCE, fd_set * pfdSet)
+#else
 ConsDown(pCE, pfdSet)
     CONSENT *pCE;
     fd_set *pfdSet;
+#endif
 {
-    static char acOut[BUFSIZ];
-
     if (-1 != pCE->ipid) {
-	Debug("Sending pid %d signal %d", pCE->ipid, SIGHUP);
+	Debug(1, "Sending pid %d signal %d", pCE->ipid, SIGHUP);
 	kill(pCE->ipid, SIGHUP);
 	pCE->ipid = -1;
     }
@@ -570,9 +598,9 @@ ConsDown(pCE, pfdSet)
 	    fileWrite(pCE->fdlog, "[-- Console logging restored --]\r\n",
 		      -1);
 	}
-	sprintf(acOut, "[-- Console down -- %s]\r\n", strtime(NULL));
-	fileWrite(pCE->fdlog, acOut, -1);
-	(void)fileClose(pCE->fdlog);
+	filePrint(pCE->fdlog, "[-- Console down -- %s]\r\n",
+		  strtime(NULL));
+	fileClose(&pCE->fdlog);
 	pCE->fdlog = (CONSFILE *) 0;
     }
     pCE->fup = 0;
@@ -581,13 +609,17 @@ ConsDown(pCE, pfdSet)
 }
 
 int
+#if USE_ANSI_PROTO
+CheckHostCache(const char *hostname)
+#else
 CheckHostCache(hostname)
     const char *hostname;
+#endif
 {
     struct hostcache *p;
     p = hostcachelist;
     while (p != NULL) {
-	if (0 == strncmp(hostname, p->hostname, MAXSERVLEN)) {
+	if (0 == strcmp(hostname, p->hostname.string)) {
 	    return 1;
 	}
 	p = p->next;
@@ -596,27 +628,37 @@ CheckHostCache(hostname)
 }
 
 void
+#if USE_ANSI_PROTO
+AddHostCache(const char *hostname)
+#else
 AddHostCache(hostname)
     const char *hostname;
+#endif
 {
     struct hostcache *n;
     if ((struct hostcache *)0 ==
-	(n = (struct hostcache *)malloc(sizeof(struct hostcache)))) {
-	Error("malloc failure: %s", strerror(errno));
+	(n = (struct hostcache *)calloc(1, sizeof(struct hostcache)))) {
+	Error("calloc failure: %s", strerror(errno));
 	return;
     }
-    (void)strncpy(n->hostname, hostname, MAXSERVLEN);
+    buildMyString(hostname, &n->hostname);
     n->next = hostcachelist;
     hostcachelist = n;
 }
 
 void
+#if USE_ANSI_PROTO
 ClearHostCache()
+#else
+ClearHostCache()
+#endif
 {
     struct hostcache *p, *n;
     p = hostcachelist;
     while (p != NULL) {
 	n = p->next;
+	if (p->hostname.allocated)
+	    free(p->hostname.string);
 	free(p);
 	p = n;
     }
@@ -628,13 +670,20 @@ ClearHostCache()
  * We also maintian the select set for the caller.
  */
 void
+#if USE_ANSI_PROTO
+ConsInit(CONSENT * pCE, fd_set * pfdSet, int useHostCache)
+#else
 ConsInit(pCE, pfdSet, useHostCache)
     CONSENT *pCE;
     fd_set *pfdSet;
     int useHostCache;
+#endif
 {
+#if USE_ANSI_PROTO
+    extern int FallBack(STRING *, STRING *);
+#else
     extern int FallBack();
-    static char acOut[BUFSIZ];
+#endif
 
     if (!useHostCache)
 	ClearHostCache();
@@ -653,28 +702,22 @@ ConsInit(pCE, pfdSet, useHostCache)
     pCE->autoReUp = 0;
     pCE->fronly = 0;
     pCE->nolog = 0;
-    (void)strcpy(pCE->acline, pCE->server);
-    pCE->inamelen = strlen(pCE->server);
-    pCE->acline[pCE->inamelen++] = ':';
-    pCE->acline[pCE->inamelen++] = ' ';
-    pCE->iend = pCE->inamelen;
+    pCE->iend = 0;
 
 
     /* try to open them again
      */
     if ((CONSFILE *) 0 ==
 	(pCE->fdlog =
-	 fileOpen(pCE->lfile, O_RDWR | O_CREAT | O_APPEND, 0644))) {
-	Error("open: %s: %s", pCE->lfile, strerror(errno));
+	 fileOpen(pCE->lfile.string, O_RDWR | O_CREAT | O_APPEND, 0644))) {
+	Error("open: %s: %s", pCE->lfile.string, strerror(errno));
 	return;
     }
-    sprintf(acOut, "[-- Console up -- %s]\r\n", strtime(NULL));
-    fileWrite(pCE->fdlog, acOut, -1);
+    filePrint(pCE->fdlog, "[-- Console up -- %s]\r\n", strtime(NULL));
 
     if (0 != pCE->fvirtual) {
-	if (-1 == (pCE->fdtty = FallBack(pCE->acslave, pCE->dfile))) {
-	    Error("Failed to allocate pseudo-tty", pCE->dfile,
-		  strerror(errno));
+	if (-1 == (pCE->fdtty = FallBack(&pCE->acslave, &pCE->dfile))) {
+	    Error("Failed to allocate pseudo-tty: %s", strerror(errno));
 	    ConsDown(pCE, pfdSet);
 	    return;
 	}
@@ -686,10 +729,10 @@ ConsInit(pCE, pfdSet, useHostCache)
 	fd_set fds;
 	struct timeval tv;
 
-	if (CheckHostCache(pCE->networkConsoleHost)) {
+	if (CheckHostCache(pCE->networkConsoleHost.string)) {
 	    Error("cached previous timeout: %s (%u@%s): forcing down",
-		  pCE->server, ntohs(port.sin_port),
-		  pCE->networkConsoleHost);
+		  pCE->server.string, ntohs(port.sin_port),
+		  pCE->networkConsoleHost.string);
 	    ConsDown(pCE, pfdSet);
 	    return;
 	}
@@ -701,9 +744,9 @@ ConsInit(pCE, pfdSet, useHostCache)
 	(void)bzero((char *)&port, sizeof(port));
 #endif
 
-	if ((hp = gethostbyname(pCE->networkConsoleHost)) == NULL) {
+	if ((hp = gethostbyname(pCE->networkConsoleHost.string)) == NULL) {
 	    Error("gethostbyname(%s): %s: forcing down",
-		  pCE->networkConsoleHost, hstrerror(h_errno));
+		  pCE->networkConsoleHost.string, hstrerror(h_errno));
 	    ConsDown(pCE, pfdSet);
 	    return;
 	}
@@ -737,9 +780,9 @@ ConsInit(pCE, pfdSet, useHostCache)
 	if (connect(pCE->fdtty, (struct sockaddr *)&port, sizeof(port)) <
 	    0) {
 	    if (errno != EINPROGRESS) {
-		Error("connect: %s (%u@%s): %s: forcing down", pCE->server,
-		      ntohs(port.sin_port), pCE->networkConsoleHost,
-		      strerror(errno));
+		Error("connect: %s (%u@%s): %s: forcing down",
+		      pCE->server.string, ntohs(port.sin_port),
+		      pCE->networkConsoleHost.string, strerror(errno));
 		ConsDown(pCE, pfdSet);
 		return;
 	    }
@@ -751,21 +794,21 @@ ConsInit(pCE, pfdSet, useHostCache)
 	FD_SET(pCE->fdtty, &fds);
 
 	if ((one = select(pCE->fdtty + 1, NULL, &fds, NULL, &tv)) < 0) {
-	    Error("select: %s (%u@%s): %s: forcing down", pCE->server,
-		  ntohs(port.sin_port), pCE->networkConsoleHost,
-		  strerror(errno));
+	    Error("select: %s (%u@%s): %s: forcing down",
+		  pCE->server.string, ntohs(port.sin_port),
+		  pCE->networkConsoleHost.string, strerror(errno));
 	    ConsDown(pCE, pfdSet);
 	    return;
 	}
 
 	if (one == 0) {		/* Timeout */
-	    AddHostCache(pCE->networkConsoleHost);
-	    Error("timeout: %s (%u@%s): forcing down", pCE->server,
-		  ntohs(port.sin_port), pCE->networkConsoleHost);
+	    AddHostCache(pCE->networkConsoleHost.string);
+	    Error("timeout: %s (%u@%s): forcing down", pCE->server.string,
+		  ntohs(port.sin_port), pCE->networkConsoleHost.string);
 	    ConsDown(pCE, pfdSet);
 	    return;
 	} else {		/* Response */
-	    socklen_t slen;
+	    int slen;
 	    flags = 0;
 	    slen = sizeof(flags);
 	    /* So, getsockopt seems to return -1 if there is something
@@ -775,15 +818,15 @@ ConsInit(pCE, pfdSet, useHostCache)
 		(pCE->fdtty, SOL_SOCKET, SO_ERROR, (char *)&flags,
 		 &slen) < 0) {
 		Error("getsockopt SO_ERROR: %s (%u@%s): %s: forcing down",
-		      pCE->server, ntohs(port.sin_port),
-		      pCE->networkConsoleHost, strerror(errno));
+		      pCE->server.string, ntohs(port.sin_port),
+		      pCE->networkConsoleHost.string, strerror(errno));
 		ConsDown(pCE, pfdSet);
 		return;
 	    }
 	    if (flags != 0) {
-		Error("connect: %s (%u@%s): %s: forcing down", pCE->server,
-		      ntohs(port.sin_port), pCE->networkConsoleHost,
-		      strerror(flags));
+		Error("connect: %s (%u@%s): %s: forcing down",
+		      pCE->server.string, ntohs(port.sin_port),
+		      pCE->networkConsoleHost.string, strerror(flags));
 		ConsDown(pCE, pfdSet);
 		return;
 	    }
@@ -797,8 +840,9 @@ ConsInit(pCE, pfdSet, useHostCache)
 	write(pCE->fdtty, "\r\n", 2);
 # endif
     } else if (-1 ==
-	       (pCE->fdtty = open(pCE->dfile, O_RDWR | O_NDELAY, 0600))) {
-	Error("open: %s: %s", pCE->dfile, strerror(errno));
+	       (pCE->fdtty =
+		open(pCE->dfile.string, O_RDWR | O_NDELAY, 0600))) {
+	Error("open: %s: %s", pCE->dfile.string, strerror(errno));
 	ConsDown(pCE, pfdSet);
 	return;
     }

@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.81 2002-01-21 02:48:33-08 bryan Exp $
+ *  $Id: main.c,v 5.89 2002-02-27 18:21:51-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -29,7 +29,6 @@
 
 #include <config.h>
 
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/file.h>
@@ -50,8 +49,8 @@
 #include <consent.h>
 #include <client.h>
 #include <group.h>
-#include <master.h>
 #include <access.h>
+#include <master.h>
 #include <readcfg.h>
 #include <version.h>
 
@@ -70,17 +69,23 @@ char *pcPasswd = FULLPDPATH;
 char *pcPort = DEFPORT;
 char *pcBasePort = DEFBASEPORT;
 int domainHack = 0;
+int isMaster = 1;
+int cMaxMemb = MAXMEMB;
 char *pcAddress = NULL;
-unsigned long bindAddr;
+in_addr_t bindAddr;
 unsigned int bindPort;
 unsigned int bindBasePort;
 
 struct sockaddr_in in_port;
 struct in_addr acMyAddr;
-char acMyHost[256];		/* staff.cc.purdue.edu                  */
+char acMyHost[1024];		/* staff.cc.purdue.edu                  */
 
 void
+#if USE_ANSI_PROTO
 reopenLogfile()
+#else
+reopenLogfile()
+#endif
 {
     /* redirect stdout and stderr to the logfile.
      *
@@ -103,7 +108,11 @@ reopenLogfile()
 /* become a daemon							(ksb)
  */
 static void
+#if USE_ANSI_PROTO
 daemonize()
+#else
+daemonize()
+#endif
 {
     int res;
     FILE *fp;
@@ -164,7 +173,7 @@ daemonize()
 
 
 static char u_terse[] =
-    " [-7dDhinouvV] [-a type] [-M addr] [-p port] [-b port] [-C config] [-P passwd] [-L logfile] [-O min]";
+    " [-7dDhinouvV] [-a type] [-m max] [-M addr] [-p port] [-b port] [-C config] [-P passwd] [-L logfile] [-O min]";
 static char *apcLong[] = {
     "7          strip the high bit of all console data",
     "a type     set the default access type",
@@ -175,6 +184,7 @@ static char *apcLong[] = {
     "h          output this message",
     "i          initialize console connections on demand",
     "L logfile  give a new logfile path to the server process",
+    "m max      maximum consoles managed per process",
     "M addr     address to listen on (all addresses by default)",
     "n          obsolete - see -u",
     "o          reopen downed console on client connect",
@@ -190,8 +200,12 @@ static char *apcLong[] = {
 /* output a long message to the user					(ksb)
  */
 static void
+#if USE_ANSI_PROTO
+Usage(char **ppc)
+#else
 Usage(ppc)
     char **ppc;
+#endif
 {
     for ( /* passed */ ; (char *)0 != *ppc; ++ppc)
 	fprintf(stderr, "\t%s\n", *ppc);
@@ -200,23 +214,28 @@ Usage(ppc)
 /* show the user our version info					(ksb)
  */
 static void
+#if USE_ANSI_PROTO
 Version()
+#else
+Version()
+#endif
 {
-    char acA1[16], acA2[16];
+    static STRING acA1 = { (char *)0, 0, 0 };
+    static STRING acA2 = { (char *)0, 0, 0 };
     int i;
 
     outputPid = 0;
 
     Info("%s", THIS_VERSION);
     Info("default access type `%c\'", chDefAcc);
-    Info("default escape sequence `%s%s\'", FmtCtl(DEFATTN, acA1),
-	 FmtCtl(DEFESC, acA2));
+    Info("default escape sequence `%s%s\'", FmtCtl(DEFATTN, &acA1),
+	 FmtCtl(DEFESC, &acA2));
     Info("configuration in `%s\'", pcConfig);
     Info("password in `%s\'", pcPasswd);
     Info("logfile is `%s\'", pcLogfile);
     Info("pidfile is `%s\'", PIDFILE);
-    Info("limited to %d group%s with %d member%s", MAXGRP,
-	 MAXGRP == 1 ? "" : "s", MAXMEMB, MAXMEMB == 1 ? "" : "s");
+    Info("limited to %d member%s per group", cMaxMemb,
+	 cMaxMemb == 1 ? "" : "s");
 
     /* Look for non-numeric characters */
     for (i = 0; pcPort[i] != '\000'; i++)
@@ -260,10 +279,80 @@ Version()
 		 bindBasePort, pcBasePort);
 	}
     }
+    Info("built with `%s'", CONFIGINVOCATION);
 
     if (fVerbose)
 	printf(COPYRIGHT);
     exit(EX_OK);
+}
+
+void
+#if USE_ANSI_PROTO
+dumpDataStructures()
+#else
+dumpDataStructures()
+#endif
+{
+    GRPENT *pGE;
+    CONSENT *pCE;
+    REMOTE *pRC;
+    char *empty = "<empty>";
+
+    if (!fDebug)
+	return;
+
+    for (pGE = pGroups; pGE != (GRPENT *) 0; pGE = pGE->pGEnext) {
+	Debug(1, "Group: id=%u pid=%d, port=%d, imembers=%d", pGE->id,
+	      pGE->port, pGE->pid, pGE->imembers);
+
+	for (pCE = pGE->pCElist; pCE != (CONSENT *) 0; pCE = pCE->pCEnext) {
+	    if (pCE->pccmd.string == (char *)0)
+		pCE->pccmd.string = empty;
+	    if (pCE->server.string == (char *)0)
+		pCE->server.string = empty;
+	    if (pCE->dfile.string == (char *)0)
+		pCE->dfile.string = empty;
+	    if (pCE->lfile.string == (char *)0)
+		pCE->lfile.string = empty;
+	    if (pCE->networkConsoleHost.string == (char *)0)
+		pCE->networkConsoleHost.string = empty;
+	    if (pCE->acslave.string == (char *)0)
+		pCE->acslave.string = empty;
+
+	    Debug(1, "  server=%s, dfile=%s, lfile=%s", pCE->server.string,
+		  pCE->dfile.string, pCE->lfile.string);
+	    Debug(1, "  mark=%d, nextMark=%ld, breakType=%d", pCE->mark,
+		  pCE->nextMark, pCE->breakType);
+
+	    Debug(1, "  isNetworkConsole=%d, networkConsoleHost=%s",
+		  pCE->isNetworkConsole, pCE->networkConsoleHost.string);
+	    Debug(1,
+		  "  networkConsolePort=%d, telnetState=%d, autoReup=%d",
+		  pCE->networkConsolePort, pCE->telnetState,
+		  pCE->autoReUp);
+
+	    Debug(1, "  baud=%s, parity=%c", pCE->pbaud->acrate,
+		  pCE->pparity->ckey);
+
+	    Debug(1, "  fvirtual=%d, acslave=%s, pccmd=%s, ipid=%d",
+		  pCE->fvirtual, pCE->acslave.string, pCE->pccmd.string,
+		  pCE->ipid);
+
+	    Debug(1,
+		  "  nolog=%d, fdtty=%d, activitylog=%d, fup=%d, fronly=%d",
+		  pCE->nolog, pCE->fdtty, pCE->activitylog, pCE->fup,
+		  pCE->fronly);
+	    Debug(1, "  ------");
+	}
+    }
+    for (pRC = pRCList; (REMOTE *) 0 != pRC; pRC = pRC->pRCnext) {
+	if (pRC->rserver.string == (char *)0)
+	    pRC->rserver.string = empty;
+	if (pRC->rhost.string == (char *)0)
+	    pRC->rhost.string = empty;
+	Debug(1, "Remote: rserver=%s, rhost =%s", pRC->rserver.string,
+	      pRC->rhost.string);
+    }
 }
 
 /* find out where/who we are						(ksb)
@@ -275,21 +364,26 @@ Version()
  * exit happy
  */
 int
+#if USE_ANSI_PROTO
+main(int argc, char **argv)
+#else
 main(argc, argv)
     int argc;
     char **argv;
+#endif
 {
-    int i, j;
+    int i;
     FILE *fpConfig;
     struct hostent *hpMe;
-    static char acOpts[] = "7a:b:C:dDhiL:M:noO:p:P:suVv";
+    static char acOpts[] = "7a:b:C:dDhiL:m:M:noO:p:P:suVv";
     extern int optopt;
     extern char *optarg;
-    REMOTE *pRCUniq;		/* list of uniq console servers         */
     struct passwd *pwd;
     char *origuser = (char *)0;
     char *curuser = (char *)0;
     int curuid;
+    GRPENT *pGE;
+    CONSENT *pCE;
 
     outputPid = 1;		/* make sure stuff has the pid */
 
@@ -359,7 +453,7 @@ main(argc, argv)
 		fUseLogfile = 1;
 		break;
 	    case 'D':
-		fDebug = 1;
+		fDebug++;
 		break;
 	    case 'h':
 		fprintf(stderr, "%s: usage%s\n", progname, u_terse);
@@ -370,6 +464,9 @@ main(argc, argv)
 		break;
 	    case 'L':
 		pcLogfile = optarg;
+		break;
+	    case 'm':
+		cMaxMemb = atoi(optarg);
 		break;
 	    case 'M':
 		pcAddress = optarg;
@@ -410,6 +507,11 @@ main(argc, argv)
 		Error("option %c needs a parameter", optopt);
 		exit(EX_UNAVAILABLE);
 	}
+    }
+
+    if (cMaxMemb <= 0) {
+	Error("ignoring invalid -m option (%d <= 0)", cMaxMemb);
+	cMaxMemb = MAXMEMB;
     }
 
     /* if we read from stdin (by accident) we don't wanna block.
@@ -458,36 +560,20 @@ main(argc, argv)
     }
 #endif
 
-    /* read the config file
-     */
-    if ((FILE *) 0 == (fpConfig = fopen(pcConfig, "r"))) {
-	Error("fopen: %s: %s", pcConfig, strerror(errno));
-	exit(EX_UNAVAILABLE);
-    }
-#if HAVE_FLOCK
-    /* we lock the configuration file so that two identical
-     * conservers will not be running together  (but two with
-     * different configurations can run on the same host).
-     */
-    if (-1 == flock(fileno(fpConfig), LOCK_NB | LOCK_EX)) {
-	Error("%s is locked, won\'t run more than one conserver?",
-	      pcConfig);
-	exit(EX_UNAVAILABLE);
-    }
-#endif
-
-    ReadCfg(pcConfig, fpConfig);
-
     if (pcAddress == NULL) {
-	bindAddr = (unsigned long)INADDR_ANY;
+	bindAddr = INADDR_ANY;
     } else {
-	if ((bindAddr = inet_addr(pcAddress)) == -1) {
+	bindAddr = inet_addr(pcAddress);
+	if (bindAddr == (in_addr_t) (-1)) {
 	    Error("inet_addr: %s: %s", pcAddress, "invalid IP address");
 	    exit(EX_UNAVAILABLE);
 	}
     }
-    Debug("Bind address set to `%s'",
-	  inet_ntoa(*(struct in_addr *)&bindAddr));
+    if (fDebug) {
+	struct in_addr ba;
+	ba.s_addr = bindAddr;
+	Debug(1, "Bind address set to `%s'", inet_ntoa(ba));
+    }
 
     if (pcPort == NULL) {
 	Error("Severe error: pcPort is NULL????  How can that be?");
@@ -533,55 +619,84 @@ main(argc, argv)
 	}
     }
 
-    /* if no one can use us we need to come up with a default
+    /* read the config file
      */
-    if (0 == iAccess) {
-	SetDefAccess(hpMe);
+    if ((FILE *) 0 == (fpConfig = fopen(pcConfig, "r"))) {
+	Error("fopen: %s: %s", pcConfig, strerror(errno));
+	exit(EX_UNAVAILABLE);
     }
-
-    /* spawn all the children, so fix kids has an initial pid
+#if HAVE_FLOCK
+    /* we lock the configuration file so that two identical
+     * conservers will not be running together  (but two with
+     * different configurations can run on the same host).
      */
-    for (i = 0; i < MAXGRP; ++i) {
-	if (0 == aGroups[i].imembers)
-	    continue;
-	if (aGroups[i].imembers) {
-	    Spawn(&aGroups[i]);
+    if (-1 == flock(fileno(fpConfig), LOCK_NB | LOCK_EX)) {
+	Error("%s is locked, won\'t run more than one conserver?",
+	      pcConfig);
+	exit(EX_UNAVAILABLE);
+    }
+#endif
+
+    ReadCfg(pcConfig, fpConfig);
+
+    if (pGroups == (GRPENT *) 0 && pRCList == (REMOTE *) 0) {
+	Error("No consoles found in configuration file");
+    } else {
+	/* if no one can use us we need to come up with a default
+	 */
+	if (pACList == (ACCESS *) 0) {
+	    SetDefAccess(&acMyAddr, acMyHost);
 	}
+
+	/* spawn all the children, so fix kids has an initial pid
+	 */
+	for (pGE = pGroups; pGE != (GRPENT *) 0; pGE = pGE->pGEnext) {
+	    if (pGE->imembers == 0)
+		continue;
+
+	    Spawn(pGE);
+
+	    if (fVerbose) {
+		Info("group #%d pid %d on port %u", pGE->id, pGE->pid,
+		     ntohs(pGE->port));
+	    }
+	    for (pCE = pGE->pCElist; pCE != (CONSENT *) 0;
+		 pCE = pCE->pCEnext) {
+		if (-1 != pCE->fdtty)
+		    (void)close(pCE->fdtty);
+	    }
+	}
+
 	if (fVerbose) {
-	    Info("group #%d pid %d on port %u", i, aGroups[i].pid,
-		 ntohs(aGroups[i].port));
+	    ACCESS *pACtmp;
+	    for (pACtmp = pACList; pACtmp != (ACCESS *) 0;
+		 pACtmp = pACtmp->pACnext) {
+		Info("access type '%c' for \"%s\"", pACtmp->ctrust,
+		     pACtmp->pcwho);
+	    }
 	}
-	for (j = 0; j < aGroups[i].imembers; ++j) {
-	    if (-1 != aGroups[i].pCElist[j].fdtty)
-		(void)close(aGroups[i].pCElist[j].fdtty);
+
+	pRCUniq = FindUniq(pRCList);
+	/* output unique console server peers?
+	 */
+	if (fVerbose) {
+	    REMOTE *pRC;
+	    for (pRC = pRCUniq; (REMOTE *) 0 != pRC; pRC = pRC->pRCuniq) {
+		Info("peer server on `%s'", pRC->rhost.string);
+	    }
 	}
+
+	(void)fflush(stdout);
+	(void)fflush(stderr);
+	Master();
+
+	/* stop putting kids back, and shoot them
+	 */
+	simpleSignal(SIGCHLD, SIG_DFL);
+	SignalKids(SIGTERM);
     }
 
-    if (fVerbose) {
-	for (i = 0; i < iAccess; ++i) {
-	    Info("access type '%c' for \"%s\"", pACList[i].ctrust,
-		 pACList[i].pcwho);
-	}
-    }
-
-    pRCUniq = FindUniq(pRCList);
-    /* output unique console server peers?
-     */
-    if (fVerbose) {
-	REMOTE *pRC;
-	for (pRC = pRCUniq; (REMOTE *) 0 != pRC; pRC = pRC->pRCuniq) {
-	    Info("peer server on `%s'", pRC->rhost);
-	}
-    }
-
-    (void)fflush(stdout);
-    (void)fflush(stderr);
-    Master(pRCUniq);
-
-    /* stop putting kids back, and shoot them
-     */
-    simpleSignal(SIGCHLD, SIG_DFL);
-    SignalKids(SIGTERM);
+    dumpDataStructures();
 
     Info("Stopped at %s", strtime(NULL));
     (void)endpwent();

@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.25 2002-01-21 02:48:33-08 bryan Exp $
+ *  $Id: consent.h,v 5.29 2002-02-25 14:00:38-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -51,33 +51,29 @@ typedef struct parity {		/* a parity bits table                  */
     int iclr;
 } PARITY;
 
-#define MAXSERVLEN	32	/* max length of server name            */
-#define MAXDEVLEN	512	/* max length of /dev/ttyax             */
-#define MAXLOGLEN	1024	/* max length of /usr/adm/consoles/foo  */
-#define MAXTTYLINE	(133*2)	/* max length of a single buf'd line    */
 #define ALARMTIME	60	/* time between chimes                  */
 
 typedef struct consent {	/* console information                  */
-    char server[MAXSERVLEN];	/* server name                          */
-    char dfile[MAXDEVLEN];	/* device file                          */
-    char lfile[MAXLOGLEN];	/* log file                             */
+    STRING server;		/* server name                          */
+    STRING dfile;		/* device file                          */
+    STRING lfile;		/* log file                             */
     BAUD *pbaud;		/* the baud on this console port        */
     PARITY *pparity;		/* the parity on this line              */
     int mark;			/* Mark (chime) interval                */
     long nextMark;		/* Next mark (chime) time               */
     short int breakType;	/* break type [1-9]                     */
+    int autoReUp;
 
     /* Used if network console */
     int isNetworkConsole;
-    char networkConsoleHost[MAXSERVLEN];
+    STRING networkConsoleHost;
     int networkConsolePort;
     int telnetState;
-    int autoReUp;
 
     /* used if virtual console */
-    char acslave[MAXDEVLEN];	/* pseudo-device slave side             */
+    STRING acslave;		/* pseudo-device slave side             */
     int fvirtual;		/* is a pty device we use as a console  */
-    char *pccmd;		/* virtual console command              */
+    STRING pccmd;		/* virtual console command              */
     int ipid;			/* pid of virtual command               */
 
     /* only used in child */
@@ -87,23 +83,32 @@ typedef struct consent {	/* console information                  */
     int activitylog;		/* log attach/detach/bump               */
     short int fup;		/* we setup this line?                  */
     short int fronly;		/* we can only read this console        */
-    short int iend;		/* like icursor in CONSCLIENT           */
-    short int inamelen;		/* strlen(server)                       */
     struct client *pCLon;	/* clients on this console              */
     struct client *pCLwr;	/* client that is writting on console   */
     char acline[132 * 2 + 2];	/* max chars we will call a line        */
+    short int iend;		/* length of data stored in acline      */
+    struct consent *pCEnext;	/* next console entry                   */
 } CONSENT;
 
+struct hostcache {
+    STRING hostname;
+    struct hostcache *next;
+};
+
+#if USE_ANSI_PROTO
+extern PARITY *FindParity(char *);
+extern BAUD *FindBaud(char *);
+extern void ConsInit(CONSENT *, fd_set *, int);
+extern void ConsDown(CONSENT *, fd_set *);
+extern int CheckHostCache(const char *);
+extern void AddHostCache(const char *);
+extern void ClearHostCache();
+#else
 extern PARITY *FindParity();
 extern BAUD *FindBaud();
 extern void ConsInit();
 extern void ConsDown();
-
-struct hostcache {
-    char hostname[MAXSERVLEN];
-    struct hostcache *next;
-};
-
 extern int CheckHostCache();
 extern void AddHostCache();
 extern void ClearHostCache();
+#endif

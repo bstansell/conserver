@@ -15,7 +15,11 @@
 # name : tty[@host] : baud[parity] : device : group
 DOMAINHACK=
 LOGDIR=/tmp
-shell:|:9600p:&:
+BREAK5=\rtest\r
+shell:|:9600p:&:5
+bash:|/usr/local/bin/bash::&:2
+web:!www.conserver.com:80:&:
+b:/dev/ttyb:9600p:&:
 #ts6-10:!ts6:10010:&:
 #ts6-11:!ts6:10011:&:
 #ts6-12:!ts6:10012:&:

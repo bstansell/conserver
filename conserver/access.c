@@ -1,5 +1,5 @@
 /*
- *  $Id: access.c,v 5.36 2002-01-21 02:48:33-08 bryan Exp $
+ *  $Id: access.c,v 5.44 2002-02-26 16:12:49-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -36,7 +36,6 @@
 
 #include <config.h>
 
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/file.h>
@@ -76,25 +75,29 @@
  * Returns 0 if the addresses match, else returns 1.
  */
 int
+#if USE_ANSI_PROTO
+AddrCmp(struct in_addr *addr, char *pattern)
+#else
 AddrCmp(addr, pattern)
     struct in_addr *addr;
     char *pattern;
+#endif
 {
-    unsigned long int hostaddr, pattern_addr, netmask;
-    char buf[200], *p, *slash_posn;
+    in_addr_t hostaddr, pattern_addr, netmask;
+    char *p, *slash_posn;
+    static STRING buf = { (char *)0, 0, 0 };
 
     slash_posn = strchr(pattern, '/');
     if (slash_posn != NULL) {
-	if (strlen(pattern) >= sizeof(buf))
-	    return 1;		/* too long to handle */
-	strncpy(buf, pattern, sizeof(buf));
-	buf[slash_posn - pattern] = '\0';	/* isolate the address */
-	p = buf;
+	buildMyString((char *)0, &buf);
+	buildMyString(pattern, &buf);
+	buf.string[slash_posn - pattern] = '\0';	/* isolate the address */
+	p = buf.string;
     } else
 	p = pattern;
 
     pattern_addr = inet_addr(p);
-    if (pattern_addr == -1)
+    if (pattern_addr == (in_addr_t) (-1))
 	return 1;		/* malformed address */
 
     if (slash_posn) {
@@ -104,7 +107,7 @@ AddrCmp(addr, pattern)
 	    netmask = 0x80000000 | (netmask >> 1);
     } else {
 	/* netmask implied by address class */
-	unsigned long int ia = ntohl(pattern_addr);
+	in_addr_t ia = ntohl(pattern_addr);
 	if (IN_CLASSA(ia))
 	    netmask = IN_CLASSA_NET;
 	else if (IN_CLASSB(ia))
@@ -117,50 +120,55 @@ AddrCmp(addr, pattern)
     netmask = htonl(netmask);
     if (~netmask & pattern_addr)
 	netmask = 0xffffffff;	/* compare entire addresses */
-    hostaddr = *(unsigned long int *)addr;
+    hostaddr = addr->s_addr;
 
-    Debug("Access check:       host=%lx(%lx/%lx)", hostaddr & netmask,
+    Debug(1, "Access check:       host=%lx(%lx/%lx)", hostaddr & netmask,
 	  hostaddr, netmask);
-    Debug("Access check:        acl=%lx(%lx/%lx)", pattern_addr & netmask,
-	  pattern_addr, netmask);
+    Debug(1, "Access check:        acl=%lx(%lx/%lx)",
+	  pattern_addr & netmask, pattern_addr, netmask);
     return (hostaddr & netmask) != (pattern_addr & netmask);
 }
 
 /* return the access type for a given host entry			(ksb)
  */
 char
+#if USE_ANSI_PROTO
+AccType(struct in_addr *addr, char *hname)
+#else
 AccType(addr, hname)
     struct in_addr *addr;
     char *hname;
+#endif
 {
-    int i;
     char *pcName;
     int len;
+    ACCESS *pACtmp;
 
     if (fDebug) {
 	if (hname)
-	    Debug("Access check: hostname=%s, ip=%s", hname,
+	    Debug(1, "Access check: hostname=%s, ip=%s", hname,
 		  inet_ntoa(*addr));
 	else
-	    Debug("Access check: hostname=<unresolvable>, ip=%s",
+	    Debug(1, "Access check: hostname=<unresolvable>, ip=%s",
 		  inet_ntoa(*addr));
     }
-    for (i = 0; i < iAccess; ++i) {
-	Debug("Access check:    who=%s, trust=%c", pACList[i].pcwho,
-	      pACList[i].ctrust);
-	if (pACList[i].isCIDR != 0) {
-	    if (0 == AddrCmp(addr, pACList[i].pcwho)) {
-		return pACList[i].ctrust;
+    for (pACtmp = pACList; pACtmp != (ACCESS *) 0;
+	 pACtmp = pACtmp->pACnext) {
+	Debug(1, "Access check:    who=%s, trust=%c", pACtmp->pcwho,
+	      pACtmp->ctrust);
+	if (pACtmp->isCIDR != 0) {
+	    if (0 == AddrCmp(addr, pACtmp->pcwho)) {
+		return pACtmp->ctrust;
 	    }
 	    continue;
 	}
 	if (hname && hname[0] != '\000') {
 	    pcName = hname;
 	    len = strlen(pcName);
-	    while (len >= pACList[i].ilen) {
-		Debug("Access check:       name=%s", pcName);
-		if (0 == strcmp(pcName, pACList[i].pcwho)) {
-		    return pACList[i].ctrust;
+	    while (len >= pACtmp->ilen) {
+		Debug(1, "Access check:       name=%s", pcName);
+		if (0 == strcmp(pcName, pACtmp->pcwho)) {
+		    return pACtmp->ctrust;
 		}
 		pcName = strchr(pcName, '.');
 		if ((char *)0 == pcName) {
@@ -174,58 +182,65 @@ AccType(addr, hname)
     return chDefAcc;
 }
 
-/* we know iAccess == 0, we want to setup a nice default access list	(ksb)
- */
 void
-SetDefAccess(hpLocal)
-    struct hostent *hpLocal;
+#if USE_ANSI_PROTO
+SetDefAccess(struct in_addr *pAddr, char *pHost)
+#else
+SetDefAccess(pAddr, pHost)
+    struct in_addr *pAddr;
+    char *pHost;
+#endif
 {
     char *pcWho, *pcDomain;
     int iLen;
     char *addr;
-    struct in_addr *aptr;
 
-    aptr = (struct in_addr *)(hpLocal->h_addr);
-    addr = inet_ntoa(*aptr);
-    pACList = (ACCESS *) calloc(3, sizeof(ACCESS));
-    if ((ACCESS *) 0 == pACList) {
+    addr = inet_ntoa(*pAddr);
+    iLen = strlen(addr);
+    if ((ACCESS *) 0 == (pACList = (ACCESS *) calloc(1, sizeof(ACCESS)))) {
 	OutOfMem();
     }
-    if ((char *)0 == (pcWho = malloc(strlen(addr) + 1))) {
+    if ((char *)0 == (pcWho = malloc(iLen + 1))) {
 	OutOfMem();
     }
-    strcpy(pcWho, addr);
-    pACList[iAccess].ctrust = 'a';
-    pACList[iAccess].ilen = strlen(pcWho);
-    pACList[iAccess].pcwho = pcWho;
+    pACList->ctrust = 'a';
+    pACList->ilen = iLen;
+    pACList->pcwho = strcpy(pcWho, addr);
 
-    Debug("Access list prime: trust=%c, who=%s", pACList[iAccess].ctrust,
-	  pACList[iAccess].pcwho);
+    Debug(1, "Access list prime: trust=%c, who=%s", pACList->ctrust,
+	  pACList->pcwho);
 
-    iAccess++;
-
-    if ((char *)0 == (pcDomain = strchr(hpLocal->h_name, '.'))) {
+    if ((char *)0 == (pcDomain = strchr(pHost, '.'))) {
 	return;
     }
     ++pcDomain;
     iLen = strlen(pcDomain);
-    pcWho = malloc(iLen + 1);
-    pACList[iAccess].ctrust = 'a';
-    pACList[iAccess].ilen = iLen;
-    pACList[iAccess].pcwho = strcpy(pcWho, pcDomain);
 
-    Debug("Access list prime: trust=%c, who=%s", pACList[iAccess].ctrust,
-	  pACList[iAccess].pcwho);
+    if ((ACCESS *) 0 ==
+	(pACList->pACnext = (ACCESS *) calloc(1, sizeof(ACCESS)))) {
+	OutOfMem();
+    }
+    if ((char *)0 == (pcWho = malloc(iLen + 1))) {
+	OutOfMem();
+    }
+    pACList->pACnext->ctrust = 'a';
+    pACList->pACnext->ilen = iLen;
+    pACList->pACnext->pcwho = strcpy(pcWho, pcDomain);
 
-    iAccess++;
+    Debug(1, "Access list prime: trust=%c, who=%s",
+	  pACList->pACnext->ctrust, pACList->pACnext->pcwho);
 }
 
 /* thread ther list of uniq console server machines, aliases for	(ksb)
  * machines will screw us up
  */
 REMOTE *
+#if USE_ANSI_PROTO
+FindUniq(REMOTE * pRCAll)
+#else
 FindUniq(pRCAll)
     REMOTE *pRCAll;
+#endif
 {
     REMOTE *pRC;
 
@@ -242,7 +257,7 @@ FindUniq(pRCAll)
      * else add us by returning our node
      */
     for (pRC = pRCAll->pRCuniq; (REMOTE *) 0 != pRC; pRC = pRC->pRCuniq) {
-	if (0 == strcmp(pRC->rhost, pRCAll->rhost)) {
+	if (0 == strcmp(pRC->rhost.string, pRCAll->rhost.string)) {
 	    return pRCAll->pRCuniq;
 	}
     }

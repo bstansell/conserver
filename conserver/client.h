@@ -1,5 +1,5 @@
 /*
- *  $Id: client.h,v 5.21 2002-01-21 02:48:33-08 bryan Exp $
+ *  $Id: client.h,v 5.25 2002-02-25 14:00:38-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -54,8 +54,8 @@ typedef struct client {		/* Connection Information:              */
     short fwr;			/* (client) write enable flag           */
     short fwantwr;		/* (client) wants to write              */
     short fecho;		/* echo commands (not set by machines)  */
-    char acid[128];		/* login and location of client         */
-    char peername[128];		/* location of client                   */
+    STRING acid;		/* login and location of client         */
+    STRING peername;		/* location of client                   */
     time_t tym;			/* time of connect                      */
     time_t typetym;		/* time of last keystroke               */
     char actym[32];		/* pre-formatted time                   */
@@ -65,19 +65,27 @@ typedef struct client {		/* Connection Information:              */
     struct client
     **ppCLbscan,		/* back link for scan ptr               */
      *pCLscan,			/* next client fd to scan after select  */
+	/* scan lists link ALL clients together */
     **ppCLbnext,		/* back link for next ptr               */
      *pCLnext;			/* next person on this list             */
+    /* next lists link clients on a console */
     char ic[2];			/* two character escape sequence        */
     char iState;		/* state for fsm in server              */
     char caccess;		/* did we trust the remote machine      */
-    char accmd[MAXSERVLEN + 1];	/* the command the user issued          */
-    int icursor;		/* the length of the command issused    */
-    char msg[1024];		/* the broadcast message                */
+    STRING accmd;		/* the command the user issued          */
+    STRING msg;			/* the broadcast message                */
     struct sockaddr_in
       cnct_port;		/* where from                           */
 } CONSCLIENT;
 
+#if USE_ANSI_PROTO
+extern char *FmtCtl(int, STRING *);
+extern void Replay(CONSFILE *, CONSFILE *, int);
+extern void HelpUser(CONSCLIENT *);
+extern CONSCLIENT *FindWrite(CONSCLIENT *);
+#else
 extern char *FmtCtl();
 extern void Replay();
 extern void HelpUser();
 extern CONSCLIENT *FindWrite();
+#endif
