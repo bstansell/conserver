@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.180 2004/07/14 05:28:42 bryan Exp $
+ *  $Id: readcfg.c,v 5.181 2004/10/25 07:18:19 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -3003,8 +3003,7 @@ ConsoleDestroy()
 			      "[Conserver reconfigured - r/w access removed]\r\n",
 			      -1);
 		    if (pCL->fwr) {
-			pCL->fwr = 0;
-			pCL->fwantwr = 0;
+			BumpClient(pCE, (char *)0);
 			TagLogfileAct(pCE, "%s detached",
 				      pCL->acid->string);
 			if (pCE->nolog) {
@@ -3012,7 +3011,6 @@ ConsoleDestroy()
 			    TagLogfile(pCE,
 				       "Console logging restored (bumped)");
 			}
-			pCE->pCLwr = (CONSCLIENT *)0;
 			FindWrite(pCE);
 		    }
 		} else {

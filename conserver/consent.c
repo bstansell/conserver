@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.140 2004/06/03 21:53:59 bryan Exp $
+ *  $Id: consent.c,v 5.144 2004/10/25 07:25:35 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -324,20 +324,6 @@ StartInit(pCE)
 	StopInit(pCE);
     }
 
-    if (pCE->pCLwr != (CONSCLIENT *)0) {
-	CONSCLIENT *pCL = pCE->pCLwr;
-	pCL->fwr = 0;
-	pCL->fwantwr = 1;
-	/*
-	   FileWrite(pCL->fd,
-	   "[forced to `spy' mode by initialization command]\r\n",
-	   -1);
-	   TagLogfileAct(pCE, "initialization command bumped %s",
-	   pCL->acid->string);
-	 */
-	pCE->pCLwr = (CONSCLIENT *)0;
-    }
-
     /* pin[0] = parent read, pin[1] = child write */
     if (pipe(pin) != 0) {
 	Error("[%s] StartInit(): pipe(): %s", pCE->server,
@@ -606,6 +592,39 @@ VirtDev(pCE)
     return -1;
 }
 
+char *
+#if PROTOTYPES
+ConsState(CONSENT *pCE)
+#else
+ConsState(pCE)
+    CONSENT *pCE;
+#endif
+{
+    if (!pCE->fup)
+	return "down";
+
+    if (pCE->initfile != (CONSFILE *)0)
+	return "initializing";
+
+    switch (pCE->ioState) {
+	case ISNORMAL:
+	    return "up";
+	case INCONNECT:
+	    return "connecting";
+	case ISDISCONNECTED:
+	    return "disconnected";
+#if HAVE_OPENSSL
+	case INSSLACCEPT:
+	    return "SSL_accept";
+	case INSSLSHUTDOWN:
+	    return "SSL_shutdown";
+#endif
+	case ISFLUSHING:
+	    return "flushing";
+    }
+    return "in unknown state";
+}
+
 /* down a console, virtual or real					(ksb)
  *
  * this should be kept pretty simple, 'cause the config file reading code
@@ -843,15 +862,14 @@ ConsInit(pCE)
 	    if (ret == 0) {
 		pCE->ioState = ISNORMAL;
 		pCE->stateTimer = 0;
-		pCE->fup = 1;
 	    } else {
 		pCE->ioState = INCONNECT;
 		pCE->stateTimer = time((time_t *)0) + CONNECTTIMEOUT;
 		if (timers[T_STATE] == (time_t)0 ||
 		    timers[T_STATE] > pCE->stateTimer)
 		    timers[T_STATE] = pCE->stateTimer;
-		pCE->fup = 1;
 	    }
+	    pCE->fup = 1;
 	    break;
 	case DEVICE:
 	    if (-1 ==
@@ -929,11 +947,11 @@ ConsInit(pCE)
     }
 
     if (pCE->downHard == FLAGTRUE) {
-	if (pCE->ioState == ISNORMAL)
+	if (pCE->ioState == ISNORMAL) {
 	    Msg("[%s] console up", pCE->server);
-	else
+	    pCE->downHard = FLAGFALSE;
+	} else
 	    Msg("[%s] console initializing", pCE->server);
-	pCE->downHard = FLAGFALSE;
     }
 #if HAVE_GETTIMEOFDAY
     if (gettimeofday(&tv, (void *)0) == 0)

@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.168 2004/09/21 23:45:53 bryan Exp $
+ *  $Id: console.c,v 5.169 2004/10/25 07:18:20 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -1393,6 +1393,13 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 	    Bye(EX_UNAVAILABLE);
 	}
     }
+
+    /* try to grok the state of the console */
+    FilePrint(pcf, FLAGFALSE, "%c%c=", chAttn, chEsc);
+    r = ReadReply(pcf, 0);
+    if (strncmp(r, "[unknown", 8) != 0 &&
+	strncmp(r, "[up]", 4) != 0)
+	FileWrite(cfstdout, FLAGFALSE, r, -1);
 
     printf("[Enter `");
     PutCtlc(chAttn, stdout);

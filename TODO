@@ -100,6 +100,8 @@ Bryan Stansell
 - send sequences to console on client connect? (to repaint screen,
   for example) : John Cagle <jcagle@gmail.com>
 
+- uucp locks : Sebastian Zagrodzki <sebek@heron.net.icm.edu.pl>
+
 #
-#  $Id: TODO,v 1.51 2004/09/21 23:45:30 bryan Exp $
+#  $Id: TODO,v 1.52 2004/11/06 01:03:36 bryan Exp $
 #

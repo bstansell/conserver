@@ -1,5 +1,5 @@
 /*
- *  $Id: cutil.c,v 1.118 2004/05/25 00:38:15 bryan Exp $
+ *  $Id: cutil.c,v 1.121 2004/11/09 08:37:05 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -3092,7 +3092,7 @@ ProcessSubst(s, repl, str, name, id)
      * you could pass all arguments in...then both types of actions occur.
      */
     char *p;
-    char *repfmt[255];
+    char *repfmt[256];
     unsigned short repnum;
     int i;
 
@@ -3151,7 +3151,8 @@ ProcessSubst(s, repl, str, name, id)
 		    goto subst_err;
 		break;
 	    case REP_INT:
-		if (*p == 'd' || *p == 'x' || *p == 'X') {
+		if (*p == 'd' || *p == 'x' || *p == 'X' || *p == 'a' ||
+		    *p == 'A') {
 		    if (s->tokens[(unsigned)(*(repfmt[repnum]))] !=
 			ISNUMBER)
 			goto subst_err;
@@ -3251,20 +3252,27 @@ ProcessSubst(s, repl, str, name, id)
 			case 'X':
 			    base = 16;
 			    break;
+			case 'a':
+			case 'A':
+			    base = 36;
+			    break;
 			default:
 			    return;
 		    }
 		    while (port >= base) {
 			if (port % base >= 10)
 			    BuildStringChar((port % base) - 10 +
-					    (*c == 'x' ? 'a' : 'A'), num);
+					    ((*c == 'x' ||
+					      *c == 'a') ? 'a' : 'A'),
+					    num);
 			else
 			    BuildStringChar((port % base) + '0', num);
 			port /= base;
 		    }
 		    if (port >= 10)
 			BuildStringChar(port - 10 +
-					(*c == 'x' ? 'a' : 'A'), num);
+					((*c == 'x' ||
+					  *c == 'a') ? 'a' : 'A'), num);
 		    else
 			BuildStringChar(port + '0', num);
 

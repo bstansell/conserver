@@ -1,9 +1,24 @@
 				CHANGES
 				=======
 
+version 8.1.11 (Nov 9, 2004):
+	- fixed array bounds and stack tromping - reported by Emmett
+	  Hogan <hogan@bigcityit.com>
+	- most recent client to ask for read-write now gets it (used to
+	  be first client to connect)
+	- client read-write mode now separate from console up/down state
+	- 'make autologin.install' now compiles autologin - reported by
+	  Graham Merrill <teddgram@sbcglobal.net>
+	- new 'autocomplete' option for controlling shortest-prefix
+	  console name matching (which has always been on)
+	- client now blocks on ^Eco, waiting for status of connection
+	- added 'a' and 'A' for upper and lowercase alphanumeric
+	  (0-9a-z) conversions to the *subst config items - based on
+	  patch by Jonathan Chen <jon+conserver@spock.org>
+
 version 8.1.10 (Sep 21, 2004):
-	- fix "forwarding level too deep" issue with '^Ec;' - reported by Han
-	  Pilmeyer <han.pilmeyer@hp.com>
+	- fix "forwarding level too deep" issue with '^Ec;' - reported
+	  by Han Pilmeyer <han.pilmeyer@hp.com>
 
 version 8.1.9 (Jul 14, 2004):
 	- fixed bug processing access lists when duplicates exist in the
@@ -773,5 +788,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.193 2004/09/21 23:45:20 bryan Exp $
+#  $Id: CHANGES,v 1.196 2004/11/09 09:01:41 bryan Exp $
 #

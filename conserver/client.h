@@ -1,5 +1,5 @@
 /*
- *  $Id: client.h,v 5.36 2003/12/25 19:22:00 bryan Exp $
+ *  $Id: client.h,v 5.38 2004/10/25 07:18:18 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -58,6 +58,7 @@ typedef struct client {		/* Connection Information:              */
     short fwantwr;		/* (client) wants to write              */
     short fro;			/* read-only permission                 */
     short fecho;		/* echo commands (not set by machines)  */
+    short fiwait;		/* client wanting for console init      */
     STRING *acid;		/* login and location of client         */
     STRING *peername;		/* location of client                   */
     STRING *username;		/* login of client                      */
@@ -88,3 +89,4 @@ extern void Replay PARAMS((CONSENT *, CONSFILE *, int));
 extern void HelpUser PARAMS((CONSCLIENT *));
 extern void FindWrite PARAMS((CONSENT *));
 extern int ClientAccessOk PARAMS((CONSCLIENT *));
+extern void BumpClient PARAMS((CONSENT *, char *));

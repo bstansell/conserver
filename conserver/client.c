@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.84 2004/05/28 16:39:51 bryan Exp $
+ *  $Id: client.c,v 5.85 2004/10/25 07:18:18 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -67,9 +67,7 @@ FindWrite(pCE)
      * most recent or some such... I guess it doesn't matter that
      * much.
      */
-    if (pCE->pCLwr != (CONSCLIENT *)0 || pCE->fronly ||
-	!(pCE->fup && pCE->ioState == ISNORMAL &&
-	  pCE->initfile == (CONSFILE *)0))
+    if (pCE->pCLwr != (CONSCLIENT *)0 || pCE->fronly)
 	return;
 
     for (pCL = pCE->pCLon; (CONSCLIENT *)0 != pCL; pCL = pCL->pCLnext) {
@@ -87,6 +85,25 @@ FindWrite(pCE)
 	pCE->pCLwr = pCL;
 	return;
     }
+}
+
+void
+#if PROTOTYPES
+BumpClient(CONSENT *pCE, char *message)
+#else
+BumpClient(pCE, message)
+    CONSENT *pCE;
+    char *message;
+#endif
+{
+    if ((CONSCLIENT *)0 == pCE->pCLwr)
+	return;
+
+    if ((char *)0 != message)
+	FileWrite(pCE->pCLwr->fd, FLAGFALSE, message, -1);
+    pCE->pCLwr->fwantwr = 0;
+    pCE->pCLwr->fwr = 0;
+    pCE->pCLwr = (CONSCLIENT *)0;
 }
 
 /* replay last iBack lines of the log file upon connect to console	(ksb)

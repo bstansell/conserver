@@ -45,7 +45,7 @@ clean:
 distclean: clean
 	rm -f Makefile
 
-install:
+install: autologin
 	$(MKDIR) $(DESTDIR)$(bindir)
 	$(INSTALL_PROGRAM) autologin $(DESTDIR)$(bindir)
 

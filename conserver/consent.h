@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.58 2004/06/01 23:45:47 bryan Exp $
+ *  $Id: consent.h,v 5.59 2004/10/25 07:18:18 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -178,3 +178,4 @@ extern REMOTE *FindUniq PARAMS((REMOTE *));
 extern void DestroyRemoteConsole PARAMS((REMOTE *));
 extern void StartInit PARAMS((CONSENT *));
 extern void StopInit PARAMS((CONSENT *));
+extern char *ConsState PARAMS((CONSENT *));
