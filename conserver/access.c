@@ -1,5 +1,5 @@
 /*
- *  $Id: access.c,v 5.18 2001-02-21 17:26:06-08 bryan Exp $
+ *  $Id: access.c,v 5.21 2001-06-15 09:02:02-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -47,6 +47,7 @@ static char copyright[] =
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <ctype.h>
@@ -62,6 +63,7 @@ static char copyright[] =
 #include <group.h>
 #include <readcfg.h>
 #include <main.h>
+#include <output.h>
 
 
 
@@ -136,6 +138,9 @@ char *pattern;
     if (~netmask & pattern_addr)
 	netmask = 0xffffffff;		/* compare entire addresses */
     hostaddr = *(unsigned long int*)hp->h_addr;
+
+    Debug( "Access check:       host=%lx(%lx/%lx)", hostaddr & netmask, hostaddr, netmask );
+    Debug( "Access check:        acl=%lx(%lx/%lx)", pattern_addr & netmask, pattern_addr, netmask );
     return (hostaddr & netmask) != (pattern_addr & netmask);
 }
 
@@ -154,17 +159,15 @@ struct hostent *hp;
 	if ( fDebug ) {
 	    puc = (unsigned char *)hp->h_addr;
 	    sprintf(acAddr, "%d.%d.%d.%d", puc[0], puc[1], puc[2], puc[3]);
-	    fprintf( stderr, "%s: Access check: hostname=%s, ip=%s\n", progname, hp->h_name, acAddr );
+	    Debug( "Access check: hostname=%s, ip=%s", hp->h_name, acAddr );
 	}
 #if ORIGINAL_CODE
 	puc = (unsigned char *)hp->h_addr;
 	sprintf(acAddr, "%d.%d.%d.%d", puc[0], puc[1], puc[2], puc[3]);
 #endif
 	for (i = 0; i < iAccess; ++i) {
-		if ( fDebug ) {
-		    fprintf( stderr, "%s: Access check:    who=%s, trust=%c\n", progname, pACList[i].pcwho, pACList[i].ctrust );
-		}
-		if (isdigit(pACList[i].pcwho[0])) {
+		Debug( "Access check:    who=%s, trust=%c", pACList[i].pcwho, pACList[i].ctrust );
+		if (isdigit((int)(pACList[i].pcwho[0]))) {
 #if ORIGINAL_CODE
 			/* we could allow 128.210.7 to match all on that subnet
 			 * here...
@@ -182,6 +185,7 @@ struct hostent *hp;
 		pcName = hp->h_name;
 		len = strlen(pcName);
 		while (len >= pACList[i].ilen) {
+			Debug( "Access check:       name=%s", pcName );
 			if (0 == strcmp(pcName, pACList[i].pcwho)) {
 				return pACList[i].ctrust;
 			}

@@ -39,3 +39,8 @@
  * TCP connection timeout
  */
 #undef CONNECTTIMEOUT
+
+/*
+ * pidfile to write to
+ */
+#undef PIDFILE

@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.37 2001-05-03 06:04:11-07 bryan Exp $
+ *  $Id: console.c,v 5.39 2001-06-15 08:53:48-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -47,7 +47,7 @@
 
 
 static char rcsid[] =
-	"$Id: console.c,v 5.37 2001-05-03 06:04:11-07 bryan Exp $";
+	"$Id: console.c,v 5.39 2001-06-15 08:53:48-07 bryan Exp $";
 static char *progname =
 	rcsid;
 int fVerbose = 0, fReplay = 0, fRaw = 0;
@@ -70,6 +70,7 @@ OutOfMem()
 /*
  * remove from "host1" those domains common to "host1" and "host2"
  */
+/*
 static char *
 whittle(host1, host2)
 char *host1, *host2;
@@ -88,6 +89,7 @@ char *host1, *host2;
 	}
 	return host1;
 }
+*/
 
 static char
 	acMesg[8192+2],		/* the buffer for startup negotiation	*/
@@ -260,6 +262,7 @@ short sPort;
 #else
 	(void)bzero((char *)pPort, sizeof(*pPort));
 #endif
+	strcpy(acThisHost, acMyName);
 /*
 	if (0 == strcmp(pcToHost, strcpy(acThisHost, acMyName))) {
 		(void)strcpy(pcToHost, acLocalhost);
@@ -528,7 +531,7 @@ char *pcBuf, *pcWant;
 	 * (s/[ \t\r\n]*$//)
 	 */
 	if ((char *)0 == pcWant) {
-		while (0 != j && isspace(pcBuf[j-1])) {
+		while (0 != j && isspace((int)(pcBuf[j-1]))) {
 			pcBuf[--j] = '\000';
 		}
 		return j;
@@ -584,7 +587,7 @@ char *pcPorts, *pcMaster, *pcTo, *pcCmd, *pcWho;
 			exit(8);
 # endif
 #endif
-		} else if (!isdigit(pcPorts[0])) {
+		} else if (!isdigit((int)(pcPorts[0]))) {
 			fprintf(stderr, "%s: %s: %s\n", progname, pcMaster, pcPorts);
 			exit(2);
 		} else {
@@ -680,7 +683,7 @@ int s;
 char *pcMaster, *pcMach, *pcHow, *pcUser;
 {
 	register int nc;
-	register int fIn;
+	register int fIn = '-';
 	auto fd_set rmask, rinit;
 	extern int atoi();
 
@@ -1021,7 +1024,7 @@ char *pcMaster, *pcMach, *pcCmd, *pcWho;
 
 	/* send request for master list
 	 */
-	(void)sprintf(acPorts, "groups\r\n", pcCmd);
+	(void)sprintf(acPorts, "groups\r\n");
 	SendOut(s, acPorts, strlen(acPorts));
 
 	/* get the ports number */
@@ -1140,7 +1143,7 @@ char **argv;
 	auto int fLocal;
 	auto char acPorts[1024];
 	auto char *pcUser;
-	auto char *pcMsg;
+	auto char *pcMsg = '\000';
 	auto int (*pfiCall)();
 	static char acOpts[] = "b:aAdDsSfFe:hl:M:pvVwWUqQrux";
 	extern long atol();
@@ -1166,7 +1169,7 @@ char **argv;
 	    getuid() == pwdMe->pw_uid) {
 		/* use the login $USER is set to, if it is our (real) uid */;
 	} else if ((struct passwd *)0 == (pwdMe = getpwuid(getuid()))) {
-		fprintf(stderr, "%s: getpwuid: %d: %s\n", progname, getuid(), strerror(errno));
+		fprintf(stderr, "%s: getpwuid: %d: %s\n", progname, (int)(getuid()), strerror(errno));
 		exit(1);
 	}
 	pcUser = pwdMe->pw_name;

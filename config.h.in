@@ -51,11 +51,6 @@
 #undef PASSWDFILE
 
 /*
- * Process ID file path
- */
-#undef PIDFILE
-
-/*
  * Number of consoles per child process
  */
 #undef MAXMEMB
@@ -74,6 +69,11 @@
  * TCP connection timeout
  */
 #undef CONNECTTIMEOUT
+
+/*
+ * pidfile to write to
+ */
+#undef PIDFILE
 
 /* Define if you have the flock function.  */
 #undef HAVE_FLOCK

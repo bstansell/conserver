@@ -1,5 +1,5 @@
 /*
- *  $Id: fallback.c,v 5.25 2001-02-21 17:26:06-08 bryan Exp $
+ *  $Id: fallback.c,v 5.27 2001-06-15 11:33:49-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -37,12 +37,12 @@
 
 #if DO_VIRTUAL && ! HAVE_PTYD
 
+#if 0
 static char *__pty_host;
 static char *__pty_fmt;
+#endif
 
-static int iLogPri = LOG_DEBUG;
-
-
+#if ! HAVE_PTSNAME
 /*
  * Below is the string for finding /dev/ptyXX.  For each architecture we
  * leave some pty's world writable because we don't have source for
@@ -71,6 +71,8 @@ static char charone[] =
 static char chartwo[] =
 	"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
+#endif /* ! HAVE_PTSNAME */
+
 # if (defined(_AIX) || defined(PTX4))
 static char acMaster[] =
 	"/dev/ptc/XXXXXXXXX";
@@ -93,7 +95,7 @@ getpseudotty(slave, master)
 char **master, **slave;
 {
 	int fd;
-	char *pcName, *pcTmp;
+	char *pcName;
 
 	if (0 > (fd = open("/dev/ptc", O_RDWR|O_NDELAY, 0))) {
 		return -1;
@@ -122,7 +124,7 @@ getpseudotty(slave, master)
 char **master, **slave;
 {
 	int fd;
-	char *pcName, *pcTmp;
+	char *pcName;
 
 	if (0 > (fd = open("/dev/ptmx", O_RDWR, 0))) {
 		return -1;
@@ -130,9 +132,10 @@ char **master, **slave;
 	grantpt(fd);			/* change permission of slave */
 	unlockpt(fd);			/* unlock slave */
 	if ((char *)0 == (pcName = ttyname(fd))) {
-		return -1;
+		(void)strcpy(acMaster, "/dev/ptmx");
+	} else {
+		(void)strcpy(acMaster, pcName);
 	}
-	(void)strcpy(acMaster, pcName);
 	*master = acMaster;
 
 	if ((char *) 0 == (pcName = ptsname(fd))) {

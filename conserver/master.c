@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.30 2001-02-21 17:26:06-08 bryan Exp $
+ *  $Id: master.c,v 5.36 2001-06-15 09:12:01-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -52,6 +52,7 @@
 #include <readcfg.h>
 #include <version.h>
 #include <main.h>
+#include <output.h>
 
 
 
@@ -77,6 +78,7 @@ FixKids()
 	register int i, pid;
 	auto time_t tyme;
 	auto int UWbuf;
+	char styme[26];
 
 #if HAVE_WAIT3
 	while (-1 != (pid = wait3(& UWbuf, WNOHANG, (struct rusage *)0))) {
@@ -102,7 +104,9 @@ FixKids()
 			 */
 			Spawn(& aGroups[i]);
 			tyme = time((time_t *)0);
-			printf("%s: %s: exit(%d), restarted %s", progname, aGroups[i].pCElist[0].server, WEXITSTATUS(UWbuf), ctime(&tyme));
+			(void)strcpy(styme, ctime(&tyme));
+			styme[24] = '\000';
+			Info("%s: exit(%d), restarted %s", aGroups[i].pCElist[0].server, WEXITSTATUS(UWbuf), styme);
 		}
 	}
 }
@@ -148,7 +152,7 @@ SignalKids(arg)
 		if (0 == aGroups[i].imembers)
 			continue;
 		if (-1 == kill(aGroups[i].pid, arg)) {
-		    fprintf(stderr, "%s: kill: %s\n", progname, strerror(errno));
+		    Error("%s: kill: %s", strerror(errno));
 		}
 	}
 }
@@ -164,7 +168,7 @@ REMOTE
 	register char *pcArgs;
 	register int i, j, cfd;
 	register REMOTE *pRC, *pRCFound;
-	register int nr, prnum, found, msfd;
+	register int nr, prnum = 0, found, msfd;
 	register struct hostent *hpPeer;
 	auto char cType;
 	auto int so;
@@ -195,7 +199,7 @@ REMOTE
 	{
 		struct servent *pSE;
 		if ((struct servent *)0 == (pSE = getservbyname(acService, "tcp"))) {
-			fprintf(stderr, "%s: getservbyname: %s: %s\n", progname, acService, strerror(errno));
+			Error("%s: getservbyname: %s: %s", acService, strerror(errno));
 			return;
 		}
 		master_port.sin_port = pSE->s_port;
@@ -204,26 +208,26 @@ REMOTE
 # if defined(PORTNUMBER)
 	master_port.sin_port = htons((u_short)PORTNUMBER);
 # else
-	fprintf(stderr, "%s: no port or service compiled in?\n", progname);
+	Error("%s: no port or service compiled in?");
 # endif
 #endif
 
 	if ((msfd=socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		fprintf(stderr, "%s: socket: %s\n", progname, strerror(errno));
+		Error("%s: socket: %s", strerror(errno));
 		return;
 	}
 #if  HAVE_SETSOCKOPT
 	if (setsockopt(msfd, SOL_SOCKET, SO_REUSEADDR, (char *)&true, sizeof(true))<0) {
-		fprintf(stderr, "%s: setsockopt: %s\n", progname, strerror(errno));
+		Error("%s: setsockopt: %s", strerror(errno));
 		return;
 	}
 #endif
 	if (bind(msfd, (struct sockaddr *)&master_port, sizeof(master_port))<0) {
-		fprintf(stderr, "%s: bind: %s\n", progname, strerror(errno));
+		Error("%s: bind: %s", strerror(errno));
 		return;
 	}
 	if (listen(msfd, SOMAXCONN) < 0) {
-		fprintf(stderr, "%s: listen: %s\n", progname, strerror(errno));
+		Error("%s: listen: %s", strerror(errno));
 	}
 
 	FD_ZERO(&rmaster);
@@ -246,7 +250,7 @@ REMOTE
 
 		if (-1 == select(msfd+1, &rmask, (fd_set *)0, (fd_set *)0, (struct timeval *)0)) {
 			if ( errno != EINTR ) {
-			    fprintf(stderr, "%s: select: %s\n", progname, strerror(errno));
+			    Error("%s: select: %s", strerror(errno));
 			}
 			continue;
 		}
@@ -256,7 +260,7 @@ REMOTE
 		so = sizeof(response_port);
 		cfd = accept(msfd, (struct sockaddr *)&response_port, (socklen_t *)&so);
 		if (cfd < 0) {
-			fprintf(stderr, "%s: accept: %s\n", progname, strerror(errno));
+			Error("%s: accept: %s", strerror(errno));
 			continue;
 		}
 
@@ -291,6 +295,7 @@ REMOTE
 			(void)close(cfd);
 			continue;
 		case 0:
+			thepid = getpid();
 			break;
 		}
 #endif
@@ -317,7 +322,7 @@ REMOTE
 			acIn[--i] = '\000';
 		}
 		if (0 == i) {
-			fprintf(stderr, "%s: lost connection\n", progname);
+			Error("%s: lost connection");
 			(void)close(cfd);
 #if TEST_FORK
 			exit(1);
@@ -385,12 +390,13 @@ REMOTE
 		}
 		if (0 == strcmp(acIn, "pid")) {
 #if TEST_FORK
-			sprintf(acOut, "%d\r\n", getppid());
+			sprintf(acOut, "%d\r\n", (int)getppid());
 			(void)write(cfd, acOut, strlen(acOut));
 			exit(0);
 #else
-			sprintf(acOut, "%d\r\n", getpid());
+			sprintf(acOut, "%d\r\n", (int)getpid());
 			(void)write(cfd, acOut, strlen(acOut));
+			(void)close(cfd);
 			continue;
 #endif
 		}
@@ -436,6 +442,7 @@ REMOTE
 		if (0 == strcmp(acIn, "version")) {
 			sprintf(acOut, "version `%s\'\r\n", THIS_VERSION);
 			(void)write(cfd, acOut, strlen(acOut));
+			(void)close(cfd);
 #if TEST_FORK
 			exit(0);
 #else
@@ -444,6 +451,16 @@ REMOTE
 		}
 		if (0 != strcmp(acIn, "call")) {
 			CSTROUT(cfd, "unknown command\r\n");
+			(void)close(cfd);
+#if TEST_FORK
+			exit(0);
+#else
+			continue;
+#endif
+		}
+
+		if ((char *)0 == pcArgs) {
+			CSTROUT(cfd, "call requires argument\r\n");
 			(void)close(cfd);
 #if TEST_FORK
 			exit(0);
@@ -468,6 +485,17 @@ REMOTE
 				++found;
 			}
 		}
+		/* Purposefully hunt for another match - this will detect
+		 * duplicates - a bad state to be in.
+		 * Does the readcfg.c code even check for dups?
+		 */
+		for (pRC = pRCList; (REMOTE *)0 != pRC; pRC = pRC->pRCnext) {
+			if (0 != strcmp(pcArgs, pRC->rserver)) {
+				continue;
+			}
+			++found;
+			pRCFound = pRC;
+		}
 		if ( found == 0 ) {	/* Then look for substring matches */
 		    for (i = 0; i < MAXGRP; ++i) {
 			    if (0 == aGroups[i].imembers)
@@ -479,15 +507,16 @@ REMOTE
 				prnum = ntohs((u_short)aGroups[i].port);
 				++found;
 			}
-		}
-		}
-		/* look for a remote server */
-		for (pRC = pRCList; (REMOTE *)0 != pRC; pRC = pRC->pRCnext) {
-			if (0 != strncmp(pcArgs, pRC->rserver, strlen(pcArgs))) {
-				continue;
-			}
-			++found;
-			pRCFound = pRC;
+		    }
+		    /* look for a remote server */
+		    /* again, looks for dups with local consoles */
+		    for (pRC = pRCList; (REMOTE *)0 != pRC; pRC = pRC->pRCnext) {
+			    if (0 != strncmp(pcArgs, pRC->rserver, strlen(pcArgs))) {
+				    continue;
+			    }
+			    ++found;
+			    pRCFound = pRC;
+		    }
 		}
 		switch (found) {
 		case 0:
@@ -495,7 +524,7 @@ REMOTE
 			break;
 		case 1:
 			if ((REMOTE *)0 != pRCFound) {
-				sprintf(acOut, "@%s\r\n", pRCFound->rhost, pcArgs);
+				sprintf(acOut, "@%s\r\n", pRCFound->rhost);
 			} else {
 				sprintf(acOut, "%d\r\n", prnum);
 			}

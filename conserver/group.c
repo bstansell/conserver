@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.66 2001-02-21 17:26:06-08 bryan Exp $
+ *  $Id: group.c,v 5.72 2001-06-15 11:33:49-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -82,6 +82,7 @@ All rights reserved.\n";
 #include <group.h>
 #include <version.h>
 #include <main.h>
+#include <output.h>
 
 #if DO_VIRTUAL
 # if HAVE_PTYD
@@ -225,12 +226,55 @@ Mark()
 	    if (-1 == pCE->fdlog) {
 		    continue;
 	    }
-	    if ( pCE->nextMark && (tyme >= pCE->nextMark) ) {
+	    if ( (pCE->nextMark > 0) && (tyme >= pCE->nextMark) ) {
 		(void)write(pCE->fdlog, acOut, strlen(acOut));
 		pCE->nextMark = tyme + pCE->mark;
 	    }
     }
     alarm(ALARMTIME);
+}
+
+void
+writeLog(pCE, s, len)
+CONSENT *pCE;
+char *s;
+int len;
+{
+    time_t tyme;
+    char styme[26];
+    char acOut[BUFSIZ];
+    int i = 0;
+    int j;
+
+    if (-1 == pCE->fdlog) {
+	    return;
+    }
+    if ( pCE->mark >= 0 ) { /* no line marking */
+	(void)write(pCE->fdlog, s, len);
+	return;
+    }
+    acOut[0] = '\000';
+    for (j=0; j<len; j++) {
+	if (s[j] == '\n') {
+	    (pCE->nextMark)++;
+	    Debug( "Found newline for %s (nextMark=%d, mark=%d)", pCE->server, pCE->nextMark, pCE->mark );
+	    if (pCE->nextMark == 0) {
+		(void)write(pCE->fdlog, s+i, j-i+1);
+		i=j+1;
+		if ( acOut[0] == '\000' ) {
+		    tyme = time((time_t *)0);
+		    (void)strcpy(styme, ctime(&tyme));
+		    styme[24] = '\000';
+		    sprintf(acOut, "[%s]", styme);
+		}
+		(void)write(pCE->fdlog, acOut, strlen(acOut));
+		pCE->nextMark = pCE->mark;
+	    }
+	}
+    }
+    if ( i <= j ) {
+	(void)write(pCE->fdlog, s+i, j-i+1);
+    }
 }
 
 void
@@ -263,16 +307,6 @@ FlagGoAway(sig)
 int sig;
 {
     fSawGoAway = 1;
-}
-
-static void
-GoAway()
-{
-	SendShutdownMsg(pGEHup);
-
-	exit(0);
-	_exit(0);
-	abort();
 }
 
 #if DO_VIRTUAL
@@ -314,8 +348,7 @@ static RETSIGTYPE
 ReapVirt(sig)
 int sig;
 {
-	register int i, pid;
-	auto long tyme;
+	register int pid;
 	auto int UWbuf;
 
 # if HAVE_WAIT3
@@ -333,7 +366,20 @@ int sig;
 		}
 	}
 }
-#endif /* DO_VIRUAL */
+
+#else /* DO_VIRTUAL */
+
+static void
+GoAway()
+{
+	SendShutdownMsg(pGEHup);
+
+	exit(0);
+	_exit(0);
+	abort();
+}
+
+#endif /* DO_VIRTUAL */
 
 
 static char acStop[] = {	/* buffer for oob stop command		*/
@@ -354,12 +400,12 @@ char *pw_string;
 #endif
 
     strcpy(username, pCLServing->acid);
-    if ( user = strchr(username, '@') )
+    if ( (user = strchr(username, '@')) )
 	*user = '\000';
 
     if ((fp = fopen(pcPasswd, "r")) == NULL) {
-	printf("%s: Cannot open passwd file %s: %s\n",
-	       progname, pcPasswd, strerror(errno));
+	Info("Cannot open passwd file %s: %s",
+	       pcPasswd, strerror(errno));
 
 	if ((struct passwd *)0 == (pwd = getpwuid(0))) {
 	    CSTROUT(pCLServing->fd, "no root passwd?\r\n");
@@ -367,8 +413,8 @@ char *pw_string;
 	}
 	if (0 != CheckPass(pwd, pw_string, pCLServing->accmd)) {
 		if (fVerbose) {
-		    printf("%s: User %s logging into server %s via root or console passwd\n",
-		       progname, pCLServing->acid, pCLServing->pCEwant->server);
+		    Info("User %s logging into server %s via root or console passwd",
+		       pCLServing->acid, pCLServing->pCEwant->server);
 		}
 		return 1;
 	}
@@ -416,8 +462,8 @@ char *pw_string;
 		while ( server ) {  /* For each server */
 		    if (strcmp(server, "any") == 0) {
 			if (fVerbose) {
-			    printf("%s: User %s logging into server %s\n",
-			       progname, pCLServing->acid, pCLServing->pCEwant->server);
+			    Info("User %s logging into server %s",
+			       pCLServing->acid, pCLServing->pCEwant->server);
 			}
 			fclose(fp);
 			return 1;
@@ -429,8 +475,8 @@ char *pw_string;
 			while ( strlen(p) >= max ) {
 			    if (strcmp(server, p) == 0) {
 				if (fVerbose) {
-				    printf("%s: User %s logging into server %s\n",
-				       progname, pCLServing->acid, pCLServing->pCEwant->server);
+				    Info("User %s logging into server %s",
+				       pCLServing->acid, pCLServing->pCEwant->server);
 				}
 				fclose(fp);
 				return 1;
@@ -468,11 +514,11 @@ register long tyme;
     minutes = minutes % 60;
 
     if ( hours < 24 )
-	sprintf( timestr, "%2d:%02d", hours, minutes );
+	sprintf( timestr, "%2ld:%02ld", hours, minutes );
     else if ( hours < 48 )
-	sprintf( timestr, "%d day", hours / 24 );
+	sprintf( timestr, "%ld day", hours / 24 );
     else
-	sprintf( timestr, "%ddays", hours / 24 );
+	sprintf( timestr, "%lddays", hours / 24 );
 
     return timestr;
 }
@@ -520,8 +566,6 @@ int sfd;
 	register int iConsole;
 	register int i, nr;
 	register struct hostent *hpPeer;
-	register struct passwd *pwd;
-	register char *pcPass;
 	register long tyme;
 	time_t tymee;
 	char stymee[26];
@@ -531,7 +575,7 @@ int sfd;
 	auto fd_set rmask, rinit;
 	auto char acOut[BUFSIZ], acIn[BUFSIZ], acNote[132*2];
 	auto CONSCLIENT dude[MAXMEMB];	/* alloc one set per console	*/
-#if HAVE_RLIMIT
+#if HAVE_GETRLIMIT
 	struct rlimit rl;
 #endif
 #if HAVE_TERMIOS_H
@@ -598,7 +642,7 @@ int sfd;
 	 * we used to do in the loop, but we have to mod rinit whenever
 	 * we add a connection or drop one...	(ksb)
 	 */
-#if HAVE_RLIMIT
+#if HAVE_GETRLIMIT
 	getrlimit(RLIMIT_NOFILE, &rl);
 	maxfd = rl.rlim_cur;
 #else
@@ -665,7 +709,7 @@ int sfd;
 
 		if (-1 == select(maxfd, &rmask, (fd_set *)0, (fd_set *)0, (struct timeval *)0)) {
 		    if ( errno != EINTR ) {
-			fprintf(stderr, "%s: select: %s\n", progname, strerror(errno));
+			Error( "select: %s", strerror(errno));
 		    }
 		    continue;
 		}
@@ -680,7 +724,7 @@ int sfd;
 			/* read terminal line */
 			if ((nr = read(pCEServing->fdtty, acIn, sizeof(acIn))) <= 0) {
 				/* carrier lost */
-				fprintf(stderr, "%s: lost carrier on %s (%s)!\n", progname, pCEServing->server, pCEServing->dfile);
+				Error( "lost carrier on %s (%s)!", pCEServing->server, pCEServing->dfile);
 #if DO_VIRTUAL
 				if (pCEServing->fvirtual) {
 					FD_CLR(pCEServing->fdtty, &rinit);
@@ -705,7 +749,7 @@ int sfd;
 			/* log it and write to all connections on this server
 			 */
 			if ( !pCEServing->nolog ) {
-			    (void)write(pCEServing->fdlog, acIn, nr);
+			    (void)writeLog(pCEServing, acIn, nr);
 			}
 
 			/* output all console info nobody is attached
@@ -745,7 +789,7 @@ int sfd;
 			pCEServing = pCLServing->pCEto;
 #if DEBUG
 			if ((pCLServing->fwr != 0) != (pCEServing->pCLwr == pCLServing)) {
-				fprintf(stderr, "%s: internal check failed  %s on %s\n", progname, pCLServing->acid, pCEServing->server);
+				Error( "internal check failed  %s on %s", pCLServing->acid, pCEServing->server);
 			}
 #endif
 			/* read connection */
@@ -761,7 +805,7 @@ drop:
 					tymee = time((time_t *)0);
 					(void)strcpy(stymee, ctime(&tymee));
 					stymee[24] = '\000';
-					printf("%s: %s: logout %s [%s]\n", progname, pCEServing->server, pCLServing->acid, stymee);
+					Info("%s: logout %s [%s]", pCEServing->server, pCLServing->acid, stymee);
 				}
 				if (fNoinit && (CONSCLIENT *)0 ==
 				    pCLServing->pCEto->pCLon->pCLnext)
@@ -853,7 +897,7 @@ drop:
 					CSTROUT(pCLServing->fd, "Name too long.\r\n");
 					goto drop;
 				}
-				if (!isspace(acIn[i])) {
+				if (!isspace((int)(acIn[i]))) {
 					pCLServing->acid[pCLServing->icursor++] = acIn[i];
 					continue;
 				}
@@ -874,7 +918,7 @@ drop:
 					CSTROUT(pCLServing->fd, "Host too long.\r\n");
 					goto drop;
 				}
-				if (!isspace(acIn[i])) {
+				if (!isspace((int)(acIn[i]))) {
 					pCLServing->accmd[pCLServing->icursor++] = acIn[i];
 					continue;
 				}
@@ -931,20 +975,9 @@ drop:
 				}
 				pCLServing->icursor = 0;
 
-				/* in the CONFIGFILE file gave this group a
-				 * password use it before root's
-				 * password  (for malowany)
-				 */
-/*
-				if ((struct passwd *)0 == (pwd = getpwuid(0))) {
-					CSTROUT(pCLServing->fd, "no root passwd?\r\n");
-					goto drop;
-				}
-				if (0 == CheckPass(pwd, pGE->passwd, pCLServing->accmd)) {
-}*/
 				if (0 == CheckPasswd( pCLServing, pGE->passwd)) {
 					CSTROUT(pCLServing->fd, "Sorry.\r\n");
-					printf("%s: %s: %s: bad passwd\n", progname, pCLServing->pCEwant->server, pCLServing->acid);
+					Info("%s: %s: bad passwd", pCLServing->pCEwant->server, pCLServing->acid);
 					goto drop;
 				}
 	shift_console:
@@ -967,9 +1000,9 @@ drop:
 					(void)strcpy(stymee, ctime(&tymee));
 					stymee[24] = '\000';
 					if (&CECtl == pCEServing) {
-						printf("%s: %s: login %s [%s]\n", progname, pCLServing->pCEwant->server, pCLServing->acid, stymee);
+						Info("%s: login %s [%s]", pCLServing->pCEwant->server, pCLServing->acid, stymee);
 					} else {
-						printf("%s: %s moves from %s to %s [%s]\n", progname, pCLServing->acid, pCEServing->server, pCLServing->pCEwant->server, stymee);
+						Info("%s moves from %s to %s [%s]", pCLServing->acid, pCEServing->server, pCLServing->pCEwant->server, stymee);
 					}
 /*				} */
 
@@ -1008,7 +1041,7 @@ drop:
 
 			case S_QUOTE:	/* send octal code		*/
 				/* must type in 3 octal digits */
-				if (isdigit(acIn[i])) {
+				if (isdigit((int)(acIn[i]))) {
 					pCLServing->accmd[0] *= 8;
 					pCLServing->accmd[0] += acIn[i] - '0';
 					if (++(pCLServing->icursor) < 3) {
@@ -1207,9 +1240,9 @@ drop:
 						}
 					} else if (pCL == pCLServing) {
 						if ( pCEServing->nolog ) {
-						    sprintf(acOut, "ok (nologging)]\r\n", pCL->acid);
+						    sprintf(acOut, "ok (nologging)]\r\n");
 						} else {
-						    sprintf(acOut, "ok]\r\n", pCL->acid);
+						    sprintf(acOut, "ok]\r\n");
 						}
 					} else {
 						pCLServing->fwantwr = 1;
@@ -1433,7 +1466,7 @@ drop:
 						pCLServing->fwr = 1;
 						sprintf(acOut, "up -- attached]\r\n");
 					} else if (pCL == pCLServing) {
-						sprintf(acOut, "up]\r\n", pCL->acid);
+						sprintf(acOut, "up]\r\n");
 					} else {
 						sprintf(acOut, "up, %s is attached]\r\n", pCL->acid);
 					}
@@ -1627,7 +1660,7 @@ unknown:
 		so = sizeof(struct sockaddr_in);
 		pCLFree->fd = accept(sfd, (struct sockaddr *)&pCLFree->cnct_port, (socklen_t *)&so);
 		if (pCLFree->fd < 0) {
-			fprintf(stderr, "%s: accept: %s\n", progname, strerror(errno));
+			Error( "accept: %s", strerror(errno));
 			continue;
 		}
 
@@ -1659,7 +1692,7 @@ unknown:
 
 		/* init the identification stuff
 		 */
-		sprintf(pCL->acid, "client@%.*s", sizeof(pCL->acid)-10, hpPeer->h_name);
+		sprintf(pCL->acid, "client@%.*s", (int)(sizeof(pCL->acid)-10), hpPeer->h_name);
 	pCL->typetym = pCL->tym = time((time_t *)0);
 		(void)strcpy(pCL->actym, ctime(&(pCL->tym)));
 		pCL->actym[24] = '\000';
@@ -1744,23 +1777,23 @@ GRPENT *pGE;
 	 * (prepared by master so he can see the port number of the kid)
 	 */
 	if ((sfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		fprintf(stderr, "%s: socket: %s\n", progname, strerror(errno));
+		Error( "socket: %s", strerror(errno));
 		exit(9);
 	}
 #if HAVE_SETSOCKOPT
 	if (setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, (char *)&true, sizeof(true))<0) {
-		fprintf(stderr, "%s: setsockopt: %s\n", progname, strerror(errno));
+		Error( "setsockopt: %s", strerror(errno));
 		exit(9);
 	}
 #endif
 	if (bind(sfd, (struct sockaddr *)&lstn_port, sizeof(lstn_port))<0) {
-		fprintf(stderr, "%s: bind: %s\n", progname, strerror(errno));
+		Error( "bind: %s", strerror(errno));
 		exit(9);
 	}
 	so = sizeof(lstn_port);
 
 	if (-1 == getsockname(sfd, (struct sockaddr *)&lstn_port, (socklen_t *)&so)) {
-		fprintf(stderr, "%s: getsockname: %s\n", progname, strerror(errno));
+		Error( "getsockname: %s", strerror(errno));
 		exit(9);
 	}
 	pGE->port = lstn_port.sin_port;
@@ -1769,7 +1802,7 @@ GRPENT *pGE;
 	(void)fflush(stdout);
 	switch (pid = fork()) {
 	case -1:
-		fprintf(stderr, "%s: fork: %s\n", progname, strerror(errno));
+		Error( "fork: %s", strerror(errno));
 		exit(1);
 	default:
 		(void)close(sfd);
@@ -1777,10 +1810,11 @@ GRPENT *pGE;
 		return;
 	case 0:
 		sleep(1);	/* pause to let master get ready */
+		thepid = getpid();
 		break;
 	}
 	if (listen(sfd, SOMAXCONN) < 0) {
-		fprintf(stderr, "%s: listen: %s\n", progname, strerror(errno));
+		Error( "listen: %s", strerror(errno));
 		exit(9);
 	}
 	Kiddie(pGE, sfd);
@@ -1788,7 +1822,7 @@ GRPENT *pGE;
 	/* should never get here...
 	 */
 	(void)close(sfd);
-	fprintf(stderr, "%s: internal flow error\n", progname);
+	Error( "internal flow error" );
 	exit(1);
 	/*NOTREACHED*/
 }

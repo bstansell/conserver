@@ -1,5 +1,5 @@
 /*
- *  $Id: main.h,v 5.17 2001-02-21 17:26:06-08 bryan Exp $
+ *  $Id: main.h,v 5.18 2001-06-12 19:18:58-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -46,6 +46,7 @@ extern struct sockaddr_in in_port;
 extern char acMyHost[];
 extern char acMyAddr[];
 extern int domainHack;
+extern int thepid;
 
 #if defined(SERVICENAME)
 extern char acService[];

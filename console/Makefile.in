@@ -37,7 +37,7 @@ all: $(ALL)
 console: $(CONSOLE_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o console $(CONSOLE_OBJS) $(LIBS)
 
-%.o: $(srcdir)/%.c $(CONSOLE_HDRS)
+.c.o:
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
 
 clean:
@@ -46,7 +46,7 @@ clean:
 distclean: clean
 	rm -f Makefile
 
-install:
+install: console
 	$(MKDIR) $(DESTDIR)$(bindir)
 	$(INSTALL_PROGRAM) console $(DESTDIR)$(bindir)
 	$(MKDIR) $(DESTDIR)$(mandir)/man1

@@ -3,6 +3,8 @@
 
 Quickie Instructions
 
+	- Download conserver (http://www.conserver.com/) and unpack
+
 	- Run './configure'
 
 	- If all is well, run 'make install'
@@ -20,9 +22,10 @@ Detailed Instructions
 	--with-master=MASTER    Specify master server hostname [console]
 	--with-cffile=CFFILE    Specify config filename [conserver.cf] 
 	--with-pwdfile=PWDFILE  Specify password filename [conserver.passwd] 
+	--with-pidfile=PIDFILE  Specify PID filepath [/var/run/conserver.pid]
 	--with-maxmemb=MAXMEMB  Specify maximum consoles per process [8]
 	--with-maxgrp=MAXGRP    Specify maximum number of processes [32]
-	--enable-8bit           Enable 8bit data path 
+	--disable-8bit          Disable 8bit data path 
 	--with-timeout=TIMEOUT  Specify connect() timeout in seconds [10]
 
       Not surprisingly, some match the old conserver/cons.h items...here
@@ -82,5 +85,5 @@ Detailed Instructions
     - That's it!  Just start up the console server and enjoy!
 
 #
-#  $Id: INSTALL,v 1.8 2001-02-18 21:50:14-08 bryan Exp $
+#  $Id: INSTALL,v 1.10 2001-06-15 09:48:58-07 bryan Exp $
 #

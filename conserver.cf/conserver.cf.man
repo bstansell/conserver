@@ -1,4 +1,4 @@
-.\" $Id: conserver.cf.man,v 1.6 2000-12-11 17:49:08-08 bryan Exp $
+.\" $Id: conserver.cf.man,v 1.7 2001-06-15 07:11:37-07 bryan Exp $
 .\" @(#)constab.5 01/06/91 OSU CIS; Thomas A. Fine
 .TH CONSERVER.CF 4 "Local"
 .SH NAME
@@ -7,11 +7,11 @@ conserver.cf \- table of server console terminals used by conserver(8L)
 .br
 LOGDIR=\fIlogdirectory\fP
 .br
-\fIserver\fP:\fIdevice\fP[@\fIconserver\fP]:\fIbaud\fP:\fIlogfile\fP:\fImark-interval\fP[\fIm|h|d\fP]
+\fIserver\fP:\fIdevice\fP[@\fIconserver\fP]:\fIbaud\fP:\fIlogfile\fP:\fImark-interval\fP[\fIm|h|d|l\fP]
 .br
-\fIserver\fP:!\fIhost\fP[@\fIconserver\fP]:\fIport\fP:\fIlogfile\fP:\fImark-interval\fP[\fIm|h|d\fP]
+\fIserver\fP:!\fIhost\fP[@\fIconserver\fP]:\fIport\fP:\fIlogfile\fP:\fImark-interval\fP[\fIm|h|d|l\fP]
 .br
-\fIserver\fP:|\fIcommand\fP[@\fIconserver\fP]::\fIlogfile\fP:\fImark-interval\fP[\fIm|h|d\fP]
+\fIserver\fP:|\fIcommand\fP[@\fIconserver\fP]::\fIlogfile\fP:\fImark-interval\fP[\fIm|h|d|l\fP]
 .br
 \fB%%\fP
 .br
@@ -49,9 +49,14 @@ this server is logged.  Any occurance of `&' will be replaced with
 the \fIserver\fP name.  Any path that doesn't begin with a `/' will
 have \fIlogdirectory\fP (value of LOGDIR) prepended to it.
 .PP
-\fImark-interval\fP[\fIm|h|d\fP] - specifies the time between
+\fImark-interval\fP[\fIm|h|d|l\fP] - specifies the time between
 timestamps applied to the console log file.  The timestamps look like
-`[-- MARK -- Mon Jan 25 14:46:56 PST 1999]'.
+`[-- MARK -- Mon Jan 25 14:46:56 PST 1999]'.  The `m', `h', and `d' tags
+specify `minutes', `hours', and `days'.  The `l' tag specifies `lines'
+and will cause timestamps of the form `[Mon Jan 25 14:46:56 PST 1999]' to
+be placed every \fImark-interval\fP lines (a newline character signifies
+a new line). So, `5h' specifies every 5 hours and `2l' specifies every
+two lines.
 .PP
 This section is terminated with a `%%' token on a line by itself.
 .PP

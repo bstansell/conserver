@@ -1,0 +1,25 @@
+Bits of some relavent communication from Paul Heinlein:
+
+    Date: Tue, 17 Apr 2001 13:19:46 -0700 (PDT)
+    From: Paul Heinlein <heinlein@measurecast.com>
+    To: Bryan Stansell <bryan@conserver.com>
+    Subject: Red Hat conserver init script for Linux
+
+    Below my sig I've pasted an init script that will start and stop
+    conserver on Red Hat Linux. It's set up to work with the chkconfig
+    runlevel manager that ships with Red Hat.
+
+    ----------------------------------------------
+
+    Date: Tue, 17 Apr 2001 15:58:18 -0700 (PDT)
+    From: Paul Heinlein <heinlein@measurecast.com>
+    To: Bryan Stansell <bryan@conserver.com>
+    Subject: Re: Conserver patch
+
+    If this spec file goes in the root directory of the distribution as
+    conserver.spec, then Red Hat users will be able to build rpms by doing no
+    more than
+
+    % rpm -ta conserver-7.x.x.tar.gz
+
+    I'll be happy to do any tweaking necessary to get this to work.

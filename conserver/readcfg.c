@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.31 2001-02-21 17:26:06-08 bryan Exp $
+ *  $Id: readcfg.c,v 5.35 2001-06-15 09:04:41-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -55,6 +55,7 @@
 #include <readcfg.h>
 #include <master.h>
 #include <main.h>
+#include <output.h>
 
 
 GRPENT
@@ -103,7 +104,7 @@ register FILE *fp;
 
 		++iLine;
 		for (pcRem = acIn+strlen(acIn)-1; pcRem >= acIn; --pcRem) {
-			if (!isspace(*pcRem))
+			if (!isspace((int)(*pcRem)))
 				break;
 			*pcRem = '\000';
 			if (pcRem == acIn)
@@ -124,14 +125,14 @@ register FILE *fp;
 			    domainHack = 1;
 			} else {
 			    *pcLine = '=';
-			    fprintf(stderr, "%s: %s(%d) bad variable line `%s'\n", progname, pcFile, iLine, acIn);
+			    Error( "%s(%d) bad variable line `%s'", pcFile, iLine, acIn);
 			}
 			continue;
 		}
 		if ( (char *)0 == (pcLine = strchr(acIn, ':')) ||
 		     (char *)0 == (pcMode = strchr(pcLine+1, ':')) ||
 		     (char *)0 == (pcLog  = strchr(pcMode+1, ':'))) {
-			fprintf(stderr, "%s: %s(%d) bad config line `%s'\n", progname, pcFile, iLine, acIn);
+			Error( "%s(%d) bad config line `%s'", pcFile, iLine, acIn);
 			continue;
 		}
 		*pcLine++ = '\000';
@@ -156,12 +157,12 @@ register FILE *fp;
 
 			if ((struct hostent *)0 ==
 			    (hpMe = gethostbyname(pcRem))) {
-				fprintf(stderr, "%s: gethostbyname: %s\n", progname, hstrerror(h_errno));
+				Error( "gethostbyname(%s): %s", pcRem, hstrerror(h_errno));
 				exit(1);
 			}
 			if (4 != hpMe->h_length ||
 			    AF_INET != hpMe->h_addrtype) {
-				fprintf(stderr, "%s: wrong address size (4 != %d) or address family (%d != %d)\n", progname, hpMe->h_length, AF_INET, hpMe->h_addrtype);
+				Error( "wrong address size (4 != %d) or address family (%d != %d)", hpMe->h_length, AF_INET, hpMe->h_addrtype);
 				exit(1);
 			}
 
@@ -184,7 +185,7 @@ register FILE *fp;
 				*ppRC = pRCTemp;
 				ppRC = & pRCTemp->pRCnext;
 				if (fVerbose) {
-					printf("%s: %s remote on %s\n", progname, acIn, pcRem);
+					Info("%s remote on %s", acIn, pcRem);
 				}
 				continue;
 			}
@@ -196,7 +197,7 @@ register FILE *fp;
 			++iG;
 		}
 		if (iG < minG || iG >= MAXGRP) {
-			fprintf(stderr, "%s: %s(%d) group number out of bounds %d <= %d < %d\n", progname, pcFile, iLine, minG, iG, MAXGRP);
+			Error( "%s(%d) group number out of bounds %d <= %d < %d", pcFile, iLine, minG, iG, MAXGRP);
 			exit(1);
 		}
 		minG = iG;
@@ -205,13 +206,13 @@ register FILE *fp;
 			pGE->pCElist = pCE;
 		}
 		if (pGE->imembers > MAXMEMB) {
-			fprintf(stderr, "%s: %s(%d) group %d has more than %d members -- but we'll give it a spin\n", progname, pcFile, iLine, iG, MAXMEMB);
+			Error( "%s(%d) group %d has more than %d members -- but we'll give it a spin", pcFile, iLine, iG, MAXMEMB);
 		}
 
 		/* fill in the console entry
 		 */
 		if (sizeof(aConsoles)/sizeof(CONSENT) == iLocal) {
-			fprintf(stderr, "%s: %s(%d) %d is too many consoles for hard coded tables, adjust MAXGRP or MAXMEMB\n", progname, pcFile, iLine, iLocal);
+			Error( "%s(%d) %d is too many consoles for hard coded tables, adjust MAXGRP or MAXMEMB", pcFile, iLine, iLocal);
 			exit(1);
 		}
 		(void)strcpy(pCE->server, acIn);
@@ -239,27 +240,33 @@ register FILE *fp;
 		}
 
 		if ( pcMark ) {
-		    int factor;
+		    int factor = 0;
 		    char *p;
 		    p = pcMark + strlen(pcMark) - 1;
-		    if ( *p == 'm' ) {
+		    if ( *p == 'm' || *p == 'M' ) {
 			factor = 60;
-		    } else if ( *p == 'h' ) {
+		    } else if ( *p == 'h' || *p == 'H' ) {
 			factor = 60 * 60;
-		    } else if ( *p == 'd' ) {
+		    } else if ( *p == 'd'  || *p == 'D') {
 			factor = 60 * 60 * 24;
+		    } else if ( *p == 'l'  || *p == 'L') {
+			factor = -1;
 		    } else {
-			fprintf(stderr, "%s: %s(%d) bad mark specification `%s'\n", progname, pcFile, iLine, pcMark);
+			Error( "%s(%d) bad mark specification `%s'", pcFile, iLine, pcMark);
 			pcMark = 0;
-			factor = 0;
 		    }
 		    if ( factor ) {
 			*p = '\000';
-			pCE->mark = atoi(pcMark) * factor;
-			pCE->nextMark = tyme + pCE->mark;
+			pCE->mark = atoi(pcMark);
 			if ( pCE->mark < 0 ) {
-			    fprintf(stderr, "%s: %s(%d) negative mark specification `%s'\n", progname, pcFile, iLine, pcMark);
+			    Error( "%s(%d) negative mark specification `%s'", pcFile, iLine, pcMark);
 			    pcMark = 0;
+			}
+			pCE->mark = pCE->mark * factor;
+			if ( factor > 0 ) {
+			    pCE->nextMark = tyme + pCE->mark;
+			} else {
+			    pCE->nextMark = pCE->mark;
 			}
 		    }
 		}
@@ -275,8 +282,8 @@ register FILE *fp;
 		    pCE->networkConsolePort = atoi(pcMode);
 		    
 		    if (fVerbose) {
-			printf("%s: %d: %s is network on %s/%d logged to %s\n",
-			       progname, iG, acIn, pCE->networkConsoleHost,
+			Info("%d: %s is network on %s/%d logged to %s",
+			       iG, acIn, pCE->networkConsoleHost,
 			       pCE->networkConsolePort, pCE->lfile);
 		    }
 		    pCE->fvirtual = 0;
@@ -300,7 +307,7 @@ register FILE *fp;
 		pCE->ipid = -1;
 #else
 		if ('|' == pcLine[0]) {
-			fprintf(stderr, "%s: %s(%d) this server doesn't provide any virtual console support\n", progname, pcFile, iLine);
+			Error( "%s(%d) this server doesn't provide any virtual console support", pcFile, iLine);
 			exit(9);
 		}
 		(void)strcpy(pCE->dfile, pcLine);
@@ -316,10 +323,10 @@ register FILE *fp;
 		if (fVerbose) {
 #if DO_VIRTUAL
 			if (pCE->fvirtual)
-				printf("%s: %d: %s with command `%s' logged to %s\n", progname, iG, acIn, pCE->pccmd, pCE->lfile);
+				Info("%d: %s with command `%s' logged to %s", iG, acIn, pCE->pccmd, pCE->lfile);
 			else
 #endif
-				printf("%s: %d: %s is on %s (%s%c) logged to %s\n", progname, iG, acIn, pCE->dfile, pCE->pbaud->acrate, pCE->pparity->ckey, pCE->lfile);
+				Info("%d: %s is on %s (%s%c) logged to %s", iG, acIn, pCE->dfile, pCE->pbaud->acrate, pCE->pparity->ckey, pCE->lfile);
 		    }
 		}
 		++pCE, ++iLocal;
@@ -337,7 +344,7 @@ register FILE *fp;
 
 		++iLine;
 		for (pcRem = acIn+strlen(acIn)-1; pcRem >= acIn; --pcRem) {
-			if (!isspace(*pcRem))
+			if (!isspace((int)(*pcRem)))
 				break;
 			*pcRem = '\000';
 			if (pcRem == acIn)
@@ -350,12 +357,12 @@ register FILE *fp;
 			break;
 		}
 		if ((char *)0 == (pcNext = strchr(acIn, ':'))) {
-			fprintf(stderr, "%s: %s(%d) missing colon?\n", progname, pcFile, iLine);
+			Error( "%s(%d) missing colon?", pcFile, iLine);
 			exit(3);
 		}
 		do {
 			*pcNext++ = '\000';
-		} while (isspace(*pcNext));
+		} while (isspace((int)(*pcNext)));
 		switch (acIn[0]) {
 		case 'a':		/* allowed, allow, allows	*/
 		case 'A':
@@ -370,14 +377,14 @@ register FILE *fp;
 			cType = 't';
 			break;
 		default:
-			fprintf(stderr, "%s: %s(%d) unknown access key `%s\'\n", progname, pcFile, iLine, acIn);
+			Error( "%s(%d) unknown access key `%s\'", pcFile, iLine, acIn);
 			exit(3);
 		}
 		while ('\000' != *(pcMach = pcNext)) {
-			while ('\000' != *pcNext && !isspace(*pcNext)) {
+			while ('\000' != *pcNext && !isspace((int)(*pcNext))) {
 				++pcNext;
 			}
-			while ('\000' != *pcNext && isspace(*pcNext)) {
+			while ('\000' != *pcNext && isspace((int)(*pcNext))) {
 				*pcNext++ = '\000';
 			}
 			if (iAccess < iG) {

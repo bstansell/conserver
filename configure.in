@@ -203,15 +203,15 @@ fi
 
 
 
-dnl ### Check for needed functions. ################################
-AC_CHECK_FUNCS(getopt strerror getrlimit getsid setsid getuserattr setgroups tcgetpgrp tcsetpgrp tcgetattr tcsetattr tcsendbreak setpgrp getutent setttyent wait3 getspnam setlinebuf setvbuf getpseudo ptsname flock sigaction setsockopt getdtablesize putenv memset memcpy memcmp)
-AC_FUNC_SETPGRP
-
-
 dnl ### Check for libraries. #######################################
 AC_CHECK_LIB(socket,socket)
 AC_CHECK_LIB(nsl,gethostbyname)
 AC_CHECK_LIB(crypt,crypt)
+
+
+dnl ### Check for needed functions. ################################
+AC_CHECK_FUNCS(getopt strerror getrlimit getsid setsid getuserattr setgroups tcgetpgrp tcsetpgrp tcgetattr tcsetattr tcsendbreak setpgrp getutent setttyent wait3 getspnam setlinebuf setvbuf getpseudo ptsname flock sigaction setsockopt getdtablesize putenv memset memcpy memcmp)
+AC_FUNC_SETPGRP
 
 
 dnl ### Create output files. #######################################

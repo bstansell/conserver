@@ -1,6 +1,25 @@
 				CHANGES
 				=======
 
+version 7.0.2 (Jun 15, 2001):
+	- Bogus "ambiguous server abbreviation" with distributed server
+	  setup fixed
+	- Hostname not passed with username from console client
+	- Fixed pseudo-terminal ('|' syntax in .cf file) bug with Solaris
+	  and other STREAMS-based systems (actually works now in 7.X)
+	- Line-oriented timestamps in logfiles (see 'l' mark
+	  specification) based on patch from Benn Oshrin
+	  <benno@columbia.edu>
+	- Generalized debugging output, info messages and error messages
+	- Moved library search up in configure.in so function calls are
+	  detected properly
+	- Permissions of install-sh were wrong
+	- Trimmed the README file and now distribute conserver.html
+	- Redhat RPM bundle (contrib/redhat-rpm) contributed by Paul
+	  Heinlein <heinlein@measurecast.com>
+	- Cleaned up gcc warnings (for Solaris 7, at least)
+	- Makefiles now use .c.o: specification instead of %.o:
+
 version 7.0.1 (May 3, 2001):
 	- 8bit on by default now (use --disable-8bit for old behavior)
 	- FreeBSD patches by Bill Fenner <fenner@research.att.com>
@@ -109,5 +128,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.25 2001-05-03 06:44:01-07 bryan Exp $
+#  $Id: CHANGES,v 1.28 2001-06-15 17:36:53-07 bryan Exp $
 #

@@ -1,0 +1,49 @@
+#!/bin/sh
+#
+# conserver -- serial-port console daemon
+#
+# chkconfig: 2345 92 08
+# description: conserver is a serial-port console daemon
+# config: /etc/conserver.cf
+#
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+# Source networking configuration.
+. /etc/sysconfig/network
+
+# Check that networking is up.
+[  ${NETWORKING} = "no" ] && exit 0
+
+# make sure conserver is installed and executable
+[ -x /usr/sbin/conserver  ] || exit 1
+
+
+# See how we were called.
+case "$1" in
+  start)
+    echo -n "Starting conserver: "
+    daemon conserver -d -n
+    echo
+    touch /var/lock/subsys/conserver
+    ;;
+  stop)
+    echo -n "Shutting down conserver: "
+    killproc conserver
+    echo
+    rm -f /var/lock/subsys/conserver
+    ;;
+  status)
+    status conserver
+    ;;
+  restart)
+    $0 stop
+    $0 start
+    ;;
+  *)
+    echo "Usage: conserver {start|stop|restart|status}"
+    exit 1
+esac
+
+exit 0

@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.41 2001-05-03 06:31:33-07 bryan Exp $
+ *  $Id: consent.c,v 5.47 2001-06-15 11:33:49-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -63,6 +63,7 @@ static char copyright[] =
 #include <consent.h>
 #include <client.h>
 #include <main.h>
+#include <output.h>
 
 
 struct hostcache *hostcachelist=NULL;
@@ -136,11 +137,11 @@ char *pcMode;
 	register int i;
 	auto char acFirst;
 
-	while (isdigit(*pcMode)) {
+	while (isdigit((int)(*pcMode))) {
 		++pcMode;
 	}
 	acFirst = *pcMode;
-	if (isupper(acFirst))
+	if (isupper((int)(acFirst)))
 		acFirst = tolower(acFirst);
 	for (i = 0; i < sizeof(parity)/sizeof(struct parity); ++i) {
 		if (acFirst != parity[i].ckey)
@@ -164,7 +165,7 @@ CONSENT *pCE;
 	/* here we should fstat for `read-only' checks
 	 */
 	if (-1 == fstat(pCE->fdtty, & stPerm)) {
-		fprintf(stderr, "%s: fstat: %s: %s\n", progname, pCE->dfile, strerror(errno));
+		Error( "fstat: %s: %s", pCE->dfile, strerror(errno));
 	} else if (0 == (stPerm.st_mode & 0222)) {
 		/* any device that is read-only we won't write to
 		 */
@@ -175,7 +176,7 @@ CONSENT *pCE;
 	 * Get terminal attributes
 	 */
 	if (-1 == tcgetattr(pCE->fdtty, &termp)) {
-		fprintf(stderr, "%s: tcgetattr: %s(%d): %s\n", progname, pCE->dfile, pCE->fdtty, strerror(errno));
+		Error( "tcgetattr: %s(%d): %s", pCE->dfile, pCE->fdtty, strerror(errno));
 		return -1;
 	}
 
@@ -201,11 +202,11 @@ CONSENT *pCE;
 	termp.c_cc[VTIME] = 1;
 
 	if (-1 == cfsetospeed(&termp,pCE->pbaud->irate)) {
-		fprintf(stderr, "%s: cfsetospeed: %s(%d): %s\n", progname, pCE->dfile, pCE->fdtty, strerror(errno));
+		Error( "cfsetospeed: %s(%d): %s", pCE->dfile, pCE->fdtty, strerror(errno));
 		return -1;
 	}
 	if (-1 == cfsetispeed(&termp,pCE->pbaud->irate)) {
-		fprintf(stderr, "%s: cfsetispeed: %s(%d): %s\n", progname, pCE->dfile, pCE->fdtty, strerror(errno));
+		Error( "cfsetispeed: %s(%d): %s", pCE->dfile, pCE->fdtty, strerror(errno));
 		return -1;
 	}
 
@@ -213,7 +214,7 @@ CONSENT *pCE;
 	 * Set terminal attributes
 	 */
 	if (-1 == tcsetattr(pCE->fdtty, TCSADRAIN, &termp)) {
-		fprintf(stderr, "%s: tcsetattr: %s(%d): %s\n", progname, pCE->dfile, pCE->fdtty, strerror(errno));
+		Error( "tcsetattr: %s(%d): %s", pCE->dfile, pCE->fdtty, strerror(errno));
 		return -1;
 	}
 
@@ -247,7 +248,7 @@ CONSENT *pCE;
 	/* here we should fstat for `read-only' checks
 	 */
 	if (-1 == fstat(pCE->fdtty, & stPerm)) {
-		fprintf(stderr, "%s: fstat: %s: %s\n", progname, pCE->dfile, strerror(errno));
+		Error( "fstat: %s: %s", pCE->dfile, strerror(errno));
 	} else if (0 == (stPerm.st_mode & 0222)) {
 		/* any device that is read-only we won't write to
 		 */
@@ -256,7 +257,7 @@ CONSENT *pCE;
 
 #  if defined(TIOCSSOFTCAR)
 	if (-1 == ioctl(pCE->fdtty, TIOCSSOFTCAR, &fSoftcar)) {
-		fprintf(stderr, "%s: softcar: %d: %s\n", progname, pCE->fdtty, strerror(errno));
+		Error( "softcar: %d: %s", pCE->fdtty, strerror(errno));
 		return -1;
 	}
 #  endif
@@ -264,7 +265,7 @@ CONSENT *pCE;
 	/* stty 9600 raw cs7
 	 */
 	if (-1 == ioctl(pCE->fdtty, TIOCGETP, (char *)&sty)) {
-		fprintf(stderr, "%s: ioctl1: %s(%d): %s\n", progname, pCE->dfile, pCE->fdtty, strerror(errno));
+		Error( "ioctl1: %s(%d): %s", pCE->dfile, pCE->fdtty, strerror(errno));
 		return -1;
 	}
 	sty.sg_flags &= ~(ECHO|CRMOD|pCE->pparity->iclr);
@@ -274,7 +275,7 @@ CONSENT *pCE;
 	sty.sg_ispeed = pCE->pbaud->irate;
 	sty.sg_ospeed = pCE->pbaud->irate;
 	if (-1 == ioctl(pCE->fdtty, TIOCSETP, (char *)&sty)) {
-		fprintf(stderr, "%s: ioctl2: %d: %s\n", progname, pCE->fdtty, strerror(errno));
+		Error( "ioctl2: %d: %s", pCE->fdtty, strerror(errno));
 		return -1;
 	}
 
@@ -282,7 +283,7 @@ CONSENT *pCE;
 	 * (in cbreak mode we may not need to this... but we do)
 	 */
 	if (-1 == ioctl(pCE->fdtty, TIOCGETC, (char *)&m_tchars)) {
-		fprintf(stderr, "%s: ioctl3: %d: %s\n", progname, pCE->fdtty, strerror(errno));
+		Error( "ioctl3: %d: %s", pCE->fdtty, strerror(errno));
 		return -1;
 	}
 	m_tchars.t_intrc = -1;
@@ -292,11 +293,11 @@ CONSENT *pCE;
 	m_tchars.t_eofc = -1;
 	m_tchars.t_brkc = -1;
 	if (-1 == ioctl(pCE->fdtty, TIOCSETC, (char *)&m_tchars)) {
-		fprintf(stderr, "%s: ioctl4: %d: %s\n", progname, pCE->fdtty, strerror(errno));
+		Error( "ioctl4: %d: %s", pCE->fdtty, strerror(errno));
 		return -1;
 	}
 	if (-1 == ioctl(pCE->fdtty, TIOCGLTC, (char *)&m_ltchars)) {
-		fprintf(stderr, "%s: ioctl5: %d: %s\n", progname, pCE->fdtty, strerror(errno));
+		Error( "ioctl5: %d: %s", pCE->fdtty, strerror(errno));
 		return -1;
 	}
 	m_ltchars.t_werasc = -1;
@@ -305,7 +306,7 @@ CONSENT *pCE;
 	m_ltchars.t_suspc = -1;
 	m_ltchars.t_dsuspc = -1;
 	if (-1 == ioctl(pCE->fdtty, TIOCSLTC, (char *)&m_ltchars)) {
-		fprintf(stderr, "%s: ioctl6: %d: %s\n", progname, pCE->fdtty, strerror(errno));
+		Error( "ioctl6: %d: %s", pCE->fdtty, strerror(errno));
 		return -1;
 	}
 #  if HAVE_STROPTS_H
@@ -339,11 +340,10 @@ CONSENT *pCE;
 	auto struct ltchars m_ltchars;
 #  endif
 # endif
-# if HAVE_RLIMIT
+# if HAVE_GETRLIMIT
 	auto struct rlimit rl;
 # endif
 	auto int i, iNewGrp;
-	auto int fd;
 	extern char **environ;
 	register char *pcShell, **ppcArgv;
 
@@ -353,9 +353,10 @@ CONSENT *pCE;
 	case -1:
 		return -1;
 	case 0:
+		thepid = getpid();
 		break;
 	default:
-		fprintf(stderr, "%s: %d is the pid on %s\n", progname, pCE->ipid, pCE->acslave);
+		Error( "%d is the pid on %s", pCE->ipid, pCE->acslave);
 		(void)fflush(stderr);
 		pCE->fup = 1;
 		sleep(2);	/* chance to open line */
@@ -370,7 +371,7 @@ CONSENT *pCE;
 
 	/* setup new process with clean filew descriptors
 	 */
-# if HAVE_RLIMIT
+# if HAVE_GETRLIMIT
 	getrlimit(RLIMIT_NOFILE, &rl);
 	i = rl.rlim_cur;
 # else
@@ -393,7 +394,7 @@ CONSENT *pCE;
 # if HAVE_SETSID
 	iNewGrp = setsid();
 	if (-1 == iNewGrp) {
-		fprintf(stderr, "%s: %s: setsid: %s\n", progname, pCE->server, strerror(errno));
+		Error( "%s: setsid: %s", pCE->server, strerror(errno));
 		iNewGrp = getpid();
 	}
 # else
@@ -401,7 +402,7 @@ CONSENT *pCE;
 # endif
 
 	if (0 != open(pCE->acslave, 2, 0) || 1 != dup(0)) {
-		fprintf(stderr, "%s: %s: fd sync error\n", progname, pCE->server);
+		Error( "%s: fd sync error", pCE->server);
 		exit(1);
 	}
 # if HAVE_PTSNAME
@@ -409,10 +410,6 @@ CONSENT *pCE;
 	 * under PTX (others?) we have to push the compatibility
 	 * streams modules `ptem' and `ld'
 	 */
-	(void)ioctl(0, I_PUSH, "ptem");
-	(void)ioctl(0, I_PUSH, "ld");
-# endif
-# if HAVE_LDTERM
 	(void)ioctl(0, I_PUSH, "ptem");
 	(void)ioctl(0, I_PUSH, "ldterm");
 # endif
@@ -427,7 +424,7 @@ CONSENT *pCE;
 	if (0 != ioctl(0, TCGETS, & n_tio))
 #  endif
 	{
-		fprintf(stderr, "%s: iotcl: getsw: %s\n", progname, strerror(errno));
+		Error( "iotcl: getsw: %s", strerror(errno));
 		exit(1);
 	}
 	n_tio.c_iflag &= ~(IGNCR|IUCLC);
@@ -452,7 +449,7 @@ CONSENT *pCE;
 	if (0 != ioctl(0, TCSETS, & n_tio))
 #  endif
 	{
-		fprintf(stderr, "%s: getarrt: %s\n", progname, strerror(errno));
+		Error( "getarrt: %s", strerror(errno));
 		exit(1);
 	}
 
@@ -461,7 +458,7 @@ CONSENT *pCE;
 	/* stty 9600 raw cs7
 	 */
 	if (-1 == ioctl(0, TIOCGETP, (char *)&sty)) {
-		fprintf(stderr, "%s: ioctl1: %s: %s\n", progname, pCE->fdtty, strerror(errno));
+		Error( "ioctl1: %s: %s", pCE->fdtty, strerror(errno));
 		exit(1);
 	}
 	sty.sg_flags &= ~(CBREAK|TANDEM|pCE->pparity->iclr);
@@ -471,7 +468,7 @@ CONSENT *pCE;
 	sty.sg_ispeed = pCE->pbaud->irate;
 	sty.sg_ospeed = pCE->pbaud->irate;
 	if (-1 == ioctl(0, TIOCSETP, (char *)&sty)) {
-		fprintf(stderr, "%s: ioctl2: %s\n", progname, strerror(errno));
+		Error( "ioctl2: %s", strerror(errno));
 		exit(1);
 	}
 
@@ -479,7 +476,7 @@ CONSENT *pCE;
 	 * (in cbreak mode we may not need to this... but we do)
 	 */
 	if (-1 == ioctl(0, TIOCGETC, (char *)&m_tchars)) {
-		fprintf(stderr, "%s: ioctl3: %s\n", progname, strerror(errno));
+		Error( "ioctl3: %s", strerror(errno));
 		exit(1);
 	}
 	m_tchars.t_intrc = '\003';
@@ -489,11 +486,11 @@ CONSENT *pCE;
 	m_tchars.t_eofc = '\004';
 	m_tchars.t_brkc = '\033';
 	if (-1 == ioctl(0, TIOCSETC, (char *)&m_tchars)) {
-		fprintf(stderr, "%s: ioctl4: %s\n", progname, strerror(errno));
+		Error( "ioctl4: %s", strerror(errno));
 		exit(1);
 	}
 	if (-1 == ioctl(0, TIOCGLTC, (char *)&m_ltchars)) {
-		fprintf(stderr, "%s: ioctl5: %s\n", progname, strerror(errno));
+		Error( "ioctl5: %s", strerror(errno));
 		exit(1);
 	}
 	m_ltchars.t_werasc = '\027';
@@ -502,7 +499,7 @@ CONSENT *pCE;
 	m_ltchars.t_suspc = '\032';
 	m_ltchars.t_dsuspc = '\031';
 	if (-1 == ioctl(0, TIOCSLTC, (char *)&m_ltchars)) {
-		fprintf(stderr, "%s: ioctl6: %s\n", progname, strerror(errno));
+		Error( "ioctl6: %s", strerror(errno));
 		exit(1);
 	}
 
@@ -544,7 +541,7 @@ CONSENT *pCE;
 		ppcArgv = apcArgv;
 	}
 	execve(pcShell, ppcArgv, environ);
-	fprintf(stderr, "execve: %s\n", strerror(errno));
+	Error("execve: %s", strerror(errno));
 	exit(1);
 	/*NOTREACHED*/
 }
@@ -608,7 +605,7 @@ const char *hostname;
 {
     struct hostcache *n;
     if ((struct hostcache *)0 == (n = (struct hostcache *)malloc(sizeof(struct hostcache)))) {
-	fprintf(stderr, "%s: malloc failure: %s\n", progname, strerror(errno));
+	Error( "malloc failure: %s", strerror(errno));
 	return;
     }
     (void)strncpy(n->hostname, hostname, MAXSERVLEN);
@@ -659,9 +656,7 @@ int useHostCache;
 	if (-1 ==
 	    (pCE->fdlog = open(pCE->lfile, O_RDWR|O_CREAT|O_APPEND, 0644)))
 	{
-		fprintf(stderr,
-			"%s: open: %s: %s\n",
-			progname, pCE->lfile, strerror(errno));
+		Error( "open: %s: %s", pCE->lfile, strerror(errno));
 		return;
 	}
 
@@ -681,8 +676,8 @@ int useHostCache;
 	    struct timeval tv;
 	    
 	    if ( CheckHostCache( pCE->networkConsoleHost ) ) {
-		  fprintf(stderr, "%s: cached previous timeout: %s (%d@%s): forcing down\n",
-			    progname, pCE->server, ntohs(port.sin_port),
+		  Error( "cached previous timeout: %s (%d@%s): forcing down",
+			    pCE->server, ntohs(port.sin_port),
 			    pCE->networkConsoleHost);
 		  ConsDown(pCE, pfdSet);
 		  return;
@@ -692,48 +687,54 @@ int useHostCache;
 	    usleep( USLEEP_FOR_SLOW_PORTS );  /* Sleep for slow network ports */
 # endif
 
-	    bzero(&port, sizeof(port));
+#if HAVE_MEMSET
+	    (void)memset((void *)&port, 0, sizeof(port));
+#else   
+	    (void)bzero((char *)&port, sizeof(port));
+#endif  
 
 	    if ((hp = gethostbyname(pCE->networkConsoleHost)) == NULL)
 	    {
-		fprintf(stderr, "%s: gethostbyname %s failed\n",
-			progname, pCE->networkConsoleHost);
+		Error( "gethostbyname(%s): %s", pCE->networkConsoleHost, hstrerror(h_errno));
 		exit(1);
 	    }
 
-	    bcopy(hp->h_addr, &port.sin_addr, hp->h_length);
+#if HAVE_MEMCPY
+	    (void)memcpy(&port.sin_addr, hp->h_addr, hp->h_length);
+#else
+	    (void)bcopy(hp->h_addr, &port.sin_addr, hp->h_length);
+#endif
 	    port.sin_family = hp->h_addrtype;
 	    port.sin_port = htons(pCE->networkConsolePort);
 	    
 	    if ((pCE->fdtty = socket(AF_INET, SOCK_STREAM, 0)) < 0)
 	    {
-		fprintf(stderr, "%s: socket: %s\n", progname, strerror(errno));
+		Error( "socket: %s", strerror(errno));
 		exit(1);
 	    }
 	    if (setsockopt(pCE->fdtty, SOL_SOCKET, SO_KEEPALIVE,
 			   (char *) &one, sizeof(one)) < 0)
 	    {
-		fprintf(stderr, "%s: setsockopt SO_KEEPALIVE: %s\n",
-			progname, strerror(errno));
+		Error( "setsockopt SO_KEEPALIVE: %s",
+			strerror(errno));
 	    }
 
 	    if ( (flags = fcntl(pCE->fdtty, F_GETFL)) >= 0 )
 	    {
 		flags |= O_NONBLOCK;
 		if ( fcntl(pCE->fdtty, F_SETFL, flags) < 0 ) {
-		    fprintf( stderr, "%s: fcntl O_NONBLOCK: %s\n",
-			progname, strerror(errno));
+		    Error( "fcntl O_NONBLOCK: %s", strerror(errno));
 		}
 	    } else {
-		fprintf( stderr, "%s: fcntl: %s\n", progname, strerror(errno));
+		Error( "fcntl: %s", strerror(errno));
 	    }
 
 	    if (connect(pCE->fdtty,
 			(struct sockaddr *)&port, sizeof(port)) < 0)
 	    {
 		if (errno != EINPROGRESS ) {
-		  fprintf(stderr, "%s: connect: %s (%d@%s): %s: forcing down\n",
-			    progname, pCE->server, ntohs(port.sin_port),
+		  Error( "connect: %s (%d@%s): %s: forcing down",
+			    pCE->server, ntohs(port.sin_port),
 			    pCE->networkConsoleHost, strerror(errno));
 		  ConsDown(pCE, pfdSet);
 		  return;
@@ -746,8 +747,8 @@ int useHostCache;
 	    FD_SET(pCE->fdtty, &fds);
 
 	    if ( (one=select( pCE->fdtty+1, NULL, &fds, NULL, &tv )) < 0 ) {
-		fprintf(stderr, "%s: select: %s (%d@%s): %s: forcing down\n",
-			progname, pCE->server, ntohs(port.sin_port),
+		Error( "select: %s (%d@%s): %s: forcing down",
+			pCE->server, ntohs(port.sin_port),
 			pCE->networkConsoleHost, strerror(errno));
 		ConsDown(pCE, pfdSet);
 		return;
@@ -755,8 +756,8 @@ int useHostCache;
 
 	    if (one == 0) {	/* Timeout */
 		AddHostCache(pCE->networkConsoleHost);
-		fprintf(stderr, "%s: timeout: %s (%d@%s): forcing down\n",
-			progname, pCE->server, ntohs(port.sin_port),
+		Error( "timeout: %s (%d@%s): forcing down",
+			pCE->server, ntohs(port.sin_port),
 			pCE->networkConsoleHost);
 		ConsDown(pCE, pfdSet);
 		return;
@@ -769,16 +770,16 @@ int useHostCache;
 		if (getsockopt(pCE->fdtty, SOL_SOCKET, SO_ERROR,
 		    (char*)&flags, &one) < 0)
 		{
-		    fprintf(stderr, "%s: getsockopt SO_ERROR: %s (%d@%s): %s: forcing down\n",
-			    progname, pCE->server, ntohs(port.sin_port),
+		    Error( "getsockopt SO_ERROR: %s (%d@%s): %s: forcing down",
+			    pCE->server, ntohs(port.sin_port),
 			    pCE->networkConsoleHost, strerror(errno));
 		    ConsDown(pCE, pfdSet);
 		    return;
 		}
 		if (flags != 0)
 		{
-		    fprintf(stderr, "%s: connect: %s (%d@%s): %s: forcing down\n",
-			    progname, pCE->server, ntohs(port.sin_port),
+		    Error( "connect: %s (%d@%s): %s: forcing down",
+			    pCE->server, ntohs(port.sin_port),
 			    pCE->networkConsoleHost, strerror(flags));
 		    ConsDown(pCE, pfdSet);
 		    return;
@@ -793,7 +794,7 @@ int useHostCache;
 	    write(pCE->fdtty, "\r\n", 2);
 # endif
 	} else if (-1 == (pCE->fdtty = open(pCE->dfile, O_RDWR|O_NDELAY, 0600))) {
-		fprintf(stderr, "%s: open: %s: %s\n", progname, pCE->dfile, strerror(errno));
+		Error( "open: %s: %s", pCE->dfile, strerror(errno));
 		(void)close(pCE->fdlog);
 		pCE->fdlog = -1;
 		return;
@@ -815,7 +816,7 @@ int useHostCache;
 	}
 #else /* ! DO_VIRTUAL */
 	if (-1 == (pCE->fdtty = open(pCE->dfile, O_RDWR|O_NDELAY, 0600))) {
-		fprintf(stderr, "%s: open: %s: %s\n", progname, pCE->dfile, strerror(errno));
+		Error( "open: %s: %s", pCE->dfile, strerror(errno));
 		(void)close(pCE->fdlog);
 		pCE->fdlog = -1;
 		return;

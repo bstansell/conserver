@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.42 2001-05-03 06:39:43-07 bryan Exp $
+ *  $Id: main.c,v 5.47 2001-06-15 09:04:08-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -52,14 +52,16 @@
 #include <access.h>
 #include <readcfg.h>
 #include <version.h>
+#include <output.h>
 
 char rcsid[] =
-	"$Id: main.c,v 5.42 2001-05-03 06:39:43-07 bryan Exp $";
+	"$Id: main.c,v 5.47 2001-06-15 09:04:08-07 bryan Exp $";
 char *progname =
 	rcsid;
 int fAll = 1, fVerbose = 0, fSoftcar = 0, fNoinit = 0, fDebug = 0, fVersion = 0;
 int fDaemon = 0;
 char chDefAcc = 'r';
+int thepid = 0;
 
 #define FULLCFPATH SYSCONFDIR "/" CONFIGFILE;
 #define FULLPDPATH SYSCONFDIR "/" PASSWDFILE;
@@ -81,8 +83,11 @@ char acMyHost[256];	/* staff.cc.purdue.edu			*/
 static void
 daemonize()
 {
-	int res, td;
+	int res;
 	FILE *fp;
+#if !HAVE_SETSID
+	int td;
+#endif
 
 	(void) signal(SIGQUIT, SIG_IGN);
 	(void) signal(SIGINT,  SIG_IGN);
@@ -95,9 +100,10 @@ daemonize()
 
 	switch (res = fork()) {
 	case -1:
-		(void) fprintf(stderr, "%s: fork: %m\n", progname, strerror(errno));
+		Error( "fork: %s", strerror(errno));
 		exit(1);
 	case 0:
+		thepid = getpid();
 		break;
 	default:
 		sleep(1);
@@ -108,7 +114,7 @@ daemonize()
 	 */
 	close(0);
 	if (0 != open("/dev/null", 2, 0644)) {
-		fprintf(stderr, "%s: open: /dev/null: %s\n", progname, strerror(errno));
+		Error( "open: /dev/null: %s", strerror(errno));
 		exit(1);
 	}
 
@@ -134,7 +140,7 @@ daemonize()
 		fprintf(fp, "%d\n", (int) getpid());
 		fclose(fp);
 	} else {
-		fprintf(stderr,"%s: can't write pid to %s\n", progname, PIDFILE);
+		Error("can't write pid to %s", PIDFILE);
 	}
 }
 
@@ -170,37 +176,41 @@ static void
 Version()
 {
 	auto char acA1[16], acA2[16];
+#if defined(SERVICENAME)
+	char acOut[BUFSIZ];
+#endif
 
-	printf("%s: %s\n", progname, THIS_VERSION);
-	printf("%s: default access type `%c\'\n", progname, chDefAcc);
-	printf("%s: default escape sequence `%s%s\'\n", progname, FmtCtl(DEFATTN, acA1), FmtCtl(DEFESC, acA2));
-	printf("%s: configuration in `%s\'\n", progname, pcConfig);
-	printf("%s: password in `%s\'\n", progname, pcPasswd);
-	printf("%s: pidfile in `%s\'\n", progname, PIDFILE);
-	printf("%s: limited to %d group%s with %d member%s\n", progname, MAXGRP, MAXGRP == 1 ? "" : "s", MAXMEMB, MAXMEMB == 1 ? "" : "s");
+	Info("%s", THIS_VERSION);
+	Info("default access type `%c\'", chDefAcc);
+	Info("default escape sequence `%s%s\'", FmtCtl(DEFATTN, acA1), FmtCtl(DEFESC, acA2));
+	Info("configuration in `%s\'", pcConfig);
+	Info("password in `%s\'", pcPasswd);
+	Info("pidfile in `%s\'", PIDFILE);
+	Info("limited to %d group%s with %d member%s", MAXGRP, MAXGRP == 1 ? "" : "s", MAXMEMB, MAXMEMB == 1 ? "" : "s");
 #if CPARITY
-	printf("%s: high-bit of data stripped (7-bit clean)\n", progname);
+	Info("high-bit of data stripped (7-bit clean)");
 #else
-	printf("%s: high-bit of data *not* stripped (8-bit clean)\n", progname);
+	Info("high-bit of data *not* stripped (8-bit clean)");
 #endif
 #if defined(SERVICENAME)
 	{
 		struct servent *pSE;
 		if ((struct servent *)0 == (pSE = getservbyname(acService, "tcp"))) {
-			fprintf(stderr, "%s: getservbyname: %s: %s\n", progname, acService, strerror(errno));
+			Error( "getservbyname: %s: %s", acService, strerror(errno));
 			return;
 		}
-		printf("%s: service name `%s\'", progname, pSE->s_name);
+		sprintf(acOut, "service name `%s\'", pSE->s_name);
 		if (0 != strcmp(pSE->s_name, acService)) {
-			printf(" (which we call `%s\')", acService);
+			sprintf(acOut, " (which we call `%s\')", acService);
 		}
-		printf(" on port %d\n", ntohs((u_short)pSE->s_port));
+		sprintf(acOut, " on port %d", ntohs((u_short)pSE->s_port));
+		Info( "%s", acOut );
 	}
 #else
 #if defined(PORTNUMBER)
-	printf("%s: on port %d\n", progname, PORTNUMBER);
+	Info("on port %d", PORTNUMBER);
 #else
-	printf("%s: no service or port compiled in\n", progname);
+	Info("no service or port compiled in");
 	exit(1);
 #endif
 #endif
@@ -229,6 +239,7 @@ char **argv;
 	auto REMOTE
 		*pRCUniq;	/* list of uniq console servers		*/
 
+	thepid = getpid();
 	if ((char *)0 == (progname = strrchr(argv[0], '/'))) {
 		progname = argv[0];
 	} else {
@@ -245,11 +256,11 @@ char **argv;
 
 	(void)gethostname(acMyHost, sizeof(acMyHost));
 	if ((struct hostent *)0 == (hpMe = gethostbyname(acMyHost))) {
-		fprintf(stderr, "%s: gethostbyname: %s\n", progname, hstrerror(h_errno));
+		Error( "gethostbyname(%s): %s", acMyHost, hstrerror(h_errno));
 		exit(1);
 	}
 	if (4 != hpMe->h_length || AF_INET != hpMe->h_addrtype) {
-		fprintf(stderr, "%s: wrong address size (4 != %d) or adress family (%d != %d)\n", progname, hpMe->h_length, AF_INET, hpMe->h_addrtype);
+		Error( "wrong address size (4 != %d) or adress family (%d != %d)", hpMe->h_length, AF_INET, hpMe->h_addrtype);
 		exit(1);
 	}
 #if HAVE_MEMCPY
@@ -262,7 +273,7 @@ char **argv;
 		switch (i) {
 		case 'a':
 			chDefAcc = '\000' == *optarg ? 'r' : *optarg;
-			if (isupper(chDefAcc)) {
+			if (isupper((int)(chDefAcc))) {
 				chDefAcc = tolower(chDefAcc);
 			}
 			switch (chDefAcc) {
@@ -271,7 +282,7 @@ char **argv;
 			case 't':
 				break;
 			default:
-				fprintf(stderr, "%s: unknown access type `%s\'\n", progname, optarg);
+				Error( "unknown access type `%s\'", optarg);
 				exit(3);
 			}
 			break;
@@ -288,7 +299,7 @@ char **argv;
 			fDebug = 1;
 			break;
 		case 'h':
-			fprintf(stderr, "%s: usage%s\n", progname, u_terse);
+			Error( "usage%s", u_terse);
 			Usage(stdout, apcLong);
 			exit(0);
 		case 'i':
@@ -307,10 +318,10 @@ char **argv;
 			fVerbose = 1;
 			break;
 		case '\?':
-			fprintf(stderr, "%s: usage%s\n", progname, u_terse);
+			Error( "usage%s", u_terse);
 			exit(1);
 		default:
-			fprintf(stderr, "%s: option %c needs a parameter\n", progname, optopt);
+			Error( "option %c needs a parameter", optopt);
 			exit(1);
 		}
 	}
@@ -323,7 +334,7 @@ char **argv;
 #if HAVE_GETSPNAM
 /*  Why force root???  Cause of getsp*() calls... */
 	if (0 != geteuid()) {
-		fprintf(stderr, "%s: must be the superuser\n", progname);
+		Error( "must be the superuser" );
 		exit(1);
 	}
 #endif
@@ -331,7 +342,7 @@ char **argv;
 	/* read the config file
 	 */
 	if ((FILE *)0 == (fpConfig = fopen(pcConfig, "r"))) {
-		fprintf(stderr, "%s: fopen: %s: %s\n", progname, pcConfig, strerror(errno));
+		Error( "fopen: %s: %s", pcConfig, strerror(errno));
 		exit(1);
 	}
 	ReadCfg(pcConfig, fpConfig);
@@ -342,7 +353,7 @@ char **argv;
 	 * different configurations can run on the same host).
 	 */
 	if (-1 == flock(fileno(fpConfig), LOCK_NB|LOCK_EX)) {
-		fprintf(stderr, "%s: %s is locked, won\'t run more than one conserver?\n", progname, pcConfig);
+		Error( "%s is locked, won\'t run more than one conserver?", pcConfig);
 		exit(3);
 	}
 #endif
@@ -374,7 +385,7 @@ char **argv;
 			Spawn(& aGroups[i]);
 		}
 		if (fVerbose) {
-			printf("%s: group %d on port %d\n", progname, i, ntohs((u_short)aGroups[i].port));
+			Info("group %d on port %d", i, ntohs((u_short)aGroups[i].port));
 		}
 		for (j = 0; j < aGroups[i].imembers; ++j) {
 			if (-1 != aGroups[i].pCElist[j].fdtty)
@@ -384,7 +395,7 @@ char **argv;
 
 	if (fVerbose) {
 		for (i = 0; i < iAccess; ++i) {
-			printf("%s: access type '%c' for \"%s\"\n", progname, pACList[i].ctrust, pACList[i].pcwho);
+			Info("access type '%c' for \"%s\"", pACList[i].ctrust, pACList[i].pcwho);
 		}
 	}
 
@@ -394,7 +405,7 @@ char **argv;
 	if (fVerbose) {
 		register REMOTE *pRC;
 		for (pRC = pRCUniq; (REMOTE *)0 != pRC; pRC = pRC->pRCuniq) {
-			printf("%s: peer server on `%s'\n", progname, pRC->rhost);
+			Info("peer server on `%s'", pRC->rhost);
 		}
 	}
 
@@ -414,7 +425,7 @@ char **argv;
 		if (0 == aGroups[i].imembers)
 			continue;
 		if (-1 == kill(aGroups[i].pid, SIGTERM)) {
-			fprintf(stderr, "%s: kill: %s\n", progname, strerror(errno));
+			Error( "kill: %s", strerror(errno));
 		}
 	}
 

@@ -36,7 +36,7 @@ all: $(ALL)
 autologin: $(AUTOLOGIN_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o autologin $(AUTOLOGIN_OBJS) $(LIBS)
 
-%.o: $(srcdir)/%.c $(AUTOLOGIN_HDRS)
+.c.o:
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
 
 clean:
