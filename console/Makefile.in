@@ -25,7 +25,7 @@ LIBS	= @LIBS@
 
 ### Makefile rules - no user-servicable parts below
 
-CONSOLE_OBJS = console.o
+CONSOLE_OBJS = console.o ../conserver/output.o
 CONSOLE_HDRS = ../config.h $(top_srcdir)/compat.h $(top_srcdir)/conserver/port.h
 ALL = console
 
@@ -36,6 +36,9 @@ all: $(ALL)
 
 console: $(CONSOLE_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o console $(CONSOLE_OBJS) $(LIBS)
+
+../conserver/output.o:
+	( cd ../conserver && $(MAKE) $(MAKE_FLAGS) output.o ) || exit 1;
 
 .c.o:
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<

@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.47 2001-06-15 11:33:49-07 bryan Exp $
+ *  $Id: consent.c,v 5.51 2001-07-05 04:12:31-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -37,10 +37,6 @@
 /*
  * Network console modifications by Robert Olson, olson@mcs.anl.gov.
  */
-#ifndef lint
-static char copyright[] =
-"@(#) Copyright 1992 Purdue Research Foundation.\nAll rights reserved.\n";
-#endif
 
 #include <config.h>
 
@@ -324,7 +320,6 @@ CONSENT *pCE;
 
 #endif /* HAVE_TERMIOS_H */
 
-#if DO_VIRTUAL
 /* setup a virtual device						(ksb)
  */
 static int
@@ -385,7 +380,7 @@ CONSENT *pCE;
 	close(1);
 	close(0);
 # if defined(TIOCNOTTY)
-	if (-1 != (i = open("/dev/tty", 2, 0))) {
+	if (-1 != (i = open("/dev/tty", O_RDWR, 0))) {
 		ioctl(i, TIOCNOTTY, (char *)0);
 		close(i);
 	}
@@ -401,7 +396,7 @@ CONSENT *pCE;
 	iNewGrp = getpid();
 # endif
 
-	if (0 != open(pCE->acslave, 2, 0) || 1 != dup(0)) {
+	if (0 != open(pCE->acslave, O_RDWR, 0) || 1 != dup(0)) {
 		Error( "%s: fd sync error", pCE->server);
 		exit(1);
 	}
@@ -412,9 +407,6 @@ CONSENT *pCE;
 	 */
 	(void)ioctl(0, I_PUSH, "ptem");
 	(void)ioctl(0, I_PUSH, "ldterm");
-# endif
-# if HAVE_STTY_LD
-	(void)ioctl(0, I_PUSH, "stty_ld");
 # endif
 
 # if HAVE_TERMIOS_H
@@ -545,7 +537,6 @@ CONSENT *pCE;
 	exit(1);
 	/*NOTREACHED*/
 }
-#endif /* DO_VIRTUAL */
 
 /* down a console, virtual or real					(ksb)
  */
@@ -554,24 +545,17 @@ ConsDown(pCE, pfdSet)
 CONSENT *pCE;
 fd_set *pfdSet;
 {
-#if DO_VIRTUAL
 	if (-1 != pCE->ipid) {
 		if (-1 != kill(pCE->ipid, SIGHUP))
 			sleep(1);
 		pCE->ipid = -1;
 	}
-#endif
 	if (-1 != pCE->fdtty) {
 		FD_CLR(pCE->fdtty, pfdSet);
-#if DO_VIRTUAL
 		if (0 == pCE->fvirtual)  {
 			(void)close(pCE->fdtty);
 			pCE->fdtty = -1;
 		}
-#else
-		(void)close(pCE->fdtty);
-		pCE->fdtty = -1;
-#endif
 	}
 	if (-1 != pCE->fdlog) {
 		if (pCE->nolog) {
@@ -660,7 +644,6 @@ int useHostCache;
 		return;
 	}
 
-#if DO_VIRTUAL
 	if (0 != pCE->fvirtual)
 	{
   		/* still open, never ever close it, but set the bit */
@@ -814,17 +797,4 @@ int useHostCache;
 	{
 		TtyDev(pCE);
 	}
-#else /* ! DO_VIRTUAL */
-	if (-1 == (pCE->fdtty = open(pCE->dfile, O_RDWR|O_NDELAY, 0600))) {
-		Error( "open: %s: %s", pCE->dfile, strerror(errno));
-		(void)close(pCE->fdlog);
-		pCE->fdlog = -1;
-		return;
-	}
-	FD_SET(pCE->fdtty, pfdSet);
-
-	/* ok, now setup the device
-	 */
-	TtyDev(pCE);
-#endif /* DO_VIRTUAL */
 }

@@ -1,5 +1,5 @@
 /*
- *  $Id: fallback.c,v 5.27 2001-06-15 11:33:49-07 bryan Exp $
+ *  $Id: fallback.c,v 5.29 2001-06-29 00:34:11-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -34,8 +34,6 @@
 #include <compat.h>
 
 #include <port.h>
-
-#if DO_VIRTUAL && ! HAVE_PTYD
 
 #if 0
 static char *__pty_host;
@@ -222,5 +220,3 @@ char *pcSlave, *pcMaster;
 	(void) strcpy(pcMaster, pcTMaster);
 	return fd;
 }
-
-#endif /* no code if it is not used */

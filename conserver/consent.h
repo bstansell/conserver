@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.17 2001-02-21 17:26:06-08 bryan Exp $
+ *  $Id: consent.h,v 5.19 2001-06-28 11:14:30-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -71,17 +71,17 @@ typedef struct consent {	/* console information			*/
 	char networkConsoleHost[MAXSERVLEN];
 	int networkConsolePort;
 
-#if DO_VIRTUAL
 	/* used if virtual console */
 	char acslave[MAXDEVLEN];/* pseudo-device slave side		*/
 	int fvirtual;		/* is a pty device we use as a console	*/
 	char *pccmd;		/* virtual console command		*/
 	int ipid;		/* pid of virtual command		*/
-#endif
+
 	/* only used in child */
 	int nolog;		/* don't log output			*/
 	int fdlog;		/* the local log file			*/
 	int fdtty;		/* the port to talk to machine on	*/
+	int activitylog;	/* log attach/detach/bump		*/
 	short int fup;		/* we setup this line?			*/
 	short int fronly;	/* we can only read this console	*/
 	short int iend;		/* like icursor in CONSCLIENT		*/

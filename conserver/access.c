@@ -1,5 +1,5 @@
 /*
- *  $Id: access.c,v 5.21 2001-06-15 09:02:02-07 bryan Exp $
+ *  $Id: access.c,v 5.26 2001-07-03 02:07:34-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -33,10 +33,6 @@
  *
  * 4. This notice may not be removed or altered.
  */
-#ifndef lint
-static char copyright[] =
-"@(#) Copyright 1992 Purdue Research Foundation.\nAll rights reserved.\n";
-#endif
 
 #include <config.h>
 
@@ -92,15 +88,12 @@ OutOfMem()
  * Returns 0 if the addresses match, else returns 1.
  */
 int
-AddrCmp(hp, pattern)
-struct hostent *hp;
+AddrCmp(addr, pattern)
+struct in_addr *addr;
 char *pattern;
 {
     unsigned long int hostaddr, pattern_addr, netmask;
     char buf[200], *p, *slash_posn;
-
-    if (hp->h_addrtype != AF_INET || hp->h_length != 4)
-	return 1;	/* unsupported address type */
 
     slash_posn = strchr(pattern, '/');
     if (slash_posn != NULL) {
@@ -137,7 +130,7 @@ char *pattern;
     netmask = htonl(netmask);
     if (~netmask & pattern_addr)
 	netmask = 0xffffffff;		/* compare entire addresses */
-    hostaddr = *(unsigned long int*)hp->h_addr;
+    hostaddr = *(unsigned long int*)addr;
 
     Debug( "Access check:       host=%lx(%lx/%lx)", hostaddr & netmask, hostaddr, netmask );
     Debug( "Access check:        acl=%lx(%lx/%lx)", pattern_addr & netmask, pattern_addr, netmask );
@@ -147,54 +140,43 @@ char *pattern;
 /* return the access type for a given host entry			(ksb)
  */
 char
-AccType(hp)
-struct hostent *hp;
+AccType(addr,hname)
+struct in_addr *addr;
+char *hname;
 {
 	register int i;
-	register unsigned char *puc;
 	register char *pcName;
-	auto char acAddr[4*4];
 	register int len;
 
 	if ( fDebug ) {
-	    puc = (unsigned char *)hp->h_addr;
-	    sprintf(acAddr, "%d.%d.%d.%d", puc[0], puc[1], puc[2], puc[3]);
-	    Debug( "Access check: hostname=%s, ip=%s", hp->h_name, acAddr );
+	    if (hname)
+		Debug( "Access check: hostname=%s, ip=%s", hname, inet_ntoa(*addr) );
+	    else
+		Debug( "Access check: hostname=<unresolvable>, ip=%s", inet_ntoa(*addr) );
 	}
-#if ORIGINAL_CODE
-	puc = (unsigned char *)hp->h_addr;
-	sprintf(acAddr, "%d.%d.%d.%d", puc[0], puc[1], puc[2], puc[3]);
-#endif
 	for (i = 0; i < iAccess; ++i) {
 		Debug( "Access check:    who=%s, trust=%c", pACList[i].pcwho, pACList[i].ctrust );
 		if (isdigit((int)(pACList[i].pcwho[0]))) {
-#if ORIGINAL_CODE
-			/* we could allow 128.210.7 to match all on that subnet
-			 * here...
-			 */
-			if (0 == strcmp(acAddr, pACList[i].pcwho)) {
+			if (0 == AddrCmp(addr, pACList[i].pcwho)) {
 				return pACList[i].ctrust;
 			}
-#else
-			if (0 == AddrCmp(hp, pACList[i].pcwho)) {
-				return pACList[i].ctrust;
-			}
-#endif
 			continue;
 		}
-		pcName = hp->h_name;
-		len = strlen(pcName);
-		while (len >= pACList[i].ilen) {
-			Debug( "Access check:       name=%s", pcName );
-			if (0 == strcmp(pcName, pACList[i].pcwho)) {
-				return pACList[i].ctrust;
-			}
-			pcName = strchr(pcName, '.');
-			if ((char *)0 == pcName) {
-				break;
-			}
-			++pcName;
-			len = strlen(pcName);
+		if (hname && hname[0] != '\000') {
+		    pcName = hname;
+		    len = strlen(pcName);
+		    while (len >= pACList[i].ilen) {
+			    Debug( "Access check:       name=%s", pcName );
+			    if (0 == strcmp(pcName, pACList[i].pcwho)) {
+				    return pACList[i].ctrust;
+			    }
+			    pcName = strchr(pcName, '.');
+			    if ((char *)0 == pcName) {
+				    break;
+			    }
+			    ++pcName;
+			    len = strlen(pcName);
+		    }
 		}
 	}
 	return chDefAcc;
@@ -207,21 +189,28 @@ SetDefAccess(hpLocal)
 struct hostent *hpLocal;
 {
 	register char *pcWho, *pcDomain;
-	register unsigned char *puc;
 	register int iLen;
+	char *addr;
+	struct in_addr *aptr;
 
+	aptr = (struct in_addr *)(hpLocal->h_addr);
+	addr = inet_ntoa(*aptr);
 	pACList = (ACCESS *)calloc(3, sizeof(ACCESS));
 	if ((ACCESS *)0 == pACList) {
 		OutOfMem();
 	}
-	if ((char *)0 == (pcWho = malloc(4*3+1))) {
+	if ((char *)0 == (pcWho = malloc(strlen(addr)+1))) {
 		OutOfMem();
 	}
-	puc = (unsigned char *)hpLocal->h_addr;
-	sprintf(pcWho, "%d.%d.%d.%d", puc[0], puc[1], puc[2], puc[3]);
+	strcpy(pcWho, addr);
 	pACList[iAccess].ctrust = 'a';
 	pACList[iAccess].ilen = strlen(pcWho);
-	pACList[iAccess++].pcwho = pcWho;
+	pACList[iAccess].pcwho = pcWho;
+
+	Debug( "Access list prime: trust=%c, who=%s", pACList[iAccess].ctrust,
+		pACList[iAccess].pcwho );
+
+	iAccess++;
 
 	if ((char *)0 == (pcDomain = strchr(hpLocal->h_name, '.'))) {
 		return;
@@ -231,7 +220,12 @@ struct hostent *hpLocal;
 	pcWho = malloc(iLen+1);
 	pACList[iAccess].ctrust = 'a';
 	pACList[iAccess].ilen = iLen;
-	pACList[iAccess++].pcwho = strcpy(pcWho, pcDomain);
+	pACList[iAccess].pcwho = strcpy(pcWho, pcDomain);
+
+	Debug( "Access list prime: trust=%c, who=%s", pACList[iAccess].ctrust,
+		pACList[iAccess].pcwho );
+
+	iAccess++;
 }
 
 /* thread ther list of uniq console server machines, aliases for	(ksb)

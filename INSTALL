@@ -15,7 +15,7 @@ Detailed Instructions
 
     - First thing to do is determine if you want different defaults.  A
       './configure --help' will show you the basics.  If you like all
-      the defaults shown, your set.  If not, here are the conserver
+      the defaults shown, you're set.  If not, here are the conserver
       unique options:
 
 	--with-port=PORT        Specify port number [conserver]
@@ -85,5 +85,5 @@ Detailed Instructions
     - That's it!  Just start up the console server and enjoy!
 
 #
-#  $Id: INSTALL,v 1.10 2001-06-15 09:48:58-07 bryan Exp $
+#  $Id: INSTALL,v 1.11 2001-07-05 02:46:01-07 bryan Exp $
 #

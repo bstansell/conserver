@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.25 2001-02-21 17:26:06-08 bryan Exp $
+ *  $Id: client.c,v 5.28 2001-06-29 00:26:39-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -33,10 +33,6 @@
  *
  * 4. This notice may not be removed or altered.
  */
-#ifndef lint
-static char copyright[] =
-"@(#) Copyright 1992 Purdue Research Foundation.\nAll rights reserved.\n";
-#endif
 
 #include <config.h>
 
@@ -58,6 +54,7 @@ static char copyright[] =
 #include <port.h>
 #include <consent.h>
 #include <client.h>
+#include <group.h>
 
 
 /* find the next guy who wants to write on the console			(ksb)
@@ -83,28 +80,11 @@ CONSCLIENT *pCL;
 		} else {
 		    CSTROUT(pCL->fd, "\r\n[attached]\r\n");
 		}
+		tagLogfile(pCL->pCEto, "%s attached", pCL->acid);
 		return pCL;
 	}
 	return (CONSCLIENT *)0;
 }
-
-#if HAVE_IDENTD
-/* use identd to verify a user at a host				(ksb)
- * we have a list of login@host:passwd:trust after the general host
- * limits.  We call identd/tap/auth to get info and compare
- */
-IdentifyMe(pCL)
-CONSCLIENT *pCL;
-{
-	/* ZZZ */
-	/* we would have to getsockname(fdClient)
-	 * getpeername(fdClient)
-	 * identd_client(addr, addr, acBuffer
-	 * check for identifier in allowed list
-	 * return the permision (modify in pCL)
-	 */
-}
-#endif
 
 /* show a character as a string so the user cannot mistake it for	(ksb)
  * another

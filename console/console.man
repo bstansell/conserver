@@ -1,17 +1,17 @@
-.\" $Id: console.man,v 1.5 1999-04-12 22:40:55-07 bryan Exp $
+.\" $Id: console.man,v 1.6 2001-07-05 01:39:15-07 bryan Exp $
 .TH CONSOLE 8 "Local"
 .SH NAME
 console \- console server client program
 .SH SYNOPSIS
-\fBconsole\fP [\-\fBaAfFsS\fP] [\-\fBrv\fP] [\-\fBe\fP \fIesc\fP] [\-\fBM\fP \fIserver\fP] \fIhost\fP
+\fBconsole\fP [\-\fBaAfFsS\fP] [\-\fBrv\fP] [\-\fBe\fP \fIesc\fP] [\-\fBM\fP \fImach\fP] \fIconsole\fP
 .br
-\fBconsole\fP [\-\fBv\fP] [\-\fBhdDuVwx\fP] [\-\fBb\fP \fImessage\fP]
+\fBconsole\fP [\-\fBv\fP] [\-\fBhdDPuVwx\fP] [\-\fBb\fP \fImessage\fP]
 .br
-\fBconsole\fP [\-\fBqQ\fP] [\-\fBM\fP \fIserver\fP]
+\fBconsole\fP [\-\fBqQ\fP] [\-\fBM\fP \fImach\fP]
 .SH DESCRIPTION
 .B Console
 is used to manipulate console terminals remotely or poll running
-\fIconserver\fP(8L) daemons for status information.
+\fIconserver\fP(8) daemons for status information.
 .PP
 .B Console
 queries the user for the their passwd before
@@ -34,6 +34,9 @@ Display daemon versions.  The \fIconsole\fP client connects to each
 server to request its version information.  The uppercase varient of
 this option only requests the primary server's version.
 .TP
+.B \-D
+Same as \fB\-d\fP but just acts on the local server.
+.TP
 .BI \-e esc
 Set the initial two character escape sequence to
 those represented by \fIesc\fP.
@@ -41,16 +44,24 @@ Any of the forms output by \fIcat\fP(1)'s \-\fBv\fP option
 are accepted.  The default value is ``^Ec''.
 .TP
 .B \-f
-Same as
-.I \-a
-except it will force any existing connection into spy mode.
+Same as \fB\-a\fP except it will force any existing connection into spy mode.
 .TP
 .B \-h
 Display a brief help message.
 .TP
-.BI \-M server
-The \fIconsole\fP client program polls \fIserver\fP as the primary server,
+.BI \-l user
+Sets the username used for authentication to \fIuser\fP.
+.TP
+.BI \-M mach
+The \fIconsole\fP client program polls \fImach\fP as the primary server,
 rather than the hard coded default (``console'').
+.TP
+.BI \-p port
+Set the port to connect to.  The default \fIport\fP is set at compile time
+using the --with-port option.
+.TP
+.B \-P
+Display the pids of the master daemon processes.
 .TP
 .B \-q
 The \fIconsole\fP client requests the server daemon quit (shutdown).
@@ -58,7 +69,7 @@ A password is sent in the protocol stream, if none is required for
 the local host to shutdown the server just press return.
 .TP
 .B \-Q
-Like -q, but just acts on the primary server.
+Same as \fB\-q\fP but just acts on the local server.
 .TP
 .B \-r
 Request a raw connection to the group control virtual console,
@@ -73,6 +84,9 @@ but all other keyboard input is discarded.
 .B \-u
 Show a list of all consoles with status and attached users.
 .TP
+.B \-U
+Same as \fB\-u\fP.
+.TP
 .B \-V
 Output the version of the console client program.
 .TP
@@ -84,15 +98,18 @@ for added benefit.
 .B \-w
 Show a list of all connections to consoles.
 .TP
+.B \-W
+Same as \fB\-w\fP.
+.TP
 .B \-x
 Show a list of consoles and devices.
 .PP
-The \-\fBA\fP, \-\fBF\fP, or \-\fBS\fP options have the same effect as
+The \fB\-A\fP, \fB\-F\fP, or \fB\-S\fP options have the same effect as
 their lower case variants.
 In addition they each request the last 20 lines of the console output after
 making the connection.
 .PP
-Any default (\-\fBa\fP) connection is dropped to spy mode if
+Any default (\fB\-a\fP) connection is dropped to spy mode if
 someone else is attached read-write.
 .SH "ESCAPE SEQUENCES"
 The connection can be controlled by a two character escape sequence, followed
@@ -120,8 +137,7 @@ w	who is using this console
 x	examine this group's devices and modes.
 z	suspend this connection
 ?	display list of commands
-^I	toggle tab expansion
-^J	continue, ignore the escape sequence
+^M	continue, ignore the escape sequence
 ^R	replay the last line only
 \.	disconnect
 .TE
@@ -179,18 +195,18 @@ Requests a connection to the host ``lv426'' with the escape characters
 set to ``escape one''.
 .SH BUGS
 Connections suspended under Dynix sometimes break the kernel when
-resumed.  Suspended connections are a poor idea in general, just
-disconnect instead.
+resumed.
 .PP
 It is possible to create a loop of console connections, with ugly results.
-Never run \fIconsole\fP from within a console connection.
+Never run \fIconsole\fP from within a console connection (unless you set each
+escape sequence differently).
 .PP
-The \-\fBr\fP option doesn't help to explain how connections get built.
+The \fB\-r\fP option doesn't help to explain how connections get built.
 .SH AUTHORS
 Thomas A. Fine, Ohio State Computer Science.
 .br
 Kevin Braunsdorf, Purdue University Computing Center
 .br
-Bryan Stansell, Global Networking and Computing, Inc.
+Bryan Stansell, conserver.com
 .SH "SEE ALSO"
-conserver.cf(5L), conserver(8L)
+conserver.cf(5), conserver(8)

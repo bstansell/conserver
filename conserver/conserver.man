@@ -1,16 +1,16 @@
 .\" @(#)conserver.8 01/06/91 OSU CIS; Thomas A. Fine
-.\" $Id: conserver.man,v 1.6 1999-12-01 11:55:13-08 bryan Exp $
+.\" $Id: conserver.man,v 1.11 2001-07-05 05:09:50-07 bryan Exp $
 .TH CONSERVER 8 "Local"
 .SH NAME
 conserver \- console server daemon
 .SH SYNOPSIS
-.B conserver [\-\fBdinv\fP] [\-\fBC\fP \fIconfig\fP]
-.br
-.B conserver [\-\fBhV\fP]
+.B conserver [\-\fBdDhinsvV\fP] [\-\fBa\fP \fItype\fP] [\-\fBM\fP \fIaddr\fP]
+.B [\-\fBp\fP \fIport\fP] [\-\fBC\fP \fIconfig\fP] [\-\fBP\fP \fIpasswd\fP]
+.B [\-\fBL\fP \fIlogfile\fP]
 .SH DESCRIPTION
 .B Conserver
 is the daemon for the
-.IR console (1L)
+.IR console (1)
 program.
 It provides remote access to the server consoles,
 and logs all console data.
@@ -29,19 +29,32 @@ All handling of escape sequenes is done by the server,
 except the suspend sequence which is
 sent as an out-of-band command to the client.
 .PP
-The
-.B conserver
-parent process will automatically respawn any child process that dies.
-If the parent process receives a SIGTERM, it will propogate the signal
-to its children.
+The \fBconserver\fP parent process will automatically respawn any child
+process that dies.  If the parent process receives a SIGTERM, it will
+propagate the signal to its children, shutting everything down.  The
+parent will also propagate the SIGHUP and SIGUSR1 signals.  A SIGHUP
+will cause all the console logfiles to be closed and
+then reopened (no reread of the configuration file is done).  A SIGUSR1
+will cause the server to try and connect to any consoles marked as
+down.  This can come in handy if you had a terminal server (or more)
+that wasn't accepting connections at startup and you want
+\fBconserver\fP to try and reconnect to all those downed ports.
 .SH OPTIONS
 .TP
+.B \-a
+Set the default access type.
+.TP
 .BI \-C config
-With this option the invoker may specify an alternate confguration.
-The default \fIconfig\fP is /usr/local/lib/conserver.cf.
+This option points the server at a different configuration file.
+The default \fIconfig\fP is set at compile time using the
+--with-cffile option.
 .TP
 .B \-d
-Become a daemon.
+Become a daemon.  Disconnects from the controlling terminal and sends
+all output to the logfile specified with \fB\-L\fP.
+.TP
+.B \-D
+Enable debugging output, sent to stderr.
 .TP
 .B \-h
 Output a brief help message.
@@ -49,9 +62,26 @@ Output a brief help message.
 .B \-i
 Initiate console connections on demand (and close them when not used)
 .TP
+.BI \-L logfile
+This option points the server at a different logfile path.  The default
+\fIlogfile\fP is set at compile time using the --with-logfile option.
+.TP
+.BI \-M addr
+Set the address to listen on.  This allows conserver to bind to a
+particular ip address (like `localhost') instead of all interfaces.
+The default is to bind to all addresses.
+.TP
 .B \-n
 The \fIconserver\fP will \fBnot\fP output unloved console output to
 stdout.
+.TP
+.BI \-p port
+Set the port to listen on.  The default \fIport\fP is set at compile time
+using the --with-port option.
+.TP
+.BI \-P passwd
+This option points the server at a different password file.  The default
+\fIpasswd\fP is set at compile time using the --with-pwdfile option.
 .TP
 .B \-v
 Echo the configuration as it is being read (be verbose).
@@ -70,6 +100,6 @@ Thomas A. Fine, Ohio State Computer Science
 .br
 Kevin S Braunsdorf, Purdue University Computing Center
 .br
-Bryan Stansell, Global Networking and Computing, Inc.
+Bryan Stansell, conserver.com
 .SH "SEE ALSO"
-console(1L), conserver.cf(5L)
+console(1), conserver.cf(5)

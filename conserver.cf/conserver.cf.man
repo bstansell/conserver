@@ -1,17 +1,19 @@
-.\" $Id: conserver.cf.man,v 1.7 2001-06-15 07:11:37-07 bryan Exp $
+.\" $Id: conserver.cf.man,v 1.10 2001-07-05 01:39:00-07 bryan Exp $
 .\" @(#)constab.5 01/06/91 OSU CIS; Thomas A. Fine
 .TH CONSERVER.CF 4 "Local"
 .SH NAME
-conserver.cf \- table of server console terminals used by conserver(8L)
+conserver.cf \- table of server console terminals used by conserver(8)
 .SH SYNOPSIS
 .br
 LOGDIR=\fIlogdirectory\fP
 .br
-\fIserver\fP:\fIdevice\fP[@\fIconserver\fP]:\fIbaud\fP:\fIlogfile\fP:\fImark-interval\fP[\fIm|h|d|l\fP]
+TIMESTAMP=\fItimestamp-spec\fP
 .br
-\fIserver\fP:!\fIhost\fP[@\fIconserver\fP]:\fIport\fP:\fIlogfile\fP:\fImark-interval\fP[\fIm|h|d|l\fP]
+\fIserver\fP:\fIdevice\fP[@\fIconserver\fP]:\fIbaud\fP:\fIlogfile\fP:\fItimestamp-spec\fP
 .br
-\fIserver\fP:|\fIcommand\fP[@\fIconserver\fP]::\fIlogfile\fP:\fImark-interval\fP[\fIm|h|d|l\fP]
+\fIserver\fP:!\fIhost\fP[@\fIconserver\fP]:\fIport\fP:\fIlogfile\fP:\fItimestamp-spec\fP
+.br
+\fIserver\fP:|\fIcommand\fP[@\fIconserver\fP]::\fIlogfile\fP:\fItimestamp-spec\fP
 .br
 \fB%%\fP
 .br
@@ -19,7 +21,7 @@ LOGDIR=\fIlogdirectory\fP
 .SH DESCRIPTION
 .B Conserver.cf
 is the configuration file for
-.IR conserver (8L).
+.IR conserver (8).
 All lines starting with the pound sign `#' are considered comment lines.
 Blank lines are ignored.
 .PP
@@ -33,7 +35,7 @@ it is used to refer to the server when using the console program.
 The \fIbaud\fP rate is the speed and parity for this console.
 Speed may be given as an integer,
 parity only requires the first letter of any of: even, odd, mark, space.
-For no parity, use the character 'p'.
+For no parity, use the character `p'.
 .PP
 !\fIhost\fP - the hostname of the server to connect to.
 A socket connection will be made to port \fIport\fP (an integer).
@@ -49,14 +51,23 @@ this server is logged.  Any occurance of `&' will be replaced with
 the \fIserver\fP name.  Any path that doesn't begin with a `/' will
 have \fIlogdirectory\fP (value of LOGDIR) prepended to it.
 .PP
-\fImark-interval\fP[\fIm|h|d|l\fP] - specifies the time between
-timestamps applied to the console log file.  The timestamps look like
-`[-- MARK -- Mon Jan 25 14:46:56 PST 1999]'.  The `m', `h', and `d' tags
-specify `minutes', `hours', and `days'.  The `l' tag specifies `lines'
-and will cause timestamps of the form `[Mon Jan 25 14:46:56 PST 1999]' to
+\fItimestamp-spec\fP - specifies the time between
+timestamps applied to the console log file and activity logging.
+The format of the specification is
+[\fImark-interval\fP(\fIm\fP|\fIh\fP|\fId\fP|\fIl\fP)][\fIa\fP].
+The timestamps look like `[-- MARK -- Mon Jan 25 14:46:56 PST 1999]'.  The `m',
+`h', and `d' tags specify `minutes', `hours', and `days'.  The `l' tag
+specifies `lines' and will cause timestamps of the form
+`[Mon Jan 25 14:46:56 PST 1999]' to
 be placed every \fImark-interval\fP lines (a newline character signifies
 a new line). So, `5h' specifies every 5 hours and `2l' specifies every
-two lines.
+two lines.  An `a' can be specified to add activity logs to the
+logfile: `attached', `detached', and `bumped' messages.
+.PP
+A default \fItimestamp-spec\fP can be specified by using the TIMESTAMP=
+syntax.  All consoles below the TIMESTAMP= line will have use that
+\fItimestamp-spec\fP unless overridden.  To turn off marks for a specific
+console, use a \fImark-interval\fP of zero.
 .PP
 This section is terminated with a `%%' token on a line by itself.
 .PP
@@ -134,4 +145,4 @@ trusted: console.cc.purdue.edu 128.210.7.90
 .br
 allow: cc.purdue.edu stat.cc.purdue.edu
 .SH "SEE ALSO"
-console(1L), conserver(8L)
+console(1), conserver(8)

@@ -1,0 +1,91 @@
+				TODO
+				====
+
+Warning to those who aren't me: this is an unorganized list of things
+that might be classified as bugs, improvements, random thoughts or
+suggestions.  Hopefully it will get cleaned up over time.
+
+Bryan Stansell
+
+---------------------------------------------------------------------------
+
+- reread of conserver.cf - totally difficult
+    - non-dynamic memory allocation
+    - no IPC for coordinated updates
+    - additions only may work
+    - deletions only may work
+    - reimplement the whole thing *would* work
+
+- better shadow file support
+
+- PAM support
+
+- syslog?
+
+- alternate (md5) password encryption support in conserver.passwd
+
+- config file examples for various configurations
+
+- per-line timestamps
+    - only when not connected?
+
+- flow control configuration (hardcoded on, i think)
+
+- pipe input/output (console <-> program) via 'console'
+
+- group permissions (better user management in general)
+
+- 64-bit compilation support (have a patch set contributed, somewhere, i think)
+
+- autologout?  setting per console?  gack, would have to interpret data.
+
+- "listen" capability (watch all/multiple consoles)
+
+- alternate break (^ecl2?)
+
+- aliases for console entries
+
+- authentication to terminal servers (ssh, passphrase, whatever)
+
+- "not" or "except" in passwd file (!console).
+
+- master redirect for same host - big mess
+    - redirect for console goes to `hostname`
+    - should probably go to ip of connection
+    - addresses not allowed - has to be hostname (resolvable by client)
+    - can you say: gack!
+
+- multi-homed/multi-ip hosts not supported well
+    - other names/ip addrs not detected as local, necessarily
+
+- cyclades ts1000/2000 port : "Moses, Joel" <jmoses@deloitte.com>
+
+- dynamic memory allocation
+    - buf[BUFSIZ] in conserver/group.c CheckPasswd().
+    - kill --with-maxgrp
+
+- config file for client (list of masters, for example)
+
+- patches from Enrik Berkhan <Enrik.Berkhan@planb.de>
+    - bind address
+    - base port for children
+
+- strftime() idea for logfile names : Lars Kellogg-Stedman <lars@larsshack.org>
+
+- 9600baud log replay?
+
+- SSH/SSL/Encryption of some type between client/server
+
+- server -M flag should accept multiple addresses (comma separated)
+    - should client as well?
+
+- logfile rotation based on size
+
+- website docs on serial port configs
+    - PCs (solaris x86, linux, *bsd, etc)
+    - lilo
+    - bios support
+
+#
+#  $Id: TODO,v 1.7 2001-07-05 07:37:34-07 bryan Exp $
+#

@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.47 2001-06-15 09:04:08-07 bryan Exp $
+ *  $Id: main.c,v 5.56 2001-07-05 05:48:18-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -36,6 +36,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <ctype.h>
@@ -54,29 +55,43 @@
 #include <version.h>
 #include <output.h>
 
-char rcsid[] =
-	"$Id: main.c,v 5.47 2001-06-15 09:04:08-07 bryan Exp $";
-char *progname =
-	rcsid;
-int fAll = 1, fVerbose = 0, fSoftcar = 0, fNoinit = 0, fDebug = 0, fVersion = 0;
+int fAll = 1, fVerbose = 0, fSoftcar = 0, fNoinit = 0, fVersion = 0;
 int fDaemon = 0;
 char chDefAcc = 'r';
-int thepid = 0;
 
 #define FULLCFPATH SYSCONFDIR "/" CONFIGFILE;
 #define FULLPDPATH SYSCONFDIR "/" PASSWDFILE;
 
+char *pcLogfile = LOGFILEPATH;
 char *pcConfig = FULLCFPATH;
 char *pcPasswd = FULLPDPATH;
+char *pcPort = DEFPORT;
 int domainHack = 0;
-
-#if defined(SERVICENAME)
-char acService[] = SERVICENAME;
-#endif
+char *pcAddress = NULL;
+unsigned long bindAddr;
+unsigned int bindPort;
 
 struct sockaddr_in in_port;
 char acMyAddr[4];	/* "\200\76\7\1"			*/
 char acMyHost[256];	/* staff.cc.purdue.edu			*/
+
+void
+reopenLogfile()
+{
+    /* redirect stdout and stderr to the logfile.
+     *
+     * first time through any problems will show up (stderr still there).
+     * after that, all bets are off...probably not see the errors (well,
+     * aside from the tail of the old logfile, if it was rolled).
+     */
+    close(1);
+    if (1 != open(pcLogfile, O_WRONLY|O_CREAT|O_APPEND, 0644)) {
+	    Error( "open: %s: %s", pcLogfile, strerror(errno));
+	    exit(1);
+    }
+    close(2);
+    dup(1);
+}
 
 /* become a daemon							(ksb)
  */
@@ -98,6 +113,9 @@ daemonize()
 	(void) signal(SIGTSTP, SIG_IGN);
 #endif
 
+	(void)fflush(stdout);
+	(void)fflush(stderr);
+
 	switch (res = fork()) {
 	case -1:
 		Error( "fork: %s", strerror(errno));
@@ -106,17 +124,18 @@ daemonize()
 		thepid = getpid();
 		break;
 	default:
-		sleep(1);
 		exit(0);
 	}
 
 	/* if we read from stdin (by accident) we don't wanna block
 	 */
 	close(0);
-	if (0 != open("/dev/null", 2, 0644)) {
+	if (0 != open("/dev/null", O_RDWR, 0644)) {
 		Error( "open: /dev/null: %s", strerror(errno));
 		exit(1);
 	}
+
+	reopenLogfile();
 
 	/* Further disassociate this process from the terminal
 	 * Maybe this will allow you to start a daemon from rsh,
@@ -145,29 +164,33 @@ daemonize()
 }
 
 
+static char u_terse[] =
+	" [-dDhinsvV] [-a type] [-M addr] [-p port] [-C config] [-P passwd] [-L logfile]";
 static char *apcLong[] = {
-	"a type    set the default access type",
-	"C config  give a new config file to the server process",
-	"d         become a daemon, output to /dev/null",
-	"D         enable debug output, sent to stderr",
-	"h         output this message",
-	"i         init console connections on demand",
-	"n         do not output summary stream to stdout",
-	"C passwd  give a new passwd file to the server process",
-	"v         be verbose on startup",
-	"V         output version info",
+	"a type     set the default access type",
+	"C config   give a new config file to the server process",
+	"d          become a daemon, output to logfile (see -L)",
+	"D          enable debug output, sent to stderr",
+	"h          output this message",
+	"i          init console connections on demand",
+	"L logfile  give a new logfile path to the server process",
+	"M addr     address to listen on (all addresses by default)",
+	"n          do not output summary stream to stdout",
+	"p port     port to listen on",
+	"P passwd   give a new passwd file to the server process",
+	"v          be verbose on startup",
+	"V          output version info",
 	(char *)0
 };
 
 /* output a long message to the user					(ksb)
  */
 static void
-Usage(fp, ppc)
-FILE *fp;
+Usage(ppc)
 char **ppc;
 {
 	for (/* passed */; (char *)0 != *ppc; ++ppc)
-		(void)fprintf(fp, "%s\n", *ppc);
+		fprintf(stderr, "\t%s\n", *ppc);
 }
 
 /* show the user our version info					(ksb)
@@ -176,44 +199,46 @@ static void
 Version()
 {
 	auto char acA1[16], acA2[16];
-#if defined(SERVICENAME)
-	char acOut[BUFSIZ];
-#endif
+	int i;
+
+	outputPid = 0;
 
 	Info("%s", THIS_VERSION);
 	Info("default access type `%c\'", chDefAcc);
 	Info("default escape sequence `%s%s\'", FmtCtl(DEFATTN, acA1), FmtCtl(DEFESC, acA2));
 	Info("configuration in `%s\'", pcConfig);
 	Info("password in `%s\'", pcPasswd);
-	Info("pidfile in `%s\'", PIDFILE);
+	Info("logfile is `%s\'", pcLogfile);
+	Info("pidfile is `%s\'", PIDFILE);
 	Info("limited to %d group%s with %d member%s", MAXGRP, MAXGRP == 1 ? "" : "s", MAXMEMB, MAXMEMB == 1 ? "" : "s");
 #if CPARITY
 	Info("high-bit of data stripped (7-bit clean)");
 #else
 	Info("high-bit of data *not* stripped (8-bit clean)");
 #endif
-#if defined(SERVICENAME)
-	{
+
+	/* Look for non-numeric characters */
+	for (i=0;pcPort[i] != '\000';i++)
+		if (!isdigit((int)pcPort[i])) break;
+
+	if ( pcPort[i] == '\000' ) {
+		/* numeric only */
+		bindPort = atoi( pcPort );
+		Info("on port %u (referenced as `%s')", bindPort, pcPort);
+	} else {
+		/* non-numeric only */
 		struct servent *pSE;
-		if ((struct servent *)0 == (pSE = getservbyname(acService, "tcp"))) {
-			Error( "getservbyname: %s: %s", acService, strerror(errno));
-			return;
+		if ((struct servent *)0 == (pSE = getservbyname(pcPort, "tcp"))) {
+			Error("getservbyname: %s: %s", pcPort, strerror(errno));
+		} else {
+		    bindPort = ntohs((u_short)pSE->s_port);
+		    Info("on port %u (referenced as `%s')", bindPort, pcPort);
 		}
-		sprintf(acOut, "service name `%s\'", pSE->s_name);
-		if (0 != strcmp(pSE->s_name, acService)) {
-			sprintf(acOut, " (which we call `%s\')", acService);
-		}
-		sprintf(acOut, " on port %d", ntohs((u_short)pSE->s_port));
-		Info( "%s", acOut );
 	}
-#else
-#if defined(PORTNUMBER)
-	Info("on port %d", PORTNUMBER);
-#else
-	Info("no service or port compiled in");
+
+	if (fVerbose)
+	    printf(COPYRIGHT);
 	exit(1);
-#endif
-#endif
 }
 
 /* find out where/who we are						(ksb)
@@ -232,12 +257,13 @@ char **argv;
 	register int i, j;
 	register FILE *fpConfig;
 	auto struct hostent *hpMe;
-	static char acOpts[] = "a:C:dDhinP:sVv",
-		u_terse[] = " [-dDhinsvV] [-a type] [-C config] [-P passwd]";
+	static char acOpts[] = "a:C:dDhiM:np:P:sVv";
 	extern int optopt;
 	extern char *optarg;
 	auto REMOTE
 		*pRCUniq;	/* list of uniq console servers		*/
+
+	outputPid = 1;		/* make sure stuff has the pid */
 
 	thepid = getpid();
 	if ((char *)0 == (progname = strrchr(argv[0], '/'))) {
@@ -247,12 +273,16 @@ char **argv;
 	}
 
 	(void)setpwent();
+
 #if HAVE_SETLINEBUF
+	setlinebuf(stdout);
 	setlinebuf(stderr);
 #endif
 #if HAVE_SETVBUF
+	setvbuf(stdout, NULL, _IOLBF, BUFSIZ);
 	setvbuf(stderr, NULL, _IOLBF, BUFSIZ);
 #endif
+
 
 	(void)gethostname(acMyHost, sizeof(acMyHost));
 	if ((struct hostent *)0 == (hpMe = gethostbyname(acMyHost))) {
@@ -289,6 +319,9 @@ char **argv;
 		case 'C':
 			pcConfig = optarg;
 			break;
+		case 'p':
+			pcPort = optarg;
+			break;
 		case 'P':
 			pcPasswd = optarg;
 			break;
@@ -299,11 +332,17 @@ char **argv;
 			fDebug = 1;
 			break;
 		case 'h':
-			Error( "usage%s", u_terse);
-			Usage(stdout, apcLong);
+			fprintf(stderr, "%s: usage%s\n", progname, u_terse);
+			Usage(apcLong);
 			exit(0);
 		case 'i':
 			fNoinit = 1;
+			break;
+		case 'L':
+			pcLogfile = optarg;
+			break;
+		case 'M':
+			pcAddress = optarg;
 			break;
 		case 'n':
 			fAll = 0;
@@ -318,7 +357,7 @@ char **argv;
 			fVerbose = 1;
 			break;
 		case '\?':
-			Error( "usage%s", u_terse);
+			fprintf(stderr, "%s: usage%s\n", progname, u_terse);
 			exit(1);
 		default:
 			Error( "option %c needs a parameter", optopt);
@@ -331,11 +370,13 @@ char **argv;
 		exit(0);
 	}
 
+	if (fDaemon) {
+		daemonize();
+	}
+
 #if HAVE_GETSPNAM
-/*  Why force root???  Cause of getsp*() calls... */
 	if (0 != geteuid()) {
-		Error( "must be the superuser" );
-		exit(1);
+		Error( "Warning: Running as a non-root user - any shadow password usage will most likely fail!" );
 	}
 #endif
 
@@ -345,7 +386,6 @@ char **argv;
 		Error( "fopen: %s: %s", pcConfig, strerror(errno));
 		exit(1);
 	}
-	ReadCfg(pcConfig, fpConfig);
 
 #if HAVE_FLOCK
 	/* we lock the configuration file so that two identical
@@ -358,24 +398,48 @@ char **argv;
 	}
 #endif
 
+	ReadCfg(pcConfig, fpConfig);
+
+	if ( pcAddress == NULL ) {
+		bindAddr = (unsigned long)INADDR_ANY;
+	} else {
+		if ((bindAddr = inet_addr(pcAddress)) == -1) {
+			Error("inet_addr: %s: %s", pcAddress, "invalid IP address");
+			exit(1);
+		}
+	}
+	Debug( "Bind address set to `%s'", inet_ntoa(*(struct in_addr *)&bindAddr) );
+
+	if ( pcPort == NULL )
+	{
+		Error( "Severe error: pcPort is NULL????  How can that be?" );
+		exit(1);
+	}
+
+	/* Look for non-numeric characters */
+	for (i=0;pcPort[i] != '\000';i++)
+		if (!isdigit((int)pcPort[i])) break;
+
+	if ( pcPort[i] == '\000' ) {
+		/* numeric only */
+		bindPort = atoi( pcPort );
+	} else {
+		/* non-numeric only */
+		struct servent *pSE;
+		if ((struct servent *)0 == (pSE = getservbyname(pcPort, "tcp"))) {
+			Debug("getservbyname: %s: %s", pcPort, strerror(errno));
+			exit(1);
+		} else {
+		    bindPort = ntohs((u_short)pSE->s_port);
+		}
+	}
+
 	/* if no one can use us we need to come up with a default
 	 */
 	if (0 == iAccess) {
 		SetDefAccess(hpMe);
 	}
 
-#if HAVE_SETLINEBUF
-	setlinebuf(stdout);
-#endif
-#if HAVE_SETVBUF
-	setvbuf(stdout, NULL, _IOLBF, BUFSIZ);
-#endif
-
-	(void)fflush(stdout);
-	(void)fflush(stderr);
-	if (fDaemon) {
-		daemonize();
-	}
 	/* spawn all the children, so fix kids has an initial pid
 	 */
 	for (i = 0; i < MAXGRP; ++i) {
@@ -411,11 +475,6 @@ char **argv;
 
 	(void)fflush(stdout);
 	(void)fflush(stderr);
-/*
-	if (fDaemon) {
-		daemonize();
-	}
-*/
 	Master(pRCUniq);
 
 	/* stop putting kids back, and shoot them

@@ -1,5 +1,5 @@
 /*
- *  $Id: main.h,v 5.18 2001-06-12 19:18:58-07 bryan Exp $
+ *  $Id: main.h,v 5.21 2001-07-05 05:09:50-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -37,18 +37,15 @@
 /* program options and stuff
  */
 extern char rcsid[];
-extern char *progname;
-extern int fAll, fVerbose, fSoftcar, fNoinit, fInteractive, fDebug;
+extern int fAll, fVerbose, fSoftcar, fNoinit, fInteractive;
 extern char chDefAcc;
+extern unsigned long bindAddr;
+extern unsigned int bindPort;
+extern char *pcLogfile;
 extern char *pcConfig;
 extern char *pcPasswd;
 extern struct sockaddr_in in_port;
 extern char acMyHost[];
 extern char acMyAddr[];
 extern int domainHack;
-extern int thepid;
-
-#if defined(SERVICENAME)
-extern char acService[];
-#endif
-
+extern void reopenLogfile();

@@ -1,5 +1,5 @@
 /*
- *  $Id: output.h,v 1.1 2001-06-14 09:28:05-07 bryan Exp $
+ *  $Id: output.h,v 1.2 2001-07-05 00:09:39-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -9,3 +9,6 @@
 extern void Debug();
 extern void Error();
 extern void Info();
+extern int outputPid, fDebug;
+extern char *progname;
+extern int thepid;

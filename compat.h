@@ -212,3 +212,9 @@ extern char *h_errlist[];
 #ifndef BSDLY
 #define BSDLY 0
 #endif
+#ifndef ONOCR
+#define ONOCR 0
+#endif
+#ifndef ONLRET 
+#define ONLRET 0      
+#endif

@@ -1,5 +1,5 @@
 /*
- *  $Id: port.h,v 1.21 2001-02-21 17:26:06-08 bryan Exp $
+ *  $Id: port.h,v 1.26 2001-07-05 00:14:06-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -59,26 +59,6 @@
 # define MAXREPLAY	(80*25)
 #endif
 
-/* the console server will provide a pseudo-device console which
- * allows operators to run backups and such without a hard wired
- * line (this is also good for testing the server to see if you
- * might wanna use it).  Turn this on only if you (might) need it.
- */
-#if !defined(DO_VIRTUAL)
-# define DO_VIRTUAL	1
-#endif
-
-#if DO_VIRTUAL
-/* if the virtual console option is on we need a source to ptys,
- * the PUCC ptyd daemon is the best source be know, else fall back
- * on some emulation code?? (XXX)
- */
-#if !defined(HAVE_PTYD)
-# define HAVE_PTYD	(defined(S81)||defined(VAX8800))
-#endif
-
-#endif /* virtual (process on a pseudo-tty) console support */
-
 /* communication constants
  */
 #define OB_SUSP		'Z'		/* suspended by server		*/
@@ -110,3 +90,16 @@ extern int shut_up_lint;
 	write(Mfd, _ac, sizeof(_ac)-1); \
 	} while (shut_up_lint)
 
+/* For legacy compile-time setting of the port...
+ */
+#if ! defined(DEFPORT)
+#  if defined(SERVICENAME)
+#    define DEFPORT SERVICENAME
+#  else
+#    if defined(PORTNUMBER)
+#      define DEFPORT PORTNUMBER
+#    else
+#      define DEFPORT "conserver"
+#    endif
+#  endif
+#endif

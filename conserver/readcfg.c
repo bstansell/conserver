@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.35 2001-06-15 09:04:41-07 bryan Exp $
+ *  $Id: readcfg.c,v 5.45 2001-07-05 09:06:52-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -57,7 +57,6 @@
 #include <main.h>
 #include <output.h>
 
-
 GRPENT
 	aGroups[MAXGRP];		/* even spread is OK		*/
 CONSENT
@@ -72,6 +71,122 @@ ACCESS
 int
 	iAccess;		/* how many access restrictions we have	*/
 
+/* Parse the [number(m|h|d|l)[a]] spec
+ * return 0 on invalid spec, non-zero on valid spec
+ */
+int
+parseMark(pcFile, iLine, pcMark, tyme, pCE)
+const char *pcFile;
+const int iLine;
+const char *pcMark;
+CONSENT *pCE;
+{
+    char mark[BUFSIZ];
+    char *p, *n = (char *)0;
+    int activity = 0;
+    int factor = 0, pfactor = 0;
+    int value = 0, pvalue = 0;
+
+    if ((pcMark == (char *)0) ||
+	(*pcMark == '\000'))
+	return 0;
+    (void)strcpy(mark, pcMark);
+
+    for (p = mark; *p != '\000'; p++) {
+	if ( *p == 'a' || *p == 'A' ) {
+	    if ( n != (char *)0 ) {
+		Error( "%s(%d) bad timestamp specification `%s': numeral before `a' (ignoring numeral)", pcFile, iLine, pcMark);
+	    }
+	    activity = 1;
+	} else if ( *p == 'm' || *p == 'M' ) {
+	    pfactor = 60;
+	} else if ( *p == 'h' || *p == 'H' ) {
+	    pfactor = 60 * 60;
+	} else if ( *p == 'd'  || *p == 'D') {
+	    pfactor = 60 * 60 * 24;
+	} else if ( *p == 'l'  || *p == 'L') {
+	    pfactor = -1;
+	} else if ( isdigit((int)*p) ) {
+	    if ( n == (char *)0 )
+		n = p;
+	} else {
+	    Error( "%s(%d) bad timestamp specification `%s': unknown character `%c'", pcFile, iLine, pcMark, *p);
+	    return 0;
+	}
+	if ( pfactor ) {
+	    if ( n == (char *)0 ) {
+		Error( "%s(%d) bad timestamp specification `%s': missing numeric prefix for `%c'", pcFile, iLine, pcMark, *p);
+		return 0;
+	    } else {
+		*p = '\000';
+		pvalue = atoi(n);
+		if ( pvalue < 0 ) {
+		    Error( "%s(%d) negative timestamp specification `%s'", pcFile, iLine, pcMark);
+		    return 0;
+		}
+		n = (char *)0;
+		factor = pfactor;
+		value = pvalue * pfactor;
+		pvalue = pfactor = 0;
+	    }
+	}
+    }
+
+    Debug( "Mark spec of `%s' parsed: factor=%d, value=%d, activity=%d", pcMark, factor, value, activity );
+
+    if (pCE != (CONSENT *)0) {
+	pCE->activitylog = activity;
+	if ( factor && value ) {
+	    pCE->mark = value;
+	    if ( factor > 0 ) {
+		pCE->nextMark = tyme + value;
+	    } else {
+		pCE->nextMark = value;
+	    }
+	} else {
+		pCE->nextMark = pCE->mark = 0;
+	}
+    }
+
+    return factor;
+}
+
+/* replace trailing space with '\000' in a string and return
+ * a pointer to the start of the non-space part
+ */
+char *
+pruneSpace( string )
+char *string;
+{
+    char *p;
+    char *head = (char *)0;
+    char *tail = (char *)0;
+
+    /* Don't do much if it's crap */
+    if ( string == (char *)0 || *string == '\000' )
+	return string;
+
+    /* Now for the tricky part - search the string */
+    for (p = string; *p != '\000'; p++) {
+	if (isspace((int)(*p))) {
+	    if (tail == (char *)0)
+		tail = p;		/* possible end of string */
+	} else {
+	    if (head == (char *)0)
+		head = p;		/* found the start */
+	    tail = (char *)0;		/* reset tail */
+	}
+    }
+
+    if (tail != (char *)0)
+	*tail = '\000';
+
+    if (head != (char *)0)
+	return head;
+    else
+	return string;
+}
+
 /* read in the configuration file, fill in all the structs we use	(ksb)
  * to manage the consoles
  */
@@ -84,11 +199,13 @@ register FILE *fp;
 	register int iG, minG;
 	auto int iLine;
 	auto char acIn[BUFSIZ];
+	char *acStart;
 	register GRPENT *pGEAll;
 	register CONSENT *pCE;
 	register REMOTE **ppRC;
 	char LogDirectory[MAXLOGLEN];
 	time_t tyme;
+	char defMark[BUFSIZ];
 
 	tyme = time((time_t *)0);
 	LogDirectory[0] = '\000';
@@ -103,33 +220,35 @@ register FILE *fp;
 		register char *pcLine, *pcMode, *pcLog, *pcRem, *pcStart, *pcMark;
 
 		++iLine;
-		for (pcRem = acIn+strlen(acIn)-1; pcRem >= acIn; --pcRem) {
-			if (!isspace((int)(*pcRem)))
-				break;
-			*pcRem = '\000';
-			if (pcRem == acIn)
-				break;
-		}
-		if ('#' == acIn[0] || '\000' == acIn[0]) {
+
+		acStart = pruneSpace( acIn );
+
+		if ('#' == acStart[0] || '\000' == acStart[0]) {
 			continue;
 		}
-		if ('%' == acIn[0] && '%' == acIn[1] && '\000' == acIn[2]) {
+		if ('%' == acStart[0] && '%' == acStart[1] && '\000' == acStart[2]) {
 			break;
 		}
-		if ( (char *)0 == strchr(acIn, ':') &&
-		     (char *)0 != (pcLine = strchr(acIn, '=')) ) {
-			*pcLine = '\000';
-			if ( 0 == strcmp(acIn, "LOGDIR") ) {
-			    (void)strcpy(LogDirectory, ++pcLine);
-			} else if ( 0 == strcmp(acIn, "DOMAINHACK") ) {
+		if ( (char *)0 == strchr(acStart, ':') &&
+		     (char *)0 != (pcLine = strchr(acStart, '=')) ) {
+			*pcLine++ = '\000';
+			acStart = pruneSpace( acStart );
+			pcLine = pruneSpace( pcLine );
+			if ( 0 == strcmp(acStart, "LOGDIR") ) {
+			    (void)strcpy(LogDirectory, pcLine);
+			} else if ( 0 == strcmp(acStart, "TIMESTAMP") ) {
+			    if ( parseMark(pcFile, iLine, pcLine, tyme, NULL) )
+				(void)strcpy(defMark, pcLine);
+			    else
+				defMark[0] = '\000';
+			} else if ( 0 == strcmp(acStart, "DOMAINHACK") ) {
 			    domainHack = 1;
 			} else {
-			    *pcLine = '=';
-			    Error( "%s(%d) bad variable line `%s'", pcFile, iLine, acIn);
+			    Error( "%s(%d) unknown variable `%s'", pcFile, iLine, acStart);
 			}
 			continue;
 		}
-		if ( (char *)0 == (pcLine = strchr(acIn, ':')) ||
+		if ( (char *)0 == (pcLine = strchr(acStart, ':')) ||
 		     (char *)0 == (pcMode = strchr(pcLine+1, ':')) ||
 		     (char *)0 == (pcLog  = strchr(pcMode+1, ':'))) {
 			Error( "%s(%d) bad config line `%s'", pcFile, iLine, acIn);
@@ -139,8 +258,14 @@ register FILE *fp;
 		*pcMode++ = '\000';
 		*pcLog++ = '\000';
 
+		acStart = pruneSpace( acStart );
+		pcLine = pruneSpace( pcLine );
+		pcMode = pruneSpace( pcMode );
+		pcLog = pruneSpace( pcLog );
+
 		if ((char *)0 != (pcMark = strchr(pcLog, ':'))) {
 			*pcMark++ = '\000';
+			pcMark = pruneSpace( pcMark );
 			/* Skip null intervals */
 			if ( pcMark[0] == '\000' ) pcMark = (char *)0;
 		}
@@ -154,6 +279,8 @@ register FILE *fp;
 			auto struct hostent *hpMe;
 
 			*pcRem++ = '\000';
+			pcLine = pruneSpace( pcLine );
+			pcRem = pruneSpace( pcRem );
 
 			if ((struct hostent *)0 ==
 			    (hpMe = gethostbyname(pcRem))) {
@@ -181,11 +308,11 @@ register FILE *fp;
 					exit(32);
 				}
 				(void)strcpy(pRCTemp->rhost, pcRem);
-				(void)strcpy(pRCTemp->rserver, acIn);
+				(void)strcpy(pRCTemp->rserver, acStart);
 				*ppRC = pRCTemp;
 				ppRC = & pRCTemp->pRCnext;
 				if (fVerbose) {
-					Info("%s remote on %s", acIn, pcRem);
+					Info("%s remote on %s", acStart, pcRem);
 				}
 				continue;
 			}
@@ -215,7 +342,7 @@ register FILE *fp;
 			Error( "%s(%d) %d is too many consoles for hard coded tables, adjust MAXGRP or MAXMEMB", pcFile, iLine, iLocal);
 			exit(1);
 		}
-		(void)strcpy(pCE->server, acIn);
+		(void)strcpy(pCE->server, acStart);
 
 /*
  *  Here we substitute the console name for any '&' character in the
@@ -227,7 +354,7 @@ register FILE *fp;
 		while ((char *)0 != (pcRem = strchr(pcStart, '&'))) {
 		    *pcRem = '\000';
 		    (void)strcat(pCE->lfile, pcStart);
-		    (void)strcat(pCE->lfile, acIn);
+		    (void)strcat(pCE->lfile, acStart);
 		    pcStart = pcRem + 1;
 		}
 		(void)strcat(pCE->lfile, pcStart);
@@ -240,41 +367,11 @@ register FILE *fp;
 		}
 
 		if ( pcMark ) {
-		    int factor = 0;
-		    char *p;
-		    p = pcMark + strlen(pcMark) - 1;
-		    if ( *p == 'm' || *p == 'M' ) {
-			factor = 60;
-		    } else if ( *p == 'h' || *p == 'H' ) {
-			factor = 60 * 60;
-		    } else if ( *p == 'd'  || *p == 'D') {
-			factor = 60 * 60 * 24;
-		    } else if ( *p == 'l'  || *p == 'L') {
-			factor = -1;
-		    } else {
-			Error( "%s(%d) bad mark specification `%s'", pcFile, iLine, pcMark);
-			pcMark = 0;
-		    }
-		    if ( factor ) {
-			*p = '\000';
-			pCE->mark = atoi(pcMark);
-			if ( pCE->mark < 0 ) {
-			    Error( "%s(%d) negative mark specification `%s'", pcFile, iLine, pcMark);
-			    pcMark = 0;
-			}
-			pCE->mark = pCE->mark * factor;
-			if ( factor > 0 ) {
-			    pCE->nextMark = tyme + pCE->mark;
-			} else {
-			    pCE->nextMark = pCE->mark;
-			}
-		    }
-		}
-		if ( !pcMark ) {
-		    pCE->nextMark = pCE->mark = 0;
+		    (void)parseMark(pcFile, iLine, pcMark, tyme, pCE);
+		} else {
+		    (void)parseMark(pcFile, iLine, defMark, tyme, pCE);
 		}
 
-#if DO_VIRTUAL
 		if (pcLine[0] == '!')
 		{
 		    pCE->isNetworkConsole = 1;
@@ -282,8 +379,8 @@ register FILE *fp;
 		    pCE->networkConsolePort = atoi(pcMode);
 		    
 		    if (fVerbose) {
-			Info("%d: %s is network on %s/%d logged to %s",
-			       iG, acIn, pCE->networkConsoleHost,
+			Info("%s is network on %s/%d logged to %s",
+			       acStart, pCE->networkConsoleHost,
 			       pCE->networkConsolePort, pCE->lfile);
 		    }
 		    pCE->fvirtual = 0;
@@ -299,19 +396,13 @@ register FILE *fp;
 			}
 			(void)strcpy(pCE->pccmd, pcLine+1);
 			(void)strcpy(pCE->dfile, "/dev/null");
+			(void)strcpy(pCE->acslave, "/dev/null");
 		} else {
 		    pCE->isNetworkConsole = 0;
 			pCE->fvirtual = 0;
 			(void)strcpy(pCE->dfile, pcLine);
 		}
 		pCE->ipid = -1;
-#else
-		if ('|' == pcLine[0]) {
-			Error( "%s(%d) this server doesn't provide any virtual console support", pcFile, iLine);
-			exit(9);
-		}
-		(void)strcpy(pCE->dfile, pcLine);
-#endif
 
 		if (!pCE->isNetworkConsole)
 		{
@@ -321,12 +412,10 @@ register FILE *fp;
 		pCE->pbaud = FindBaud(pcMode);
 		pCE->pparity = FindParity(pcMode);
 		if (fVerbose) {
-#if DO_VIRTUAL
 			if (pCE->fvirtual)
-				Info("%d: %s with command `%s' logged to %s", iG, acIn, pCE->pccmd, pCE->lfile);
+				Info("%s with command `%s' logged to %s", acStart, pCE->pccmd, pCE->lfile);
 			else
-#endif
-				Info("%d: %s is on %s (%s%c) logged to %s", iG, acIn, pCE->dfile, pCE->pbaud->acrate, pCE->pparity->ckey, pCE->lfile);
+				Info("%s is on %s (%s%c) logged to %s", acStart, pCE->dfile, pCE->pbaud->acrate, pCE->pparity->ckey, pCE->lfile);
 		    }
 		}
 		++pCE, ++iLocal;
@@ -338,32 +427,30 @@ register FILE *fp;
 	iG = iAccess = 0;
 	pACList = (ACCESS *)0;
 	while (fgets(acIn, sizeof(acIn)-1, fp) != NULL) {
-		register char *pcRem, *pcMach, *pcNext, *pcMem;
+		register char *pcMach, *pcNext, *pcMem;
 		auto char cType;
 		auto int iLen;
 
 		++iLine;
-		for (pcRem = acIn+strlen(acIn)-1; pcRem >= acIn; --pcRem) {
-			if (!isspace((int)(*pcRem)))
-				break;
-			*pcRem = '\000';
-			if (pcRem == acIn)
-				break;
-		}
-		if ('#' == acIn[0] || '\000' == acIn[0]) {
+
+		acStart = pruneSpace( acIn );
+
+		if ('#' == acStart[0] || '\000' == acStart[0]) {
 			continue;
 		}
-		if ('%' == acIn[0] && '%' == acIn[1] && '\000' == acIn[2]) {
+		if ('%' == acStart[0] && '%' == acStart[1] && '\000' == acStart[2]) {
 			break;
 		}
-		if ((char *)0 == (pcNext = strchr(acIn, ':'))) {
+		if ((char *)0 == (pcNext = strchr(acStart, ':'))) {
 			Error( "%s(%d) missing colon?", pcFile, iLine);
 			exit(3);
 		}
+
 		do {
 			*pcNext++ = '\000';
 		} while (isspace((int)(*pcNext)));
-		switch (acIn[0]) {
+
+		switch (acStart[0]) {
 		case 'a':		/* allowed, allow, allows	*/
 		case 'A':
 			cType = 'a';
@@ -377,7 +464,7 @@ register FILE *fp;
 			cType = 't';
 			break;
 		default:
-			Error( "%s(%d) unknown access key `%s\'", pcFile, iLine, acIn);
+			Error( "%s(%d) unknown access key `%s\'", pcFile, iLine, acStart);
 			exit(3);
 		}
 		while ('\000' != *(pcMach = pcNext)) {

@@ -56,5 +56,4 @@ install: conserver
 	$(MKDIR) $(DESTDIR)$(mandir)/man8
 	$(INSTALL) conserver.man $(DESTDIR)$(mandir)/man8/conserver.8
 	$(MKDIR) $(DESTDIR)$(sysconfdir)
-	$(INSTALL) conserver.rc $(DESTDIR)$(sysconfdir)
-
+	[ -f $(DESTDIR)$(sysconfdir)/conserver.rc ] || $(INSTALL) conserver.rc $(DESTDIR)$(sysconfdir)

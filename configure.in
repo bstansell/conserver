@@ -16,19 +16,14 @@ AC_MSG_CHECKING(for port number specification)
 AC_ARG_WITH(port,
 	[  --with-port=PORT        Specify port number [conserver]],
 	[if test "$withval" != yes -a "$withval" != no; then
-		if expr "$withval" : '.*[[^0-9]]' >/dev/null 2>&1; then
-			AC_DEFINE_UNQUOTED(SERVICENAME, "$withval")
-			AC_MSG_RESULT(/etc/services name '$withval')
-		else
-			AC_DEFINE_UNQUOTED(PORTNUMBER, $withval)
-			AC_MSG_RESULT(port $withval)
-		fi
+		AC_DEFINE_UNQUOTED(DEFPORT, "$withval")
+		AC_MSG_RESULT(port '$withval')
 	else
-		AC_DEFINE_UNQUOTED(SERVICENAME, "conserver")
-		AC_MSG_RESULT(/etc/services name 'conserver')
+		AC_DEFINE_UNQUOTED(DEFPORT, "conserver")
+		AC_MSG_RESULT(port 'conserver')
 	fi],
-	[AC_DEFINE_UNQUOTED(SERVICENAME, "conserver")
-	AC_MSG_RESULT(/etc/services name 'conserver')])
+	[AC_DEFINE_UNQUOTED(DEFPORT, "conserver")
+	AC_MSG_RESULT(port 'conserver')])
 
 AC_MSG_CHECKING(for master conserver hostname)
 AC_ARG_WITH(master,
@@ -68,6 +63,19 @@ AC_ARG_WITH(pwdfile,
 	fi],
 	[AC_DEFINE_UNQUOTED(PASSWDFILE, "conserver.passwd")
 	AC_MSG_RESULT('conserver.passwd')])
+
+AC_MSG_CHECKING(for log filename)
+AC_ARG_WITH(logfile,
+	[  --with-logfile=LOGFILE  Specify log filename [/var/log/conserver] ],
+	[if test "$withval" != yes; then
+		AC_DEFINE_UNQUOTED(LOGFILEPATH, "$withval")
+		AC_MSG_RESULT('$withval')
+	else
+		AC_DEFINE_UNQUOTED(LOGFILEPATH, "/var/log/conserver")
+		AC_MSG_RESULT('/var/log/conserver')
+	fi],
+	[AC_DEFINE_UNQUOTED(LOGFILEPATH, "/var/log/conserver")
+	AC_MSG_RESULT('/var/log/conserver')])
 
 AC_MSG_CHECKING(for PID filename)
 AC_ARG_WITH(pidfile,

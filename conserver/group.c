@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.72 2001-06-15 11:33:49-07 bryan Exp $
+ *  $Id: group.c,v 5.89 2001-07-05 09:00:36-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -51,12 +51,6 @@
  *
  * 4. This notice may not be removed or altered.
  */
-#ifndef lint
-static char copyright[] =
-"@(#) Copyright (c) 1990 The Ohio State University.\n\
-@(#) Copyright 1992 Purdue Research Foundation.\n\
-All rights reserved.\n";
-#endif
 
 #include <config.h>
 
@@ -67,11 +61,13 @@ All rights reserved.\n";
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <ctype.h>
 #include <signal.h>
 #include <pwd.h>
+#include <varargs.h>
 
 #include <compat.h>
 
@@ -84,13 +80,7 @@ All rights reserved.\n";
 #include <main.h>
 #include <output.h>
 
-#if DO_VIRTUAL
-# if HAVE_PTYD
-#  include "local/openpty.h"
-# else
 extern int FallBack();
-# endif /* ptyd */
-#endif /* virtual consoles */
 
 #include <arpa/telnet.h>
 
@@ -124,6 +114,26 @@ char *pcEPass, *pcWord;
 	}
 #endif
 	return 0 == strcmp(pwd->pw_passwd, crypt(pcWord, pwd->pw_passwd));
+}
+
+/* This returns a string with the current time in ascii form.
+ * (same as ctime() but without the \n)
+ * optionally returns the time in time_t form (pass in NULL if you don't care).
+ * It's overwritten each time, so use it and forget it.
+ */
+char curtime[25];
+
+const char *
+strtime(ltime)
+    time_t *ltime;
+{
+    time_t tyme;
+
+    tyme = time((time_t *)0);
+    (void)strcpy(curtime, ctime(&tyme));
+    curtime[24] = '\000';
+    if (ltime != NULL) *ltime = tyme;
+    return (const char *)curtime;
 }
 
 /* on an HUP close and re-open log files so lop can trim them		(ksb)
@@ -203,12 +213,32 @@ FlagMark(sig)
 #endif
 }
 
+void
+tagLogfile(pCE, fmt, va_alist)
+const CONSENT *pCE;
+const char *fmt;
+va_dcl
+{
+    char ac[BUFSIZ];
+    char acOut[BUFSIZ];
+    va_list ap;
+    va_start(ap);
+
+    if ((pCE == (CONSENT *)0) ||
+	(pCE->fdlog == -1) ||
+	(pCE->activitylog == 0)) return;
+
+    vsprintf(ac, fmt, ap);
+    sprintf(acOut, "[-- %s -- %s]\r\n", ac, strtime(NULL));
+    (void)write(pCE->fdlog, acOut, strlen(acOut));
+    va_end(ap);
+}
+
 static void
 Mark()
 {
-    time_t tyme;
     char acOut[BUFSIZ];
-    char styme[26];
+    time_t tyme;
     register int i;
     register CONSENT *pCE;
 
@@ -216,17 +246,15 @@ Mark()
 	    return;
     }
 
-    tyme = time((time_t *)0);
-    (void)strcpy(styme, ctime(&tyme));
-    styme[24] = '\000';
     /* [-- MARK -- `date`] */
-    sprintf(acOut, "[-- MARK -- %s]\r\n", styme);
+    sprintf(acOut, "[-- MARK -- %s]\r\n", strtime(&tyme));
 
     for (i = 0, pCE = pGEHup->pCElist; i < pGEHup->imembers; ++i, ++pCE) {
 	    if (-1 == pCE->fdlog) {
 		    continue;
 	    }
 	    if ( (pCE->nextMark > 0) && (tyme >= pCE->nextMark) ) {
+		Debug( "[-- MARK --] stamp added to %s", pCE->lfile );
 		(void)write(pCE->fdlog, acOut, strlen(acOut));
 		pCE->nextMark = tyme + pCE->mark;
 	    }
@@ -240,8 +268,6 @@ CONSENT *pCE;
 char *s;
 int len;
 {
-    time_t tyme;
-    char styme[26];
     char acOut[BUFSIZ];
     int i = 0;
     int j;
@@ -256,24 +282,17 @@ int len;
     acOut[0] = '\000';
     for (j=0; j<len; j++) {
 	if (s[j] == '\n') {
-	    (pCE->nextMark)++;
 	    Debug( "Found newline for %s (nextMark=%d, mark=%d)", pCE->server, pCE->nextMark, pCE->mark );
-	    if (pCE->nextMark == 0) {
-		(void)write(pCE->fdlog, s+i, j-i+1);
-		i=j+1;
-		if ( acOut[0] == '\000' ) {
-		    tyme = time((time_t *)0);
-		    (void)strcpy(styme, ctime(&tyme));
-		    styme[24] = '\000';
-		    sprintf(acOut, "[%s]", styme);
-		}
-		(void)write(pCE->fdlog, acOut, strlen(acOut));
-		pCE->nextMark = pCE->mark;
+	    (void)write(pCE->fdlog, s+i, j-i+1);
+	    i=j+1;
+	    if ( acOut[0] == '\000' ) {
+		sprintf(acOut, "[%s]", strtime(NULL));
 	    }
+	    (void)write(pCE->fdlog, acOut, strlen(acOut));
 	}
     }
-    if ( i <= j ) {
-	(void)write(pCE->fdlog, s+i, j-i+1);
+    if ( i < j ) {
+	(void)write(pCE->fdlog, s+i, j-i);
     }
 }
 
@@ -309,7 +328,6 @@ int sig;
     fSawGoAway = 1;
 }
 
-#if DO_VIRTUAL
 /* on a TERM we have to cleanup utmp entries (ask ptyd to do it)	(ksb)
  */
 static void
@@ -328,11 +346,7 @@ DeUtmp()
 		if (-1 == pCE->fdtty || 0 == pCE->fvirtual) {
 			continue;
 		}
-# if HAVE_PTYD
-		(void)closepty(pCE->acslave, pCE->dfile, OPTY_UTMP, pCE->fdlog);
-# else
 		(void)close(pCE->fdlog);
-# endif
 	}
 	exit(0);
 	_exit(0);
@@ -367,21 +381,6 @@ int sig;
 	}
 }
 
-#else /* DO_VIRTUAL */
-
-static void
-GoAway()
-{
-	SendShutdownMsg(pGEHup);
-
-	exit(0);
-	_exit(0);
-	abort();
-}
-
-#endif /* DO_VIRTUAL */
-
-
 static char acStop[] = {	/* buffer for oob stop command		*/
 	OB_SUSP, 0
 };
@@ -392,7 +391,7 @@ char *pw_string;
 {
     struct passwd *pwd;
     FILE *fp;
-    char buf[100];
+    char buf[BUFSIZ];
     char *server, *servers, *this_pw, *user;
     char username[64];  /* same as acid */
 #if HAVE_GETSPNAM
@@ -567,8 +566,6 @@ int sfd;
 	register int i, nr;
 	register struct hostent *hpPeer;
 	register long tyme;
-	time_t tymee;
-	char stymee[26];
 	auto CONSENT CECtl;		/* our control `console'	*/
 	auto char cType;
 	auto int maxfd, so;
@@ -591,11 +588,7 @@ int sfd;
 	 */
 	(void)signal(SIGURG, SIG_DFL);
 	Set_signal(SIGTERM, FlagGoAway);
-#if DO_VIRTUAL
 	Set_signal(SIGCHLD, ReapVirt);
-#else
-	(void)signal(SIGCHLD, SIG_DFL);
-#endif
 
 	/* setup our local data structures and fields, and control line
 	 */
@@ -603,7 +596,6 @@ int sfd;
 	for (iConsole = 0; iConsole < pGE->imembers; ++iConsole) {
 		pCE[iConsole].fup = 0;
 		pCE[iConsole].pCLon = pCE[iConsole].pCLwr = (CONSCLIENT *)0;
-#if DO_VIRTUAL
 		pCE[iConsole].fdlog = -1;
 		if (0 == pCE[iConsole].fvirtual) {
 			pCE[iConsole].fdtty = -1;
@@ -611,16 +603,9 @@ int sfd;
 		}
 		/* open a pty for each vitrual console
 		 */
-# if HAVE_PTYD
-		pCE[iConsole].fdtty = openpty(pCE[iConsole].acslave, pCE[iConsole].dfile, OPTY_UTMP, 0);
-# else /* oops, get ptyd soon */
 		/* we won't get a utmp entry... *sigh*
 		 */
 		pCE[iConsole].fdtty = FallBack(pCE[iConsole].acslave, pCE[iConsole].dfile);
-# endif /* find openpty */
-#else
-		pCE[iConsole].fdlog = pCE[iConsole].fdtty = -1;
-#endif
 	}
 	sprintf(CECtl.server, "ctl_%d", pGE->port);
 	CECtl.inamelen = strlen(CECtl.server);	/* bogus, of course	*/
@@ -686,14 +671,11 @@ int sfd;
 	while (1) {
 		/* check signal flags */
 		if (fSawGoAway) {
-#if DO_VIRTUAL
 		    DeUtmp();
-#else
-		    GoAway();
-#endif
 		}
 		if (fSawReOpen) {
 		    fSawReOpen = 0;
+		    reopenLogfile();
 		    ReOpen();
 		}
 		if (fSawReUp) {
@@ -725,7 +707,6 @@ int sfd;
 			if ((nr = read(pCEServing->fdtty, acIn, sizeof(acIn))) <= 0) {
 				/* carrier lost */
 				Error( "lost carrier on %s (%s)!", pCEServing->server, pCEServing->dfile);
-#if DO_VIRTUAL
 				if (pCEServing->fvirtual) {
 					FD_CLR(pCEServing->fdtty, &rinit);
 					pCEServing->ipid = -1;
@@ -733,9 +714,6 @@ int sfd;
 				} else {
 					ConsInit(pCEServing, &rinit, 0);
 				}
-#else
-				ConsInit(pCEServing, &rinit, 0);
-#endif
 				continue;
 			}
 #if CPARITY
@@ -802,10 +780,7 @@ drop:
 				 * close gap in table, restart loop
 				 */
 				if (&CECtl != pCEServing) {
-					tymee = time((time_t *)0);
-					(void)strcpy(stymee, ctime(&tymee));
-					stymee[24] = '\000';
-					Info("%s: logout %s [%s]", pCEServing->server, pCLServing->acid, stymee);
+					Info("%s: logout %s [%s]", pCEServing->server, pCLServing->acid, strtime(NULL));
 				}
 				if (fNoinit && (CONSCLIENT *)0 ==
 				    pCLServing->pCEto->pCLon->pCLnext)
@@ -821,6 +796,7 @@ drop:
 				if (pCLServing->fwr) {
 					pCLServing->fwr = 0;
 					pCLServing->fwantwr = 0;
+					tagLogfile(pCEServing, "%s detached", pCLServing->acid);
 					if (pCEServing->nolog) {
 					    pCEServing->nolog = 0;
 					    sprintf(acOut, "[Console logging restored (logout)]\r\n");
@@ -990,19 +966,17 @@ drop:
 				if (pCLServing->fwr) {
 					pCLServing->fwr = 0;
 					pCLServing->fwantwr = 0;
+					tagLogfile(pCEServing, "%s detached", pCLServing->acid);
 					pCEServing->pCLwr = FindWrite(pCEServing->pCLon);
 				}
 
 				/* inform operators of the change
 				 */
 /*				if (fVerbose) { */
-					tymee = time((time_t *)0);
-					(void)strcpy(stymee, ctime(&tymee));
-					stymee[24] = '\000';
 					if (&CECtl == pCEServing) {
-						Info("%s: login %s [%s]", pCLServing->pCEwant->server, pCLServing->acid, stymee);
+						Info("%s: login %s [%s]", pCLServing->pCEwant->server, pCLServing->acid, strtime(NULL));
 					} else {
-						Info("%s moves from %s to %s [%s]", pCLServing->acid, pCEServing->server, pCLServing->pCEwant->server, stymee);
+						Info("%s moves from %s to %s [%s]", pCLServing->acid, pCEServing->server, pCLServing->pCEwant->server, strtime(NULL));
 					}
 /*				} */
 
@@ -1032,6 +1006,7 @@ drop:
 					CSTROUT(pCLServing->fd, "attached]\r\n");
 					/* this keeps the ops console neat */
 					pCEServing->iend = pCEServing->inamelen;
+					tagLogfile(pCEServing, "%s attached", pCLServing->acid);
 				} else {
 					CSTROUT(pCLServing->fd, "spy]\r\n");
 				}
@@ -1071,6 +1046,7 @@ drop:
 					} else {
 					    CSTROUT(pCLServing->fd, " -- attached]\r\n");
 					}
+					tagLogfile(pCEServing, "%s attached", pCLServing->acid);
 				} else {
 					CSTROUT(pCLServing->fd, " -- spy mode]\r\n");
 				}
@@ -1238,6 +1214,7 @@ drop:
 						} else {
 						    sprintf(acOut, "attached]\r\n");
 						}
+						tagLogfile(pCEServing, "%s attached", pCLServing->acid);
 					} else if (pCL == pCLServing) {
 						if ( pCEServing->nolog ) {
 						    sprintf(acOut, "ok (nologging)]\r\n");
@@ -1256,11 +1233,9 @@ drop:
 					if (pCEServing->isNetworkConsole) {
 						continue;
 					}
-#if DO_VIRTUAL
 					if (pCEServing->fvirtual) {
 						continue;
 					}
-#endif
 
 #if HAVE_TERMIOS_H
 					if (-1 == tcgetattr(pCEServing->fdtty, & sbuf)) {
@@ -1311,6 +1286,7 @@ drop:
 
 					pCLServing->fwr = 0;
 					pCEServing->pCLwr = (CONSCLIENT *)0;
+					tagLogfile(pCEServing, "%s detached", pCLServing->acid);
 					ConsDown(pCEServing, &rinit);
 					CSTROUT(pCLServing->fd, "line down]\r\n");
 
@@ -1366,6 +1342,9 @@ drop:
 						}
 						sprintf(acNote, "\r\n[forced to `spy\' mode by %s]\r\n", pCLServing->acid);
 						(void)write(pCL->fd, acNote, strlen(acNote));
+						tagLogfile(pCEServing, "%s bumped %s", pCLServing->acid, pCL->acid);
+					} else {
+						tagLogfile(pCEServing, "%s attached", pCLServing->acid);
 					}
 					pCEServing->pCLwr = pCLServing;
 					pCLServing->fwr = 1;
@@ -1394,27 +1373,6 @@ drop:
 					HelpUser(pCLServing);
 					break;
 
-#if HAVE_IDENTD
-				case 'I':	/* identd auth request	*/
-				case 'i':
-					CSTROUT(pCLServing->fd, "ident");
-					IdentifyMe(pCLServing, pCEServing);
-					switch (pCLServing->caccess) {
-					case 'a':
-						CSTROUT(pCLServing->fd, " allowerd]\r\n");
-						break;
-					case 'r':
-						CSTROUT(pCLServing->fd, " refused]\r\n");
-						break;
-					case 't':
-						CSTROUT(pCLServing->fd, " trusted]\r\n");
-						break;
-					default:
-						CSTROUT(pCLServing->fd, " failed]\r\n");
-						break;
-					}
-					break;
-#endif
 				case 'L':
 					if (pCLServing->fwr) {
 					    pCEServing->nolog = !pCEServing->nolog;
@@ -1465,8 +1423,10 @@ drop:
 						pCEServing->pCLwr = pCLServing;
 						pCLServing->fwr = 1;
 						sprintf(acOut, "up -- attached]\r\n");
+						tagLogfile(pCEServing, "%s attached", pCLServing->acid);
 					} else if (pCL == pCLServing) {
 						sprintf(acOut, "up]\r\n");
+						tagLogfile(pCEServing, "%s attached", pCLServing->acid);
 					} else {
 						sprintf(acOut, "up, %s is attached]\r\n", pCL->acid);
 					}
@@ -1501,6 +1461,7 @@ drop:
 						break;
 					}
 					pCLServing->fwr = 0;
+					tagLogfile(pCEServing, "%s detached", pCLServing->acid);
 					pCEServing->pCLwr = FindWrite(pCEServing->pCLon);
 					CSTROUT(pCLServing->fd, "spying]\r\n");
 					break;
@@ -1534,7 +1495,11 @@ drop:
 				case 'X':
 					CSTROUT(pCLServing->fd, "examine]\r\n");
 					for (iConsole = 0; iConsole < pGE->imembers; ++iConsole) {
-						sprintf(acOut, " %-24.24s on %-32.32s at %5.5s%c\r\n", pCE[iConsole].server, pCE[iConsole].dfile, pCE[iConsole].pbaud->acrate, pCE[iConsole].pparity->ckey);
+						if (pCE[iConsole].fvirtual) {
+						    sprintf(acOut, " %-24.24s on %-32.32s at %5.5s%c\r\n", pCE[iConsole].server, pCE[iConsole].acslave, pCE[iConsole].pbaud->acrate, pCE[iConsole].pparity->ckey);
+						} else {
+						    sprintf(acOut, " %-24.24s on %-32.32s at %5.5s%c\r\n", pCE[iConsole].server, pCE[iConsole].dfile, pCE[iConsole].pbaud->acrate, pCE[iConsole].pparity->ckey);
+						}
 						(void)write(pCLServing->fd, acOut, strlen(acOut));
 					}
 					break;
@@ -1551,6 +1516,7 @@ drop:
 						pCLServing->fwr = 0;
 						pCLServing->fwantwr = 0;
 						pCEServing->pCLwr = (CONSCLIENT *)0;
+						tagLogfile(pCEServing, "%s detached", pCLServing->acid);
 					}
 					break;
 
@@ -1596,11 +1562,9 @@ drop:
 					if (pCEServing->isNetworkConsole) {
 						goto drop;
 					}
-#if DO_VIRTUAL
 					if (pCEServing->fvirtual) {
 						goto drop;
 					}
-#endif
 
 #if HAVE_TERMIOS_H
 					if (-1 == tcgetattr(pCEServing->fdtty, & sbuf)) {
@@ -1675,11 +1639,11 @@ unknown:
 		}
 		so = sizeof(in_port.sin_addr);
 		if ((struct hostent *)0 == (hpPeer = gethostbyaddr((char *)&in_port.sin_addr, so, AF_INET))) {
-			CSTROUT(pCLFree->fd, "unknown peer name\r\n");
-			(void)close(pCLFree->fd);
-			continue;
+		    cType = AccType(&in_port.sin_addr, NULL);
+		} else {
+		    cType = AccType(&in_port.sin_addr, hpPeer->h_name);
 		}
-		if ('r' == (cType = AccType(hpPeer))) {
+		if ('r' == cType) {
 			CSTROUT(pCLFree->fd, "access from your host refused\r\n");
 			(void)close(pCLFree->fd);
 			continue;
@@ -1692,10 +1656,14 @@ unknown:
 
 		/* init the identification stuff
 		 */
-		sprintf(pCL->acid, "client@%.*s", (int)(sizeof(pCL->acid)-10), hpPeer->h_name);
-	pCL->typetym = pCL->tym = time((time_t *)0);
-		(void)strcpy(pCL->actym, ctime(&(pCL->tym)));
-		pCL->actym[24] = '\000';
+		if (hpPeer == (struct hostent *)0) {
+			sprintf(pCL->acid, "client@%.*s", (int)(sizeof(pCL->acid)-10), inet_ntoa(in_port.sin_addr));
+		} else {
+			sprintf(pCL->acid, "client@%.*s", (int)(sizeof(pCL->acid)-10), hpPeer->h_name);
+		}
+		Debug( "Client acid initialized to `%s'", pCL->acid );
+		(void)strcpy(pCL->actym, strtime(&(pCL->tym)));
+		pCL->typetym = pCL->tym;
 
 		/* link into the control list for the dummy console
 		 */
@@ -1770,7 +1738,7 @@ GRPENT *pGE;
 	(void)bzero((char *)&lstn_port, sizeof(lstn_port));
 #endif
 	lstn_port.sin_family = AF_INET;
-	*(u_long *)&lstn_port.sin_addr = INADDR_ANY;
+	*(u_long *)&lstn_port.sin_addr = bindAddr;
 	lstn_port.sin_port = 0;
 
 	/* create a socket to listen on

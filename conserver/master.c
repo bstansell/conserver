@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.36 2001-06-15 09:12:01-07 bryan Exp $
+ *  $Id: master.c,v 5.42 2001-07-05 07:36:57-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -76,9 +76,7 @@ static void
 FixKids()
 {
 	register int i, pid;
-	auto time_t tyme;
 	auto int UWbuf;
-	char styme[26];
 
 #if HAVE_WAIT3
 	while (-1 != (pid = wait3(& UWbuf, WNOHANG, (struct rusage *)0))) {
@@ -103,10 +101,7 @@ FixKids()
 			/* this kid kid is dead, start another
 			 */
 			Spawn(& aGroups[i]);
-			tyme = time((time_t *)0);
-			(void)strcpy(styme, ctime(&tyme));
-			styme[24] = '\000';
-			Info("%s: exit(%d), restarted %s", aGroups[i].pCElist[0].server, WEXITSTATUS(UWbuf), styme);
+			Info("%s: exit(%d), restarted %s", aGroups[i].pCElist[0].server, WEXITSTATUS(UWbuf), strtime(NULL));
 		}
 	}
 }
@@ -152,7 +147,7 @@ SignalKids(arg)
 		if (0 == aGroups[i].imembers)
 			continue;
 		if (-1 == kill(aGroups[i].pid, arg)) {
-		    Error("%s: kill: %s", strerror(errno));
+		    Error("kill: %s", strerror(errno));
 		}
 	}
 }
@@ -194,40 +189,25 @@ REMOTE
 	(void)bzero((char *)&master_port, sizeof(master_port));
 #endif
 	master_port.sin_family = AF_INET;
-	*(u_long *)&master_port.sin_addr = INADDR_ANY;
-#if defined(SERVICENAME)
-	{
-		struct servent *pSE;
-		if ((struct servent *)0 == (pSE = getservbyname(acService, "tcp"))) {
-			Error("%s: getservbyname: %s: %s", acService, strerror(errno));
-			return;
-		}
-		master_port.sin_port = pSE->s_port;
-	}
-#else
-# if defined(PORTNUMBER)
-	master_port.sin_port = htons((u_short)PORTNUMBER);
-# else
-	Error("%s: no port or service compiled in?");
-# endif
-#endif
+	*(u_long *)&master_port.sin_addr = bindAddr;
+	master_port.sin_port = htons(bindPort);
 
 	if ((msfd=socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		Error("%s: socket: %s", strerror(errno));
+		Error("socket: %s", strerror(errno));
 		return;
 	}
 #if  HAVE_SETSOCKOPT
 	if (setsockopt(msfd, SOL_SOCKET, SO_REUSEADDR, (char *)&true, sizeof(true))<0) {
-		Error("%s: setsockopt: %s", strerror(errno));
+		Error("setsockopt: %s", strerror(errno));
 		return;
 	}
 #endif
 	if (bind(msfd, (struct sockaddr *)&master_port, sizeof(master_port))<0) {
-		Error("%s: bind: %s", strerror(errno));
+		Error("bind: %s", strerror(errno));
 		return;
 	}
 	if (listen(msfd, SOMAXCONN) < 0) {
-		Error("%s: listen: %s", strerror(errno));
+		Error("listen: %s", strerror(errno));
 	}
 
 	FD_ZERO(&rmaster);
@@ -239,6 +219,7 @@ REMOTE
 		}
 		if (fSawHUP) {
 		    fSawHUP = 0;
+		    reopenLogfile();
 		    SignalKids(SIGHUP);
 		}
 		if (fSawUSR1) {
@@ -250,7 +231,7 @@ REMOTE
 
 		if (-1 == select(msfd+1, &rmask, (fd_set *)0, (fd_set *)0, (struct timeval *)0)) {
 			if ( errno != EINTR ) {
-			    Error("%s: select: %s", strerror(errno));
+			    Error("select: %s", strerror(errno));
 			}
 			continue;
 		}
@@ -260,7 +241,7 @@ REMOTE
 		so = sizeof(response_port);
 		cfd = accept(msfd, (struct sockaddr *)&response_port, (socklen_t *)&so);
 		if (cfd < 0) {
-			Error("%s: accept: %s", strerror(errno));
+			Error("accept: %s", strerror(errno));
 			continue;
 		}
 
@@ -273,11 +254,11 @@ REMOTE
 		}
 		so = sizeof(in_port.sin_addr);
 		if ((struct hostent *)0 == (hpPeer = gethostbyaddr((char *)&in_port.sin_addr, so, AF_INET))) {
-			CSTROUT(cfd, "unknown peer name\r\n");
-			(void)close(cfd);
-			continue;
+			cType = AccType(&in_port.sin_addr, NULL);
+		} else {
+			cType = AccType(&in_port.sin_addr, hpPeer->h_name);
 		}
-		if ('r' == (cType = AccType(hpPeer))) {
+		if ('r' == cType) {
 			CSTROUT(cfd, "access from your host refused\r\n");
 			(void)close(cfd);
 			continue;
@@ -322,7 +303,7 @@ REMOTE
 			acIn[--i] = '\000';
 		}
 		if (0 == i) {
-			Error("%s: lost connection");
+			Error("lost connection");
 			(void)close(cfd);
 #if TEST_FORK
 			exit(1);

@@ -1,9 +1,7 @@
 /*
  * Socket used to communicate
- * Choose either PORT or SERVICE...
  */
-#undef SERVICENAME
-#undef PORTNUMBER
+#undef DEFPORT
 
 /*
  * Hostname of console server
@@ -19,6 +17,11 @@
  * Password file path
  */
 #undef PASSWDFILE
+
+/*
+ * Logfile path
+ */
+#undef LOGFILEPATH
 
 /*
  * Number of consoles per child process

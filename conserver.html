@@ -23,9 +23,26 @@
 <TABLE SUMMARY="Logo" BGCOLOR="black" WIDTH="100%" ALIGN="CENTER"><TR><TD ALIGN="CENTER">
 <BR><IMG SRC="conserver.gif" ALT="Conserver"><BR><BR></TD></TR></TABLE><BR>
 
-<TABLE SUMMARY="Conserver Page" WIDTH="80%" ALIGN="CENTER"><TR><TD>
+<TABLE SUMMARY="Conserver Page" WIDTH="80%" ALIGN="CENTER">
+<TR><TD>
 
 <H3>What is conserver?</H3>
+
+</TD>
+
+<TD ALIGN="RIGHT">
+<FORM METHOD="POST" ACTION="http://www.conserver.com/cgi-bin/htsearch">
+<INPUT TYPE="HIDDEN" NAME="method" VALUE="and">
+<INPUT TYPE="HIDDEN" NAME="format" VALUE="builtin-long">
+<INPUT TYPE="HIDDEN" NAME="sort" VALUE="score">
+<INPUT TYPE="HIDDEN" NAME="config" VALUE="htdig">
+<INPUT TYPE="HIDDEN" NAME="restrict" VALUE="">
+<INPUT TYPE="HIDDEN" NAME="exclude" VALUE="">
+<INPUT TYPE="TEXT" SIZE="20" name="words" VALUE="">
+<INPUT TYPE="SUBMIT" VALUE="Search">
+</FORM>
+</TD></TR>
+<TR><TD COLSPAN=2>
 
 <P>
 
@@ -72,30 +89,25 @@ HREF="https://www.conserver.com/mailman/listinfo">web pages</A>.
 
 </P>
 
-<H3>Wanna Search?</H3>
-<P>
-
-Give the <A HREF="http://www.conserver.com/htdig/">search engine</A> a
-try.  You can hunt through the mailing list archives as well as the
-files referenced here.
-
-</P>
-
-
 <H3>Origin</H3>
 <P>
 
 The console server software found here is a heavily modified version
-originally written by Tom Fine (fine@head-cfa.harvard.edu) and then
-Kevin S Braunsdorf (ksb+conserver@sa.fedex.com).  Patches from Robert
-Olson (olson@mcs.anl.gov) were then applied to get network console
-support.
+originally written by <A HREF="http://hea-www.harvard.edu/~fine/">Tom
+Fine</A> (<A
+HREF="mailto:fine@head-cfa.harvard.edu">fine@head-cfa.harvard.edu</A>)
+at Ohio State and then Kevin S Braunsdorf (<A
+HREF="mailto:ksb+conserver@sa.fedex.com">ksb+conserver@sa.fedex.com</A>).
+Patches from Robert Olson (<A
+HREF="mailto:olson@mcs.anl.gov">olson@mcs.anl.gov</A>) were then
+applied to get network console support.
 
 </P>
 <P>
 
-Arnold de Leon (arnold@corp.webtv.net) then fixed various bugs and
-added enhancements while at <A
+Arnold de Leon (<A
+HREF="mailto:arnold@corp.webtv.net">arnold@corp.webtv.net</A>) then
+fixed various bugs and added enhancements while at <A
 HREF="http://www.synopsys.com/">Synopsys</A>.  I then took the result,
 continued fixing things, and added features we found useful.
 
@@ -131,10 +143,10 @@ GNAC name - sad, but true.
 
 <P>
 The current version is <A
-HREF="http://www.conserver.com/7.0.2.tar.gz">
-7.0.2.tar.gz</A>.  You can get it via <A
-HREF="ftp://ftp.conserver.com/conserver/7.0.2.tar.gz">FTP</A>
-or <A HREF="http://www.conserver.com/7.0.2.tar.gz">HTTP</A>.
+HREF="http://www.conserver.com/7.0.3.tar.gz">
+7.0.3.tar.gz</A>.  You can get it via <A
+HREF="ftp://ftp.conserver.com/conserver/7.0.3.tar.gz">FTP</A>
+or <A HREF="http://www.conserver.com/7.0.3.tar.gz">HTTP</A>.
 See the <A HREF="http://www.conserver.com/CHANGES">CHANGES</A> file for
 information on the latest updates.
 </P>

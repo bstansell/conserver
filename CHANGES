@@ -1,6 +1,32 @@
 				CHANGES
 				=======
 
+version 7.0.3 (Jul 5, 2001):
+	- "Off by 1" bug in 7.0.2 line-oriented timestamp code fixed (extra
+	  chars in logfile) reported by Matthew Cheek <cheek@mars-systems.com>
+	- TODO file added to distribution
+	- 'attached', 'detached', and 'bumped' actions now written to
+	  console logs that have 'a' in timestamp-spec field
+	- Default timestamp specification with TIMESTAMP= in .cf file
+	- config file much more forgiving about whitespace in fields
+	- gethostbyaddr() failures are no longer fatal
+	- Added -M for server to specify the address to listen on
+	- Added -p option to client and server to specify the port to
+	  connect to and listen on (--with-port still sets the default)
+	- Added logfile output when going into daemon mode
+	    - Added --with-logfile to configure
+	    - Added -L to override compile-time logfile location
+	    - SIGHUP reopens this logfile as well as previous behavior
+	- Run as root only restriction removed - warning now (if necessary)
+	- More #defines for FreeBSD compatibility
+	- Using inet_ntoa() now instead of peeking at bytes
+	- Fixed up -V (and -Vv) output for client and server
+	- Increased conserver.passwd read buffer (CheckPasswd())
+	- Removed DO_VIRTUAL #if's - always build that code now
+	- Removed ORIGINAL_CODE #if's (old non-CIDR access list parsing)
+	- Changed undocumented -p option to -P in console client
+	- man pages updated to reflect a little more reality
+
 version 7.0.2 (Jun 15, 2001):
 	- Bogus "ambiguous server abbreviation" with distributed server
 	  setup fixed
@@ -128,5 +154,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.28 2001-06-15 17:36:53-07 bryan Exp $
+#  $Id: CHANGES,v 1.32 2001-07-05 08:09:30-07 bryan Exp $
 #

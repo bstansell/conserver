@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.39 2001-06-15 08:53:48-07 bryan Exp $
+ *  $Id: console.c,v 5.44 2001-07-05 02:15:04-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -44,16 +44,15 @@
 
 #include <port.h>
 #include <version.h>
+#include <output.h>
 
 
-static char rcsid[] =
-	"$Id: console.c,v 5.39 2001-06-15 08:53:48-07 bryan Exp $";
-static char *progname =
-	rcsid;
-int fVerbose = 0, fReplay = 0, fRaw = 0;
+int fVerbose = 0, fReplay = 0, fRaw = 0, fVersion = 0;
 int chAttn = -1, chEsc = -1;
 char *pcInMaster =	/* which machine is current */
 	MASTERHOST;
+char *pcPort = DEFPORT;
+unsigned int bindPort;
 
 /* panic -- we have no more momory
  */
@@ -133,13 +132,15 @@ static char *apcLong[] = {
 	"h	output this message",
 	"l user	use username instead of current username",
 	"M mach	master server to poll first",
+	"p port	port to connect to",
+	"P	display pids of daemon(s)",
 	"q(Q)	send a quit command to the (local) server",
 	"r	connect to the console group only",
 	"s(S)	spy on a console (and replay)",
-	"u	show users on the various consoles",
+	"u(U)	show users on the various consoles",
 	"v	be more verbose",
 	"V	show version information",
-	"w	show who is on which console",
+	"w(W)	show who is on which console",
 	"x	examine ports and baud rates",
 	(char *)0
 };
@@ -147,12 +148,11 @@ static char *apcLong[] = {
 /* output a long message to the user
  */
 static void
-Usage(fp, ppc)
-FILE *fp;
+Usage(ppc)
 char **ppc;
 {
 	for (/* passed */; (char *)0 != *ppc; ++ppc)
-		(void)fprintf(fp, "%s\n", *ppc);
+		fprintf(stderr, "\t%s\n", *ppc);
 }
 
 /* expain who we are and which revision we are				(ksb)
@@ -160,16 +160,34 @@ char **ppc;
 static void
 Version()
 {
-/*	register unsigned char *puc; */
+	int i;
 
-	printf("%s: %s\n", progname, THIS_VERSION);
-	printf("%s: initial master server `%s\'\n", progname, pcInMaster);
+	Info("%s", THIS_VERSION);
+	Info("initial master server `%s\'", pcInMaster);
 	printf("%s: default escape sequence `", progname);
 	putCtlc(DEFATTN, stdout);
 	putCtlc(DEFESC, stdout);
 	printf("\'\n");
-/*	puc = (unsigned char *)&local_port.sin_addr;
-	printf("%s: loopback address for %s is %d.%d.%d.%d\n", progname, acMyName, puc[0], puc[1], puc[2], puc[3]); */
+	/* Look for non-numeric characters */
+	for (i=0;pcPort[i] != '\000';i++)
+		if (!isdigit((int)pcPort[i])) break;
+
+	if ( pcPort[i] == '\000' ) {
+		/* numeric only */
+		bindPort = atoi( pcPort );
+		Info("on port %u (referenced as `%s')", bindPort, pcPort);
+	} else {
+		/* non-numeric only */
+		struct servent *pSE;
+		if ((struct servent *)0 == (pSE = getservbyname(pcPort, "tcp"))) {
+			Error("getservbyname: %s: %s", pcPort, strerror(errno));
+		} else {
+		    bindPort = ntohs((u_short)pSE->s_port);
+		    Info("on port %u (referenced as `%s')", bindPort, pcPort);
+		}
+	}
+	if (fVerbose)
+	    printf(COPYRIGHT);
 }
 
 
@@ -232,11 +250,11 @@ char *pcText;
 
 	pcTemp = pcText;
 	if (ParseChar(&pcTemp, &c1) || ParseChar(&pcTemp, &c2)) {
-		fprintf(stderr, "%s: poorly formed escape sequence `%s\'\n", progname, pcText);
+		Error("poorly formed escape sequence `%s\'", pcText);
 		exit(3);
 	}
 	if ('\000' != *pcTemp) {
-		fprintf(stderr, "%s: too many characters in new escape sequence at ...`%s\'\n", progname, pcTemp);
+		Error("too many characters in new escape sequence at ...`%s\'", pcTemp);
 		exit(3);
 	}
 	chAttn = c1;
@@ -279,7 +297,7 @@ short sPort;
 		(void)bcopy((char *)hp->h_addr, (char *)&pPort->sin_addr, hp->h_length);
 #endif
 	} else {
-		fprintf(stderr, "%s: gethostbyname: %s: %s\n", progname, pcToHost, hstrerror(h_errno));
+		Error("gethostbyname: %s: %s", pcToHost, hstrerror(h_errno));
 		exit(9);
 	}
 	pPort->sin_port = sPort;
@@ -300,11 +318,11 @@ short sPort;
 	 * (it will tell us who to talk to to get a real connection)
 	 */
 	if ((s = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		fprintf(stderr, "%s: socket: %s\n", progname, strerror(errno));
+		Error("socket: %s", strerror(errno));
 		exit(1);
 	}
 	if (connect(s, (struct sockaddr *)pPort, sizeof(*pPort)) < 0) {
-		fprintf(stderr, "%s: connect: %d@%s: %s\n", progname, ntohs(pPort->sin_port), pcToHost, strerror(errno));
+		Error("connect: %d@%s: %s", ntohs(pPort->sin_port), pcToHost, strerror(errno));
 		exit(1);
 	}
 
@@ -359,7 +377,7 @@ c2raw()
 	if (0 != ioctl(0, TCGETS, & o_tios))
 # endif
 	{
-		fprintf(stderr, "%s: iotcl: getsw: %s\n", progname, strerror(errno));
+		Error("iotcl: getsw: %s", strerror(errno));
 		exit(10);
 	}
 	n_tios = o_tios;
@@ -374,13 +392,13 @@ c2raw()
 	if (0 != ioctl(0, TCSETS, & n_tios))
 # endif
 	{
-		fprintf(stderr, "%s: getarrt: %s\n", progname, strerror(errno));
+		Error("getarrt: %s", strerror(errno));
 		exit(10);
 	}
 #else
 # ifdef HAVE_TERMIO_H
 	if (0 != ioctl(0, TCGETA, & o_tio)) {
-		fprintf(stderr, "%s: iotcl: geta: %s\n", progname, strerror(errno));
+		Error("iotcl: geta: %s", strerror(errno));
 		exit(10);
 	}
 	n_tio = o_tio;	
@@ -390,12 +408,12 @@ c2raw()
 	n_tio.c_cc[VMIN] = 1;
 	n_tio.c_cc[VTIME] = 0;
 	if (0 != ioctl(0, TCSETAF, & n_tio)) {
-		fprintf(stderr, "%s: iotcl: seta: %s\n", progname, strerror(errno));
+		Error("iotcl: seta: %s", strerror(errno));
 		exit(10);
 	}
 # else
 	if (0 != ioctl(0, TIOCGETP, (char *)&o_sty)) {
-		fprintf(stderr, "%s: iotcl: getp: %s\n", progname, strerror(errno));
+		Error("iotcl: getp: %s", strerror(errno));
 		exit(10);
 	}
 	n_sty = o_sty;
@@ -405,25 +423,25 @@ c2raw()
 	n_sty.sg_kill = -1;
 	n_sty.sg_erase = -1;
 	if (0 != ioctl(0, TIOCSETP, (char *)&n_sty)) {
-		fprintf(stderr, "%s: iotcl: setp: %s\n", progname, strerror(errno));
+		Error("iotcl: setp: %s", strerror(errno));
 		exit(10);
 	}
 
 	/* stty undef all tty chars
 	 */
 	if (-1 == ioctl(0, TIOCGETC, (char *)&n_tchars)) {
-		fprintf(stderr, "%s: ioctl: getc: %s\n", progname, strerror(errno));
+		Error("ioctl: getc: %s", strerror(errno));
 		return;
 	}
 	o_tchars = n_tchars;
 	n_tchars.t_intrc = -1;
 	n_tchars.t_quitc = -1;
 	if (-1 == ioctl(0, TIOCSETC, (char *)&n_tchars)) {
-		fprintf(stderr, "%s: ioctl: setc: %s\n", progname, strerror(errno));
+		Error("ioctl: setc: %s", strerror(errno));
 		return;
 	}
 	if (-1 == ioctl(0, TIOCGLTC, (char *)&n_ltchars)) {
-		fprintf(stderr, "%s: ioctl: gltc: %s\n", progname, strerror(errno));
+		Error("ioctl: gltc: %s", strerror(errno));
 		return;
 	}
 	o_ltchars = n_ltchars;
@@ -432,7 +450,7 @@ c2raw()
 	n_ltchars.t_flushc = -1;
 	n_ltchars.t_lnextc = -1;
 	if (-1 == ioctl(0, TIOCSLTC, (char *)&n_ltchars)) {
-		fprintf(stderr, "%s: ioctl: sltc: %s\n", progname, strerror(errno));
+		Error("ioctl: sltc: %s", strerror(errno));
 		return;
 	}
 # endif
@@ -480,7 +498,7 @@ char *pcBuf;
 	while (0 != iLen) {
 		if (-1 == (nr = write(fd, pcBuf, iLen))) {
 			c2cooked();
-			fprintf(stderr, "%s: lost connection\n", progname);
+			Error("lost connection");
 			exit(3);
 		}
 		iLen -= nr;
@@ -508,7 +526,7 @@ char *pcBuf, *pcWant;
 			/* fall through */
 		case -1:
 			c2cooked();
-			fprintf(stderr, "%s: lost connection\n", progname);
+			Error("lost connection");
 			exit(3);
 		default:
 			j += nr;
@@ -519,7 +537,7 @@ char *pcBuf, *pcWant;
 			}
 			if (0 == iLen) {
 				c2cooked();
-				fprintf(stderr, "%s: reply too long\n", progname);
+				Error("reply too long");
 				exit(3);
 			}
 			continue;
@@ -538,10 +556,6 @@ char *pcBuf, *pcWant;
 	}
 	return strcmp(pcBuf, pcWant);
 }
-
-#if defined(SERVICENAME)
-static struct servent *pSE;
-#endif
 
 /* call a machine master for group master ports and machine master ports
  * take a list like "1782@localhost:@mentor.cc.purdue.edu:@pop.stat.purdue.edu"
@@ -576,19 +590,9 @@ char *pcPorts, *pcMaster, *pcTo, *pcCmd, *pcWho;
 		}
 
 		if ('\000' == *pcPorts) {
-#if defined(SERVICENAME)
-			/* in net order -- ksb */
-			j = pSE->s_port;
-#else
-# if defined(PORTNUMBER)
-			j = htons(PORTNUMBER);
-# else
-			fprintf(stderr, "%s: no port or service compiled in?\n", progname);
-			exit(8);
-# endif
-#endif
+			j = htons(bindPort);
 		} else if (!isdigit((int)(pcPorts[0]))) {
-			fprintf(stderr, "%s: %s: %s\n", progname, pcMaster, pcPorts);
+			Error("%s: %s", pcMaster, pcPorts);
 			exit(2);
 		} else {
 			j = htons((short)atoi(pcPorts));
@@ -597,7 +601,7 @@ char *pcPorts, *pcMaster, *pcTo, *pcCmd, *pcWho;
 		s = GetPort(acExcg, & client_port, j);
 
 		if (0 != ReadReply(s, acMesg, sizeof(acMesg), "ok\r\n")) {
-			fprintf(stderr, "%s: %s: %s", progname, acExcg, acMesg);
+			Error("%s: %s", acExcg, acMesg);
 			exit(4);
 		}
 
@@ -646,7 +650,7 @@ int s;
 			continue;
 		case EINVAL:
 		default:
-			fprintf(stderr, "%s: recv: %d: %s\r\n", progname, s, strerror(errno));
+			Error("recv: %d: %s\r", s, strerror(errno));
 			sleep(1);
 			continue;
 		}
@@ -669,7 +673,7 @@ int s;
 		exit(1);
 		/*NOTREACHED*/
 	default:
-		fprintf(stderr, "%s: unknown out of band command `%c\'\r\n", progname, acCmd[0]);
+		Error("unknown out of band command `%c\'\r", acCmd[0]);
 		(void)fflush(stderr);
 		break;
 	}
@@ -688,11 +692,11 @@ char *pcMaster, *pcMach, *pcHow, *pcUser;
 	extern int atoi();
 
 	if (fVerbose) {
-		printf("%s: %s to %s (%son %s)\n", progname, pcHow, pcMach, fRaw ? "raw " : "", pcMaster);
+		Info("%s to %s (%son %s)", pcHow, pcMach, fRaw ? "raw " : "", pcMaster);
 	}
 #if defined(F_SETOWN)
 	if (-1 == fcntl(s, F_SETOWN, getpid())) {
-		fprintf(stderr, "%s: fcntl: %d: %s\n", progname, s, strerror(errno));
+		Error("fcntl: %d: %s", s, strerror(errno));
 	}
 #else
 # if defined(SIOCSPGRP)
@@ -702,7 +706,7 @@ char *pcMaster, *pcMach, *pcHow, *pcUser;
 	 */
 	iTemp = -getpid();
 	if (-1 == ioctl(s, SIOCSPGRP, & iTemp)) {
-		fprintf(stderr, "%s: ioctl: %d: %s\n", progname, s, strerror(errno));
+		Error("ioctl: %d: %s", s, strerror(errno));
 	}
 	}
 # endif
@@ -724,7 +728,7 @@ char *pcMaster, *pcMach, *pcHow, *pcUser;
 		(void)sprintf(acMesg, "%c%ce%c%c", DEFATTN, DEFESC, chAttn, chEsc);
 		SendOut(s, acMesg, 5);
 		if (0 == ReadReply(s, acMesg, sizeof(acMesg), (char *)0)) {
-			fprintf(stderr, "protocol botch on redef on escape sequence\n");
+			Error("protocol botch on redef on escape sequence");
 			exit(8);
 		}
 	}
@@ -747,14 +751,14 @@ char *pcMaster, *pcMach, *pcHow, *pcUser;
 		(void)sprintf(acMesg, "%c%c;", chAttn, chEsc);
 		SendOut(s, acMesg, 3);
 		if (0 != ReadReply(s, acMesg, sizeof(acMesg), "[login:\r\n") && 0 != strcmp(acMesg, "\r\n[login:\r\n")) {
-			fprintf(stderr, "%s: call: %s\n", progname, acMesg);
+			Error("call: %s", acMesg);
 			exit(2);
 		}
 
 		(void)sprintf(acMesg, "%s@%s\n", pcUser, acThisHost);
 		SendOut(s, acMesg, strlen(acMesg));
 		if (0 != ReadReply(s, acMesg, sizeof(acMesg), "host:\r\n")) {
-			fprintf(stderr, "%s: %s\n", progname, acMesg);
+			Error("%s", acMesg);
 			exit(2);
 		}
 
@@ -787,7 +791,7 @@ char *pcMaster, *pcMach, *pcHow, *pcUser;
 		} else if (0 == strcmp(acMesg, "line to host is down]")) {
 			/* ouch, the machine is down on the server */
 			fIn = '-';
-			fprintf(stderr, "%s: %s is down\n", progname, pcMach);
+			Error("%s is down", pcMach);
 			if (fVerbose) {
 				printf("[use `");
 				putCtlc(chAttn, stdout);
@@ -796,7 +800,7 @@ char *pcMaster, *pcMach, *pcHow, *pcUser;
 			}
 		} else if (0 == strcmp(acMesg, "no -- on ctl]")) {
 			fIn = '-';
-			fprintf(stderr, "%s: %s is a control port\n", progname, pcMach);
+			Error("%s is a control port", pcMach);
 			if (fVerbose) {
 				printf("[use `");
 				putCtlc(chAttn, stdout);
@@ -804,7 +808,7 @@ char *pcMaster, *pcMach, *pcHow, *pcUser;
 				printf(";\' to open a console line]\n");
 			}
 		} else {
-			fprintf(stderr, "%s: %s: %s\n", progname, pcMach, acMesg);
+			Error("%s: %s", pcMach, acMesg);
 			exit(5);
 		}
 	}
@@ -820,7 +824,7 @@ char *pcMaster, *pcMach, *pcHow, *pcUser;
 	if ('-' != fIn) {
 		if (fIn == 'r') {
 			if ('s' != *pcHow) {
-				fprintf(stderr, "%s: %s is read-only\n", progname, pcMach);
+				Error("%s is read-only", pcMach);
 			}
 		} else if (fIn != ('f' == *pcHow ? 'a' : *pcHow)) {
 			(void)sprintf(acMesg, "%c%c%c", chAttn, chEsc, *pcHow);
@@ -904,14 +908,14 @@ char *pcMaster, *pcMach, *pcCmd, *pcWho;
 
 	/* get the ports number */
 	if (0 >= ReadReply(s, acPorts, sizeof(acPorts), (char *)0)) {
-		fprintf(stderr, "%s: master forward broken\n", progname);
+		Error("master forward broken");
 		exit(1);
 	}
 
 	if ('@' == acPorts[0]) {
 		static int iLimit = 0;
 		if (iLimit++ > 10) {
-			fprintf(stderr, "%s: forwarding level too deep!\n", progname);
+			Error("forwarding level too deep!");
 			return 1;
 		}
 		return Gather(Indir, acPorts, pcMaster, pcMach, pcCmd, pcWho);
@@ -1029,7 +1033,7 @@ char *pcMaster, *pcMach, *pcCmd, *pcWho;
 
 	/* get the ports number */
 	if (0 >= ReadReply(s, acPorts, sizeof(acPorts), (char *)0)) {
-		fprintf(stderr, "%s: master forward broken\n", progname);
+		Error("master forward broken");
 		exit(1);
 	}
 	if (fVerbose) {
@@ -1057,7 +1061,7 @@ char *pcMaster, *pcMach, *pcCmd, *pcWho;
 
 	/* get the ports number */
 	if (0 >= ReadReply(s, acPorts, sizeof(acPorts), (char *)0)) {
-		fprintf(stderr, "%s: master forward broken\n", progname);
+		Error("master forward broken");
 		exit(1);
 	}
 	/* to the command to each master
@@ -1085,7 +1089,7 @@ char *pcMaster, *pcMach, *pcCmd, *pcWho;
 
 	/* get the ports number */
 	if (0 >= ReadReply(s, acPorts, sizeof(acPorts), (char *)0)) {
-		fprintf(stderr, "%s: group leader died?\n", progname);
+		Error("group leader died?");
 		return 1;
 	}
 	if (fVerbose) {
@@ -1115,7 +1119,7 @@ char *pcMaster, *pcMach, *pcCmd, *pcWho;
 
 	/* get the ports number */
 	if (0 >= ReadReply(s, acPorts, sizeof(acPorts), (char *)0)) {
-		fprintf(stderr, "%s: master forward broken\n", progname);
+		Error("master forward broken");
 		exit(1);
 	}
 	/* to the command to each master
@@ -1145,50 +1149,19 @@ char **argv;
 	auto char *pcUser;
 	auto char *pcMsg = '\000';
 	auto int (*pfiCall)();
-	static char acOpts[] = "b:aAdDsSfFe:hl:M:pvVwWUqQrux";
+	static char acOpts[] = "b:aAdDsSfFe:hl:M:p:PvVwWqQruUx";
 	extern long atol();
 	extern int optind;
 	extern int optopt;
 	extern char *optarg;
+	int i;
+
+	outputPid = 0;	/* make sure stuff DOESN'T have the pid */
 
 	if ((char *)0 == (progname = strrchr(argv[0], '/'))) {
 		progname = argv[0];
 	} else {
 		++progname;
-	}
-
-#if defined(SERVICENAME)
-	if ((struct servent *)0 == (pSE = getservbyname(SERVICENAME, "tcp"))) {
-		fprintf(stderr, "%s: getservbyname: %s: %s\n", progname, SERVICENAME, strerror(errno));
-		exit(1);
-	}
-#endif
-
-	if (((char *)0 != (ptr = getenv("USER")) || (char *)0 != (ptr = getenv("LOGNAME"))) &&
-	    (struct passwd *)0 != (pwdMe = getpwnam(ptr)) &&
-	    getuid() == pwdMe->pw_uid) {
-		/* use the login $USER is set to, if it is our (real) uid */;
-	} else if ((struct passwd *)0 == (pwdMe = getpwuid(getuid()))) {
-		fprintf(stderr, "%s: getpwuid: %d: %s\n", progname, (int)(getuid()), strerror(errno));
-		exit(1);
-	}
-	pcUser = pwdMe->pw_name;
-
-	/* get the out hostname and the loopback devices IP address
-	 * (for trusted connections mostly)
-	 */
-	if (-1 == gethostname(acMyName, sizeof(acMyName)-1)) {
-		fprintf(stderr, "%s: gethostname: %s\n", progname, strerror(errno));
-		exit(2);
-	}
-	if ((struct hostent *)0 != (hp = gethostbyname(acLocalhost))) {
-#if HAVE_MEMCPY
-		memcpy((char *)&local_port.sin_addr, (char *)hp->h_addr, hp->h_length);
-#else
-		(void)bcopy((char *)hp->h_addr, (char *)&local_port.sin_addr, hp->h_length);
-#endif
-	} else {
-		acLocalhost[0] = '\000';
 	}
 
 	/* command line parsing
@@ -1263,7 +1236,11 @@ char **argv;
 			pcCmd = "xamine";
 			break;
 		
-		case 'p':	/* send a pid command to the server	*/
+		case 'p':
+			pcPort = optarg;
+			break;
+
+		case 'P':	/* send a pid command to the server	*/
 			pcCmd = "pid";
 			break;
 
@@ -1279,20 +1256,74 @@ char **argv;
 			break;
 
 		case 'V':
-			Version();
-			exit(0);
+			fVersion = 1;
+			break;
 
 		default:	/* huh? */
-			if ( opt != 'h' )
-			    fprintf(stderr, "%s: unknown option `%c\'\n", progname, optopt);
-			printf("%s: usage [-aAfFsS] [-rv] [-e esc] [-M mach] [-l username] machine\n", progname);
-			printf("%s: usage [-v] [-hdDuVwx] [-b message]\n", progname);
-			printf("%s: usage [-qQ] [-M mach]\n", progname);
-			Usage(stdout, apcLong);
+			Error("usage [-aAfFsS] [-rv] [-e esc] [-M mach] [-l username] console");
+			Error("usage [-v] [-hdDPuVwx] [-b message]");
+			Error("usage [-qQ] [-M mach]");
+			Usage(apcLong);
 			exit(0);
 			/*NOTREACHED*/
 
 		}
+	}
+
+	if (fVersion) {
+		Version();
+		exit(0);
+	}
+
+	if ( pcPort == NULL )
+	{
+		Error("Severe error: pcPort is NULL????  How can that be?" );
+		exit(1);
+	}
+
+	/* Look for non-numeric characters */
+	for (i=0;pcPort[i] != '\000';i++)
+		if (!isdigit((int)pcPort[i])) break;
+
+	if ( pcPort[i] == '\000' ) {
+		/* numeric only */
+		bindPort = atoi( pcPort );
+	} else {
+		/* non-numeric only */
+		struct servent *pSE;
+		if ((struct servent *)0 == (pSE = getservbyname(pcPort, "tcp"))) {
+			Error("getservbyname: %s: %s", pcPort, strerror(errno));
+			exit(1);
+		} else {
+		    bindPort = ntohs((u_short)pSE->s_port);
+		}
+	}
+
+	if (((char *)0 != (ptr = getenv("USER")) || (char *)0 != (ptr = getenv("LOGNAME"))) &&
+	    (struct passwd *)0 != (pwdMe = getpwnam(ptr)) &&
+	    getuid() == pwdMe->pw_uid) {
+		/* use the login $USER is set to, if it is our (real) uid */;
+	} else if ((struct passwd *)0 == (pwdMe = getpwuid(getuid()))) {
+		Error("getpwuid: %d: %s", (int)(getuid()), strerror(errno));
+		exit(1);
+	}
+	pcUser = pwdMe->pw_name;
+
+	/* get the out hostname and the loopback devices IP address
+	 * (for trusted connections mostly)
+	 */
+	if (-1 == gethostname(acMyName, sizeof(acMyName)-1)) {
+		Error("gethostname: %s", strerror(errno));
+		exit(2);
+	}
+	if ((struct hostent *)0 != (hp = gethostbyname(acLocalhost))) {
+#if HAVE_MEMCPY
+		memcpy((char *)&local_port.sin_addr, (char *)hp->h_addr, hp->h_length);
+#else
+		(void)bcopy((char *)hp->h_addr, (char *)&local_port.sin_addr, hp->h_length);
+#endif
+	} else {
+		acLocalhost[0] = '\000';
 	}
 
 	/* finish resolving the command to do, call Gather
@@ -1303,7 +1334,7 @@ char **argv;
 
 	if ('a' == *pcCmd || 'f' == *pcCmd || 's' == *pcCmd) {
 		if (optind >= argc) {
-			fprintf(stderr, "%s: missing machine name\n", progname);
+			Error("missing console name");
 			exit(1);
 		}
 		pcTo = argv[optind++];
@@ -1311,7 +1342,7 @@ char **argv;
 		pcTo = "*";
 	}
 	if (optind < argc) {
-		fprintf(stderr, "%s: extra garbage on command line? (%s...)\n", progname, argv[optind]);
+		Error("extra garbage on command line? (%s...)", argv[optind]);
 		exit(1);
 	}
 	(void)sprintf(acPorts, "@%s", pcInMaster);

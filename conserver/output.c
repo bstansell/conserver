@@ -1,5 +1,5 @@
 /*
- *  $Id: output.c,v 1.5 2001-06-15 07:16:51-07 bryan Exp $
+ *  $Id: output.c,v 1.6 2001-07-05 00:09:39-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -8,8 +8,12 @@
 
 #include <stdio.h>
 #include <varargs.h>
-#include <main.h>
 #include <output.h>
+
+int outputPid = 0;
+char *progname = "conserver package";
+int thepid = 0;
+int fDebug = 0;
 
 void Debug(fmt, va_alist)
 char *fmt;
@@ -18,7 +22,10 @@ va_dcl
     va_list ap;
     va_start(ap);
     if (!fDebug) return;
-    fprintf(stderr, "%s (%d): DEBUG: ", progname, thepid );
+    if (outputPid)
+	fprintf(stderr, "%s (%d): DEBUG: ", progname, thepid);
+    else
+	fprintf(stderr, "%s: DEBUG: ", progname);
     vfprintf(stderr, fmt, ap);
     fprintf(stderr, "\n" );
     va_end(ap);
@@ -30,7 +37,10 @@ va_dcl
 {
     va_list ap;
     va_start(ap);
-    fprintf(stderr, "%s (%d): ", progname, thepid );
+    if (outputPid)
+	fprintf(stderr, "%s (%d): ", progname, thepid);
+    else
+	fprintf(stderr, "%s: ", progname);
     vfprintf(stderr, fmt, ap);
     fprintf(stderr, "\n" );
     va_end(ap);
@@ -42,7 +52,10 @@ va_dcl
 {
     va_list ap;
     va_start(ap);
-    fprintf(stdout, "%s (%d): ", progname, thepid );
+    if (outputPid)
+	fprintf(stdout, "%s (%d): ", progname, thepid);
+    else
+	fprintf(stdout, "%s: ", progname);
     vfprintf(stdout, fmt, ap);
     fprintf(stdout, "\n" );
     va_end(ap);
