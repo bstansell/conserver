@@ -1,22 +1,13 @@
 /*
- *  $Id: util.c,v 1.75 2003-04-06 05:29:35-07 bryan Exp $
+ *  $Id: util.c,v 1.98 2003-08-24 10:40:10-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  */
 
-#include <config.h>
-
-#include <stdio.h>
-#include <sys/param.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <signal.h>
-#include <sys/socket.h>
-#include <ctype.h>
-
 #include <compat.h>
+
 #include <util.h>
 
 #if HAVE_OPENSSL
@@ -24,13 +15,20 @@
 #endif
 
 
-int fVerbose = 0;
+int fVerbose = 0, fErrorPrinted = 0;
 int isMultiProc = 0;
 char *progname = "conserver package";
 pid_t thepid = 0;
 int fDebug = 0;
-STRING *allStrings = (STRING *) 0;
+STRING *allStrings = (STRING *)0;
 int stringCount = 0;		/* count of allStrings list */
+struct in_addr *myAddrs = (struct in_addr *)0;
+char myHostname[MAXHOSTNAME];	/* staff.cc.purdue.edu                  */
+fd_set rinit;
+fd_set winit;
+int maxfd = 0;
+int debugLineNo = 0;
+char *debugFileName = (char *)0;
 
 /* in the routines below (the init code) we can bomb if malloc fails	(ksb)
  */
@@ -71,7 +69,7 @@ Bye(status)
  */
 const char *
 #if PROTOTYPES
-StrTime(time_t * ltime)
+StrTime(time_t *ltime)
 #else
 StrTime(ltime)
     time_t *ltime;
@@ -80,7 +78,7 @@ StrTime(ltime)
     static char curtime[25];
     time_t tyme;
 
-    tyme = time((time_t *) 0);
+    tyme = time((time_t *)0);
     strcpy(curtime, ctime(&tyme));
     curtime[24] = '\000';
     if (ltime != NULL)
@@ -88,31 +86,11 @@ StrTime(ltime)
     return (const char *)curtime;
 }
 
-void
-#if PROTOTYPES
-CheckRW(int fd, int *r, int *w)
-#else
-CheckRW(fd, r, w)
-    int fd, int *r, int *w;
-#endif
-{
-    fd_set rfd, wfd;
-    struct timeval t = { 0, 0 };
-
-    FD_ZERO(&rfd);
-    FD_ZERO(&wfd);
-    FD_SET(fd, &rfd);
-    FD_SET(fd, &wfd);
-    select(fd, &rfd, &wfd, (fd_set *) 0, &t);
-    *r = FD_ISSET(fd, &rfd);
-    *w = FD_ISSET(fd, &wfd);
-}
-
 #define STRING_ALLOC_SIZE 64
 
 char *
 #if PROTOTYPES
-BuildStringChar(const char ch, STRING * msg)
+BuildStringChar(const char ch, STRING *msg)
 #else
 BuildStringChar(ch, msg)
     const char ch;
@@ -127,28 +105,29 @@ BuildStringChar(ch, msg)
 	    msg->allocated += STRING_ALLOC_SIZE * sizeof(char);
 	    msg->string = (char *)realloc(msg->string, msg->allocated);
 	}
-	Debug(3, "BuildStringChar(): 0x%lx tried allocating %lu bytes",
-	      (void *)msg, msg->allocated);
+	CONDDEBUG((3,
+		   "BuildStringChar(): 0x%lx tried allocating %lu bytes",
+		   (void *)msg, msg->allocated));
 	if (msg->string == (char *)0)
 	    OutOfMem();
     }
     if (msg->used) {
 	msg->string[msg->used - 1] = ch;	/* overwrite NULL and */
 	msg->string[msg->used++] = '\000';	/* increment by one */
-	Debug(3, "BuildStringChar(): 0x%lx added 1 char (%d/%d now)",
-	      (void *)msg, msg->used, msg->allocated);
+	CONDDEBUG((3, "BuildStringChar(): 0x%lx added 1 char (%d/%d now)",
+		   (void *)msg, msg->used, msg->allocated));
     } else {
 	msg->string[msg->used++] = ch;	/* no NULL, so store stuff */
 	msg->string[msg->used++] = '\000';	/* and increment by two */
-	Debug(3, "BuildStringChar(): 0x%lx added 2 chars (%d/%d now)",
-	      (void *)msg, msg->used, msg->allocated);
+	CONDDEBUG((3, "BuildStringChar(): 0x%lx added 2 chars (%d/%d now)",
+		   (void *)msg, msg->used, msg->allocated));
     }
     return msg->string;
 }
 
 char *
 #if PROTOTYPES
-BuildString(const char *str, STRING * msg)
+BuildString(const char *str, STRING *msg)
 #else
 BuildString(str, msg)
     const char *str;
@@ -161,7 +140,7 @@ BuildString(str, msg)
 	msg->used = 0;
 	if (msg->string != (char *)0)
 	    msg->string[0] = '\000';
-	Debug(3, "BuildString(): 0x%lx reset", (void *)msg);
+	CONDDEBUG((3, "BuildString(): 0x%lx reset", (void *)msg));
 	return msg->string;
     }
     len = strlen(str) + 1;
@@ -177,8 +156,8 @@ BuildString(str, msg)
 		 1) * STRING_ALLOC_SIZE * sizeof(char);
 	    msg->string = (char *)realloc(msg->string, msg->allocated);
 	}
-	Debug(3, "BuildString(): 0x%lx tried allocating %lu bytes",
-	      (void *)msg, msg->allocated);
+	CONDDEBUG((3, "BuildString(): 0x%lx tried allocating %lu bytes",
+		   (void *)msg, msg->allocated));
 	if (msg->string == (char *)0)
 	    OutOfMem();
     }
@@ -190,14 +169,100 @@ BuildString(str, msg)
     if (msg->used)
 	len--;
     msg->used += len;
-    Debug(3, "BuildString(): 0x%lx added %d chars (%d/%d now)",
-	  (void *)msg, len, msg->used, msg->allocated);
+    CONDDEBUG((3, "BuildString(): 0x%lx added %d chars (%d/%d now)",
+	       (void *)msg, len, msg->used, msg->allocated));
+    return msg->string;
+}
+
+char *
+#if PROTOTYPES
+BuildStringN(const char *str, int n, STRING *msg)
+#else
+BuildStringN(str, n, msg)
+    const char *str;
+    int n;
+    STRING *msg;
+#endif
+{
+    int len;
+
+    if ((char *)0 == str) {
+	msg->used = 0;
+	if (msg->string != (char *)0)
+	    msg->string[0] = '\000';
+	CONDDEBUG((3, "BuildStringN(): 0x%lx reset", (void *)msg));
+	return msg->string;
+    }
+    if (n <= 0)
+	return msg->string;
+    len = strlen(str) + 1;
+    if (len > n) {		/* if we're a substring */
+	len = n;
+	if (str[n - 1] != '\000')	/* if we aren't copying a '\000', */
+	    len++;		/* we need to add one at the end */
+    }
+    if (msg->used + len >= msg->allocated) {
+	if (0 == msg->allocated) {
+	    msg->allocated =
+		(len / STRING_ALLOC_SIZE +
+		 1) * STRING_ALLOC_SIZE * sizeof(char);
+	    msg->string = (char *)calloc(1, msg->allocated);
+	} else {
+	    msg->allocated +=
+		((msg->used + len - msg->allocated) / STRING_ALLOC_SIZE +
+		 1) * STRING_ALLOC_SIZE * sizeof(char);
+	    msg->string = (char *)realloc(msg->string, msg->allocated);
+	}
+	CONDDEBUG((3, "BuildStringN(): 0x%lx tried allocating %lu bytes",
+		   (void *)msg, msg->allocated));
+	if (msg->string == (char *)0)
+	    OutOfMem();
+    }
+#if HAVE_MEMCPY
+    memcpy(msg->string + (msg->used ? msg->used - 1 : 0), str, len);
+#else
+    bcopy(str, msg->string + (msg->used ? msg->used - 1 : 0), len);
+#endif
+    if (len > n)		/* we need to terminate the string */
+	msg->string[(msg->used ? msg->used - 1 : 0) + len - 1] = '\000';
+    if (msg->used)
+	len--;
+    msg->used += len;
+    CONDDEBUG((3, "BuildStringN(): 0x%lx added %d chars (%d/%d now)",
+	       (void *)msg, len, msg->used, msg->allocated));
+    return msg->string;
+}
+
+char *
+#if PROTOTYPES
+ShiftString(STRING *msg, int n)
+#else
+ShiftString(msg, n)
+    STRING *msg;
+    int n;
+#endif
+{
+    if (msg == (STRING *)0 || n <= 0 || n > msg->used - 1)
+	return (char *)0;
+
+#if HAVE_MEMMOVE
+    memmove(msg->string, msg->string + n, msg->used - n);
+#else
+    {
+	char *s, *e;
+	int len;
+	for (s = msg->string, e = s + n, len = msg->used - n; len > 0;
+	     len--)
+	    *s++ = *e++;
+    }
+#endif
+    msg->used -= n;
     return msg->string;
 }
 
 void
 #if PROTOTYPES
-InitString(STRING * msg)
+InitString(STRING *msg)
 #else
 InitString(msg)
     STRING *msg;
@@ -209,31 +274,32 @@ InitString(msg)
 
 void
 #if PROTOTYPES
-DestroyString(STRING * msg)
+DestroyString(STRING *msg)
 #else
 DestroyString(msg)
     STRING *msg;
 #endif
 {
-    if (msg->prev == (STRING *) 0 && msg->next == (STRING *) 0 &&
+    if (msg->prev == (STRING *)0 && msg->next == (STRING *)0 &&
 	allStrings != msg) {
-	Debug(1, "DestroyString(): 0x%lx non-pooled string destroyed",
-	      (void *)msg, stringCount);
+	CONDDEBUG((1, "DestroyString(): 0x%lx non-pooled string destroyed",
+		   (void *)msg, stringCount));
     } else {
-	if (msg->prev != (STRING *) 0)
+	if (msg->prev != (STRING *)0)
 	    msg->prev->next = msg->next;
-	if (msg->next != (STRING *) 0)
+	if (msg->next != (STRING *)0)
 	    msg->next->prev = msg->prev;
 	if (msg == allStrings) {
 	    allStrings = msg->next;
 	}
 	stringCount--;
-	Debug(1, "DestroyString(): 0x%lx string destroyed (count==%d)",
-	      (void *)msg, stringCount);
+	CONDDEBUG((1,
+		   "DestroyString(): 0x%lx string destroyed (count==%d)",
+		   (void *)msg, stringCount));
     }
     if (msg->allocated)
 	free(msg->string);
-    InitString(msg);
+    free(msg);
 }
 
 STRING *
@@ -244,18 +310,18 @@ AllocString()
 #endif
 {
     STRING *s;
-    s = (STRING *) calloc(1, sizeof(STRING));
-    if (s == (STRING *) 0)
+    if ((s = (STRING *)calloc(1, sizeof(STRING)))
+	== (STRING *)0)
 	OutOfMem();
-    if (allStrings != (STRING *) 0) {
+    if (allStrings != (STRING *)0) {
 	allStrings->prev = s;
 	s->next = allStrings;
     }
     allStrings = s;
     InitString(s);
     stringCount++;
-    Debug(1, "AllocString(): 0x%lx created string #%d", (void *)s,
-	  stringCount);
+    CONDDEBUG((1, "AllocString(): 0x%lx created string #%d", (void *)s,
+	       stringCount));
     return s;
 }
 
@@ -266,14 +332,12 @@ DestroyStrings(void)
 DestroyStrings()
 #endif
 {
-    while (allStrings != (STRING *) 0) {
-	STRING *s = allStrings;
+    while (allStrings != (STRING *)0) {
 	DestroyString(allStrings);
-	free(s);
     }
 }
 
-static STRING *mymsg = (STRING *) 0;
+static STRING *mymsg = (STRING *)0;
 
 char *
 #if PROTOTYPES
@@ -283,7 +347,7 @@ BuildTmpString(str)
     const char *str;
 #endif
 {
-    if (mymsg == (STRING *) 0)
+    if (mymsg == (STRING *)0)
 	mymsg = AllocString();
     return BuildString(str, mymsg);
 }
@@ -296,14 +360,14 @@ BuildTmpStringChar(c)
     const char c;
 #endif
 {
-    if (mymsg == (STRING *) 0)
+    if (mymsg == (STRING *)0)
 	mymsg = AllocString();
     return BuildStringChar(c, mymsg);
 }
 
 char *
 #if PROTOTYPES
-ReadLine(FILE * fp, STRING * save, int *iLine)
+ReadLine(FILE *fp, STRING *save, int *iLine)
 #else
 ReadLine(fp, save, iLine)
     FILE *fp;
@@ -315,12 +379,12 @@ ReadLine(fp, save, iLine)
     char *wholeline = (char *)0;
     char *ret = (char *)0;
     int i, buflen, peek, commentCheck = 1, comment = 0;
-    static STRING *bufstr = (STRING *) 0;
-    static STRING *wholestr = (STRING *) 0;
+    static STRING *bufstr = (STRING *)0;
+    static STRING *wholestr = (STRING *)0;
 
-    if (bufstr == (STRING *) 0)
+    if (bufstr == (STRING *)0)
 	bufstr = AllocString();
-    if (wholestr == (STRING *) 0)
+    if (wholestr == (STRING *)0)
 	wholestr = AllocString();
     peek = 0;
     wholeline = (char *)0;
@@ -392,8 +456,8 @@ ReadLine(fp, save, iLine)
 	wholeline = BuildString(bufstr->string, wholestr);
     }
 
-    Debug(1, "ReadLine(): returning <%s>",
-	  (wholeline != (char *)0) ? wholeline : "<NULL>");
+    CONDDEBUG((1, "ReadLine(): returning <%s>",
+	       (wholeline != (char *)0) ? wholeline : "<NULL>"));
     return wholeline;
 }
 
@@ -402,7 +466,7 @@ ReadLine(fp, save, iLine)
  */
 char *
 #if PROTOTYPES
-FmtCtl(int ci, STRING * pcIn)
+FmtCtl(int ci, STRING *pcIn)
 #else
 FmtCtl(ci, pcIn)
     int ci;
@@ -435,7 +499,7 @@ FmtCtl(ci, pcIn)
 
 void
 #if PROTOTYPES
-FmtCtlStr(char *pcIn, int len, STRING * pcOut)
+FmtCtlStr(char *pcIn, int len, STRING *pcOut)
 #else
 FmtCtlStr(pcIn, len, pcOut)
     char *pcIn;
@@ -476,18 +540,21 @@ Debug(level, fmt, va_alist)
 #endif
 {
     va_list ap;
+
+    if (fDebug < level)
+	return;
 #if PROTOTYPES
     va_start(ap, fmt);
 #else
     va_start(ap);
 #endif
-    if (fDebug < level)
-	return;
     if (isMultiProc)
-	fprintf(stderr, "[%s] %s (%lu): DEBUG: ", StrTime(NULL), progname,
-		(unsigned long)thepid);
+	fprintf(stderr, "[%s] %s (%lu): DEBUG: [%s:%d] ",
+		StrTime((time_t *)0), progname, (unsigned long)thepid,
+		debugFileName, debugLineNo);
     else
-	fprintf(stderr, "%s: DEBUG: ", progname);
+	fprintf(stderr, "%s: DEBUG: [%s:%d] ", progname, debugFileName,
+		debugLineNo);
     vfprintf(stderr, fmt, ap);
     fprintf(stderr, "\n");
     va_end(ap);
@@ -509,13 +576,14 @@ Error(fmt, va_alist)
     va_start(ap);
 #endif
     if (isMultiProc)
-	fprintf(stderr, "[%s] %s (%lu): ERROR: ", StrTime(NULL), progname,
-		(unsigned long)thepid);
+	fprintf(stderr, "[%s] %s (%lu): ERROR: ", StrTime((time_t *)0),
+		progname, (unsigned long)thepid);
     else
 	fprintf(stderr, "%s: ", progname);
     vfprintf(stderr, fmt, ap);
     fprintf(stderr, "\n");
     va_end(ap);
+    fErrorPrinted = 1;
 }
 
 void
@@ -534,7 +602,7 @@ Msg(fmt, va_alist)
     va_start(ap);
 #endif
     if (isMultiProc)
-	fprintf(stdout, "[%s] %s (%lu): ", StrTime(NULL), progname,
+	fprintf(stdout, "[%s] %s (%lu): ", StrTime((time_t *)0), progname,
 		(unsigned long)thepid);
     else
 	fprintf(stdout, "%s: ", progname);
@@ -563,8 +631,8 @@ Verbose(fmt, va_alist)
     va_start(ap);
 #endif
     if (isMultiProc)
-	fprintf(stdout, "[%s] %s (%lu): INFO: ", StrTime(NULL), progname,
-		(unsigned long)thepid);
+	fprintf(stdout, "[%s] %s (%lu): INFO: ", StrTime((time_t *)0),
+		progname, (unsigned long)thepid);
     else
 	fprintf(stdout, "%s: ", progname);
     vfprintf(stdout, fmt, ap);
@@ -625,7 +693,7 @@ GetMaxFiles()
 	mf = (FD_SETSIZE - 1);
     }
 #endif
-    Debug(1, "GetMaxFiles(): maxfiles=%d", mf);
+    CONDDEBUG((1, "GetMaxFiles(): maxfiles=%d", mf));
     return mf;
 }
 
@@ -647,24 +715,25 @@ FileOpenFD(fd, type)
 {
     CONSFILE *cfp;
 
-    cfp = (CONSFILE *) calloc(1, sizeof(CONSFILE));
-    if ((CONSFILE *) 0 == cfp)
+    if ((cfp = (CONSFILE *)calloc(1, sizeof(CONSFILE)))
+	== (CONSFILE *)0)
 	OutOfMem();
     cfp->ftype = type;
     cfp->fd = fd;
+    cfp->wbuf = AllocString();
 #if HAVE_OPENSSL
-    cfp->ssl = (SSL *) 0;
-    cfp->waitonWrite = cfp->waitonRead = 0;
+    cfp->ssl = (SSL *)0;
+    cfp->waitForRead = cfp->waitForWrite = FLAGFALSE;
 #endif
 
-    Debug(2, "FileOpenFD(): encapsulated fd %d type %d", fd, type);
+    CONDDEBUG((2, "FileOpenFD(): encapsulated fd %d type %d", fd, type));
     return cfp;
 }
 
 /* This is to "unencapsulate" the file descriptor */
 int
 #if PROTOTYPES
-FileUnopen(CONSFILE * cfp)
+FileUnopen(CONSFILE *cfp)
 #else
 FileUnopen(cfp)
     CONSFILE *cfp;
@@ -688,7 +757,7 @@ FileUnopen(cfp)
 	    retval = -1;
 	    break;
     }
-    Debug(2, "FileUnopen(): unopened fd %d", cfp->fd);
+    CONDDEBUG((2, "FileUnopen(): unopened fd %d", cfp->fd));
     free(cfp);
 
     return retval;
@@ -711,20 +780,21 @@ FileOpen(path, flag, mode)
     int fd;
 
     if (-1 == (fd = open(path, flag, mode))) {
-	Debug(2, "FileOpen(): failed to open `%s'", path);
-	return (CONSFILE *) 0;
+	CONDDEBUG((2, "FileOpen(): failed to open `%s'", path));
+	return (CONSFILE *)0;
     }
-    cfp = (CONSFILE *) calloc(1, sizeof(CONSFILE));
-    if ((CONSFILE *) 0 == cfp)
+    if ((cfp = (CONSFILE *)calloc(1, sizeof(CONSFILE)))
+	== (CONSFILE *)0)
 	OutOfMem();
     cfp->ftype = simpleFile;
     cfp->fd = fd;
+    cfp->wbuf = AllocString();
 #if HAVE_OPENSSL
-    cfp->ssl = (SSL *) 0;
-    cfp->waitonWrite = cfp->waitonRead = 0;
+    cfp->ssl = (SSL *)0;
+    cfp->waitForRead = cfp->waitForWrite = FLAGFALSE;
 #endif
 
-    Debug(2, "FileOpen(): opened `%s' as fd %d", path, fd);
+    CONDDEBUG((2, "FileOpen(): opened `%s' as fd %d", path, fd));
     return cfp;
 }
 
@@ -734,48 +804,42 @@ FileOpen(path, flag, mode)
  */
 int
 #if PROTOTYPES
-FileClose(CONSFILE ** pcfp)
+FileClose(CONSFILE **pcfp)
 #else
-FileClose(cfp)
+FileClose(pcfp)
     CONSFILE **pcfp;
 #endif
 {
     CONSFILE *cfp;
     int retval = 0;
 #if defined(__CYGWIN__)
-    int client_sock_flags;
     struct linger lingeropt;
-#endif
-#if HAVE_OPENSSL
-    int sflags;
 #endif
 
     cfp = *pcfp;
-    if (cfp == (CONSFILE *) 0)
+    if (cfp == (CONSFILE *)0)
 	return 0;
 
     switch (cfp->ftype) {
 	case simpleFile:
-	    retval = close(cfp->fd);
+	    do {
+		retval = close(cfp->fd);
+	    } while (retval == -1 && errno == EINTR);
 	    break;
 	case simpleSocket:
 #if defined(__CYGWIN__)
 	    /* flush out the client socket - set it to blocking,
 	     * then write to it
 	     */
-	    client_sock_flags = fcntl(cfp->fd, F_GETFL, 0);
-	    if (client_sock_flags != -1)
-		/* enable blocking */
-		fcntl(cfp->fd, F_SETFL, client_sock_flags & ~O_NONBLOCK);
+	    SetFlags(cfp->fd, 0, O_NONBLOCK)
 
-	    /* sent it a byte - guaranteed to block - ensure delivery
-	     * of prior data yeah - this is a bit paranoid - try
-	     * without this at first
-	     */
-	    /* write(cfp->fd, "\n", 1); */
-
-	    /* this is the guts of the workaround for Winsock close bug */
-	    shutdown(cfp->fd, 1);
+		/* sent it a byte - guaranteed to block - ensure delivery
+		 * of prior data yeah - this is a bit paranoid - try
+		 * without this at first
+		 */
+		/* write(cfp->fd, "\n", 1); */
+		/* this is the guts of the workaround for Winsock close bug */
+		shutdown(cfp->fd, 1);
 
 	    /* enable lingering */
 	    lingeropt.l_onoff = 1;
@@ -783,31 +847,20 @@ FileClose(cfp)
 	    setsockopt(cfp->fd, SOL_SOCKET, SO_LINGER, &lingeropt,
 		       sizeof(lingeropt));
 #endif
-	    retval = close(cfp->fd);
-
+	    do {
+		retval = close(cfp->fd);
+	    } while (retval == -1 && errno == EINTR);
 
 	    break;
 #if HAVE_OPENSSL
 	case SSLSocket:
-	    sflags = fcntl(cfp->fd, F_GETFL, 0);
-	    if (sflags != -1) {
-		Debug(2,
-		      "FileClose(): setting socket to BLOCKING on fd %d",
-		      cfp->fd);
-		fcntl(cfp->fd, F_SETFL, sflags & ~O_NONBLOCK);
-	    }
-	    Debug(2, "FileClose(): performing a SSL_shutdown() on fd %d",
-		  cfp->fd);
+	    CONDDEBUG((2,
+		       "FileClose(): performing a SSL_shutdown() on fd %d",
+		       cfp->fd));
 	    SSL_shutdown(cfp->ssl);
-	    Debug(2, "FileClose(): performing a SSL_free() on fd %d",
-		  cfp->fd);
+	    CONDDEBUG((2, "FileClose(): performing a SSL_free() on fd %d",
+		       cfp->fd));
 	    SSL_free(cfp->ssl);
-	    if (sflags != -1) {
-		Debug(2,
-		      "FileClose(): restoring socket blocking mode on fd %d",
-		      cfp->fd);
-		fcntl(cfp->fd, F_SETFL, sflags);
-	    }
 	    /* set the sucker back to a simpleSocket and recall so we
 	     * do all that special stuff we oh so love...and make sure
 	     * we return so we don't try and free(0).  -bryan
@@ -819,17 +872,19 @@ FileClose(cfp)
 	    retval = -1;
 	    break;
     }
-    Debug(2, "FileClose(): closed fd %d", cfp->fd);
+
+    CONDDEBUG((2, "FileClose(): closed fd %d", cfp->fd));
+    DestroyString(cfp->wbuf);
     free(cfp);
-    *pcfp = (CONSFILE *) 0;
+    *pcfp = (CONSFILE *)0;
 
     return retval;
 }
 
-/* Unless otherwise stated, returns the same values as read(2) */
+/* returns: -1 on error or eof, >= 0 for valid reads */
 int
 #if PROTOTYPES
-FileRead(CONSFILE * cfp, void *buf, int len)
+FileRead(CONSFILE *cfp, void *buf, int len)
 #else
 FileRead(cfp, buf, len)
     CONSFILE *cfp;
@@ -837,161 +892,66 @@ FileRead(cfp, buf, len)
     int len;
 #endif
 {
-    int retval = 0;
-#if HAVE_OPENSSL
-    /*int r, w; */
-    int sflags;
-#endif
+    int retval = -1;
 
     switch (cfp->ftype) {
 	case simpleFile:
 	case simpleSocket:
-	    retval = read(cfp->fd, buf, len);
+	    while (retval < 0) {
+		if ((retval = read(cfp->fd, buf, len)) <= 0) {
+		    if (retval == 0) {
+			retval = -1;
+			break;
+		    }
+		    if (errno == EINTR)
+			continue;
+		    if (errno == EAGAIN) {
+			/* must be non-blocking - so stop */
+			retval = 0;
+			break;
+		    }
+		    Error("FileRead(): fd %d: %s", cfp->fd,
+			  strerror(errno));
+		    retval = -1;
+		    break;
+		}
+	    }
 	    break;
 #if HAVE_OPENSSL
 	case SSLSocket:
-	    /*CheckRW(cfp->fd, &r, &w); */
-	    sflags = fcntl(cfp->fd, F_GETFL, 0);
-	    if (sflags != -1) {
-		Debug(2, "FileRead(): setting socket to BLOCKING on fd %d",
-		      cfp->fd);
-		fcntl(cfp->fd, F_SETFL, sflags & ~O_NONBLOCK);
+	    if (cfp->waitForWrite == FLAGTRUE) {
+		cfp->waitForWrite = FLAGFALSE;
+		if (cfp->wbuf->used <= 1)
+		    FD_CLR(cfp->fd, &winit);
 	    }
 	    retval = SSL_read(cfp->ssl, buf, len);
 	    switch (SSL_get_error(cfp->ssl, retval)) {
 		case SSL_ERROR_NONE:
 		    break;
-		case SSL_ERROR_WANT_READ:	/* these two shouldn't */
-		case SSL_ERROR_WANT_WRITE:	/* happen (yet) */
-		    Error
-			("FileRead(): Ugh, ok..an SSL_ERROR_WANT_* happened and I didn't think it ever would.  Code needs serious work!");
-		    exit(EX_UNAVAILABLE);
-		case SSL_ERROR_ZERO_RETURN:
-		default:
-		    Debug(2,
-			  "FileRead(): performing a SSL_shutdown() on fd %d",
-			  cfp->fd);
-		    SSL_shutdown(cfp->ssl);
-		    Debug(2,
-			  "FileRead(): performing a SSL_free() on fd %d",
-			  cfp->fd);
-		    SSL_free(cfp->ssl);
-		    cfp->ssl = (SSL *) 0;
-		    cfp->ftype = simpleSocket;
+		case SSL_ERROR_WANT_READ:
 		    retval = 0;
 		    break;
-	    }
-	    if (sflags != -1) {
-		Debug(2,
-		      "FileRead(): restoring socket blocking mode on fd %d",
-		      cfp->fd);
-		fcntl(cfp->fd, F_SETFL, sflags);
-	    }
-	    break;
-#endif
-	default:
-	    retval = 0;
-	    break;
-    }
-
-    if (retval >= 0) {
-	Debug(2, "FileRead(): read %d byte%s from fd %d", retval,
-	      (retval == 1) ? "" : "s", cfp->fd);
-    } else {
-	Debug(2, "FileRead(): read of %d byte%s from fd %d: %s", len,
-	      (retval == 1) ? "" : "s", cfp->fd, strerror(errno));
-    }
-    return retval;
-}
-
-/* Unless otherwise stated, returns the same values as write(2) */
-int
-#if PROTOTYPES
-FileWrite(CONSFILE * cfp, const char *buf, int len)
-#else
-FileWrite(cfp, buf, len)
-    CONSFILE *cfp;
-    const char *buf;
-    int len;
-#endif
-{
-    int len_orig = len;
-    int len_out = 0;
-    int retval = 0;
-#if HAVE_OPENSSL
-    /*int r, w; */
-    int sflags;
-#endif
-
-    if (buf == (char *)0)
-	return 0;
-
-    if (len < 0)
-	len = strlen(buf);
-
-    if (len == 0)
-	return 0;
-
-    switch (cfp->ftype) {
-	case simpleFile:
-	case simpleSocket:
-	    while (len > 0) {
-		if ((retval = write(cfp->fd, buf, len)) < 0) {
+		case SSL_ERROR_WANT_WRITE:
+		    cfp->waitForWrite = FLAGTRUE;
+		    FD_SET(cfp->fd, &winit);
+		    retval = 0;
 		    break;
-		}
-		buf += retval;
-		len -= retval;
-		len_out += retval;
-	    }
-	    break;
-#if HAVE_OPENSSL
-	case SSLSocket:
-	    /*CheckRW(cfp->fd, &r, &w); */
-	    sflags = fcntl(cfp->fd, F_GETFL, 0);
-	    if (sflags != -1) {
-		Debug(2,
-		      "FileWrite(): setting socket to BLOCKING on fd %d",
-		      cfp->fd);
-		fcntl(cfp->fd, F_SETFL, sflags & ~O_NONBLOCK);
-	    }
-	    while (len > 0) {
-		retval = SSL_write(cfp->ssl, buf, len);
-		switch (SSL_get_error(cfp->ssl, retval)) {
-		    case SSL_ERROR_NONE:
-			break;
-		    case SSL_ERROR_WANT_READ:	/* these two shouldn't */
-		    case SSL_ERROR_WANT_WRITE:	/* happen (yet) */
-			Error
-			    ("FileWrite(): Ugh, ok..an SSL_ERROR_WANT_* happened and I didn't think it ever would.  Code needs serious work!");
-			exit(EX_UNAVAILABLE);
-		    case SSL_ERROR_ZERO_RETURN:
-		    default:
-			Debug(2,
-			      "FileWrite(): performing a SSL_shutdown() on fd %d",
-			      cfp->fd);
-			SSL_shutdown(cfp->ssl);
-			Debug(2,
-			      "FileWrite(): performing a SSL_free() on fd %d",
-			      cfp->fd);
-			SSL_free(cfp->ssl);
-			cfp->ssl = (SSL *) 0;
-			cfp->ftype = simpleSocket;
-			retval = -1;
-			break;
-		}
-		if (retval == -1) {
-		    len_out = -1;
+		default:
+		    Error("FileRead(): SSL error on fd %d", cfp->fd);
+		    /* fall through */
+		case SSL_ERROR_ZERO_RETURN:
+		    retval = -1;
+		    CONDDEBUG((2,
+			       "FileRead(): performing a SSL_shutdown() on fd %d",
+			       cfp->fd));
+		    SSL_shutdown(cfp->ssl);
+		    CONDDEBUG((2,
+			       "FileRead(): performing a SSL_free() on fd %d",
+			       cfp->fd));
+		    SSL_free(cfp->ssl);
+		    cfp->ssl = (SSL *)0;
+		    cfp->ftype = simpleSocket;
 		    break;
-		}
-		buf += retval;
-		len -= retval;
-		len_out += retval;
-	    }
-	    if (sflags != -1) {
-		Debug(2,
-		      "FileWrite(): restoring socket blocking mode on fd %d",
-		      cfp->fd);
-		fcntl(cfp->fd, F_SETFL, sflags);
 	    }
 	    break;
 #endif
@@ -1000,45 +960,282 @@ FileWrite(cfp, buf, len)
 	    break;
     }
 
-    if (len_out >= 0) {
-	Debug(2, "FileWrite(): wrote %d byte%s to fd %d", len_out,
-	      (len_out == 1) ? "" : "s", cfp->fd);
+    if (retval >= 0) {
+	CONDDEBUG((2, "FileRead(): read %d byte%s from fd %d", retval,
+		   (retval == 1) ? "" : "s", cfp->fd));
+	if (fDebug && buf != (char *)0) {
+	    static STRING *tmpString = (STRING *)0;
+	    if (tmpString == (STRING *)0)
+		tmpString = AllocString();
+	    BuildString((char *)0, tmpString);
+	    FmtCtlStr(buf, retval > 30 ? 30 : retval, tmpString);
+	    CONDDEBUG((2, "FileRead(): read `%s' from fd %d",
+		       tmpString->string, cfp->fd));
+	}
     } else {
-	Debug(2, "FileWrite(): write of %d byte%s to fd %d: %s", len_orig,
-	      (len_out == 1) ? "" : "s", cfp->fd, strerror(errno));
+	CONDDEBUG((2,
+		   "FileRead(): failed attempted read of %d byte%s from fd %d",
+		   len, (len == 1) ? "" : "s", cfp->fd));
+    }
+    return retval;
+}
+
+/* returns: -1 on error or eof, >= 0 for valid reads */
+int
+#if PROTOTYPES
+FileWrite(CONSFILE *cfp, char *buf, int len)
+#else
+FileWrite(cfp, buf, len)
+    CONSFILE *cfp;
+    char *buf;
+    int len;
+#endif
+{
+    int len_orig = len;
+    int len_out = 0;
+    int retval = 0;
+
+    if (len < 0 && buf != (char *)0)
+	len = strlen(buf);
+
+    if (fDebug && len > 0 && buf != (char *)0) {
+	static STRING *tmpString = (STRING *)0;
+	if (tmpString == (STRING *)0)
+	    tmpString = AllocString();
+	BuildString((char *)0, tmpString);
+	FmtCtlStr(buf, len > 30 ? 30 : len, tmpString);
+	CONDDEBUG((2, "FileWrite(): sending `%s' to fd %d",
+		   tmpString->string, cfp->fd));
+    }
+    /* save the data */
+    if (len > 0 && buf != (char *)0)
+	BuildStringN(buf, len, cfp->wbuf);
+
+    /* point at the local data */
+    buf = cfp->wbuf->string;
+    len = cfp->wbuf->used - 1;
+
+    /* if we don't have any, forget it */
+    if (buf == (char *)0 || len <= 0)
+	return 0;
+
+    /* so, we could be blocking or non-blocking.  since we may be able
+     * to block, we'll just keep trying to write while we have data and
+     * stop when we hit an error or flush all the data.
+     */
+    switch (cfp->ftype) {
+	case simpleFile:
+	case simpleSocket:
+	    while (len > 0) {
+		if ((retval = write(cfp->fd, buf, len)) < 0) {
+		    if (errno == EINTR)
+			continue;
+		    if (errno == EAGAIN) {
+			/* must be non-blocking - so stop */
+			retval = 0;
+			break;
+		    }
+		    retval = -1;
+		    if (errno == EPIPE)
+			break;
+		    Error("FileWrite(): fd %d: %s", cfp->fd,
+			  strerror(errno));
+		    break;
+		}
+		buf += retval;
+		len -= retval;
+		len_out += retval;
+	    }
+	    break;
+#if HAVE_OPENSSL
+	case SSLSocket:
+	    if (cfp->waitForRead == FLAGTRUE)
+		cfp->waitForRead = FLAGFALSE;
+	    while (len > 0) {
+		/* in theory, SSL_write always returns 'len' on success
+		 * so the while() loop is a noop.  but, just in case i
+		 * read something wrong, we treat SSL_write like write().
+		 */
+		retval = SSL_write(cfp->ssl, buf, len);
+		switch (SSL_get_error(cfp->ssl, retval)) {
+		    case SSL_ERROR_NONE:
+			break;
+		    case SSL_ERROR_WANT_READ:
+			cfp->waitForRead = FLAGTRUE;
+			retval = len_out = 0;
+			break;
+		    case SSL_ERROR_WANT_WRITE:
+			retval = len_out = 0;
+			break;
+		    default:
+			Error("FileWrite(): SSL error on fd %d", cfp->fd);
+			/* fall through */
+		    case SSL_ERROR_ZERO_RETURN:
+			retval = -1;
+			CONDDEBUG((2,
+				   "FileWrite(): performing a SSL_shutdown() on fd %d",
+				   cfp->fd));
+			SSL_shutdown(cfp->ssl);
+			CONDDEBUG((2,
+				   "FileWrite(): performing a SSL_free() on fd %d",
+				   cfp->fd));
+			SSL_free(cfp->ssl);
+			cfp->ssl = (SSL *)0;
+			cfp->ftype = simpleSocket;
+			break;
+		}
+		if (retval <= 0)
+		    break;
+		buf += retval;
+		len -= retval;
+		len_out += retval;
+	    }
+	    break;
+#endif
+	default:
+	    len_out = -1;
+	    break;
+    }
+
+    /* so, if we saw an error, just bail...all is done anyway */
+    if (retval < 0)
+	len_out = retval;
+
+    if (len_out > 0) {
+	/* save the rest for later */
+	if (len > 0) {
+	    ShiftString(cfp->wbuf, len_out);
+	} else {
+	    BuildString((char *)0, cfp->wbuf);
+	}
+    }
+    if (cfp->wbuf->used <= 1)
+	FD_CLR(cfp->fd, &winit);
+    else {
+	FD_SET(cfp->fd, &winit);
+	CONDDEBUG((2, "FileWrite(): buffered %d byte%s for fd %d",
+		   (cfp->wbuf->used <= 1) ? 0 : cfp->wbuf->used,
+		   (cfp->wbuf->used <= 1) ? "" : "s", cfp->fd));
+    }
+
+    if (len_out >= 0) {
+	CONDDEBUG((2, "FileWrite(): wrote %d byte%s to fd %d", len_out,
+		   (len_out == 1) ? "" : "s", cfp->fd));
+    } else {
+	CONDDEBUG((2, "FileWrite(): write of %d byte%s to fd %d: %s",
+		   len_orig, (len_out == -1) ? "" : "s", cfp->fd,
+		   strerror(errno)));
     }
     return len_out;
 }
 
+int
+#if PROTOTYPES
+FileCanRead(CONSFILE *cfp, fd_set *prfd, fd_set *pwfd)
+#else
+FileCanRead(cfp, prfd, pwfd)
+    CONSFILE *cfp;
+    fd_set *prfd;
+    fd_set *pwfd;
+#endif
+{
+    if (cfp == (CONSFILE *)0)
+	return 0;
+
+    return ((FD_ISSET(cfp->fd, prfd)
+#if HAVE_OPENSSL
+	     && cfp->waitForRead != FLAGTRUE) || (FD_ISSET(cfp->fd, pwfd)
+						  && cfp->waitForWrite ==
+						  FLAGTRUE
+#endif
+	    ));
+}
+
+int
+#if PROTOTYPES
+FileCanWrite(CONSFILE *cfp, fd_set *prfd, fd_set *pwfd)
+#else
+FileCanWrite(cfp, prfd, pwfd)
+    CONSFILE *cfp;
+    fd_set *prfd;
+    fd_set *pwfd;
+#endif
+{
+    if (cfp == (CONSFILE *)0)
+	return 0;
+
+    return ((FD_ISSET(cfp->fd, pwfd)
+#if HAVE_OPENSSL
+	     && cfp->waitForWrite != FLAGTRUE) || (FD_ISSET(cfp->fd, prfd)
+						   && cfp->waitForRead ==
+						   FLAGTRUE
+#endif
+	    ));
+}
+
+int
+#if PROTOTYPES
+FileBufEmpty(CONSFILE *cfp)
+#else
+FileBufEmpty(cfp)
+    CONSFILE *cfp;
+#endif
+{
+    if (cfp == (CONSFILE *)0)
+	return 1;
+    return (cfp->wbuf->used <= 1);
+}
+
 void
 #if PROTOTYPES
-FileVWrite(CONSFILE * cfp, const char *fmt, va_list ap)
+VWrite(CONSFILE *cfp, STRING *str, unsigned which, char *fmt, va_list ap)
 #else
-FileVWrite(cfp, fmt, ap)
+VWrite(cfp, str, which, fmt, ap)
     CONSFILE *cfp;
-    const char *fmt;
+    STRING *str;
+    unsigned which;
+    char *fmt;
     va_list ap;
 #endif
 {
     int s, l, e;
     char c;
-    static STRING *msg = (STRING *) 0;
+    static STRING *msg = (STRING *)0;
     static short flong, fneg;
 
     if (fmt == (char *)0)
 	return;
+    switch (which) {
+	case 0:
+	    if (cfp == (CONSFILE *)0)
+		return;
+	    break;
+	case 1:
+	    if (str == (STRING *)0)
+		return;
+	    BuildString((char *)0, str);
+	    break;
+	default:
+	    return;
+    }
 
-    if (msg == (STRING *) 0)
+    if (msg == (STRING *)0)
 	msg = AllocString();
     fneg = flong = 0;
     for (e = s = l = 0; (c = fmt[s + l]) != '\000'; l++) {
 	if (c == '%') {
 	    if (e) {
 		e = 0;
-		FileWrite(cfp, "%", 1);
+		if (which == 0)
+		    FileWrite(cfp, "%", 1);
+		else if (which == 1)
+		    BuildStringChar('%', str);
 	    } else {
 		e = 1;
-		FileWrite(cfp, fmt + s, l);
+		if (which == 0)
+		    FileWrite(cfp, fmt + s, l);
+		else if (which == 1)
+		    BuildStringN(fmt + s, l, str);
 		s += l;
 		l = 0;
 	    }
@@ -1058,11 +1255,17 @@ FileVWrite(cfp, fmt, ap)
 		    continue;
 		case 'c':
 		    cc = (char)va_arg(ap, int);
-		    FileWrite(cfp, &cc, 1);
+		    if (which == 0)
+			FileWrite(cfp, &cc, 1);
+		    else if (which == 1)
+			BuildStringChar(cc, str);
 		    break;
 		case 's':
 		    p = va_arg(ap, char *);
-		    FileWrite(cfp, p, -1);
+		    if (which == 0)
+			FileWrite(cfp, p, -1);
+		    else if (which == 1)
+			BuildString(p, str);
 		    break;
 		case 'd':
 		    i = (flong ? va_arg(ap, long) : (long)va_arg(ap, int));
@@ -1093,14 +1296,20 @@ FileVWrite(cfp, fmt, ap)
 			msg->string[u - i - 1] = temp;
 		    }
 		    if (fneg) {
-			FileWrite(cfp, "-", 1);
+			if (which == 0)
+			    FileWrite(cfp, "-", 1);
+			else if (which == 1)
+			    BuildStringChar('-', str);
 			fneg = 0;
 		    }
-		    FileWrite(cfp, msg->string, msg->used - 1);
+		    if (which == 0)
+			FileWrite(cfp, msg->string, msg->used - 1);
+		    else if (which == 1)
+			BuildString(msg->string, str);
 		    break;
 		default:
 		    Error
-			("FileVWrite(): unknown conversion character `%c' in `%s'",
+			("VWrite(): unknown conversion character `%c' in `%s'",
 			 c, fmt);
 		    break;
 	    }
@@ -1109,17 +1318,58 @@ FileVWrite(cfp, fmt, ap)
 	    e = flong = 0;
 	}
     }
-    if (l)
-	FileWrite(cfp, fmt + s, l);
+    if (l) {
+	if (which == 0)
+	    FileWrite(cfp, fmt + s, l);
+	else if (which == 1)
+	    BuildStringN(fmt + s, l, str);
+    }
+}
+
+char *
+#if PROTOTYPES
+BuildStringPrint(STRING *str, char *fmt, ...)
+#else
+BuildStringPrint(str, fmt, va_alist)
+    STRING *str;
+    char *fmt;
+    va_dcl
+#endif
+{
+    va_list ap;
+#if PROTOTYPES
+    va_start(ap, fmt);
+#else
+    va_start(ap);
+#endif
+    VWrite((CONSFILE *)0, str, 1, fmt, ap);
+    va_end(ap);
+    if (str == (STRING *)0)
+	return (char *)0;
+    else
+	return str->string;
 }
 
 void
 #if PROTOTYPES
-FilePrint(CONSFILE * cfp, const char *fmt, ...)
+FileVWrite(CONSFILE *cfp, char *fmt, va_list ap)
+#else
+FileVWrite(cfp, fmt, ap)
+    CONSFILE *cfp;
+    char *fmt;
+    va_list ap;
+#endif
+{
+    VWrite(cfp, (STRING *)0, 0, fmt, ap);
+}
+
+void
+#if PROTOTYPES
+FilePrint(CONSFILE *cfp, char *fmt, ...)
 #else
 FilePrint(cfp, fmt, va_alist)
     CONSFILE *cfp;
-    const char *fmt;
+    char *fmt;
     va_dcl
 #endif
 {
@@ -1136,7 +1386,7 @@ FilePrint(cfp, fmt, va_alist)
 /* Unless otherwise stated, returns the same values as fstat(2) */
 int
 #if PROTOTYPES
-FileStat(CONSFILE * cfp, struct stat *buf)
+FileStat(CONSFILE *cfp, struct stat *buf)
 #else
 FileStat(cfp, buf)
     CONSFILE *cfp;
@@ -1168,7 +1418,7 @@ FileStat(cfp, buf)
 /* Unless otherwise stated, returns the same values as lseek(2) */
 int
 #if PROTOTYPES
-FileSeek(CONSFILE * cfp, off_t offset, int whence)
+FileSeek(CONSFILE *cfp, off_t offset, int whence)
 #else
 FileSeek(cfp, offset, whence)
     CONSFILE *cfp;
@@ -1201,13 +1451,16 @@ FileSeek(cfp, offset, whence)
 /* Returns the file descriptor number of the underlying file */
 int
 #if PROTOTYPES
-FileFDNum(CONSFILE * cfp)
+FileFDNum(CONSFILE *cfp)
 #else
 FileFDNum(cfp)
     CONSFILE *cfp;
 #endif
 {
     int retval = 0;
+
+    if (cfp == (CONSFILE *)0)
+	return -1;
 
     switch (cfp->ftype) {
 	case simpleFile:
@@ -1232,7 +1485,7 @@ FileFDNum(cfp)
 /* Returns the file type */
 enum consFileType
 #if PROTOTYPES
-FileGetType(CONSFILE * cfp)
+FileGetType(CONSFILE *cfp)
 #else
 FileGetType(cfp)
     CONSFILE *cfp;
@@ -1255,7 +1508,7 @@ FileGetType(cfp)
 /* Sets the file type */
 void
 #if PROTOTYPES
-FileSetType(CONSFILE * cfp, enum consFileType type)
+FileSetType(CONSFILE *cfp, enum consFileType type)
 #else
 FileSetType(cfp, type)
     CONSFILE *cfp;
@@ -1269,7 +1522,7 @@ FileSetType(cfp, type)
 /* Get the SSL instance */
 SSL *
 #if PROTOTYPES
-FileGetSSL(CONSFILE * cfp)
+FileGetSSL(CONSFILE *cfp)
 #else
 FileGetSSL(cfp)
     CONSFILE *cfp;
@@ -1281,7 +1534,7 @@ FileGetSSL(cfp)
 /* Sets the SSL instance */
 void
 #if PROTOTYPES
-FileSetSSL(CONSFILE * cfp, SSL * ssl)
+FileSetSSL(CONSFILE *cfp, SSL *ssl)
 #else
 FileSetSSL(cfp, ssl)
     CONSFILE *cfp;
@@ -1290,12 +1543,78 @@ FileSetSSL(cfp, ssl)
 {
     cfp->ssl = ssl;
 }
+
+/* return -1 on error, 0 for "wait" state, 1 for success */
+int
+#if PROTOTYPES
+FileCanSSLAccept(CONSFILE *cfp, fd_set *prfd, fd_set *pwfd)
+#else
+FileCanSSLAccept(cfp)
+    CONSFILE *cfp;
+    fd_set *prfd;
+    fd_set *pwfd;
+#endif
+{
+    if (cfp == (CONSFILE *)0)
+	return 0;
+
+    return ((FD_ISSET(cfp->fd, prfd) && cfp->waitForRead == FLAGTRUE) ||
+	    (FD_ISSET(cfp->fd, pwfd) && cfp->waitForWrite == FLAGTRUE) ||
+	    (cfp->waitForRead != FLAGTRUE &&
+	     cfp->waitForWrite != FLAGTRUE));
+}
+
+/* return -1 on error, 0 for "wait" state, 1 for success */
+int
+#if PROTOTYPES
+FileSSLAccept(CONSFILE *cfp)
+#else
+FileSSLAccept(cfp)
+    CONSFILE *cfp;
+#endif
+{
+    int retval;
+    if (cfp->waitForWrite == FLAGTRUE) {
+	cfp->waitForWrite = FLAGFALSE;
+	if (cfp->wbuf->used <= 1)
+	    FD_CLR(cfp->fd, &winit);
+    }
+    cfp->waitForRead = FLAGFALSE;
+
+    CONDDEBUG((1, "FileSSLAccept(): about to SSL_accept() for fd %d",
+	       cfp->fd));
+    retval = SSL_accept(cfp->ssl);
+    switch (SSL_get_error(cfp->ssl, retval)) {
+	case SSL_ERROR_NONE:
+	    break;
+	case SSL_ERROR_WANT_READ:
+	    cfp->waitForRead = FLAGTRUE;
+	    return 0;
+	case SSL_ERROR_WANT_WRITE:
+	    cfp->waitForWrite = FLAGTRUE;
+	    FD_SET(cfp->fd, &winit);
+	    return 0;
+	default:
+	    Error("FileSSLAccept(): SSL error on fd %d", cfp->fd);
+	    /* fall through */
+	case SSL_ERROR_ZERO_RETURN:
+	    SSL_free(cfp->ssl);
+	    cfp->ssl = (SSL *)0;
+	    cfp->ftype = simpleSocket;
+	    return -1;
+    }
+    cfp->ftype = SSLSocket;
+    CONDDEBUG((1, "FileSSLAccept(): SSL Connection: %s :: %s",
+	       SSL_get_cipher_version(cfp->ssl),
+	       SSL_get_cipher_name(cfp->ssl)));
+    return 1;
+}
 #endif
 
 /* Unless otherwise stated, returns the same values as send(2) */
 int
 #if PROTOTYPES
-FileSend(CONSFILE * cfp, const void *msg, size_t len, int flags)
+FileSend(CONSFILE *cfp, const void *msg, size_t len, int flags)
 #else
 FileSend(cfp, msg, len, flags)
     CONSFILE *cfp;
@@ -1326,11 +1645,120 @@ FileSend(cfp, msg, len, flags)
     return retval;
 }
 
+/* replace trailing space with '\000' in a string and return
+ * a pointer to the start of the non-space part
+ */
+char *
+#if PROTOTYPES
+PruneSpace(char *string)
+#else
+PruneSpace(string)
+    char *string;
+#endif
+{
+    char *p;
+    char *head = (char *)0;
+    char *tail = (char *)0;
+
+    /* Don't do much if it's crap */
+    if (string == (char *)0 || *string == '\000')
+	return string;
+
+    /* Now for the tricky part - search the string */
+    for (p = string; *p != '\000'; p++) {
+	if (isspace((int)(*p))) {
+	    if (tail == (char *)0)
+		tail = p;	/* possible end of string */
+	} else {
+	    if (head == (char *)0)
+		head = p;	/* found the start */
+	    tail = (char *)0;	/* reset tail */
+	}
+    }
+
+    if (tail != (char *)0)
+	*tail = '\000';
+
+    if (head != (char *)0)
+	return head;
+    else
+	return string;
+}
+
+int
+#if PROTOTYPES
+IsMe(char *id)
+#else
+IsMe(id)
+    char *id;
+#endif
+{
+    int j, i;
+    struct hostent *he;
+    in_addr_t addr;
+#if HAVE_INET_ATON
+    struct in_addr inetaddr;
+#endif
+
+    /* check for ip address match */
+#if HAVE_INET_ATON
+    if (inet_aton(id, &inetaddr) != 0) {
+	addr = inetaddr.s_addr;
+#else
+    addr = inet_addr(id);
+    if (addr != (in_addr_t) (-1)) {
+#endif
+	for (i = 0;
+	     myAddrs != (struct in_addr *)0 &&
+	     myAddrs[i].s_addr != (in_addr_t) 0; i++) {
+	    if (
+#if HAVE_MEMCMP
+		   memcmp(&(myAddrs[i].s_addr), &addr, sizeof(addr))
+#else
+		   bcmp(&(myAddrs[i].s_addr), &addr, sizeof(addr))
+#endif
+		   == 0)
+		return 1;
+	}
+	return 0;
+    }
+
+    /* check for ip match of hostname */
+    if ((struct hostent *)0 == (he = gethostbyname(id))) {
+	Error("IsMe(): gethostbyname(%s): %s", id, hstrerror(h_errno));
+	return 0;
+    }
+    if (4 != he->h_length || AF_INET != he->h_addrtype) {
+	Error
+	    ("IsMe(): gethostbyname(%s): wrong address size (4 != %d) or address family (%d != %d)",
+	     id, he->h_length, AF_INET, he->h_addrtype);
+	return 0;
+    }
+
+    for (j = 0; he->h_addr_list[j] != (char *)0; j++) {
+	for (i = 0;
+	     myAddrs != (struct in_addr *)0 &&
+	     myAddrs[i].s_addr != (in_addr_t) 0; i++) {
+	    if (
+#if HAVE_MEMCMP
+		   memcmp(&(myAddrs[i].s_addr), he->h_addr_list[j],
+			  he->h_length)
+#else
+		   bcmp(&(myAddrs[i].s_addr), he->h_addr_list[j],
+			he->h_length)
+#endif
+		   == 0)
+		return 1;
+	}
+    }
+    return 0;
+}
+
 #if HAVE_OPENSSL
 /* Unless otherwise stated, returns the same values as send(2) */
 int
 #if PROTOTYPES
-SSLVerifyCallback(int ok, X509_STORE_CTX * store)
+SSLVerifyCallback(int ok, X509_STORE_CTX *store)
 #else
 SSLVerifyCallback(ok, store)
     int ok;
@@ -1343,13 +1771,13 @@ SSLVerifyCallback(ok, store)
 	    X509 *cert = X509_STORE_CTX_get_current_cert(store);
 	    int depth = X509_STORE_CTX_get_error_depth(store);
 
-	    Debug(1,
-		  "SSLVerifyCallback(): info of certificate at depth: %d",
-		  depth);
+	    CONDDEBUG((1,
+		       "SSLVerifyCallback(): info of certificate at depth: %d",
+		       depth));
 	    X509_NAME_oneline(X509_get_issuer_name(cert), data, 256);
-	    Debug(1, "SSLVerifyCallback():   issuer  = %s", data);
+	    CONDDEBUG((1, "SSLVerifyCallback():   issuer  = %s", data));
 	    X509_NAME_oneline(X509_get_subject_name(cert), data, 256);
-	    Debug(1, "SSLVerifyCallback():   subject = %s", data);
+	    CONDDEBUG((1, "SSLVerifyCallback():   subject = %s", data));
 	}
     } else {
 	X509 *cert = X509_STORE_CTX_get_current_cert(store);
@@ -1368,3 +1796,28 @@ SSLVerifyCallback(ok, store)
     return ok;
 }
 #endif
+
+int
+#if PROTOTYPES
+SetFlags(int fd, int s, int c)
+#else
+SetFlags(fd, s, c)
+    int fd, s, c;
+#endif
+{
+    int flags;
+
+    if ((flags = fcntl(fd, F_GETFL)) >= 0) {
+	flags |= s;
+	flags &= ~c;
+	if (fcntl(fd, F_SETFL, flags) < 0) {
+	    Error("SetFlags(): fcntl(%u,F_SETFL): %s", fd,
+		  strerror(errno));
+	    return 0;
+	}
+    } else {
+	Error("SetFlags(): fcntl(%u,F_GETFL): %s", fd, strerror(errno));
+	return 0;
+    }
+    return 1;
+}

@@ -1,7 +1,29 @@
 # test conserver config file
-LOGDIR=.
-BREAK5=\rtest\r
-shell:|:9600p:&.log:5
-shell2:|::shell2.log:2
-%%
-trusted: 127.0.0.1
+default full {
+	rw *;
+}
+default * {
+	logfile ./&;
+	timestamp "";
+	include full;
+}
+break 5 {
+	string "\rtest\r";
+}
+console shell {
+	master 127.0.0.1;
+	logfile ./&.log;
+	timestamp 5;
+	type exec;
+	exec "";
+}
+console shell2 {
+	master 127.0.0.1;
+	logfile ./shell2.log;
+	timestamp 2;
+	type exec;
+	exec "";
+}
+access * {
+	trusted 127.0.0.1;
+}

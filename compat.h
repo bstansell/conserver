@@ -1,5 +1,18 @@
 #include <config.h>
 
+/* things everything seems to need */
+#include <stdio.h>
+#include <sys/param.h>
+#include <sys/socket.h>
+#include <sys/file.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <ctype.h>
+#include <signal.h>
+
 /* If, when processing a logfile for replaying the last N lines,
  * we end up seeing more than MAXREPLAYLINELEN characters in a line,
  * abort processing and display the data.  Why?  There could be some
@@ -76,17 +89,7 @@ typedef long fd_set;
 # include <sys/ioctl_compat.h>
 #endif
 
-#ifdef HAVE_TERMIOS_H
-# include <termios.h>		/* POSIX */
-#else
-# ifdef HAVE_TERMIO_H
-#  include <termio.h>		/* SysV */
-# else
-#  ifdef HAVE_SGTTY_H
-#   include <sgtty.h>		/* BSD */
-#  endif
-# endif
-#endif
+#include <termios.h>
 
 #ifdef HAVE_STROPTS_H
 # include <stropts.h>
@@ -211,6 +214,18 @@ extern char *h_errlist[];
 #include <usersec.h>
 #endif
 
+#ifdef HAVE_PTY_H
+#include <pty.h>
+#endif
+
+#ifdef HAVE_LIBUTIL_H
+#include <libutil.h>
+#endif
+
+#ifdef HAVE_UTIL_H
+#include <util.h>
+#endif
+
 
 #ifndef NGROUPS_MAX
 # define NGROUPS_MAX	8
@@ -277,7 +292,12 @@ typedef int socklen_t;
 #  define PARAMS(protos) protos
 # else /* no PROTOTYPES */
 #  define PARAMS(protos) ()
-# endif /* no PROTOTYPES */
+# endif	/* no PROTOTYPES */
+#endif
+
+/* setup a conditional debugging line */
+#ifndef CONDDEBUG
+#define CONDDEBUG(line) if (fDebug) {debugFileName=__FILE__; debugLineNo=__LINE__; Debug line;}
 #endif
 
 #if HAVE_DMALLOC

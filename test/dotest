@@ -6,11 +6,14 @@ exitval=0
 
 cleanup()
 {
-    [ -f test.out ] && rm test.out
-    [ -f c.cf ] && rm c.cf
+    [ -f test.out ] && rm -f test.out
+    [ -f c.cf ] && rm -f c.cf
     [ $pid -eq 0 ] && return 0
     kill $pid
-    for i in *.log; do rm $i; done
+    for i in *.log; do
+	[ "$i" != "conserver.log" ] && [ -f "$i" ] && rm -f "$i";
+    done
+    [ "$exitval" = 0 ] && rm -f conserver.log
     exit $exitval
 }
 
@@ -21,7 +24,7 @@ dotest()
     if [ "$2" ]; then
 	eval "$2" > test.out 2>&1
     else
-	(echo "$1" && sleep 2) | \
+	echo "$1" | \
 	    ../console/console -M 127.0.0.1 -p 7777 shell > test.out 2>&1
     fi
     if [ "$record" ]; then
@@ -31,7 +34,7 @@ dotest()
 	if [ -f results/test$testnum ]; then
 	    if diff -i test.out results/test$testnum >test$testnum.diff 2>&1; then
 		echo "succeded"
-		rm test$testnum.diff
+		rm -f test$testnum.diff
 	    else
 		echo "failed (diffs in test$testnum.diff)"
 		exitval=1
@@ -39,7 +42,7 @@ dotest()
 	else
 	    echo "unknown (not recorded)"
 	fi
-	rm test.out
+	rm -f test.out
     fi
 }
 
@@ -57,6 +60,7 @@ else
 fi
 
 $ECHO "starting conserver...$EE"
+rm -f c.cf
 cp test1.cf c.cf
 ../conserver/conserver -M 127.0.0.1 -p 7777 -v -C c.cf \
     -P test.passwd -m 32 > conserver.log 2>&1 &
@@ -75,6 +79,7 @@ dotest 'cdc.'
 dotest 'coc.'
 
 echo "moving in second config file"
+rm -f c.cf
 cp test2.cf c.cf
 kill -1 $pid
 sleep 3
@@ -84,5 +89,9 @@ dotest 'c?c.'
 dotest 'cl?c.'
 dotest 'cdc.'
 dotest 'coc.'
+
+dotest EVAL "echo 'tu.' | ../console/console -M 127.0.0.1 -p 7777 -e 'tu' shell"
+dotest EVAL "../console/console -M 127.0.0.1 -p 7777 -P | sed -e 's/:.*//'"
+dotest EVAL "../console/console -M 127.0.0.1 -p 7777 -x | sed -e 's/ on [^ ]* */ on /'"
 
 cleanup

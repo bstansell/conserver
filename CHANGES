@@ -1,6 +1,94 @@
 				CHANGES
 				=======
 
+version 8.0.0 (Sep 22, 2003):
+	- better error messages and management of the user's password
+	- 8.0.0-beta4 mistakenly lost conserver.passwd usage
+	- empty passwords now don't trigger a passwd prompt (like 7.2.7)
+	- upgraded to autoconf-2.57 and use recent config.guess/sub
+	  files - suggested by Jorgen Hagg <jorgen.hagg@axis.com>
+	- we now install the conserver.rc file as well as sample
+	  conserver.cf and conserver.passwd files in
+	  $(prefix)/share/examples/conserver - suggested by
+	  Hubert Feyrer <hubertf@netbsd.org>
+
+version 8.0.0-beta4 (Aug 24, 2003):
+	- totally rewrote the client/server communication, allowing SSL
+	  connections to occur first, protecting *all* information
+	- added 'admin' keyword to the 'access' portion of the config
+	  file for specifying users able to issue the 'quit' command
+	- removed client -G option since it's not really useful any more
+	- added client -t option for sending "text messages" to users,
+	  which is similar to broadcast messages, but you can specify
+	  the user and/or console - suggested by Trevor Fiatal
+	  <trevor@seven.com>
+	- added client -d option for disconnecting users specified by
+	  username and/or console - suggested by Trevor Fiatal
+	  <trevor@seven.com>
+	- removed --with-64bit configure option as 64bit operation is
+	  reported to work just fine
+	- break strings with '\d' are interpreted as a delay, which can
+	  be specified in the config file (default 250ms)
+	- removed 'reset -x' portion of default break sequence #3
+	- remote conserver hostnames now properly match - had to be a
+	  character string match previously
+	- hostname aliases now checked against access lists and the
+	  matched name is used for logging
+	- added --with-trustrevdns to enable the use of reverse DNS
+	  information for access list checks [not recommended] - see the
+	  INSTALL file for full details on who should actually need this
+	  Many thanks to Chuck Rouzer <crouzer@yahoo.com> for all the
+	  help with FreeBSD support and the following issues...
+	- fixed 'make test' problem on hosts where 'localhost' doesn't
+	  resolve to 127.0.0.1
+	- fixed interface probe problem under *BSD
+	- added openpty() interface for pty allocation
+
+version 8.0.0-beta3 (Aug 8, 2003):
+	- master process no longer forks on client requests - handles
+	  them with select() like child process
+	- alarm()/SIGALRM usage removed and replaced with counters and
+	  timer on select() call
+	- removed caching of timeouts to terminal servers - each
+	  socket connection now has a proper timeout (and can happen
+	  simultaniously)
+	- partial write()s are properly buffered and retried
+	- made all sockets (including SSL) non-buffered
+	- client now supports piping data to it and properly printing
+	  all server data ("echo '^Ecr^Ec.' | console universe")
+
+version 8.0.0-beta2 (Jul 17, 2003):
+	- console aliases added with 'aliases' console keyword
+	- two stop bit support for serial devices - requested by Kelly
+	  Setzer <setzer@placemark.com>
+	- added support for inet_aton() over inet_addr()
+	- all server interfaces now used to identify console management
+	- server interfaces probed with SIOCGIFCONF ioctl, if available
+	- added flow control options 'ixon', 'ixany', 'ixoff', and
+	  'crtscts'
+	- added info to console client -i output
+	- man pages updated, however the wording needs work
+
+version 8.0.0-beta1 (Jul 4, 2003):
+	- ***NOTICE*** the format of conserver.cf and conserver.passwd
+	  has completely changed.  see the INSTALL file for
+	  upgrade instructions (it should be "fairly painless").
+	  some documentation has been updated to reflect the new world,
+	  some hasn't - my goal for beta2 is to have all the docs updated
+	- many command-line options now also conserver.cf options options
+	- POSIX termios interface now required for compilation - some
+	  POSIX requirements were already in the code and others will
+	  undoubtedly creep in as time goes by
+	- configure --with-regex option removed because of conserver.cf
+	  and conserver.passwd changes
+	- added -S option to server for syntax checking of the
+	  configuration file - suggested by Dave Stuit <djs@tellme.com>
+	- authorized users now either have r/w or r/o access to consoles
+	- getpassword.o replaces getpass() and getpassphrase() so we can
+	  get any string length
+	- fixed rm commands in test script - patch by Petter Reinholdtsen
+	  <pere@hungry.com>
+
 version 7.2.7 (Apr 9, 2003):
 	- added test suite ('make test') for basic client/server
 	  communication tests
@@ -429,5 +517,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.82 2003-04-09 07:20:21-07 bryan Exp $
+#  $Id: CHANGES,v 1.103 2003-09-22 10:42:00-07 bryan Exp $
 #

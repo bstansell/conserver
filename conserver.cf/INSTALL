@@ -1,19 +1,11 @@
 The two files you need to set up are the conserver.cf and conserver.passwd
 files.  See the sample conserver.cf and conserver.passwd files
 for examples.  You can start with those and then modify extensively.
-The man page for conserver.cf should explain that file with enough detail
-to get you going.
-
-As for the conserver.passwd file, here are some instructions.  The file
-contains three fields seperated by colons: <username>:<passwd>:<hosts>.
-The <passwd> field should either be an encrypted password or the special
-string '*passwd*', which will cause the console server to do a getpwnam()
-call.  The <hosts> field can be a comma seperated list of console names
-(from conserver.cf) or the special string 'any'.  Access for the user
-is only granted to the hosts listed here (or all if 'any' is used).
+The man page for conserver.cf and conserver.passwd should explain the
+files with enough detail to get you going.
 
 That's about it.  Good luck.
 
 #
-#  $Id: INSTALL,v 1.2 1999-08-24 13:45:00-07 bryan Exp $
+#  $Id: INSTALL,v 1.3 2003-07-04 11:21:21-07 bryan Exp $
 #

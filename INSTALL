@@ -10,6 +10,54 @@ Upgrading?
     new features added to the client if you're considering *not*
     upgrading.
 
+    Version 8.0.0
+
+	- The client/server protocol has been rearchitected.  You *MUST*
+	  use an 8.0.0 client with an 8.0.0 server.  No combination of
+	  client/server will work with pre-8.0.0 code.
+
+	- Upgrading from pre-8.0.0 code to 8.0.0 and beyond requires
+	  you to change your conserver.cf and conserver.passwd files
+	  because both of the file formats have changed.
+
+	  The conserver.cf file changes are so major that there is a
+	  convert program available in the conserver subdirectory.  Just
+	  run './conserver/convert <old-cf-file>' and it will attempt a
+	  conversion to the new format, sending it to stdout.  Any errors
+	  will be printed to stderr.  There are a couple of things
+	  you might need to adjust.  First are the user access lists.
+	  If you are restricting users to certain consoles in your old
+	  conserver.passwd file, you'll need to move those restrictions
+	  into the new conserver.cf file.  Restrictions are set with the
+	  'ro' and 'rw' tags in the configuration file.  Second are the
+	  'access' blocks.  What get produced by the convert program
+	  will be functionally equivalent to the old behavior, but you
+	  may be able to tune things to better suit your environment.
+
+	  The conserver.passwd file's console restrictions have moved,
+	  as described above.  So to convert the conserver.passwd file,
+	  all you really need to do is something like:
+
+		awk -F: '{print $1 ":" $2}' <old-passwd-file>
+
+	  If you have comments or continuation lines in your file,
+	  you'll have to do a bit more cleanup to strip out the third
+	  field (which is what the awk command is intending to do).
+
+	- Conserver no longer trusts reverse DNS information by default.
+	  If you use the --with-trustrevdns configure flag, you can
+	  re-enable the use of gethostbyaddr() [I don't recommended it,
+	  however].  If you are using domain names in access lists,
+	  you'll either need to change those to use hostnames and/or ip
+	  addresses/ranges or use the --with-trustrevdns flag.  For
+	  example, if you have (in the
+	  8.0.0 format):
+
+		allowed conserver.com;  # allow *.conserver.com
+
+	  then you'll need to worry about this change.  If you only use
+	  full hostnames, you shouldn't have to do anything.
+
     Version 7.2.4
 
         - If SSL support is compiled into the code, older versions of
@@ -70,7 +118,6 @@ Detailed Instructions
       the defaults shown, you're set.  If not, here are the conserver
       unique options:
 
-        --with-64bit            Allow 64bit compilation
         --with-port=PORT        Specify port number [conserver]
         --with-base=PORT        Base port for secondary channel [0]
         --with-master=MASTER    Specify master server hostname [console]
@@ -82,10 +129,10 @@ Detailed Instructions
         --with-pidfile=PIDFILE  Specify PID filepath [/var/run/conserver.pid]
         --with-maxmemb=MAXMEMB  Specify maximum consoles per process [16]
         --with-timeout=TIMEOUT  Specify connect() timeout in seconds [10]
+        --with-trustrevdns      Trust reverse DNS information
         --with-libwrap[=PATH]   Compile in libwrap (tcp_wrappers) support
         --with-openssl[=PATH]   Compile in OpenSSL support
         --with-dmalloc[=PATH]   Compile in dmalloc support
-        --with-regex            Use regular expressions in conserver.passwd
         --with-pam              Enable PAM support
 
       Not surprisingly, some match the old conserver/cons.h items...here
@@ -192,5 +239,5 @@ Other Information And Gotchas
 
 
 #
-#  $Id: INSTALL,v 1.27 2003-04-09 07:15:27-07 bryan Exp $
+#  $Id: INSTALL,v 1.32 2003-08-23 11:20:55-07 bryan Exp $
 #

@@ -65,23 +65,25 @@ directed to faq@conserver.com.  The FAQ answers the following questions:
     When conserver was compiled, it was told to use the /etc/services
     entry of "conserver" (what came after getservbyname:).  You'll need
     to either recompile conserver and hard-code a port number (using
-    PORT instead of SERVICE in conserver/cons.h) or enter "conserver"
-    in /etc/services.
+    --with-port=<num>) or enter "conserver" in /etc/services.
 
  6) What does "console: gethostbyname: console: host lookup error"
     mean (or something close to that)?
 
     When the console command was compiled, it was told to use the
     hostname "console" (what came after gethostbyname:) as the master
-    conserver host.  You'll need to either recompile console with the
-    appropriate name of your conserver host or add an alias of "console".
-    In most cases, adding an alias is my suggestion.
+    conserver host.  You'll need to either reconfigure with the
+    appropriate name of your conserver host (--with-master=<name>) or
+    add an alias of "console".  In most cases, adding an alias is my
+    suggestion.
 
  7) How do I set up a local serial port for no parity?
 
-    The conserver.cf man page will have this in the 6.17 release,
-    but the answer is to use a 'p' after the baud rate.  So, '9600p'
-    is 9600 baud, no parity.
+    The manpage has the answer to this question.  For those that don't
+    want to read it, here are some guidelines.  For pre-7.2.2, you'd
+    want to use a 'p' after the baud rate ("9600p", for example).  For
+    7.2.2 thru 7.2.7, you can use an 'n'.  For 8.0.0 and beyond, you use
+    'parity none;'.
 
  8) Is "Conserver" a trademark or registered trademark?
 
@@ -184,5 +186,5 @@ directed to faq@conserver.com.  The FAQ answers the following questions:
       through the same problem?
 
 #
-#  $Id: FAQ,v 1.8 2003-04-08 14:05:16-07 bryan Exp $
+#  $Id: FAQ,v 1.9 2003-08-23 12:27:10-07 bryan Exp $
 #

@@ -1,5 +1,5 @@
 /*
- *  $Id: group.h,v 5.31 2003-03-17 08:43:20-08 bryan Exp $
+ *  $Id: group.h,v 5.38 2003-09-19 08:58:18-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -45,7 +45,6 @@ typedef struct grpent {		/* group info                           */
     unsigned short port;	/* port group listens on                */
     pid_t pid;			/* pid of server for group              */
     int imembers;		/* number of consoles in this group     */
-    fd_set rinit;		/* descriptor list                      */
     CONSENT *pCElist;		/* list of consoles in this group       */
     CONSENT *pCEctl;		/* our control `console'                */
     CONSCLIENT *pCLall;		/* all clients to scan after select     */
@@ -55,10 +54,20 @@ typedef struct grpent {		/* group info                           */
 
 extern void Spawn PARAMS((GRPENT *));
 extern int CheckPass PARAMS((char *, char *));
-extern void TagLogfile PARAMS((const CONSENT *, const char *, ...));
-extern void TagLogfileAct PARAMS((const CONSENT *, const char *, ...));
+extern void TagLogfile PARAMS((const CONSENT *, char *, ...));
+extern void TagLogfileAct PARAMS((const CONSENT *, char *, ...));
 extern void CleanupBreak PARAMS((short));
 extern void DestroyGroup PARAMS((GRPENT *));
 extern void DestroyConsent PARAMS((GRPENT *, CONSENT *));
 extern void SendClientsMsg PARAMS((CONSENT *, char *));
 extern void ResetMark PARAMS((void));
+extern void DestroyConsentUsers PARAMS((CONSENTUSERS **));
+extern CONSENTUSERS *ConsentFindUser PARAMS((CONSENTUSERS *, char *));
+extern void DisconnectClient
+PARAMS((GRPENT *, CONSCLIENT *, char *, FLAG));
+extern int ClientAccess PARAMS((CONSENT *, char *));
+extern void DestroyClient PARAMS((CONSCLIENT *));
+extern int CheckPasswd PARAMS((CONSCLIENT *, char *));
+#if HAVE_OPENSSL
+extern int AttemptSSL PARAMS((CONSCLIENT *));
+#endif

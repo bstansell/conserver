@@ -1,8 +1,9 @@
 [Enter `^Ec?' for help]
 [halt list]
- 0  `\z'
- 1  `\z'
- 2  `\r~^b'
- 3  `#.reset -x\r'
- 5  `\rtest\r'
+ 0 - 250ms, `\z'
+ 1 - 250ms, `\z'
+ 2 - 250ms, `\r~^b'
+ 3 - 250ms, `#.'
+ 4 - 600ms, `\r\d~\d^b'
+ 5 - 250ms, `\rtest\r'
 [disconnect]

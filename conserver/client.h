@@ -1,5 +1,5 @@
 /*
- *  $Id: client.h,v 5.27 2003-03-06 10:13:41-08 bryan Exp $
+ *  $Id: client.h,v 5.31 2003-08-24 13:00:50-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -35,27 +35,30 @@
  */
 /* states for a server fsm
  */
-#define S_NORMAL 0		/* just pass character                          */
-#define S_ESC1	 1		/* first escape character received              */
-#define S_CMD	 2		/* second interrupt character received          */
-#define S_CATTN	 3		/* change 1 escape character to next input char */
-#define S_CESC	 4		/* change 2 escape character to next input char */
-#define S_HALT1	 5		/* we have a halt sequence in progress          */
-#define S_SUSP	 6		/* we are suspened, first char wakes us up      */
-#define S_IDENT	 7		/* probational connection (who is this)         */
-#define S_HOST	 8		/* still needs a host name to connect           */
-#define S_PASSWD 9		/* still needs a passwd to connect              */
-#define S_QUOTE 10		/* send any character we can spell              */
-#define S_BCAST 11		/* send a broadcast message to all connections  */
+typedef enum clientState {
+    S_NORMAL,			/* just pass character                     */
+    S_ESC1,			/* first escape character received         */
+    S_CMD,			/* second interrupt character received     */
+    S_CATTN,			/* change 1 escape char to next input char */
+    S_CESC,			/* change 2 escape char to next input char */
+    S_HALT1,			/* we have a halt sequence in progress     */
+    S_SUSP,			/* we are suspened, first char wakes us up */
+    S_IDENT,			/* probational connection (who is this)    */
+    S_PASSWD,			/* still needs a passwd to connect         */
+    S_QUOTE,			/* send any character we can spell         */
+    S_BCAST			/* send a broadcast message to all clients */
+} CLIENTSTATE;
 
 typedef struct client {		/* Connection Information:              */
     CONSFILE *fd;		/* file descriptor                      */
     short fcon;			/* currently connect or not             */
     short fwr;			/* (client) write enable flag           */
     short fwantwr;		/* (client) wants to write              */
+    short fro;			/* read-only permission                 */
     short fecho;		/* echo commands (not set by machines)  */
-    STRING acid;		/* login and location of client         */
-    STRING peername;		/* location of client                   */
+    STRING *acid;		/* login and location of client         */
+    STRING *peername;		/* location of client                   */
+    STRING *username;		/* login of client                      */
     time_t tym;			/* time of connect                      */
     time_t typetym;		/* time of last keystroke               */
     char actym[32];		/* pre-formatted time                   */
@@ -70,10 +73,12 @@ typedef struct client {		/* Connection Information:              */
      *pCLnext;			/* next person on this list             */
     /* next lists link clients on a console */
     char ic[2];			/* two character escape sequence        */
-    char iState;		/* state for fsm in server              */
+    CLIENTSTATE iState;		/* state for fsm in server              */
     char caccess;		/* did we trust the remote machine      */
-    STRING accmd;		/* the command the user issued          */
-    STRING msg;			/* the broadcast message                */
+    IOSTATE ioState;		/* state of the socket                  */
+    time_t stateTimer;		/* timer for various ioState states */
+    STRING *accmd;		/* the command the user issued          */
+    STRING *msg;		/* the broadcast message                */
     struct sockaddr_in
       cnct_port;		/* where from                           */
 } CONSCLIENT;
@@ -81,3 +86,4 @@ typedef struct client {		/* Connection Information:              */
 extern void Replay PARAMS((CONSFILE *, CONSFILE *, int));
 extern void HelpUser PARAMS((CONSCLIENT *));
 extern CONSCLIENT *FindWrite PARAMS((CONSCLIENT *));
+extern int ClientAccessOk PARAMS((CONSCLIENT *));

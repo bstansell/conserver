@@ -1,239 +1,686 @@
-.\" $Id: conserver.cf.man,v 1.27 2003-04-08 13:46:12-07 bryan Exp $
-.\" @(#)constab.5 01/06/91 OSU CIS; Thomas A. Fine
-.TH CONSERVER.CF 5 "Local"
+.\" $Id: conserver.cf.man,v 1.41 2003-09-21 15:05:48-07 bryan Exp $
+.TH CONSERVER.CF 5 "2003-09-21" "conserver-8.0.0" "conserver"
 .SH NAME
-conserver.cf \- console configuration file for conserver(8)
-.SH SYNOPSIS
-.br
-.BI \s-1LOGDIR\s0= logdirectory
-.br
-.BI \s-1TIMESTAMP\s0= timestamp-spec
-.br
-.BI \s-1BREAK\s0\fIn\fP= break-spec
-.br
-\fIname\fP:\fIdevice\fP[@\fIconserver\fP]:\fIbaud\fP:\fIlogfile\fP:\fItimestamp-spec\fP:\fIbreak\fP
-.br
-\fIname\fP:!\fItermserver\fP[@\fIconserver\fP]:\fIport\fP:\fIlogfile\fP:\fItimestamp-spec\fP:\fIbreak\fP
-.br
-\fIname\fP:|\fIcommand\fP[@\fIconserver\fP]::\fIlogfile\fP:\fItimestamp-spec\fP:\fIbreak\fP
-.br
-\fB%%\fP
-.br
-\fIaccess\fP: \fIhosts\fP
+conserver.cf \- console configuration file for
+.BR conserver (8)
 .SH DESCRIPTION
-.B Conserver.cf
-is the configuration file for
-.BR conserver (8).
-It is read once upon startup;
-modifications to the file take effect only upon restarting \fBconserver\fP.
+The format of the conserver.cf file is made up of named blocks of
+keyword/value pairs, comments, and optional whitespace for formatting
+flexibility.
+The block types as well as the keywords are pre-defined and
+explained in the
+.B \s-1BLOCKS\s0
+section.
+A comment is an unquoted pound-sign
+to a newline.
+See the
+.B \s-1PARSER\s0
+section for full details on whitespace and quoting.
 .PP
-Blank lines and comment lines (those beginning with a ``#'' and
-optional leading whitespace) are ignored.  Non-ignored lines
-beginning with whitespace are considered continuations of the
-previous line.  This allows you to span one logical line over
-many physical lines and insert comments wherever appropriate.
-.PP
-The first section of the file has logical lines that are separated into
-six colon-separated fields.  Leading and trailing white space in each
-field is ignored.
-.TP
-.I name
-the unique name by which this connection is referred to
-when using the \fBconsole\fP program.
-This is typically the name of the host whose console is being monitored.
-.TP
-.I device
-the full path name of the device for this line.
-The \fIbaud\fP rate is the speed and parity for this console.
-Speed may be given as an integer,
-parity only requires the first letter of any of: even, odd, mark, space, none.
-For historical reasons, `p' can also be used for no parity.
-.TP
-.BI ! termserver
-the hostname of the terminal server to connect to.
-A socket connection will be made to port \fIport\fP (an integer).
-.TP
-.BI | command
-the command to invoke on the console server.
-.PP
-\fIdevice\fP, !\fItermserver\fP, and |\fIcommand\fP may be followed by
-a remote console server name in the form ``\fB@\fP\fIconserver\fP'',
-in which case the conserver daemon will send connections for \fIname\fP
-to the conserver running on the host named \fIconserver\fP.
-When the ``\fB@\fP\fIconserver\fP'' notation is used,
-\fBconserver\fP recognizes consoles it should manage locally
-by comparing the IP address of \fIconserver\fP
-against the IP address of the name returned by gethostname().
-Thus, it will recognize host aliases, but not names that map to
-different IP addresses that may exist on the same host,
-so care must be used in specifying the hostname.
-Since \fBconserver\fP does recognize its own hostname,
-the same cf file may be used by all servers in a network
-if every console line includes a ``\fB@\fP\fIconserver\fP'' specification.
-.TP
-.I logfile
-the full path name of file where all output from
-this host is logged.  Any occurrence of `&' will be replaced with
-\fIname\fP.  Any path that doesn't begin with a `/' will
-have \fIlogdirectory\fP (as specified in the nearest preceding
-\fB\s-1LOGDIR=\s0\fP
-line) prepended to it.  If the field is empty, no logging will occur.
-.TP
-.I timestamp-spec
-specifies the time between
-timestamps applied to the console log file and
-whether to log read/write connection actions.
-The format of the specification is
-[\fImark-interval\fP[\fBm\fP|\fBh\fP|\fBd\fP|\fBl\fP]][\fBa\fP][\fBb\fP].
-The timestamps look like `[-- MARK -- Mon Jan 25 14:46:56 1999]'.
-The `\fBm\fP', `\fBh\fP', and `\fBd\fP' tags specify
-`minutes' (the default), `hours', and `days'.  The `\fBl\fP' tag
-specifies `lines' and will cause timestamps of the form
-`[Mon Jan 25 14:46:56 PST 1999]' to
-be placed every \fImark-interval\fP lines (a newline character signifies
-a new line). So, `5h' specifies every five hours and `2l' specifies every
-two lines.
-An `\fBa\fP' can be specified to add logs of
-`attached', `detached', and `bumped' actions,
-including the user's name and the host from which the
-\fBconsole\fP connection was made,
-to the logfile.
-A `\fBb\fP' can be specified to add logging of break sequences sent
-to the console.
+Let me first show you a sample block with a couple of keyword/value
+pairs to make the description a bit simpler to understand.
 .IP
-A default \fItimestamp-spec\fP can be specified by using the
-\fB\s-1TIMESTAMP=\s0\fP syntax.
-All consoles below the \fB\s-1TIMESTAMP=\s0\fP line will use that
-\fItimestamp-spec\fP unless overridden on a per-line basis,
-and until superseded by another \fB\s-1TIMESTAMP=\s0\fP line.
-To turn off marks for a specific
-console, use a \fImark-interval\fP of zero.
-.TP
-.I break
-specifies which break sequence to use.  The default value is `1'.
-Values of `0' thru `9' are valid.  A value of `0' will unset the
-default break sequence, which will cause the \fB^Ecl0\fP sequence to do
-nothing.
+.ft CR
+.nf
+console simple { master localhost; type exec; rw *; }
+.fi
+.ft
 .PP
-The \fIbreak-spec\fP sequences are defined using
-the \fB\s-1BREAK\s0\fIn\fB=\fR
-syntax where \fIn\fP is a number from 1 to 9.
-There are three builtin defaults: ``\s-1BREAK1\s0=\\z'',
-``\s-1BREAK2\s0=\\r~^b'',
-and ``\s-1BREAK3\s0=#.reset -x\\r''.  The values of
-the \fB\s-1BREAK\s0\fIn\fR
-sequences are simple characters strings with the exception of `\\' and
-`^':
+This is actually a fully functional conserver.cf file (if certain
+conditions are met...and if you can list those conditions, you can
+probably can skip to the
+.B \s-1BLOCKS\s0
+section).
+.PP
+Our example is made of up of a console-block named ``simple'' with three
+keyword/value pairs.
+What this does is define a console named ``simple'',
+makes the master of that console the host ``localhost'', makes the type
+an exec-style console, and gives every user read/write permission.
+This is the generic format of the file:
+.IP
+.ft CR
+.nf
+block-type block-name { keyword value; ... }
+.fi
+.ft
+.PP
+To show the addition of comments and whitespace, here is the example
+reformatted (but functionally equivalent):
+.IP
+.ft CR
+.nf
+# define a console named "simple"
+console simple {
+    # setting all required values...
+    master localhost;
+    type exec;  # exec-style console
+    rw *;       # allow any username
+}
+.fi
+.ft
+.SH PARSER
+.PP
+The parser has six characters that it considers special.
+These are: ``{'', ``}'', ``;'', ``#'', ``\e'', and ``"''.
+The first three (hereby called tokens) define the format of the
+configuration blocks and are used as word
+seperators, the next is the comment character, and the last two are
+quoting characters.
+.PP
+Word seperation occurs when the parser encounters an unquoted token
+and, in certain cases, whitespace.
+Whitespace is only used as a word seperator when the parser is
+looking for a block-type or keyword.
+When it's looking for a block-name or value, whitespace is like any
+other character, which allows you to embed whitespace in a block-name
+or value without having to quote it.
+Here is an example:
+.IP
+.ft CR
+.nf
+default my defs { rw *; include other defs  ; }
+.fi
+.ft
+.PP
+The block-type is ``default'', the block-name is ``my defs'', and the value
+for the keyword ``include'' is ``other defs''.
+Whitespace around tokens are ignored so you get ``other defs''
+instead of ``other defs  '' as the value.
+.PP
+The only way to use one of the special characters as part of a block-name
+or value is to quote it.
+.PP
+Quoting is a simple matter of prefixing a character with a backslash or
+surrounding a group of characters with double-quotes.
+If a character is prefixed by a backslash, the next character is a
+literal (so ``\e\e'' produces a ``\e'', ``\e"'' produces ``"'', ``\e{''
+produces a ``{'', etc.).
+For double-quoted strings, all characters are literal except for ``\e"'',
+which embeds a double-quote.
+.PP
+Adding a variety of quotes to our example without changing the meaning
+of things, we have:
+.IP
+.ft CR
+.nf
+"defa"ult my\e defs { rw *; in\eclude "other defs"  ; }
+.fi
+.ft
+.SH BLOCKS
+.TP 8
+.B access
+.RI [ " hostname " | " ipaddr " ]
+.br
+Define an access block for the host named
+.I hostname
+or using the address
+.IR ipaddr .
+If the value of ``*'' is used, the access block will be applied to
+all conserver hosts.
+Access lists are used in a first match
+fashion (top down), so order is important.
+.RS
+.TP 15
+.B admin
+.RI [ " username" ,...
+| "" ]
+.br
+Define a list of users making up the admin list for the console server.
+If
+.I username
+matches a previously defined group name, all members of the previous
+group are added to the admin list.
+If the null string (``""'') is used, any
+users previously defined for the console servers's admin list are removed.
+.TP
+.B allowed
+.IR hostname ", ..."
+.br
+The list of hostnames are added to the ``allowed'' list, which grants
+connections from the hosts but requires username authentication.
+.TP
+.B include
+.I accessgroup
+.br
+The access lists defined using the name
+.I accessgroup
+are applied to the current access block.
+The included access block must be previously defined.
+.TP
+.B rejected
+.IR hostname ", ..."
+.br
+The list of hostnames are added to the ``rejected'' list, which rejects
+connections from the hosts.
+.TP
+.B trusted
+.IR hostname ", ..."
+.br
+The list of hostnames are added to the ``trusted'' list, which grants
+connections from the hosts without username authentication.
+.RE
+.TP 8
+.B break
+.I n
+.br
+Define a break sequence where 0 < 
+.I n
+< 10.
+Break sequences are accessed via the
+.RI ``^El n ''
+client escape sequence.
+.RS
+.TP 15
+.B delay
+.I n
+.br
+Set the time delay for the
+.B \ed
+sequence to
+.I n
+milliseconds.
+The default time delay is 250ms.
+.TP
+.B string
+.I breakseq
+.br
+Assign the string
+.IR breakseq
+to the specified slot
+.IR n .
+A break sequence is a simple character string with the exception of `\e'
+and `^':
+.RS
 .sp
 .PD 0
-.IP \\\\a
+.TP 6
+.B \ea
 alert
-.IP \\\\b
+.TP
+.B \eb
 backspace
-.IP \\\\f
+.TP
+.B \ed
+0.33 second delay
+.TP
+.B \ef
 form-feed
-.IP \\\\n
+.TP
+.B \en
 newline
-.IP \\\\r
+.TP
+.B \er
 carriage-return
-.IP \\\\t
+.TP
+.B \et
 tab
-.IP \\\\v
+.TP
+.B \ev
 vertical-tab
-.IP \\\\z
+.TP
+.B \ez
 serial break
-.IP \\\\\\\\
+.TP
+.B \e\e
 backslash
-.IP \\\\^
+.TP
+.B \e^
 circumflex
-.IP \\\\\fIooo\fP
-octal representation of a character (where \fIooo\fP is one to three
-octal digits)
-.IP \\\\\fIc\fP
-character \fIc\fP
-.IP ^?
+.TP
+.BI \e ooo
+octal representation of a character (where
+.I ooo
+is one to three octal digits)
+.TP
+.BI \e c
+character
+.I c
+.TP
+.B ^?
 delete
-.IP ^\fIc\fP
-control character (\fIc\fP is `and'ed with 0x1f)
+.TP
+.BI ^ c
+control character
+.RI ( c
+is ``and''ed with 0x1f)
 .PD
-.PP
-This section is terminated with a `\fB%%\fP' token on a line by itself.
-.PP
-The next section of the file contains a list of hosts and addresses
-which are allowed to connect to the console server.
-.B Conserver
-looks for the first match in the config file
-for a client's IP address (or network),
-or hostname (or domain) if it is able to do a reverse lookup on the IP address,
-to determine the level of access to be granted.
-Three levels of access may be specified: ``\fBtrust\fP'' (access is granted
-without a password), ``\fBallow\fP'' (access is granted with a password),
-and ``\fBrefuse\fP'' (access is not granted).  Only the first character of
-the word is important, so you can use any word that begins with
-a ``\fBt\fP'', ``\fBa\fP'', or ``\fBr\fP''.
-The access level is followed by a colon and a space-separated list of
-addresses or host names.
-Any number of any combination of these levels may be specified,
-bearing in mind that conserver uses the first match for each incoming
-client connection, so order is important.
-.PP
-Any complete suffix of a host name may be used to define access for all hosts
-in that subdomain.
-For example, `\fBcc.purdue.edu\fP' will allow `mentor.cc.purdue.edu'
-and `mace.cc.purdue.edu', but not `pucc.purdue.edu' or `hack.purdue.edu'.
-For IP addresses, optional netmask lengths may be specified
-in CIDR `/' notation.
-For example, `\fB192.168.1.0\fP' will allow the class C space of 192.168.1.0,
-but `\fB192.168.1.0/25\fP' will allow
-only the lower half of that same address space (192.168.1.0 thru 192.168.1.127).
-.SH EXAMPLE
-# name:path:baud:logfile:mark:break
-.nf
-LOGDIR=/tmp
-# overriding the builtin BREAK3 sequence
-BREAK3=#.reset\\r
-# adding another break sequence
-BREAK8=+++
-#
-# This logs to /tmp/treelog...using BREAK8
-tree:/dev/ttyj0:9600e:&log::8
-#
-# This logs to /tmp/fishlog...
-fish:/dev/ttyj1:4800e:fishlog:
-#
-# Now we're defaulting to /var/tmp for logfiles...
-LOGDIR=/var/tmp
-#
-# So, this is /var/tmp/birdlog with 1-hour timestamps
-bird:/dev/ttyj2:4800m:&log:1h
-#
-# And this is /var/tmp/solarlog, using BREAK4, no timestamps
-solar:|telnet solar::solarlog::4
-#
-# Now things are all in /var/consoles/<console name>
-LOGDIR=/var/consoles
-shell:|::&:
-#
-# These open connections to ports 2003 and 2004 of ts1
-# using BREAK2 and BREAK3
-tribe:!ts1:2003:&::2
-# This one also has 10-minute timestamps and activity logging
-reptile:!ts1:2004:&:10ma:3
-#
-# This opens /dev/ttyh0 if running on extra.cc.purdue.edu;
-# otherwise, clients are redirected to that host.
-mentor:/dev/ttyh0@extra.cc.purdue.edu:2400e:&:
-%%
-#
-# access restrictions
-# (note that the "badhost.cc.purdue.edu" entry must appear
-# before the "cc.purdue.edu" entry if connections from
-# "badhost" are to be rejected, since only the first match
-# is used)
-#
-trust: console.cc.purdue.edu 128.210.7.90
-refuse: badhost.cc.purdue.edu
-allow: cc.purdue.edu stat.cc.purdue.edu
+.RE
+.RE
+.TP 8
+.B config
+.RI [ " hostname " | " ipaddr " ]
+.br
+Define a configuration block for the host named
+.I hostname
+or using the address
+.IR ipaddr .
+If the value of ``*'' is used, the configuration block will be applied to
+all conserver hosts.
+.RS
+.TP 15
+.B defaultaccess
+.RB [ " rejected " | " trusted " | " allowed " ]
+.br
+Set the default access permission for all hosts not matched by
+an access list (see the
+.B \-a
+command-line flag).
+.TP
+.B daemonmode
+.RB [ " yes " | " true " | " on " | " no " | " false " | " off " ]
+.br
+Set whether or not to become a daemon when run (see the
+.B \-d
+command-line flag).
+.TP
+.B logfile
+.I filename
+.br
+Set the logfile to write to when in daemon mode (see the
+.B \-L
+command-line flag).
+.TP
+.B passwdfile
+.I filename
+.br
+Set the password file location used for authentication (see the
+.B \-P
+command-line flag).
+.TP
+.B primaryport
+.RI [ " number " | " name " ]
+.br
+Set the port used by the master conserver process (see the
+.B \-p
+command-line flag).
+.TP
+.B redirect
+.RB [ " yes " | " true " | " on " | " no " | " false " | " off " ]
+.br
+Turn redirection on or off (see the
+.B \-R
+command-line flag).
+.TP
+.B reinitcheck
+.I number
+.br
+Set the number of seconds used between reinitialization checks (see the
+.B \-O
+command-line flag).
+.TP
+.B secondaryport
+.RI [ " number " | " name " ]
+.br
+Set the base port number used by child processes (see the
+.B \-b
+command-line flag).
+.TP
+.B sslcredentials
+.I filename
+.br
+Set the
+.SM SSL
+credentials file location (see the
+.B \-c
+command-line flag).
+.TP
+.B sslrequired
+.RB [ " yes " | " true " | " on " | " no " | " false " | " off " ]
+.br
+Set whether or not encryption is required when talking to clients (see the
+.B \-E
+command-line flag).
+.RE
+.TP 8
+.B console
+.I name
+.br
+Define a console identified as
+.IR name .
+The keywords are the same as the
+.B default
+block with the following addition.
+.RS
+.TP 15
+.B aliases
+.RI [ " name" ", ..."
+| "" ]
+.br
+Define a list of console aliases.
+If the null string (``""'') is used, any
+aliases previously defined for the console are removed.
+.RE
+.TP 8
+.B default
+.I name
+.br
+Define a block of defaults identified as
+.IR name .
+If 
+.I name
+is ``*'', the automatically applied default block is defined (basically
+all consoles have an implicit ``include "*";'' at the begining
+of their definition).
+.RS
+.TP 15
+.B baud
+.RB [ " 300 " | " 600 " | " 1800 " | " 2400 " | " 4800"
+.RB | " 9600 " | " 19200 " | " 38400 " | " 57600 " | " 115200 " ]
+.br
+Assign the baud rate to the console.
+Only consoles of type ``device'' will use this value.
+.TP
+.B break
+.I n
+.br
+Assign the break sequence
+.I n
+as the default for the console, which is used by
+the ``^Ecl0'' client escape sequence.
+.TP
+.B device
+.I filename
+.br
+Assign the serial device
+.I filename
+as the access to the console.
+Only consoles of type ``device'' will use this value.
+.TP
+.B exec
+.RI [ " command "
+| "" ]
+.br
+Assign the string
+.I command
+as the command to access the console.
+Conserver will run the command by
+invoking ``/bin/sh -ce "\fIcommand\fP"''.
+If the null string (``""'') is used or no
+.B exec
+keyword is specified, conserver will use the command ``/bin/sh -i''.
+Only consoles of type ``device'' will use this value.
+.TP
+.B host
+.I hostname
+.br
+Assign
+.I hostname
+as the host to connect to for accessing the console.
+You must also set the
+.B port
+option as well.
+Only consoles of type ``host'' will use this value.
+.TP
+.B include
+.I default
+.br
+The default block defined using the name
+.I default
+is applied to the current console or default block.
+The included default block must be previously defined.
+.TP
+.B logfile
+.RI [ " filename "
+| "" ]
+.br
+Assign the logfile specified by
+.I filename
+to the console.  Any occurance of ``&'' in
+.I filename
+will be replaced with the name of the console.
+If the null string (``""'') is used, the logfile name is unset and
+no logging will occur.
+.TP
+.B master
+.RI [ " hostname " | " ipaddr " ]
+.br
+Define which conserver host manages the console.
+The host may be specified by
+.I hostname
+or using the address
+.IR ipaddr .
+.TP
+.B options
+.RI [ " option" ,...
+| "" ]
+.br
+You can negate the option by prefixing it with a
+.RB `` ! ''
+character.
+So, to turn off the
+.B hupcl
+flag, you would use
+.BR !hupcl .
+The following are valid
+.IR option s:
+.RS
+.sp
+.PD 0
+.TP 12
+.B ixon
+Enable
+.SM XON/XOFF
+flow control on output.
+Only consoles of type ``device'' or ``exec'' will use this value.
+Default is
+.BR ixon .
+.TP
+.B ixany
+Enable any character to restart output.
+Only consoles of type ``device'' or ``exec'' will use this value.
+Default is
+.BR !ixany .
+.TP
+.B ixoff
+Enable
+.SM XON/XOFF
+flow control on input.
+Only consoles of type ``device'' or ``exec'' will use this value.
+Default is
+.B ixoff
+for consoles of type ``device'' and
+.B !ixoff
+for consoles of type ``exec''.
+.TP
+.B crtscts
+Enable
+.SM RTS/CTS
+(hardware) flow control.
+Only consoles of type ``device'' will use this value.
+Default is
+.BR !crtscts .
+.TP
+.B cstopb
+Set two stop bits, rather than one.
+Only consoles of type ``device'' will use this value.
+Default is
+.BR !cstopb .
+.TP
+.B hupcl
+Lower modem control lines after last process closes the device (hang up).
+Only consoles of type ``device'' will use this value.
+Default is
+.BR !hupcl .
+.TP
+.B ondemand
+Initialize the console when a client requests a connection to the console.
+When no clients are connected, bring the console down.
+The conserver option
+.B \-i
+will set this flag for all consoles.
+Default is
+.BR !ondemand .
+.TP
+.B striphigh
+Strip the high bit off all data coming from this console and all clients
+connected to this console before processing occurs.
+The conserver option
+.B \-7
+will set this flag for all consoles.
+Default is
+.BR !stiphigh .
+.TP
+.B reinitoncc
+Automatically reinitialize (``bring up'') a downed console when a client
+connects.
+Without this option, a client will be attached to the downed console
+and will need to manually reinitialize the console with an escape sequence.
+The conserver option
+.B \-o
+will set this flag for all consoles.
+Default is
+.BR !reinitoncc .
+.TP
+.B autoreinit
+Allow this console to be automatically reinitialized if it unexpectedly
+goes down.
+If the console doesn't come back up, it is retried every minute.
+A console of type ``exec'' that exits with a zero exit status is
+automatically reinitialized regardless of this setting.
+The conserver option
+.B \-F
+will
+.B unset
+this flag for all consoles.
+Default is
+.BR autoreinit .
+.TP
+.B unloved
+Enable the sending of this console's output (prefixed with it's
+name) to the daemon's stdout (or the logfile if in daemon mode) when no
+clients are connected to the console.
+The conserver option
+.B \-u
+will set this flag for all consoles.
+Default is
+.BR !unloved .
+.PD
+.RE
+.TP
+.B parity
+.RB [ " even " | " mark " | " none " | " odd " | " space " ]
+.br
+Set the parity option for the console.
+Only consoles of type ``device'' will use this value.
+.TP
+.B port
+.RI [ " number " | " name " ]
+.br
+Set the port used to access the console.
+The port may be specified as a
+.I number
+or a
+.IR name ,
+in which case it will use
+.BR getservbyname (3)
+to look up a port number.
+You must also set the
+.B host
+option as well.
+Only consoles of type ``host'' will use this value.
+.TP
+.B ro
+.RI [ " username" ,...
+| "" ]
+.br
+Define a list of users making up the read-only access list
+for the console.
+If
+.I username
+matches a previously defined group name, all members of the previous
+group are added to the read-only access list.
+If the null string (``""'') is used, any
+users previously defined for the console's read-only list are removed.
+.TP
+.B rw
+.RI [ " username" ,...
+| "" ]
+.br
+Define a list of users making up the read-write access list
+for the console.
+If
+.I username
+matches a previously defined group name, all members of the previous
+group are added to the read-write access list.
+If the null string (``""'') is used, any
+users previously defined for the console's read-write list are removed.
+.TP
+.B timestamp
+[
+.RB [ \fInumber\fP [ m | h | d | l ]][ a ][ b ]
+| "" ]
+.br
+Specifies the time between timestamps applied to the console
+log file and whether to log read/write connection actions.
+The timestamps look like ``[-- MARK -- Mon Jan 25 14:46:56 1999]''.
+The
+.RB ` m ',
+.RB ` h ',
+and
+.RB ` d '
+tags specify ``minutes'' (the default), ``hours'', and ``days''.
+The
+.RB ` l '
+tag specifies ``lines'' and will cause timestamps of the
+form ``[Mon Jan 25 14:46:56 PST 1999]'' to
+be placed every
+.I number
+lines (a newline character signifies a new line).
+So, ``5h'' specifies every five hours and ``2l'' specifies every
+two lines.
+An
+.RB ` a '
+can be specified to add logs of ``attached'', ``detached'',
+and ``bumped'' actions, including the user's name and the host from which the
+client connection was made.
+A
+.RB ` b '
+can be specified to add logging of break sequences sent to the console.
+.TP
+.B type
+.RB [ " device " | " exec " | " host " ]
+.br
+Set the type of console.  The type
+.RB `` device ''
+should be used for local serial ports (also set the
+.B device
+option), the type
+.RB `` exec ''
+should be used for command invocations (perhaps also set the
+.B exec
+option), and the type
+.RB `` host ''
+should be used for terminal servers and other socket-based
+interaction (also set the
+.B host
+and
+.B port
+options).
+.RE
+.TP 8
+.B group
+.I name
+.br
+Define a user group identified as
+.I name
+.RS
+.TP 15
+.B users
+.RI [ " username" ,...
+| "" ]
+.br
+Define a list of users making up the group
+.IR name .
+If
+.I username
+matches a previously defined group name, all members of the previous
+group are added to the current group.
+If the null string (``""'') is used, any
+users previously defined for this group are removed.
+.RE
+.SH AUTHORS
+Bryan Stansell, conserver.com
 .SH "SEE ALSO"
 .BR console (1),
 .BR conserver.passwd (5),

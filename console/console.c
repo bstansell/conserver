@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.117 2003-04-06 05:29:24-07 bryan Exp $
+ *  $Id: console.c,v 5.137 2003-09-22 08:23:57-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -27,25 +27,13 @@
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <config.h>
-
-#include <sys/param.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <signal.h>
-#include <stdio.h>
-#include <netdb.h>
-#include <pwd.h>
-#include <ctype.h>
-#include <sys/stat.h>
-
 #include <compat.h>
+
+#include <pwd.h>
+
+#include <getpassword.h>
 #include <util.h>
-
 #include <version.h>
-
 #if HAVE_OPENSSL
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -53,7 +41,7 @@
 #endif
 
 
-int fReplay = 0, fRaw = 0, fVersion = 0, fStrip = 0;
+int fReplay = 0, fVersion = 0, fStrip = 0;
 #if HAVE_OPENSSL
 int fReqEncryption = 1;
 char *pcCredFile = (char *)0;
@@ -64,11 +52,13 @@ char *pcInMaster =		/* which machine is current */
 char *pcPort = DEFPORT;
 unsigned short bindPort;
 CONSFILE *cfstdout;
+char *pcUser = (char *)0;
+int disconnectCount = 0;
 
 static char acMesg[8192];	/* the buffer for startup negotiation   */
 
 #if HAVE_OPENSSL
-SSL_CTX *ctx = (SSL_CTX *) 0;
+SSL_CTX *ctx = (SSL_CTX *)0;
 
 void
 #if PROTOTYPES
@@ -77,13 +67,13 @@ SetupSSL(void)
 SetupSSL()
 #endif
 {
-    if (ctx == (SSL_CTX *) 0) {
+    if (ctx == (SSL_CTX *)0) {
 	SSL_load_error_strings();
 	if (!SSL_library_init()) {
 	    Error("SSL library initialization failed");
 	    exit(EX_UNAVAILABLE);
 	}
-	if ((ctx = SSL_CTX_new(SSLv23_method())) == (SSL_CTX *) 0) {
+	if ((ctx = SSL_CTX_new(SSLv23_method())) == (SSL_CTX *)0) {
 	    Error("Creating SSL context failed");
 	    exit(EX_UNAVAILABLE);
 	}
@@ -121,7 +111,7 @@ SetupSSL()
 
 void
 #if PROTOTYPES
-AttemptSSL(CONSFILE * pcf)
+AttemptSSL(CONSFILE *pcf)
 #else
 AttemptSSL(pcf)
     CONSFILE *pcf;
@@ -129,7 +119,7 @@ AttemptSSL(pcf)
 {
     SSL *ssl;
 
-    if (ctx == (SSL_CTX *) 0) {
+    if (ctx == (SSL_CTX *)0) {
 	Error("WTF?  The SSL context disappeared?!?!?");
 	exit(EX_UNAVAILABLE);
     }
@@ -139,16 +129,15 @@ AttemptSSL(pcf)
     }
     FileSetSSL(pcf, ssl);
     SSL_set_fd(ssl, FileFDNum(pcf));
-    Debug(1, "About to SSL_connect() on fd %d", FileFDNum(pcf));
+    CONDDEBUG((1, "About to SSL_connect() on fd %d", FileFDNum(pcf)));
     if (SSL_connect(ssl) <= 0) {
 	Error("SSL negotiation failed");
 	ERR_print_errors_fp(stderr);
 	exit(EX_UNAVAILABLE);
     }
     FileSetType(pcf, SSLSocket);
-    if (fDebug)
-	Debug(1, "SSL Connection: %s :: %s", SSL_get_cipher_version(ssl),
-	      SSL_get_cipher_name(ssl));
+    CONDDEBUG((1, "SSL Connection: %s :: %s", SSL_get_cipher_version(ssl),
+	       SSL_get_cipher_name(ssl)));
 }
 #endif
 
@@ -165,7 +154,7 @@ DestroyDataStructures()
  */
 static void
 #if PROTOTYPES
-PutCtlc(int c, FILE * fp)
+PutCtlc(int c, FILE *fp)
 #else
 PutCtlc(c, fp)
     int c;
@@ -208,6 +197,7 @@ Usage(wantfull)
 #else
 	"c cred  ignored - encryption not compiled into code",
 #endif
+	"d       disconnect [user][@console]",
 	"D       enable debug output, sent to stderr",
 	"e esc   set the initial escape characters",
 #if HAVE_OPENSSL
@@ -216,7 +206,6 @@ Usage(wantfull)
 	"E       ignored - encryption not compiled into code",
 #endif
 	"f(F)    force read/write connection (and replay)",
-	"G       connect to the console group only",
 	"i(I)    display information in machine-parseable form (on master)",
 	"h       output this message",
 	"l user  use username instead of current username",
@@ -226,6 +215,7 @@ Usage(wantfull)
 	"q(Q)    send a quit command to the (master) server",
 	"r(R)    display (master) daemon version (think 'r'emote version)",
 	"s(S)    spy on a console (and replay)",
+	"t       send a text message to [user][@console]",
 	"u       show users on the various consoles",
 	"v       be more verbose",
 	"V       show version information",
@@ -235,12 +225,12 @@ Usage(wantfull)
     };
 
     fprintf(stderr,
-	    "%s: usage [-aAEfFGsS] [-7Dv] [-c cred] [-M mach] [-p port] [-e esc] [-l username] console\n",
+	    "usage: %s [-aAEfFsS] [-7Dv] [-c cred] [-M mach] [-p port] [-e esc] [-l username] console\n",
 	    progname);
     fprintf(stderr,
-	    "%s: usage [-hiIPrRuVwWx] [-7Dv] [-M mach] [-p port] [-[bB] message]\n",
+	    "usage: %s [-hiIPrRuVwWx] [-7Dv] [-M mach] [-p port] [-d [user][@console]] [-[bB] message] [-t [user][@console] message]\n",
 	    progname);
-    fprintf(stderr, "%s: usage [-qQ] [-7Dv] [-M mach] [-p port]\n",
+    fprintf(stderr, "usage: %s [-qQ] [-7Dv] [-M mach] [-p port]\n",
 	    progname);
 
     if (wantfull) {
@@ -260,8 +250,8 @@ Version()
 #endif
 {
     int i;
-    static STRING *acA1 = (STRING *) 0;
-    static STRING *acA2 = (STRING *) 0;
+    static STRING *acA1 = (STRING *)0;
+    static STRING *acA2 = (STRING *)0;
     char *optionlist[] = {
 #if HAVE_DMALLOC
 	"dmalloc",
@@ -275,40 +265,20 @@ Version()
 #if HAVE_PAM
 	"pam",
 #endif
-#if HAVE_POSIX_REGCOMP
-	"regex",
-#endif
 	(char *)0
     };
 
-    if (acA1 == (STRING *) 0)
+    if (acA1 == (STRING *)0)
 	acA1 = AllocString();
-    if (acA2 == (STRING *) 0)
+    if (acA2 == (STRING *)0)
 	acA2 = AllocString();
 
     Msg("%s", THIS_VERSION);
-    Msg("initial master server `%s\'", pcInMaster);
+    Msg("default initial master server `%s\'", MASTERHOST);
     Msg("default escape sequence `%s%s\'", FmtCtl(DEFATTN, acA1),
 	FmtCtl(DEFESC, acA2));
-    /* Look for non-numeric characters */
-    for (i = 0; pcPort[i] != '\000'; i++)
-	if (!isdigit((int)pcPort[i]))
-	    break;
+    Msg("default port referenced as `%s'", DEFPORT);
 
-    if (pcPort[i] == '\000') {
-	/* numeric only */
-	bindPort = atoi(pcPort);
-	Msg("on port %hu (referenced as `%s')", bindPort, pcPort);
-    } else {
-	/* non-numeric only */
-	struct servent *pSE;
-	if ((struct servent *)0 == (pSE = getservbyname(pcPort, "tcp"))) {
-	    Error("getservbyname(%s): %s", pcPort, strerror(errno));
-	} else {
-	    bindPort = ntohs((u_short) pSE->s_port);
-	    Msg("on port %hu (referenced as `%s')", bindPort, pcPort);
-	}
-    }
     BuildString((char *)0, acA1);
     if (optionlist[0] == (char *)0)
 	BuildString("none", acA1);
@@ -456,50 +426,56 @@ ParseEsc(pcText)
  */
 CONSFILE *
 #if PROTOTYPES
-GetPort(char *pcToHost, struct sockaddr_in *pPort, unsigned short sPort)
+GetPort(char *pcToHost, unsigned short sPort)
 #else
-GetPort(pcToHost, pPort, sPort)
+GetPort(pcToHost, sPort)
     char *pcToHost;
-    struct sockaddr_in *pPort;
     unsigned short sPort;
 #endif
 {
     int s;
     struct hostent *hp = (struct hostent *)0;
+    struct sockaddr_in port;
 
 #if HAVE_MEMSET
-    memset((void *)pPort, '\000', sizeof(*pPort));
+    memset((void *)(&port), '\000', sizeof(port));
 #else
-    bzero((char *)pPort, sizeof(*pPort));
+    bzero((char *)(&port), sizeof(port));
 #endif
 
-    pPort->sin_addr.s_addr = inet_addr(pcToHost);
-    if ((in_addr_t) (-1) == pPort->sin_addr.s_addr) {
+#if HAVE_INET_ATON
+    if (inet_aton(pcToHost, &(port.sin_addr)) == 0)
+#else
+    port.sin_addr.s_addr = inet_addr(pcToHost);
+    if ((in_addr_t) (-1) == port.sin_addr.s_addr)
+#endif
+    {
 	if ((struct hostent *)0 != (hp = gethostbyname(pcToHost))) {
 #if HAVE_MEMCPY
-	    memcpy((char *)&pPort->sin_addr.s_addr, (char *)hp->h_addr,
+	    memcpy((char *)&port.sin_addr.s_addr, (char *)hp->h_addr,
 		   hp->h_length);
 #else
-	    bcopy((char *)hp->h_addr, (char *)&pPort->sin_addr.s_addr,
+	    bcopy((char *)hp->h_addr, (char *)&port.sin_addr.s_addr,
 		  hp->h_length);
 #endif
 	} else {
 	    Error("gethostbyname(%s): %s", pcToHost, hstrerror(h_errno));
-	    exit(EX_UNAVAILABLE);
+	    return (CONSFILE *)0;
 	}
     }
-    pPort->sin_port = sPort;
-    pPort->sin_family = AF_INET;
+    port.sin_port = sPort;
+    port.sin_family = AF_INET;
 
     if (fDebug) {
-	if ((struct hostent *)0 != hp && (char *)0 != hp->h_name)
-	    Debug(1, "GetPort: hostname=%s (%s), ip=%s, port=%hu",
-		  hp->h_name, pcToHost, inet_ntoa(pPort->sin_addr),
-		  ntohs(sPort));
-	else
-	    Debug(1,
-		  "GetPort: hostname=<unresolved> (%s), ip=%s, port=%hu",
-		  pcToHost, inet_ntoa(pPort->sin_addr), ntohs(sPort));
+	if ((struct hostent *)0 != hp && (char *)0 != hp->h_name) {
+	    CONDDEBUG((1, "GetPort: hostname=%s (%s), ip=%s, port=%hu",
+		       hp->h_name, pcToHost, inet_ntoa(port.sin_addr),
+		       ntohs(sPort)));
+	} else {
+	    CONDDEBUG((1,
+		       "GetPort: hostname=<unresolved> (%s), ip=%s, port=%hu",
+		       pcToHost, inet_ntoa(port.sin_addr), ntohs(sPort)));
+	}
     }
 
     /* set up the socket to talk to the server for all consoles
@@ -507,12 +483,12 @@ GetPort(pcToHost, pPort, sPort)
      */
     if ((s = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 	Error("socket(AF_INET,SOCK_STREAM): %s", strerror(errno));
-	exit(EX_UNAVAILABLE);
+	return (CONSFILE *)0;
     }
-    if (connect(s, (struct sockaddr *)pPort, sizeof(*pPort)) < 0) {
-	Error("connect(): %hu@%s: %s", ntohs(pPort->sin_port), pcToHost,
+    if (connect(s, (struct sockaddr *)(&port), sizeof(port)) < 0) {
+	Error("connect(): %hu@%s: %s", ntohs(port.sin_port), pcToHost,
 	      strerror(errno));
-	exit(EX_UNAVAILABLE);
+	return (CONSFILE *)0;
     }
 
     return FileOpenFD(s, simpleSocket);
@@ -523,17 +499,7 @@ GetPort(pcToHost, pPort, sPort)
  * correct mode for us to do our thing
  */
 static int screwy = 0;
-#if HAVE_TERMIOS_H
 static struct termios o_tios;
-#else
-# if HAVE_TERMIO_H
-static struct termio o_tio;
-# else
-static struct sgttyb o_sty;
-static struct tchars o_tchars;
-static struct ltchars o_ltchars;
-# endif
-#endif
 
 
 /*
@@ -548,111 +514,25 @@ C2Raw()
 C2Raw()
 #endif
 {
-#if HAVE_TERMIOS_H
     struct termios n_tios;
-#else
-# if HAVE_TERMIO_H
-    struct termio n_tio;
-# else
-    struct sgttyb n_sty;
-    struct tchars n_tchars;
-    struct ltchars n_ltchars;
-# endif
-#endif
 
     if (!isatty(0) || 0 != screwy)
 	return;
 
-#if HAVE_TERMIOS_H
-# if HAVE_TCGETATTR
     if (0 != tcgetattr(0, &o_tios)) {
 	Error("tcgetattr(0): %s", strerror(errno));
 	exit(EX_UNAVAILABLE);
     }
-# else
-    if (0 != ioctl(0, TCGETS, &o_tios)) {
-	Error("iotcl(0, TCGETS): %s", strerror(errno));
-	exit(EX_UNAVAILABLE);
-    }
-# endif
     n_tios = o_tios;
     n_tios.c_iflag &= ~(INLCR | IGNCR | ICRNL | IUCLC | IXON);
     n_tios.c_oflag &= ~OPOST;
     n_tios.c_lflag &= ~(ICANON | ISIG | ECHO | IEXTEN);
     n_tios.c_cc[VMIN] = 1;
     n_tios.c_cc[VTIME] = 0;
-# if HAVE_TCSETATTR
     if (0 != tcsetattr(0, TCSANOW, &n_tios)) {
 	Error("tcsetattr(0, TCSANOW): %s", strerror(errno));
 	exit(EX_UNAVAILABLE);
     }
-# else
-    if (0 != ioctl(0, TCSETS, &n_tios)) {
-	Error("ioctl(0, TCSETS): %s", strerror(errno));
-	exit(EX_UNAVAILABLE);
-    }
-# endif
-#else
-# if HAVE_TERMIO_H
-    if (0 != ioctl(0, TCGETA, &o_tio)) {
-	Error("iotcl(0, TCGETA): %s", strerror(errno));
-	exit(EX_UNAVAILABLE);
-    }
-    n_tio = o_tio;
-    n_tio.c_iflag &= ~(INLCR | IGNCR | ICRNL | IUCLC | IXON);
-    n_tio.c_oflag &= ~OPOST;
-    n_tio.c_lflag &=
-	~(ICANON | ISIG | ECHO | ECHOE | ECHOK | ECHONL | IEXTEN);
-    n_tio.c_cc[VMIN] = 1;
-    n_tio.c_cc[VTIME] = 0;
-    if (0 != ioctl(0, TCSETAF, &n_tio)) {
-	Error("iotcl(0, TCSETAF): %s", strerror(errno));
-	exit(EX_UNAVAILABLE);
-    }
-# else
-    if (0 != ioctl(0, TIOCGETP, (char *)&o_sty)) {
-	Error("iotcl(0, TIOCGETP): %s", strerror(errno));
-	exit(EX_UNAVAILABLE);
-    }
-    n_sty = o_sty;
-
-    n_sty.sg_flags |= CBREAK;
-    n_sty.sg_flags &= ~(CRMOD | ECHO);
-    n_sty.sg_kill = -1;
-    n_sty.sg_erase = -1;
-    if (0 != ioctl(0, TIOCSETP, (char *)&n_sty)) {
-	Error("iotcl(0, TIOCSETP): %s", strerror(errno));
-	exit(EX_UNAVAILABLE);
-    }
-
-    /* stty undef all tty chars
-     */
-    if (-1 == ioctl(0, TIOCGETC, (char *)&n_tchars)) {
-	Error("ioctl(0, TIOCGETC): %s", strerror(errno));
-	return;
-    }
-    o_tchars = n_tchars;
-    n_tchars.t_intrc = -1;
-    n_tchars.t_quitc = -1;
-    if (-1 == ioctl(0, TIOCSETC, (char *)&n_tchars)) {
-	Error("ioctl(0, TIOCSETC): %s", strerror(errno));
-	return;
-    }
-    if (-1 == ioctl(0, TIOCGLTC, (char *)&n_ltchars)) {
-	Error("ioctl(0, TIOCGLTC): %s", strerror(errno));
-	return;
-    }
-    o_ltchars = n_ltchars;
-    n_ltchars.t_suspc = -1;
-    n_ltchars.t_dsuspc = -1;
-    n_ltchars.t_flushc = -1;
-    n_ltchars.t_lnextc = -1;
-    if (-1 == ioctl(0, TIOCSLTC, (char *)&n_ltchars)) {
-	Error("ioctl(0, TIOCSLTC): %s", strerror(errno));
-	return;
-    }
-# endif
-#endif
     screwy = 1;
 }
 
@@ -668,200 +548,59 @@ C2Cooked()
 {
     if (!screwy)
 	return;
-#if HAVE_TERMIOS_H
-# if HAVE_TCSETATTR
     tcsetattr(0, TCSANOW, &o_tios);
-# else
-    ioctl(0, TCSETS, (char *)&o_tios);
-# endif
-#else
-# if HAVE_TERMIO_H
-    ioctl(0, TCSETA, (char *)&o_tio);
-# else
-    ioctl(0, TIOCSETP, (char *)&o_sty);
-    ioctl(0, TIOCSETC, (char *)&o_tchars);
-    ioctl(0, TIOCSLTC, (char *)&o_ltchars);
-# endif
-#endif
     screwy = 0;
 }
 
-
-
-/* send out some data along the connection				(ksb)
- */
-static void
+char *
 #if PROTOTYPES
-SendOut(CONSFILE * fd, char *pcBuf, int iLen)
+ReadReply(CONSFILE *fd, int toEOF)
 #else
-SendOut(fd, pcBuf, iLen)
+ReadReply(fd)
     CONSFILE *fd;
-    int iLen;
-    char *pcBuf;
+    int toEOF;
 #endif
 {
     int nr;
+    static char buf[1024];
+    static STRING *result = (STRING *)0;
 
-    if (fDebug) {
-	static STRING *tmpString = (STRING *) 0;
-	if (tmpString == (STRING *) 0)
-	    tmpString = AllocString();
-	BuildString((char *)0, tmpString);
-	FmtCtlStr(pcBuf, iLen, tmpString);
-	Debug(1, "SendOut: `%s'", tmpString->string);
-    }
-    while (0 != iLen) {
-	if (-1 == (nr = FileWrite(fd, pcBuf, iLen))) {
-	    C2Cooked();
-	    Error("lost connection");
-	    exit(EX_UNAVAILABLE);
-	}
-	iLen -= nr;
-	pcBuf += nr;
-    }
-}
+    if (result == (STRING *)0)
+	result = AllocString();
+    else
+	BuildString((char *)0, result);
 
-/* read a reply from the console server					(ksb)
- * if pcWnat == (char *)0 we strip \r\n from the end and return strlen
- */
-static int
-#if PROTOTYPES
-ReadReply(CONSFILE * fd, char *pcBuf, int iLen, char *pcWant)
-#else
-ReadReply(fd, pcBuf, iLen, pcWant)
-    CONSFILE *fd;
-    int iLen;
-    char *pcBuf, *pcWant;
-#endif
-{
-    int nr, j, iKeep;
-
-    iKeep = iLen;
-    for (j = 0; j < iLen; /* j+=nr */ ) {
-	switch (nr = FileRead(fd, &pcBuf[j], iLen - 1)) {
+    while (1) {
+	switch (nr = FileRead(fd, buf, sizeof(buf))) {
 	    case 0:
-		if (iKeep != iLen) {
-		    break;
-		}
 		/* fall through */
 	    case -1:
+		if (result->used > 1 || toEOF)
+		    break;
 		C2Cooked();
 		Error("lost connection");
 		exit(EX_UNAVAILABLE);
 	    default:
-		j += nr;
-		iLen -= nr;
-		if ('\n' == pcBuf[j - 1]) {
-		    pcBuf[j] = '\000';
+		BuildStringN(buf, nr, result);
+		if (toEOF)	/* if toEOF, read until EOF */
+		    continue;
+		if ((result->used > 1) &&
+		    (result->string[result->used - 2] == '\n'))
 		    break;
-		}
-		if (0 == iLen) {
-		    C2Cooked();
-		    Error("reply too long");
-		    exit(EX_UNAVAILABLE);
-		}
 		continue;
 	}
 	break;
     }
-    /* in this case the called wants a line of text
-     * remove the cr/lf sequence and any trtailing spaces
-     * (s/[ \t\r\n]*$//)
-     */
-    if ((char *)0 == pcWant) {
-	while (0 != j && isspace((int)(pcBuf[j - 1]))) {
-	    pcBuf[--j] = '\000';
-	}
-	Debug(1, "ReadReply: %s", pcBuf);
-	return j;
-    }
     if (fDebug) {
-	static STRING *tmpString = (STRING *) 0;
-	if (tmpString == (STRING *) 0)
+	static STRING *tmpString = (STRING *)0;
+	if (tmpString == (STRING *)0)
 	    tmpString = AllocString();
 	BuildString((char *)0, tmpString);
-	FmtCtlStr(pcWant, -1, tmpString);
-	if (strcmp(pcBuf, pcWant))
-	    Debug(1, "ReadReply: didn't match `%s'", tmpString->string);
-	else
-	    Debug(1, "ReadReply: matched `%s'", tmpString->string);
+	FmtCtlStr(result->string, result->used - 1, tmpString);
+	CONDDEBUG((1, "ReadReply: `%s'", tmpString->string));
     }
-    return strcmp(pcBuf, pcWant);
+    return result->string;
 }
-
-/* call a machine master for group master ports and machine master ports
- * take a list like "1782@localhost:@mentor.cc.purdue.edu:@pop.stat.purdue.edu"
- * and send the given command to the group leader at 1782
- * and ask the machine master at mentor for more group leaders
- * and ask the machine master at pop.stat for more group leaders
- */
-static int
-#if PROTOTYPES
-Gather(int (*pfi) (), char *pcPorts, char *pcMaster, char *pcTo,
-       char *pcCmd, char *pcWho)
-#else
-Gather(pfi, pcPorts, pcMaster, pcTo, pcCmd, pcWho)
-    int (*pfi) ();
-    char *pcPorts, *pcMaster, *pcTo, *pcCmd, *pcWho;
-#endif
-{
-    CONSFILE *pcf;
-    unsigned short j;
-    char *pcNext, *pcServer;
-    STRING *acExcg = (STRING *) 0;
-    struct sockaddr_in client_port;
-    int iRet = 0;
-
-    if (acExcg == (STRING *) 0)
-	acExcg = AllocString();
-
-    for ( /* param */ ; '\000' != *pcPorts; pcPorts = pcNext) {
-	if ((char *)0 == (pcNext = strchr(pcPorts, ':')))
-	    pcNext = "";
-	else
-	    *pcNext++ = '\000';
-
-	BuildString((char *)0, acExcg);
-	BuildString(pcMaster, acExcg);
-	if ((char *)0 != (pcServer = strchr(pcPorts, '@'))) {
-	    *pcServer++ = '\000';
-	    if ('\000' != *pcServer) {
-		BuildString((char *)0, acExcg);
-		BuildString(pcServer, acExcg);
-	    }
-	}
-
-	if ('\000' == *pcPorts) {
-	    j = htons(bindPort);
-	} else if (!isdigit((int)(pcPorts[0]))) {
-	    Error("%s: %s", pcMaster, pcPorts);
-	    exit(EX_UNAVAILABLE);
-	} else {
-	    j = htons((short)atoi(pcPorts));
-	}
-
-	pcf = GetPort(acExcg->string, &client_port, j);
-
-	if (0 != ReadReply(pcf, acMesg, sizeof(acMesg), "ok\r\n")) {
-	    int s = strlen(acMesg);
-	    if ((s > 0) && ('\n' == acMesg[s - 1]))
-		acMesg[s - 1] = '\000';
-	    Error("%s: %s", acExcg->string, acMesg);
-	    exit(EX_UNAVAILABLE);
-	}
-
-	iRet += (*pfi) (pcf, acExcg->string, pcTo, pcCmd, pcWho);
-
-	FileClose(&pcf);
-
-	if ((char *)0 != pcServer) {
-	    *pcServer = '@';
-	}
-    }
-    DestroyString(acExcg);
-    return iRet;
-}
-
 
 static int SawUrg = 0;
 
@@ -942,12 +681,12 @@ ProcessUrgentData(s)
  */
 static int
 #if PROTOTYPES
-CallUp(CONSFILE * pcf, char *pcMaster, char *pcMach, char *pcHow,
-       char *pcUser)
+CallUp(CONSFILE *pcf, char *pcMaster, char *pcMach, char *pcHow,
+       char *result)
 #else
-CallUp(pcf, pcMaster, pcMach, pcHow, pcUser)
+CallUp(pcf, pcMaster, pcMach, pcHow, result)
     CONSFILE *pcf;
-    char *pcMaster, *pcMach, *pcHow, *pcUser;
+    char *pcMaster, *pcMach, *pcHow, *result;
 #endif
 {
     int nc;
@@ -957,12 +696,11 @@ CallUp(pcf, pcMaster, pcMach, pcHow, pcUser)
     int justProcessedUrg = 0;
 
     if (fVerbose) {
-	Msg("%s to %s (%son %s)", pcHow, pcMach, fRaw ? "raw " : "",
-	    pcMaster);
+	Msg("%s to %s (on %s)", pcHow, pcMach, pcMaster);
     }
 #if !defined(__CYGWIN__)
 # if defined(F_SETOWN)
-    if (-1 == fcntl(FileFDNum(pcf), F_SETOWN, getpid())) {
+    if (fcntl(FileFDNum(pcf), F_SETOWN, getpid()) == -1) {
 	Error("fcntl(F_SETOWN,%d): %d: %s", getpid(), FileFDNum(pcf),
 	      strerror(errno));
     }
@@ -973,7 +711,7 @@ CallUp(pcf, pcMaster, pcMach, pcHow, pcUser)
 	/* on the HP-UX systems if different
 	 */
 	iTemp = -getpid();
-	if (-1 == ioctl(FileFDNum(pcf), SIOCSPGRP, &iTemp)) {
+	if (ioctl(FileFDNum(pcf), SIOCSPGRP, &iTemp) == -1) {
 	    Error("ioctl(%d,SIOCSPGRP): %s", FileFDNum(pcf),
 		  strerror(errno));
 	}
@@ -985,6 +723,49 @@ CallUp(pcf, pcMaster, pcMach, pcHow, pcUser)
     SimpleSignal(SIGURG, OOB);
 #endif
 
+    /* if we are going for a particular console
+     * send sign-on stuff, then wait for some indication of what mode
+     * we got from the server (if we are the only people on we get write
+     * access by default, which is fine for most people).
+     */
+
+    /* how did we do, did we get a read-only or read-write?
+     */
+    if (0 == strcmp(result, "[attached]\r\n")) {
+	/* OK -- we are good as gold */
+	fIn = 'a';
+    } else if (0 == strcmp(result, "[spy]\r\n") ||
+	       0 == strcmp(result, "[ok]\r\n")) {
+	/* Humph, someone else is on
+	 * or we have an old version of the server (4.X)
+	 */
+	fIn = 's';
+    } else if (0 == strcmp(result, "[host is read-only]\r\n")) {
+	fIn = 'r';
+    } else if (0 == strcmp(result, "[line to host is down]\r\n")) {
+	/* ouch, the machine is down on the server */
+	fIn = '-';
+	Error("%s is down", pcMach);
+	if (fVerbose) {
+	    printf("[use `");
+	    PutCtlc(chAttn, stdout);
+	    PutCtlc(chEsc, stdout);
+	    printf("o\' to open console line]\n");
+	}
+    } else if (0 == strcmp(result, "[no -- on ctl]\r\n")) {
+	fIn = '-';
+	Error("%s is a control port", pcMach);
+	if (fVerbose) {
+	    printf("[use `");
+	    PutCtlc(chAttn, stdout);
+	    PutCtlc(chEsc, stdout);
+	    printf(";\' to open a console line]\n");
+	}
+    } else {
+	FilePrint(cfstdout, "%s: %s", pcMach, result);
+	exit(EX_UNAVAILABLE);
+    }
+
     /* change escape sequence (if set on the command line)
      * and replay the log for the user, if asked
      */
@@ -992,123 +773,16 @@ CallUp(pcf, pcMaster, pcMach, pcHow, pcUser)
 	chAttn = DEFATTN;
 	chEsc = DEFESC;
     } else {
+	char *r;
 	/* tell the conserver to change escape sequences, assume OK
 	 * (we'll find out soon enough)
 	 */
 	sprintf(acMesg, "%c%ce%c%c", DEFATTN, DEFESC, chAttn, chEsc);
-	SendOut(pcf, acMesg, 5);
-	if (0 == ReadReply(pcf, acMesg, sizeof(acMesg), (char *)0)) {
+	FileWrite(pcf, acMesg, 5);
+	/* -bryan */
+	r = ReadReply(pcf, 0);
+	if (strncmp(r, "[redef:", 7) != 0) {
 	    Error("protocol botch on redef of escape sequence");
-	    exit(EX_UNAVAILABLE);
-	}
-    }
-    if (fVerbose) {
-	printf("Enter `");
-	PutCtlc(chAttn, stdout);
-	PutCtlc(chEsc, stdout);
-	printf("?\' for help.\n");
-    }
-
-
-    /* if we are going for a particular console
-     * send sign-on stuff, then wait for some indication of what mode
-     * we got from the server (if we are the only people on we get write
-     * access by default, which is fine for most people).
-     */
-    if (!fRaw) {
-#if HAVE_OPENSSL
-	sprintf(acMesg, "%c%c*", chAttn, chEsc);
-	SendOut(pcf, acMesg, 3);
-	if (0 == ReadReply(pcf, acMesg, sizeof(acMesg), "[ssl:\r\n")) {
-	    AttemptSSL(pcf);
-	}
-	if (fReqEncryption && FileGetType(pcf) != SSLSocket) {
-	    Error("Encryption not supported by server");
-	    exit(EX_UNAVAILABLE);
-	}
-#endif
-	/* begin connect with who we are
-	 */
-	sprintf(acMesg, "%c%c;", chAttn, chEsc);
-	SendOut(pcf, acMesg, 3);
-	if (0 != ReadReply(pcf, acMesg, sizeof(acMesg), "[login:\r\n") &&
-	    0 != strcmp(acMesg, "\r\n[login:\r\n")) {
-	    int s = strlen(acMesg);
-	    if (0 != strcmp(acMesg, "[Encryption required\r\n")) {
-		if ((s > 0) && ('\n' == acMesg[s - 1]))
-		    acMesg[s - 1] = '\000';
-		Error("call: %s", acMesg);
-	    } else {
-		Error("Encryption required by server for login");
-	    }
-	    exit(EX_UNAVAILABLE);
-	}
-
-	sprintf(acMesg, "%s\r\n", pcUser);
-	SendOut(pcf, acMesg, strlen(acMesg));
-	if (0 != ReadReply(pcf, acMesg, sizeof(acMesg), "host:\r\n")) {
-	    int s = strlen(acMesg);
-	    if ((s > 0) && ('\n' == acMesg[s - 1]))
-		acMesg[s - 1] = '\000';
-	    Error("%s", acMesg);
-	    exit(EX_UNAVAILABLE);
-	}
-
-	/* which host we want, and a passwd if asked for one
-	 */
-	sprintf(acMesg, "%s\r\n", pcMach);
-	SendOut(pcf, acMesg, strlen(acMesg));
-	ReadReply(pcf, acMesg, sizeof(acMesg), (char *)0);
-	if (0 == strcmp(acMesg, "passwd:")) {
-	    static STRING *tmpString = (STRING *) 0;
-	    if (tmpString == (STRING *) 0)
-		tmpString = AllocString();
-	    BuildString((char *)0, tmpString);
-	    sprintf(acMesg, "Enter %s@%s's password:", pcUser, pcMaster);
-#if defined(HAVE_GETPASSPHRASE)
-	    BuildString(getpassphrase(acMesg), tmpString);
-#else
-	    BuildString(getpass(acMesg), tmpString);
-#endif
-	    BuildString("\r\n", tmpString);
-	    SendOut(pcf, tmpString->string, strlen(tmpString->string));
-	    ReadReply(pcf, acMesg, sizeof(acMesg), (char *)0);
-	}
-
-	/* how did we do, did we get a read-only or read-write?
-	 */
-	if (0 == strcmp(acMesg, "attached]")) {
-	    /* OK -- we are good as gold */
-	    fIn = 'a';
-	} else if (0 == strcmp(acMesg, "spy]") ||
-		   0 == strcmp(acMesg, "ok]")) {
-	    /* Humph, someone else is on
-	     * or we have an old version of the server (4.X)
-	     */
-	    fIn = 's';
-	} else if (0 == strcmp(acMesg, "host is read-only]")) {
-	    fIn = 'r';
-	} else if (0 == strcmp(acMesg, "line to host is down]")) {
-	    /* ouch, the machine is down on the server */
-	    fIn = '-';
-	    Error("%s is down", pcMach);
-	    if (fVerbose) {
-		printf("[use `");
-		PutCtlc(chAttn, stdout);
-		PutCtlc(chEsc, stdout);
-		printf("o\' to open console line]\n");
-	    }
-	} else if (0 == strcmp(acMesg, "no -- on ctl]")) {
-	    fIn = '-';
-	    Error("%s is a control port", pcMach);
-	    if (fVerbose) {
-		printf("[use `");
-		PutCtlc(chAttn, stdout);
-		PutCtlc(chEsc, stdout);
-		printf(";\' to open a console line]\n");
-	    }
-	} else {
-	    Error("%s: %s", pcMach, acMesg);
 	    exit(EX_UNAVAILABLE);
 	}
     }
@@ -1121,21 +795,21 @@ CallUp(pcf, pcMaster, pcMach, pcHow, pcUser)
     /* if the host is not down, finish the connection, and force
      * the correct attachment for the user
      */
-    if ('-' != fIn) {
+    if (fIn != '-') {
 	if (fIn == 'r') {
-	    if ('s' != *pcHow) {
+	    if (*pcHow != 's') {
 		Error("%s is read-only", pcMach);
 	    }
-	} else if (fIn != ('f' == *pcHow ? 'a' : *pcHow)) {
+	} else if (fIn != (*pcHow == 'f' ? 'a' : *pcHow)) {
 	    sprintf(acMesg, "%c%c%c", chAttn, chEsc, *pcHow);
-	    SendOut(pcf, acMesg, 3);
+	    FileWrite(pcf, acMesg, 3);
 	}
 	if (fReplay) {
 	    sprintf(acMesg, "%c%cr", chAttn, chEsc);
-	    SendOut(pcf, acMesg, 3);
+	    FileWrite(pcf, acMesg, 3);
 	} else if (fVerbose) {
 	    sprintf(acMesg, "%c%c\022", chAttn, chEsc);
-	    SendOut(pcf, acMesg, 3);
+	    FileWrite(pcf, acMesg, 3);
 	}
     }
     fflush(stdout);
@@ -1151,6 +825,8 @@ CallUp(pcf, pcMaster, pcMach, pcHow, pcUser)
     FD_ZERO(&rinit);
     FD_SET(FileFDNum(pcf), &rinit);
     FD_SET(0, &rinit);
+    if (maxfd < FileFDNum(pcf) + 1)
+	maxfd = FileFDNum(pcf) + 1;
     for (;;) {
 	justProcessedUrg = 0;
 	if (SawUrg) {
@@ -1160,21 +836,22 @@ CallUp(pcf, pcMaster, pcMach, pcHow, pcUser)
 	/* reset read mask and select on it
 	 */
 	rmask = rinit;
-	while (-1 ==
-	       select(sizeof(rmask) * 8, &rmask, (fd_set *) 0,
-		      (fd_set *) 0, (struct timeval *)0)) {
-	    rmask = rinit;
-	    if (SawUrg) {
-		ProcessUrgentData(FileFDNum(pcf));
-		justProcessedUrg = 1;
+	if (-1 ==
+	    select(maxfd, &rmask, (fd_set *)0, (fd_set *)0,
+		   (struct timeval *)0)) {
+	    if (errno != EINTR) {
+		Error("Master(): select(): %s", strerror(errno));
+		break;
 	    }
+	    continue;
 	}
 
 	/* anything from socket? */
 	if (FD_ISSET(FileFDNum(pcf), &rmask)) {
-	    if ((nc = FileRead(pcf, acMesg, sizeof(acMesg))) == 0) {
+	    if ((nc = FileRead(pcf, acMesg, sizeof(acMesg))) < 0) {
+		/* if we got an error/eof after returning from suspend */
 		if (justProcessedUrg) {
-		    printf("\n");
+		    fprintf(stderr, "\n");
 		    Error("lost connection");
 		}
 		break;
@@ -1183,18 +860,24 @@ CallUp(pcf, pcMaster, pcMach, pcHow, pcUser)
 		for (i = 0; i < nc; ++i)
 		    acMesg[i] &= 127;
 	    }
-	    SendOut(cfstdout, acMesg, nc);
+	    FileWrite(cfstdout, acMesg, nc);
 	}
 
 	/* anything from stdin? */
 	if (FD_ISSET(0, &rmask)) {
-	    if ((nc = read(0, acMesg, sizeof(acMesg))) == 0)
-		break;
+	    if ((nc = read(0, acMesg, sizeof(acMesg))) == 0) {
+		if (screwy)
+		    break;
+		else {
+		    FD_SET(0, &rinit);
+		    continue;
+		}
+	    }
 	    if (fStrip) {
 		for (i = 0; i < nc; ++i)
 		    acMesg[i] &= 127;
 	    }
-	    SendOut(pcf, acMesg, nc);
+	    FileWrite(pcf, acMesg, nc);
 	}
     }
     C2Cooked();
@@ -1203,269 +886,229 @@ CallUp(pcf, pcMaster, pcMach, pcHow, pcUser)
     return 0;
 }
 
-
-/* the group leader tells is the server to connect to			(ksb)
- * we use CallUp to start a session with each target, or forward it
+/* shouldn't need more than 3 levels of commands (but alloc 4 just 'cause)
+ * worst case so far: master, groups, broadcast
+ *   (cmdarg == broadcast msg)
  */
-static int
+char *cmds[4] = { (char *)0, (char *)0, (char *)0, (char *)0 };
+char *cmdarg = (char *)0;
+
+/* call a machine master for group master ports and machine master ports
+ * take a list like "1782@localhost:@mentor.cc.purdue.edu:@pop.stat.purdue.edu"
+ * and send the given command to the group leader at 1782
+ * and ask the machine master at mentor for more group leaders
+ * and ask the machine master at pop.stat for more group leaders
+ */
+int
 #if PROTOTYPES
-Indir(CONSFILE * pcf, char *pcMaster, char *pcMach, char *pcCmd,
-      char *pcWho)
+DoCmds(char *master, char *ports, int cmdi)
 #else
-Indir(pcf, pcMaster, pcMach, pcCmd, pcWho)
-    CONSFILE *pcf;
-    char *pcMaster, *pcMach, *pcCmd, *pcWho;
+DoCmds(master, ports, cmdi)
+    char *master;
+    char *ports;
+    int cmdi;
 #endif
 {
-    char acPorts[4097];
-
-    /* send request for master list
-     */
-    sprintf(acPorts, "call:%s\r\n", pcMach);
-    SendOut(pcf, acPorts, strlen(acPorts));
-
-    /* get the ports number */
-    if (0 >= ReadReply(pcf, acPorts, sizeof(acPorts), (char *)0)) {
-	Error("master forward broken");
-	exit(EX_UNAVAILABLE);
-    }
-
-    if ('@' == acPorts[0]) {
-	static int iLimit = 0;
-	if (iLimit++ > 10) {
-	    Error("forwarding level too deep!");
-	    return 1;
-	}
-	return Gather(Indir, acPorts, pcMaster, pcMach, pcCmd, pcWho);
-    }
-    /* to the command to each master
-     */
-    return Gather(CallUp, acPorts, pcMaster, pcMach, pcCmd, pcWho);
-}
-
-#define BUF_G1		1024
-#define BUF_MIN		80
-#define BUF_CHUNK	(2*132)
-
-/* Cmd is implemented separately from above because of the need buffer	(ksb)
- * the ports' output.  It's about the same as what's above otherwise.
- * We trick lint because we have to be call compatible (prototype'd)
- * the same as all the other Gather functions.
- */
-static int
-#if PROTOTYPES
-Cmd(CONSFILE * pcf, char *pcMaster, char *pcMach, char *pcCmd, char *pcWho)
-#else
-Cmd(pcf, pcMaster, pcMach, pcCmd, pcWho)
     CONSFILE *pcf;
-    char *pcMaster, *pcMach, *pcCmd, *pcWho;
-#endif
-{
-    static int iMax = 0;
-    static char *pcBuf = (char *)0;
-    int nr, iRem, i, fBrace;
+    char *t;
+    char *next;
+    char *server;
+    unsigned short port;
+    char *result = (char *)0;
+    int len;
 
-    /* setup the big buffer for the server output
-     */
-    if ((char *)0 == pcBuf) {
-	iMax = BUF_G1;
-	if ((char *)0 == (pcBuf = calloc(BUF_G1, sizeof(char)))) {
-	    OutOfMem();
+    len = strlen(ports);
+    while (len > 0 && (ports[len - 1] == '\r' || ports[len - 1] == '\n'))
+	len--;
+    ports[len] = '\000';
+
+    for ( /* param */ ; *ports != '\000'; ports = next) {
+	if ((next = strchr(ports, ':')) == (char *)0)
+	    next = "";
+	else
+	    *next++ = '\000';
+
+	if ((server = strchr(ports, '@')) != (char *)0) {
+	    *server++ = '\000';
+	    if (*server == '\000')
+		server = master;
+	} else
+	    server = master;
+
+	if (*ports == '\000') {
+	    port = htons(bindPort);
+	} else if (!isdigit((int)(ports[0]))) {
+	    Error("invalid port spec for %s: `%s'", server, ports);
+	    continue;
+	} else {
+	    port = htons((short)atoi(ports));
 	}
-    }
 
-    /* send sign-on stuff, then wait for a reply, like "ok\r\n"
-     * before allowing a write
-     */
-    if (*pcCmd == 'b') {
-	sprintf(acMesg, "%c%c%c%s:%s\r%c%c.", DEFATTN, DEFESC, *pcCmd,
-		pcWho, pcMach, DEFATTN, DEFESC);
-	SendOut(pcf, acMesg, strlen(acMesg));
-    } else {
-	sprintf(acMesg, "%c%c%c%c%c.", DEFATTN, DEFESC, *pcCmd, DEFATTN,
-		DEFESC);
-	SendOut(pcf, acMesg, 6);
-    }
+      attemptLogin:
+	if ((pcf = GetPort(server, port)) == (CONSFILE *)0)
+	    continue;
 
-    /* read the server's reply,
-     * We buffer until we close the connection because it
-     * wouldn't be fair to ask the server to keep up with
-     * itself :-)  {if we are inside a console connection}.
-     */
-    iRem = iMax;
-    i = 0;
-    while (0 < (nr = FileRead(pcf, pcBuf + i, iRem))) {
-	i += nr;
-	iRem -= nr;
-	if (iRem >= BUF_MIN) {
+	t = ReadReply(pcf, 0);
+	if (strcmp(t, "ok\r\n") != 0) {
+	    FileClose(&pcf);
+	    FilePrint(cfstdout, "%s: %s", server, t);
 	    continue;
 	}
-	iMax += BUF_CHUNK;
-	if ((char *)0 == (pcBuf = realloc(pcBuf, iMax))) {
-	    OutOfMem();
+#if HAVE_OPENSSL
+	FileWrite(pcf, "ssl\r\n", 5);
+	t = ReadReply(pcf, 0);
+	if (strcmp(t, "ok\r\n") == 0) {
+	    AttemptSSL(pcf);
 	}
-	iRem += BUF_CHUNK;
-    }
-    /* edit out the command lines [...]
-     */
-    iRem = fBrace = 0;
-    for (nr = 0; nr < i; ++nr) {
-	if (0 != fBrace) {
-	    if (']' == pcBuf[nr]) {
-		fBrace = 0;
+	if (fReqEncryption && FileGetType(pcf) != SSLSocket) {
+	    Error("Encryption not supported by server `%s'", server);
+	    FileClose(&pcf);
+	    continue;
+	}
+#endif
+
+	BuildTmpString((char *)0);
+	BuildTmpString("login ");
+	BuildTmpString(pcUser);
+	t = BuildTmpString("\r\n");
+	FileWrite(pcf, t, -1);
+
+	t = ReadReply(pcf, 0);
+	if (strcmp(t, "passwd?\r\n") == 0) {
+	    static int count = 0;
+	    static STRING *tmpString = (STRING *)0;
+	    if (tmpString == (STRING *)0)
+		tmpString = AllocString();
+	    if (tmpString->used <= 1) {
+		char *pass;
+		sprintf(acMesg, "Enter %s@%s's password: ", pcUser,
+			master);
+		pass = GetPassword(acMesg);
+		if (pass == (char *)0) {
+		    Error("could not get password from tty for `%s'",
+			  server);
+		    FileClose(&pcf);
+		    continue;
+		}
+		BuildString(pass, tmpString);
+		BuildString("\r\n", tmpString);
 	    }
-	    continue;
-	}
-	switch (pcBuf[nr]) {
-	    case '\r':
-		if (0 == iRem)
-		    continue;
-		break;
-	    case '\n':
-		if (0 == iRem)
-		    continue;
-		putchar('\n');
-		iRem = 0;
+	    FileWrite(pcf, tmpString->string, tmpString->used - 1);
+	    t = ReadReply(pcf, 0);
+	    if (strcmp(t, "ok\r\n") != 0) {
+		FilePrint(cfstdout, "%s: %s", server, t);
+		if (++count < 3) {
+		    BuildString((char *)0, tmpString);
+		    goto attemptLogin;
+		}
+		Error("too many bad passwords for `%s'", server);
+		count = 0;
+		FileClose(&pcf);
 		continue;
-	    case '[':
-		fBrace = 1;
-		continue;
+	    } else
+		count = 0;
 	}
-	putchar(pcBuf[nr]);
-	iRem = 1;
+
+	/* now that we're logged in, we can do something */
+	/* if we're on the last cmd or the command is 'call' and we
+	 * have an arg (always true if it's 'call'), then send the arg
+	 */
+	if ((cmdi == 0 || cmds[cmdi][0] == 'c') && cmdarg != (char *)0)
+	    FilePrint(pcf, "%s %s\r\n", cmds[cmdi], cmdarg);
+	else
+	    FilePrint(pcf, "%s\r\n", cmds[cmdi]);
+
+	/* if we haven't gone down the stack, do "normal" stuff.
+	 * if we did hit the bottom, we send the exit\r\n now so
+	 * that the ReadReply can stop once the socket closes.
+	 */
+	if (cmdi != 0) {
+	    t = ReadReply(pcf, 0);
+	    /* save the result */
+	    if ((result = strdup(t)) == (char *)0)
+		OutOfMem();
+	}
+
+	/* if we're working on finding a console */
+	if (cmds[cmdi][0] == 'c') {
+	    /* did we get a redirect? */
+	    if (result[0] == '@' || (result[0] >= '0' && result[0] <= '9')) {
+		static int limit = 0;
+		if (limit++ > 10) {
+		    Error("forwarding level too deep!");
+		    exit(EX_SOFTWARE);
+		}
+	    } else if (result[0] != '[') {	/* did we not get a connection? */
+		FilePrint(cfstdout, "%s: %s", server, result);
+		FileClose(&pcf);
+		continue;
+	    } else {
+		/* right now, we can only connect to one console, so it's ok
+		 * to clear the password.  if we were allowed to connect to
+		 * multiple consoles (somehow), either in parallel or serial,
+		 * we wouldn't want to do this here */
+		ClearPassword();
+		CallUp(pcf, server, cmdarg, cmds[0], result);
+		return 0;
+	    }
+	} else if (cmds[cmdi][0] == 'q') {
+	    t = ReadReply(pcf, 0);
+	    FileWrite(cfstdout, t, -1);
+	    if (t[0] != 'o' || t[1] != 'k') {
+		FileWrite(pcf, "exit\r\n", 6);
+		t = ReadReply(pcf, 1);
+	    }
+	} else {
+	    /* all done */
+	    FileWrite(pcf, "exit\r\n", 6);
+	    t = ReadReply(pcf, cmdi == 0 ? 1 : 0);
+
+	    if (cmdi == 0) {
+		int len;
+		/* if we hit bottom, this is where we get our results */
+		if ((result = strdup(t)) == (char *)0)
+		    OutOfMem();
+		len = strlen(result);
+		if (len > 8 &&
+		    strcmp("goodbye\r\n", result + len - 9) == 0) {
+		    len -= 9;
+		    *(result + len) = '\000';
+		}
+		/* if (not 'broadcast' and not 'textmsg') or 
+		 *   result doesn't start with 'ok' (only checks this if
+		 *      it's a 'broadcast' or 'textmsg')
+		 */
+		if (cmds[0][0] == 'd') {
+		    if (result[0] != 'o' || result[1] != 'k') {
+			FileWrite(cfstdout, server, -1);
+			FileWrite(cfstdout, ": ", 2);
+			FileWrite(cfstdout, result, len);
+		    } else {
+			disconnectCount += atoi(result + 19);
+		    }
+		} else if ((cmds[0][0] != 'b' && cmds[0][0] != 't') ||
+			   (result[0] != 'o' || result[1] != 'k')) {
+		    /* did a 'master' before this or doing a 'disconnect' */
+		    if (cmds[1][0] == 'm' || cmds[0][0] == 'd') {
+			FileWrite(cfstdout, server, -1);
+			FileWrite(cfstdout, ": ", 2);
+		    }
+		    FileWrite(cfstdout, result, len);
+		}
+	    }
+	}
+
+	FileClose(&pcf);
+
+	/* this would only be true if we got extra redirects (@... above) */
+	if (cmds[cmdi][0] == 'c')
+	    DoCmds(server, result, cmdi);
+	else if (cmdi > 0)
+	    DoCmds(server, result, cmdi - 1);
+	free(result);
     }
-    /* SendOut(1, pcBuf, i); */
-    fflush(stdout);
 
     return 0;
-}
-
-/* the masters tell us the group masters with a "groups" command	(ksb)
- */
-static int
-#if PROTOTYPES
-CmdGroup(CONSFILE * pcf, char *pcMaster, char *pcMach, char *pcCmd,
-	 char *pcWho)
-#else
-CmdGroup(pcf, pcMaster, pcMach, pcCmd, pcWho)
-    CONSFILE *pcf;
-    char *pcMaster, *pcMach, *pcCmd, *pcWho;
-#endif
-{
-    char acPorts[4097];
-
-    /* send request for master list
-     */
-    sprintf(acPorts, "groups\r\n");
-    SendOut(pcf, acPorts, strlen(acPorts));
-
-    /* get the ports number */
-    if (0 >= ReadReply(pcf, acPorts, sizeof(acPorts), (char *)0)) {
-	Error("master forward broken");
-	exit(EX_UNAVAILABLE);
-    }
-    if (fVerbose) {
-	printf("%s:\r\n", pcMaster);
-    }
-    /* to the command to each master
-     */
-    return Gather(Cmd, acPorts, pcMaster, pcMach, pcCmd, pcWho);
-}
-
-
-/* the master tells us the machine masters with a "master" command	(ksb)
- * we ask each of those for the group members
- */
-static int
-#if PROTOTYPES
-CmdMaster(CONSFILE * pcf, char *pcMaster, char *pcMach, char *pcCmd,
-	  char *pcWho)
-#else
-CmdMaster(pcf, pcMaster, pcMach, pcCmd, pcWho)
-    CONSFILE *pcf;
-    char *pcMaster, *pcMach, *pcCmd, *pcWho;
-#endif
-{
-    char acPorts[4097];
-
-    /* send request for master list
-     */
-    SendOut(pcf, "master\r\n", 8);
-
-    /* get the ports number */
-    if (0 >= ReadReply(pcf, acPorts, sizeof(acPorts), (char *)0)) {
-	Error("master forward broken");
-	exit(EX_UNAVAILABLE);
-    }
-    /* to the command to each master
-     */
-    return Gather(CmdGroup, acPorts, pcMaster, pcMach, pcCmd, pcWho);
-}
-
-
-/* The masters tell us the group masters with a "groups" command.	(ksb)
- * We trick lint because we have to be call compatible (prototype'd)
- * the same as all the other Gather functions.
- */
-static int
-#if PROTOTYPES
-Ctl(CONSFILE * pcf, char *pcMaster, char *pcMach, char *pcCmd, char *pcWho)
-#else
-Ctl(pcf, pcMaster, pcMach, pcCmd, pcWho)
-    CONSFILE *pcf;
-    char *pcMaster, *pcMach, *pcCmd, *pcWho;
-#endif
-{
-    char acPorts[4097];
-
-    /* send request for master list
-     */
-    sprintf(acPorts, "%s:%s\r\n", pcCmd, pcMach);
-    SendOut(pcf, acPorts, strlen(acPorts));
-
-    /* get the ports number */
-    if (0 >= ReadReply(pcf, acPorts, sizeof(acPorts), (char *)0)) {
-	Error("group leader died?");
-	return 1;
-    }
-    if (fVerbose) {
-	printf("%s:\r\n", pcMaster);
-    }
-    printf("%s: %s\r\n", pcMaster, acPorts);
-
-    /* to the command to each master
-     */
-    return 0;
-}
-
-
-/* the master tells us the machine masters with a "master" command	(ksb)
- * we tell each of those the command we want them to do
- */
-static int
-#if PROTOTYPES
-CtlMaster(CONSFILE * pcf, char *pcMaster, char *pcMach, char *pcCmd,
-	  char *pcWho)
-#else
-CtlMaster(pcf, pcMaster, pcMach, pcCmd, pcWho)
-    CONSFILE *pcf;
-    char *pcMaster, *pcMach, *pcCmd, *pcWho;
-#endif
-{
-    char acPorts[4097];
-
-    /* send request for master list
-     */
-    SendOut(pcf, "master\r\n", 8);
-
-    /* get the ports number */
-    if (0 >= ReadReply(pcf, acPorts, sizeof(acPorts), (char *)0)) {
-	Error("master forward broken");
-	exit(EX_UNAVAILABLE);
-    }
-    /* to the command to each master
-     */
-    return Gather(Ctl, acPorts, pcMaster, pcMach, pcCmd, pcWho);
 }
 
 
@@ -1485,26 +1128,25 @@ main(argc, argv)
     char **argv;
 #endif
 {
-    char *pcCmd, *pcTo;
+    char *pcCmd;
     struct passwd *pwdMe = (struct passwd *)0;
     int opt;
     int fLocal;
-    static STRING *acPorts = (STRING *) 0;
-    char *pcUser = (char *)0;
-    char *pcMsg = (char *)0;
-    int (*pfiCall) ();
-    static char acOpts[] = "7aAb:B:c:De:EfFGhiIl:M:p:PqQrRsSuvVwWx";
+    static STRING *acPorts = (STRING *)0;
+    static char acOpts[] = "7aAb:B:c:d:De:EfFhiIl:M:p:PqQrRsSt:uvVwWx";
     extern int optind;
     extern int optopt;
     extern char *optarg;
     int i;
-    STRING *tmpString = (STRING *) 0;
+    STRING *textMsg = (STRING *)0;
+    int cmdi;
+    int retval;
 
     isMultiProc = 0;		/* make sure stuff DOESN'T have the pid */
 
-    if (tmpString == (STRING *) 0)
-	tmpString = AllocString();
-    if (acPorts == (STRING *) 0)
+    if (textMsg == (STRING *)0)
+	textMsg = AllocString();
+    if (acPorts == (STRING *)0)
 	acPorts = AllocString();
 
     if ((char *)0 == (progname = strrchr(argv[0], '/'))) {
@@ -1517,7 +1159,7 @@ main(argc, argv)
      */
     pcCmd = (char *)0;
     fLocal = 0;
-    while (EOF != (opt = getopt(argc, argv, acOpts))) {
+    while ((opt = getopt(argc, argv, acOpts)) != EOF) {
 	switch (opt) {
 	    case '7':		/* strip high-bit */
 		fStrip = 1;
@@ -1531,11 +1173,11 @@ main(argc, argv)
 		break;
 
 	    case 'B':		/* broadcast message */
-		fReplay = 1;
+		fLocal = 1;
 		/* fall through */
 	    case 'b':
 		pcCmd = "broadcast";
-		pcMsg = optarg;
+		cmdarg = optarg;
 		break;
 
 	    case 'c':
@@ -1546,6 +1188,11 @@ main(argc, argv)
 
 	    case 'D':
 		fDebug++;
+		break;
+
+	    case 'd':
+		pcCmd = "disconnect";
+		cmdarg = optarg;
 		break;
 
 	    case 'E':
@@ -1563,13 +1210,6 @@ main(argc, argv)
 		/* fall through */
 	    case 'f':		/* force attach */
 		pcCmd = "force";
-		break;
-
-	    case 'G':
-		fRaw = 1;
-		if ((char *)0 == pcCmd) {
-		    pcCmd = "spy";
-		}
 		break;
 
 	    case 'I':
@@ -1616,19 +1256,34 @@ main(argc, argv)
 		pcCmd = "spy";
 		break;
 
+	    case 't':
+		BuildString((char *)0, textMsg);
+		if (optarg == (char *)0 || *optarg == '\000') {
+		    Error("no destination specified for -t", optarg);
+		    exit(EX_UNAVAILABLE);
+		} else if (strchr(optarg, ' ') != (char *)0) {
+		    Error("-t option cannot contain a space: `%s'",
+			  optarg);
+		    exit(EX_UNAVAILABLE);
+		}
+		BuildString("textmsg ", textMsg);
+		BuildString(optarg, textMsg);
+		pcCmd = textMsg->string;
+		break;
+
 	    case 'u':
-		pcCmd = "users";
+		pcCmd = "hosts";
 		break;
 
 	    case 'W':
 		fLocal = 1;
 		/*fallthrough */
 	    case 'w':		/* who */
-		pcCmd = "groups";
+		pcCmd = "group";
 		break;
 
 	    case 'x':
-		pcCmd = "xamine";
+		pcCmd = "examine";
 		break;
 
 	    case 'v':
@@ -1658,10 +1313,33 @@ main(argc, argv)
 	exit(EX_OK);
     }
 
-    if (pcPort == NULL) {
-	Error("Severe error: pcPort is NULL????  How can that be?");
+    /* finish resolving the command to do */
+    if (pcCmd == (char *)0) {
+	pcCmd = "attach";
+    }
+
+    if (*pcCmd == 'a' || *pcCmd == 'f' || *pcCmd == 's') {
+	if (optind >= argc) {
+	    Error("missing console name");
+	    exit(EX_UNAVAILABLE);
+	}
+	cmdarg = argv[optind++];
+    } else if (*pcCmd == 't') {
+	if (optind >= argc) {
+	    Error("missing message text");
+	    exit(EX_UNAVAILABLE);
+	}
+	cmdarg = argv[optind++];
+    }
+
+    if (optind < argc) {
+	Error("extra garbage on command line? (%s...)", argv[optind]);
 	exit(EX_UNAVAILABLE);
     }
+
+    /* if we somehow lost the port (or got an empty string), reset */
+    if (pcPort == (char *)0 || pcPort[0] == '\000')
+	pcPort = DEFPORT;
 
     /* Look for non-numeric characters */
     for (i = 0; pcPort[i] != '\000'; i++)
@@ -1674,7 +1352,7 @@ main(argc, argv)
     } else {
 	/* non-numeric only */
 	struct servent *pSE;
-	if ((struct servent *)0 == (pSE = getservbyname(pcPort, "tcp"))) {
+	if ((pSE = getservbyname(pcPort, "tcp")) == (struct servent *)0) {
 	    Error("getservbyname(%s): %s", pcPort, strerror(errno));
 	    exit(EX_UNAVAILABLE);
 	} else {
@@ -1702,28 +1380,8 @@ main(argc, argv)
 	}
     }
 
-    /* finish resolving the command to do, call Gather
-     */
-    if ((char *)0 == pcCmd) {
-	pcCmd = "attach";
-    }
 
-    if ('a' == *pcCmd || 'f' == *pcCmd || 's' == *pcCmd) {
-	if (optind >= argc) {
-	    Error("missing console name");
-	    exit(EX_UNAVAILABLE);
-	}
-	pcTo = argv[optind++];
-    } else if ('b' == *pcCmd) {
-	pcTo = pcMsg;
-    } else {
-	pcTo = "*";
-    }
-
-    if (optind < argc) {
-	Error("extra garbage on command line? (%s...)", argv[optind]);
-	exit(EX_UNAVAILABLE);
-    }
+    SimpleSignal(SIGPIPE, SIG_IGN);
 
     cfstdout = FileOpenFD(1, simpleFile);
 
@@ -1735,30 +1393,26 @@ main(argc, argv)
     SetupSSL();			/* should only do if we want ssl - provide flag! */
 #endif
 
-    if ('q' == *pcCmd) {
-	BuildString((char *)0, tmpString);
-#if defined(HAVE_GETPASSPHRASE)
-	BuildString(getpassphrase("Enter root password:"), tmpString);
-#else
-	BuildString(getpass("Enter root password:"), tmpString);
-#endif
-	pfiCall = fLocal ? Ctl : CtlMaster;
-	if (tmpString->string == (char *)0)
-	    pcTo = "";
-	else
-	    pcTo = tmpString->string;
-    } else if ('v' == *pcCmd) {
-	pfiCall = fLocal ? Ctl : CtlMaster;
-    } else if ('p' == *pcCmd) {
-	pfiCall = CtlMaster;
-    } else if ('a' == *pcCmd || 'f' == *pcCmd || 's' == *pcCmd) {
+    /* stack up the commands for DoCmds() */
+    cmdi = -1;
+    cmds[++cmdi] = pcCmd;
+
+    if (*pcCmd == 'q' || *pcCmd == 'v' || *pcCmd == 'p') {
+	if (!fLocal)
+	    cmds[++cmdi] = "master";
+    } else if (*pcCmd == 'a' || *pcCmd == 'f' || *pcCmd == 's') {
 	ValidateEsc();
-	pfiCall = Indir;
-    } else if ('g' == *pcCmd || 'i' == *pcCmd || 'b' == *pcCmd) {
-	pfiCall = fLocal ? CmdGroup : CmdMaster;
+	cmds[++cmdi] = "call";
     } else {
-	pfiCall = CmdMaster;
+	cmds[++cmdi] = "groups";
+	if (!fLocal)
+	    cmds[++cmdi] = "master";
     }
-    exit(Gather
-	 (pfiCall, acPorts->string, pcInMaster, pcTo, pcCmd, pcUser));
+
+    retval = DoCmds(pcInMaster, acPorts->string, cmdi);
+
+    if (*pcCmd == 'd')
+	FilePrint(cfstdout, "Disconnected %d users\n", disconnectCount);
+
+    exit(retval);
 }

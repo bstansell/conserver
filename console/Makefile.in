@@ -25,7 +25,7 @@ LIBS	= @LIBS@
 
 ### Makefile rules - no user-servicable parts below
 
-CONSOLE_OBJS = console.o ../conserver/util.o
+CONSOLE_OBJS = console.o getpassword.o ../conserver/util.o
 CONSOLE_HDRS = ../config.h $(top_srcdir)/compat.h $(top_srcdir)/conserver/port.h
 ALL = console
 

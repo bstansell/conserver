@@ -1,8 +1,1 @@
-[Enter `^Ec?' for help]
-[halt list]
- 0  `\z'
- 1  `\z'
- 2  `\r~^b'
- 3  `#.reset -x\r'
- 4  `hiya there\r'
-[disconnect]
+127.0.0.1

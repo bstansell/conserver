@@ -1,50 +1,46 @@
 /*
- *  $Id: readcfg.h,v 5.23 2003-03-06 10:13:41-08 bryan Exp $
+ *  $Id: readcfg.h,v 5.31 2003-08-21 15:02:16-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
- *
- *  Copyright GNAC, Inc., 1998
  */
 
-/*
- * Copyright 1992 Purdue Research Foundation, West Lafayette, Indiana
- * 47907.  All rights reserved.
- *
- * Written by Kevin S Braunsdorf, ksb@cc.purdue.edu, purdue!ksb
- *
- * This software is not subject to any license of the American Telephone
- * and Telegraph Company or the Regents of the University of California.
- *
- * Permission is granted to anyone to use this software for any purpose on
- * any computer system, and to alter it and redistribute it freely, subject
- * to the following restrictions:
- *
- * 1. Neither the authors nor Purdue University are responsible for any
- *    consequences of the use of this software.
- *
- * 2. The origin of this software must not be misrepresented, either by
- *    explicit claim or by omission.  Credit to the authors and Purdue
- *    University must appear in documentation and sources.
- *
- * 3. Altered versions must be plainly marked as such, and must not be
- *    misrepresented as being the original software.
- *
- * 4. This notice may not be removed or altered.
- */
+typedef struct config {
+    STRING *name;
+    char defaultaccess;
+    FLAG daemonmode;
+    char *logfile;
+    char *passwdfile;
+    char *primaryport;
+    FLAG redirect;
+    int reinitcheck;
+    char *secondaryport;
+#if HAVE_OPENSSL
+    char *sslcredentials;
+    FLAG sslrequired;
+#endif
+} CONFIG;
 
-/* we read in which hosts to trust and which ones we proxy for
- * from a file, into these structures
- */
+typedef struct breaks {
+    STRING *seq;
+    int delay;
+} BREAKS;
 
-extern GRPENT *pGroups;		/* group info                   */
+extern NAMES *userList;		/* user list */
+extern GRPENT *pGroups;		/* group info */
 extern REMOTE *pRCList;		/* list of remote consoles we know about */
 extern REMOTE *pRCUniq;		/* list of uniq console servers */
-extern ACCESS *pACList;		/* `who do you love' (or trust)         */
-extern STRING *breakList;	/* list of break sequences              */
+extern ACCESS *pACList;		/* `who do you love' (or trust) */
+extern CONSENTUSERS *pADList;	/* list of admin users */
+extern BREAKS breakList[9];	/* list of break sequences */
+extern CONFIG *pConfig;		/* settings seen by config parser */
 
 extern void ReadCfg PARAMS((char *, FILE *));
-extern char *PruneSpace PARAMS((char *));
-extern void ReReadCfg PARAMS((void));
+extern void ReReadCfg PARAMS((int));
 extern void DestroyBreakList PARAMS((void));
+extern void DestroyUserList PARAMS((void));
+extern void DestroyConfig PARAMS((CONFIG *));
+extern NAMES *FindUserList PARAMS((char *));
+extern NAMES *AddUserList PARAMS((char *));
+extern CONSENT *FindConsoleName PARAMS((CONSENT *, char *));

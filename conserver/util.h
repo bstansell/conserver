@@ -1,5 +1,5 @@
 /*
- *  $Id: util.h,v 1.41 2003-03-08 08:39:57-08 bryan Exp $
+ *  $Id: util.h,v 1.52 2003-08-23 11:06:35-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -34,6 +34,24 @@ enum consFileType {
     nothing
 };
 
+typedef enum IOState {
+    ISDISCONNECTED = 0,
+    INCONNECT,
+    ISNORMAL,
+#if HAVE_OPENSSL
+    INSSLACCEPT,
+    INSSLSHUTDOWN,
+#endif
+    ISFLUSHING
+} IOSTATE;
+
+typedef enum flag {
+    FLAGUNKNOWN = 0,
+    FLAGTRUE,
+    FLAGFALSE
+} FLAG;
+
+
 typedef struct dynamicString {
     char *string;
     int used;
@@ -46,18 +64,27 @@ typedef struct consFile {
     /* Standard socket type stuff */
     enum consFileType ftype;
     int fd;
+    STRING *wbuf;
 #if HAVE_OPENSSL
     /* SSL stuff */
     SSL *ssl;
-    int waitonWrite;
-    int waitonRead;
+    FLAG waitForWrite;
+    FLAG waitForRead;
 #endif
     /* Add crypto stuff to suit */
 } CONSFILE;
 
-extern int isMultiProc, fDebug, fVerbose;
+extern int isMultiProc, fDebug, fVerbose, fErrorPrinted;
 extern char *progname;
 extern pid_t thepid;
+#define MAXHOSTNAME 1024
+extern char myHostname[];
+extern struct in_addr *myAddrs;
+extern fd_set rinit;
+extern fd_set winit;
+extern int maxfd;
+extern int debugLineNo;
+extern char *debugFileName;
 
 extern const char *StrTime PARAMS((time_t *));
 extern void Debug PARAMS((int, char *, ...));
@@ -72,9 +99,9 @@ extern CONSFILE *FileOpenFD PARAMS((int, enum consFileType));
 extern CONSFILE *FileOpen PARAMS((const char *, int, int));
 extern int FileClose PARAMS((CONSFILE **));
 extern int FileRead PARAMS((CONSFILE *, void *, int));
-extern int FileWrite PARAMS((CONSFILE *, const char *, int));
-extern void FileVWrite PARAMS((CONSFILE *, const char *, va_list));
-extern void FilePrint PARAMS((CONSFILE *, const char *, ...));
+extern int FileWrite PARAMS((CONSFILE *, char *, int));
+extern void FileVWrite PARAMS((CONSFILE *, char *, va_list));
+extern void FilePrint PARAMS((CONSFILE *, char *, ...));
 extern int FileStat PARAMS((CONSFILE *, struct stat *));
 extern int FileSeek PARAMS((CONSFILE *, off_t, int));
 extern int FileSend PARAMS((CONSFILE *, const void *, size_t, int));
@@ -85,6 +112,9 @@ extern char *BuildTmpString PARAMS((const char *));
 extern char *BuildTmpStringChar PARAMS((const char));
 extern char *BuildString PARAMS((const char *, STRING *));
 extern char *BuildStringChar PARAMS((const char, STRING *));
+extern char *BuildStringPrint PARAMS((STRING *, char *, ...));
+extern char *BuildStringN PARAMS((const char *, int, STRING *));
+extern char *ShiftString PARAMS((STRING *, int));
 extern void InitString PARAMS((STRING *));
 extern void DestroyString PARAMS((STRING *));
 extern void DestroyStrings PARAMS((void));
@@ -94,8 +124,16 @@ extern enum consFileType FileGetType PARAMS((CONSFILE *));
 extern void FileSetType PARAMS((CONSFILE *, enum consFileType));
 extern void Bye PARAMS((int));
 extern void DestroyDataStructures PARAMS((void));
+extern int IsMe PARAMS((char *));
+extern char *PruneSpace PARAMS((char *));
+extern int FileCanRead PARAMS((CONSFILE *, fd_set *, fd_set *));
+extern int FileCanWrite PARAMS((CONSFILE *, fd_set *, fd_set *));
+extern int FileBufEmpty PARAMS((CONSFILE *));
+extern int SetFlags PARAMS((int, int, int));
 #if HAVE_OPENSSL
 extern SSL *FileGetSSL PARAMS((CONSFILE *));
 extern void FileSetSSL PARAMS((CONSFILE *, SSL *));
 extern int SSLVerifyCallback PARAMS((int, X509_STORE_CTX *));
+extern int FileSSLAccept PARAMS((CONSFILE *));
+extern int FileCanSSLAccept PARAMS((CONSFILE *, fd_set *, fd_set *));
 #endif

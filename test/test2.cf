@@ -1,8 +1,35 @@
 # test conserver config file
-LOGDIR=.
-BREAK4=hiya there\r
-shell:|:9600p:&.log:5
-shella:|::&.log:5
-shellb:|::&.log:
-%%
-trusted: 127.0.0.1
+default full {
+	rw *;
+}
+default * {
+	logfile ./&;
+	timestamp "";
+	include full;
+}
+break 4 {
+	string "hiya there\r";
+}
+console shell {
+	master 127.0.0.1;
+	logfile ./&.log;
+	timestamp 5;
+	type exec;
+	exec "";
+}
+console shella {
+	master 127.0.0.1;
+	logfile ./&.log;
+	timestamp 5;
+	type exec;
+	exec "";
+}
+console shellb {
+	master 127.0.0.1;
+	logfile ./&.log;
+	type exec;
+	exec "";
+}
+access * {
+	trusted 127.0.0.1;
+}

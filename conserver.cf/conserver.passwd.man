@@ -1,70 +1,83 @@
-.\" $Id: conserver.passwd.man,v 1.6 2002-09-23 14:15:53-07 bryan Exp $
-.TH CONSERVER.PASSWD 5 "Local"
+.\" $Id: conserver.passwd.man,v 1.9 2003-07-04 13:20:52-07 bryan Exp $
+.TH CONSERVER.PASSWD 5 "2003-07-04" "conserver-8.0.0" "conserver"
 .SH NAME
-conserver.passwd \- user access information for conserver(8)
+conserver.passwd \- user access information for
+.BR conserver (8)
 .SH SYNOPSIS
-.br
-\fIusername\fB:\fIpassword\fB:\fIconsoles\fR
+.IB username : password
 .SH DESCRIPTION
-The \fBconserver.passwd\fP file
-is the user authentication and authorization file for
+The
+.B conserver.passwd
+file is the user authentication and authorization file for
 .BR conserver (8).
 Upon each incoming client connection,
-\fBconserver\fP opens and reads the \fBconserver.passwd\fP file,
-so edits to the file take effect immediately.
-It reads only until the first \fIusername\fP match.
+.B conserver
+opens and reads the
+.B conserver.passwd
+file, so edits to the file take effect immediately.
+It reads only until the first
+.I username
+match.
 .PP
 Blank lines and comment lines (those beginning with a ``#'' and
-optional leading whitespace) are ignored.  Non-ignored lines
-beginning with whitespace are considered continuations of the
-previous line.  This allows you to span one logical line over
+optional leading whitespace) are ignored.
+Non-ignored lines beginning with whitespace are considered
+continuations of the previous line.
+This allows you to span one logical line over
 many physical lines and insert comments wherever appropriate.
 .PP
-Each logical line consists of three colon-separated fields.
-Leading and trailing white space in each
-field is ignored.
+Each logical line consists of two colon-separated fields.
+Leading and trailing white space in each field is ignored.
 .TP
 .I username
 the login name of the authorized user,
-or the string ``\fB*any*\fP'' to match any user.
-This is compared against the name sent by the \fBconsole\fP client,
-based either on the user's identity or on the \fB\-l\fP option.
-Since \fBconserver\fP only uses the first \fIusername\fP match,
-an ``\fB*any*\fP'' entry will apply to any user
+or the string
+.RB `` *any* ''
+to match any user.
+This is compared against the name sent by the
+.B console
+client, based either on the user's identity or on the
+.B \-l option.
+Since
+.B conserver
+only uses the first
+.I username
+match, a
+.RB `` *any* ''
+entry will apply to any user
 without an entry earlier in the file.
 .TP
 .I password
 the encrypted password,
-or the string ``\fB*passwd*\fP''
-to indicate that \fBconserver\fP should look up the user's password
-in the system \fBpasswd\fP (or \fBshadow\fP) database.  If PAM
-support has been enabled (\fB--with-pam\fP), PAM lookups will be done instead
-of \fBpasswd\fP (or \fBshadow\fP) lookups.
+or the string
+.RB `` *passwd* ''
+to indicate that
+.B conserver
+should look up the user's password
+in the system
+.BR passwd " (or " shadow ") database."
+If PAM support has been enabled
+.RB ( --with-pam ),
+PAM lookups will be done instead of
+.BR passwd " (or " shadow ") lookups."
 If this field is empty, password checking is bypassed for this user.
-.TP
-.I consoles
-a comma- and/or space-separated list of consoles
-to which the user is permitted to connect,
-or the string ``\fBany\fP'' to allow access to any console.
-These names must match the console names in the \fBconserver.cf\fP file.
-If regular expression support was compiled in using --with-regex, the
-names here are treated as regular expressions.
 .SH EXAMPLE
-.TP 30
-\fBmary:r71mXjfALB5Ak:any\fP
-Mary may connect to any console if her password matches;
+.TP 24
+.B mary:r71mXjfALB5Ak
+Mary uses the password specified above;
 it does not matter whether she has a login on the conserver host.
 .TP
-\fBfred:*passwd*:foo.example.com,bar.example.com\fP
-Fred may connect only to the listed consoles,
-and only with his regular login password on the conserver host.
+.B fred:*passwd*
+Fred may connect only with his regular login password on the conserver host.
 .TP
-\fBbozo:*:\fP
-Bozo is not allowed access to any consoles.
+.B bozo:*
+Bozo is only allowed to access a console if his password isn't used (since
+it's invalid) which means he needs to come from a
+.B trusted
+host.
 .TP
-\fB*any*:*passwd*:any\fP
-Anyone not listed above may access any console
-if they have a regular login and know the password.
+.B *any*:*passwd*
+Anyone not listed above uses their regular login and password.
 .SH "SEE ALSO"
 .BR console (1),
 .BR conserver.cf (5),
@@ -73,4 +86,8 @@ if they have a regular login and know the password.
 .PP
 There is currently no way provided by the conserver package
 to generate the encrypted password strings
-besides copying them from the system \fBpasswd\fP database.
+besides copying them from the system
+.B passwd
+database or running
+.BR crypt (3)
+via C or perl or some other language that supports it.

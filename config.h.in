@@ -45,9 +45,6 @@
 /* Define to 1 if you have the <getopt.h> header file. */
 #undef HAVE_GETOPT_H
 
-/* Define to 1 if you have the `getpassphrase' function. */
-#undef HAVE_GETPASSPHRASE
-
 /* Define to 1 if you have the `getprpwnam' function. */
 #undef HAVE_GETPRPWNAM
 
@@ -72,6 +69,9 @@
 /* Define to 1 if you have the <hpsecurity.h> header file. */
 #undef HAVE_HPSECURITY_H
 
+/* Define to 1 if you have the `inet_aton' function. */
+#undef HAVE_INET_ATON
+
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
@@ -87,6 +87,12 @@
 /* Define to 1 if you have the `sec' library (-lsec). */
 #undef HAVE_LIBSEC
 
+/* Define to 1 if you have the `util' library (-lutil). */
+#undef HAVE_LIBUTIL
+
+/* Define to 1 if you have the <libutil.h> header file. */
+#undef HAVE_LIBUTIL_H
+
 /* Define to 1 if you have the `xnet' library (-lxnet). */
 #undef HAVE_LIBXNET
 
@@ -96,11 +102,17 @@
 /* Define to 1 if you have the `memcpy' function. */
 #undef HAVE_MEMCPY
 
+/* Define to 1 if you have the `memmove' function. */
+#undef HAVE_MEMMOVE
+
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
 
 /* Define to 1 if you have the `memset' function. */
 #undef HAVE_MEMSET
+
+/* Define to 1 if you have the `openpty' function. */
+#undef HAVE_OPENPTY
 
 /* have openssl support */
 #undef HAVE_OPENSSL
@@ -108,17 +120,20 @@
 /* have PAM support */
 #undef HAVE_PAM
 
-/* have POSIX regcomp */
-#undef HAVE_POSIX_REGCOMP
-
 /* Define to 1 if you have the <prot.h> header file. */
 #undef HAVE_PROT_H
 
 /* Define to 1 if you have the `ptsname' function. */
 #undef HAVE_PTSNAME
 
+/* Define to 1 if you have the <pty.h> header file. */
+#undef HAVE_PTY_H
+
 /* Define to 1 if you have the `putenv' function. */
 #undef HAVE_PUTENV
+
+/* Defined if sa_len member exists in struct sockaddr */
+#undef HAVE_SA_LEN
 
 /* Define to 1 if you have the `setgroups' function. */
 #undef HAVE_SETGROUPS
@@ -140,9 +155,6 @@
 
 /* Define to 1 if you have the `setvbuf' function. */
 #undef HAVE_SETVBUF
-
-/* Define to 1 if you have the <sgtty.h> header file. */
-#undef HAVE_SGTTY_H
 
 /* Define to 1 if you have the <shadow.h> header file. */
 #undef HAVE_SHADOW_H
@@ -201,6 +213,9 @@
 /* Define to 1 if you have the <sys/select.h> header file. */
 #undef HAVE_SYS_SELECT_H
 
+/* Define to 1 if you have the <sys/sockio.h> header file. */
+#undef HAVE_SYS_SOCKIO_H
+
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #undef HAVE_SYS_STAT_H
 
@@ -237,12 +252,6 @@
 /* Define to 1 if you have the `tcsetpgrp' function. */
 #undef HAVE_TCSETPGRP
 
-/* Define to 1 if you have the <termios.h> header file. */
-#undef HAVE_TERMIOS_H
-
-/* Define to 1 if you have the <termio.h> header file. */
-#undef HAVE_TERMIO_H
-
 /* Define to 1 if you have the <ttyent.h> header file. */
 #undef HAVE_TTYENT_H
 
@@ -257,6 +266,9 @@
 
 /* Define to 1 if you have the <usersec.h> header file. */
 #undef HAVE_USERSEC_H
+
+/* Define to 1 if you have the <util.h> header file. */
+#undef HAVE_UTIL_H
 
 /* Logfile path */
 #undef LOGFILEPATH
@@ -297,14 +309,14 @@
 /* Define to 1 if the `setpgrp' function takes no argument. */
 #undef SETPGRP_VOID
 
-/* The size of a `long', as computed by sizeof. */
-#undef SIZEOF_LONG
-
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
 
 /* Define to 1 if you can safely include both <sys/time.h> and <time.h>. */
 #undef TIME_WITH_SYS_TIME
+
+/* Defined if we trust reverse DNS */
+#undef TRUST_REVERSE_DNS
 
 /* use tcp_wrappers libwrap */
 #undef USE_LIBWRAP

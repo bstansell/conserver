@@ -1,5 +1,5 @@
 /*
- *  $Id: access.c,v 5.53 2003-04-06 05:31:54-07 bryan Exp $
+ *  $Id: access.c,v 5.66 2003-08-15 14:24:39-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -34,31 +34,15 @@
  * 4. This notice may not be removed or altered.
  */
 
-#include <config.h>
-
-#include <sys/param.h>
-#include <sys/socket.h>
-#include <sys/file.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <stdio.h>
-#include <ctype.h>
-#include <signal.h>
-#include <pwd.h>
-
 #include <compat.h>
-#include <util.h>
 
+#include <util.h>
 #include <access.h>
 #include <consent.h>
 #include <client.h>
 #include <group.h>
 #include <readcfg.h>
 #include <main.h>
-
 
 
 /* Compare an Internet address (IPv4 expected), with an address pattern
@@ -84,9 +68,12 @@ AddrCmp(addr, pattern)
 {
     in_addr_t hostaddr, pattern_addr, netmask;
     char *p, *slash_posn;
-    static STRING *buf = (STRING *) 0;
+    static STRING *buf = (STRING *)0;
+#if HAVE_INET_ATON
+    struct in_addr inetaddr;
+#endif
 
-    if (buf == (STRING *) 0)
+    if (buf == (STRING *)0)
 	buf = AllocString();
     slash_posn = strchr(pattern, '/');
     if (slash_posn != NULL) {
@@ -97,9 +84,15 @@ AddrCmp(addr, pattern)
     } else
 	p = pattern;
 
+#if HAVE_INET_ATON
+    if (inet_aton(p, &inetaddr) == 0)
+	return 1;
+    pattern_addr = inetaddr.s_addr;
+#else
     pattern_addr = inet_addr(p);
     if (pattern_addr == (in_addr_t) (-1))
 	return 1;		/* malformed address */
+#endif
 
     if (slash_posn) {
 	/* convert explicit netmask */
@@ -123,9 +116,9 @@ AddrCmp(addr, pattern)
 	netmask = 0xffffffff;	/* compare entire addresses */
     hostaddr = addr->s_addr;
 
-    Debug(1, "AddrCmp(): host=%lx(%lx/%lx) acl=%lx(%lx/%lx)",
-	  hostaddr & netmask, hostaddr, netmask, pattern_addr & netmask,
-	  pattern_addr, netmask);
+    CONDDEBUG((1, "AddrCmp(): host=%lx(%lx/%lx) acl=%lx(%lx/%lx)",
+	       hostaddr & netmask, hostaddr, netmask,
+	       pattern_addr & netmask, pattern_addr, netmask));
     return (hostaddr & netmask) != (pattern_addr & netmask);
 }
 
@@ -133,53 +126,102 @@ AddrCmp(addr, pattern)
  */
 char
 #if PROTOTYPES
-AccType(struct in_addr *addr, char *hname)
+AccType(struct in_addr *addr, char **peername)
 #else
-AccType(addr, hname)
+AccType(addr, peername)
     struct in_addr *addr;
-    char *hname;
+    char **peername;
 #endif
 {
-    char *pcName;
-    int len;
     ACCESS *pACtmp;
+    socklen_t so;
+    struct hostent *he = (struct hostent *)0;
+    int a;
+#if TRUST_REVERSE_DNS
+    char *pcName;
+    int wlen;
+    char *hname;
+    int len;
+#endif
 
-    if (fDebug) {
-	if (hname)
-	    Debug(1, "AccType(): hostname=%s, ip=%s", hname,
-		  inet_ntoa(*addr));
-	else
-	    Debug(1, "AccType(): hostname=<unresolvable>, ip=%s",
-		  inet_ntoa(*addr));
-    }
-    for (pACtmp = pACList; pACtmp != (ACCESS *) 0;
-	 pACtmp = pACtmp->pACnext) {
-	Debug(1, "AccType(): who=%s, trust=%c", pACtmp->pcwho,
-	      pACtmp->ctrust);
+    CONDDEBUG((1, "AccType(): ip=%s", inet_ntoa(*addr)));
+
+    so = sizeof(*addr);
+    for (pACtmp = pACList; pACtmp != (ACCESS *)0; pACtmp = pACtmp->pACnext) {
+	CONDDEBUG((1, "AccType(): who=%s, trust=%c", pACtmp->pcwho,
+		   pACtmp->ctrust));
 	if (pACtmp->isCIDR != 0) {
-	    if (0 == AddrCmp(addr, pACtmp->pcwho)) {
+	    if (AddrCmp(addr, pACtmp->pcwho) == 0)
 		return pACtmp->ctrust;
-	    }
 	    continue;
 	}
-	if (hname && hname[0] != '\000') {
-	    pcName = hname;
-	    len = strlen(pcName);
-	    while (len >= pACtmp->ilen) {
-		Debug(1, "AccType(): name=%s", pcName);
-		if (0 == strcasecmp(pcName, pACtmp->pcwho)) {
+
+	if ((he = gethostbyname(pACtmp->pcwho)) == (struct hostent *)0) {
+	    Error("AccType(): gethostbyname(%s): %s", pACtmp->pcwho,
+		  hstrerror(h_errno));
+	    continue;
+	}
+	if (4 != he->h_length || AF_INET != he->h_addrtype) {
+	    Error
+		("AccType(): gethostbyname(%s): wrong address size (4 != %d) or address family (%d != %d)",
+		 pACtmp->pcwho, he->h_length, AF_INET, he->h_addrtype);
+	    continue;
+	}
+	for (a = 0; he->h_addr_list[a] != (char *)0; a++) {
+	    CONDDEBUG((1, "AccType(): addr=%s",
+		       inet_ntoa(*(struct in_addr *)
+				 (he->h_addr_list[a]))));
+	    if (
+#if HAVE_MEMCMP
+		   memcmp(&(addr->s_addr), he->h_addr_list[a],
+			  he->h_length)
+#else
+		   bcmp(&(addr->s_addr), he->h_addr_list[a], he->h_length)
+#endif
+		   == 0)
+		return pACtmp->ctrust;
+	}
+    }
+
+#if TRUST_REVERSE_DNS
+    /* if we trust reverse dns, we get the names associated with
+     * the address we're checking and then check each of those
+     * against the access list entries.
+     * we chop bits off client names so that we can put domain
+     * names in access lists or even top-level domains.
+     *    allowed conserver.com, net;
+     * this allows anything from conserver.com and anything in
+     * the .net top-level.  without TRUST_REVERSE_DNS, those names
+     * better map to ip addresses for them to take effect.
+     */
+    if ((he =
+	 gethostbyaddr((char *)addr, so,
+		       AF_INET)) == (struct hostent *)0) {
+	Error("AccType(): gethostbyaddr(%s): %s", inet_ntoa(*addr),
+	      hstrerror(h_errno));
+	return config->defaultaccess;
+    }
+    for (pACtmp = pACList; pACtmp != (ACCESS *)0; pACtmp = pACtmp->pACnext) {
+	if (pACtmp->isCIDR != 0)
+	    continue;
+	wlen = strlen(pACtmp->pcwho);
+	for (hname = he->h_name, a = 0; hname != (char *)0;
+	     hname = he->h_aliases[a++]) {
+	    for (pcName = hname, len = strlen(pcName); len >= wlen;
+		 len = strlen(++pcName)) {
+		CONDDEBUG((1, "AccType(): name=%s", pcName));
+		if (strcasecmp(pcName, pACtmp->pcwho) == 0) {
+		    *peername = hname;
 		    return pACtmp->ctrust;
 		}
 		pcName = strchr(pcName, '.');
-		if ((char *)0 == pcName) {
+		if (pcName == (char *)0)
 		    break;
-		}
-		++pcName;
-		len = strlen(pcName);
 	    }
 	}
     }
-    return chDefAcc;
+#endif
+    return config->defaultaccess;
 }
 
 void
@@ -191,100 +233,51 @@ SetDefAccess(pAddr, pHost)
     char *pHost;
 #endif
 {
-    char *pcWho, *pcDomain;
-    int iLen;
+    char *pcDomain;
     char *addr;
+    ACCESS *a;
 
-    addr = inet_ntoa(*pAddr);
-    iLen = strlen(addr);
-    if ((ACCESS *) 0 == (pACList = (ACCESS *) calloc(1, sizeof(ACCESS)))) {
-	OutOfMem();
+    while (pAddr->s_addr != (in_addr_t) 0) {
+	addr = inet_ntoa(*pAddr);
+	if ((a = (ACCESS *)calloc(1, sizeof(ACCESS))) == (ACCESS *)0)
+	    OutOfMem();
+	if ((a->pcwho = strdup(addr)) == (char *)0)
+	    OutOfMem();
+	a->ctrust = 'a';
+	a->pACnext = pACList;
+	pACList = a;
+
+	CONDDEBUG((1, "SetDefAccess(): trust=%c, who=%s", pACList->ctrust,
+		   pACList->pcwho));
+	pAddr++;
     }
-    if ((char *)0 == (pcWho = malloc(iLen + 1))) {
-	OutOfMem();
-    }
-    pACList->ctrust = 'a';
-    pACList->ilen = iLen;
-    pACList->pcwho = strcpy(pcWho, addr);
 
-    Debug(1, "SetDefAccess(): trust=%c, who=%s", pACList->ctrust,
-	  pACList->pcwho);
-
-    if ((char *)0 == (pcDomain = strchr(pHost, '.'))) {
+    if ((char *)0 == (pcDomain = strchr(pHost, '.')))
 	return;
-    }
     ++pcDomain;
-    iLen = strlen(pcDomain);
 
-    if ((ACCESS *) 0 ==
-	(pACList->pACnext = (ACCESS *) calloc(1, sizeof(ACCESS)))) {
+    if ((a = (ACCESS *)calloc(1, sizeof(ACCESS))) == (ACCESS *)0)
 	OutOfMem();
-    }
-    if ((char *)0 == (pcWho = malloc(iLen + 1))) {
+    if ((a->pcwho = strdup(pcDomain)) == (char *)0)
 	OutOfMem();
-    }
-    pACList->pACnext->ctrust = 'a';
-    pACList->pACnext->ilen = iLen;
-    pACList->pACnext->pcwho = strcpy(pcWho, pcDomain);
+    a->ctrust = 'a';
+    a->pACnext = pACList;
+    pACList = a;
 
-    Debug(1, "SetDefAccess(): trust=%c, who=%s", pACList->pACnext->ctrust,
-	  pACList->pACnext->pcwho);
-}
-
-/* thread ther list of uniq console server machines, aliases for	(ksb)
- * machines will screw us up
- */
-REMOTE *
-#if PROTOTYPES
-FindUniq(REMOTE * pRCAll)
-#else
-FindUniq(pRCAll)
-    REMOTE *pRCAll;
-#endif
-{
-    REMOTE *pRC;
-
-    /* INV: tail of the list we are building always contains only
-     * uniq hosts, or the empty list.
-     */
-    if ((REMOTE *) 0 == pRCAll) {
-	return (REMOTE *) 0;
-    }
-
-    pRCAll->pRCuniq = FindUniq(pRCAll->pRCnext);
-
-    /* if it is in the returned list of uniq hosts, return that list
-     * else add us by returning our node
-     */
-    for (pRC = pRCAll->pRCuniq; (REMOTE *) 0 != pRC; pRC = pRC->pRCuniq) {
-	if (0 == strcasecmp(pRC->rhost.string, pRCAll->rhost.string)) {
-	    return pRCAll->pRCuniq;
-	}
-    }
-    return pRCAll;
+    CONDDEBUG((1, "SetDefAccess(): trust=%c, who=%s", pACList->ctrust,
+	       pACList->pcwho));
 }
 
 void
 #if PROTOTYPES
-DestroyRemoteConsole(REMOTE * pRCList)
-#else
-DestroyRemoteConsole(pRCList)
-    REMOTE *pRCList;
-#endif
-{
-    DestroyString(&pRCList->rserver);
-    DestroyString(&pRCList->rhost);
-    free(pRCList);
-}
-
-void
-#if PROTOTYPES
-DestroyAccessList(ACCESS * pACList)
+DestroyAccessList(ACCESS *pACList)
 #else
 DestroyAccessList(pACList)
     ACCESS *pACList;
 #endif
 {
+    if (pACList == (ACCESS *)0)
+	return;
     if (pACList->pcwho != (char *)0)
 	free(pACList->pcwho);
     free(pACList);

@@ -10,10 +10,12 @@ AH_TEMPLATE([MAXMEMB], [Number of consoles per child process])
 AH_TEMPLATE([CONNECTTIMEOUT], [TCP connection timeout])
 AH_TEMPLATE([PIDFILE], [pidfile to write to])
 AH_TEMPLATE([USE_LIBWRAP], [use tcp_wrappers libwrap])
-AH_TEMPLATE([HAVE_POSIX_REGCOMP], [have POSIX regcomp])
+dnl AH_TEMPLATE([HAVE_POSIX_REGCOMP], [have POSIX regcomp])
 AH_TEMPLATE([HAVE_PAM], [have PAM support])
 AH_TEMPLATE([HAVE_OPENSSL], [have openssl support])
 AH_TEMPLATE([HAVE_DMALLOC], [have dmalloc support])
+AH_TEMPLATE([HAVE_SA_LEN],[Defined if sa_len member exists in struct sockaddr])
+AH_TEMPLATE([TRUST_REVERSE_DNS],[Defined if we trust reverse DNS])
 
 dnl ### Normal initialization. ######################################
 AC_INIT
@@ -31,11 +33,18 @@ AC_SUBST(MKDIR)
 
 
 dnl ### Custom settings. ############################################
-AC_MSG_CHECKING(whether to allow 64bit compilation)
-AC_ARG_WITH(64bit,
-	AC_HELP_STRING([--with-64bit],[Allow 64bit compilation]),
-		[with_64bit=yes], [with_64bit=no])
-AC_MSG_RESULT($with_64bit)
+dnl AC_MSG_CHECKING(whether to allow 64bit compilation)
+dnl AC_ARG_WITH(64bit,
+dnl 	AC_HELP_STRING([--with-64bit],[Allow 64bit compilation]),
+dnl 		[case "$withval" in
+dnl 		    yes)
+dnl 			with_64bit=yes
+dnl 			;;
+dnl 		    *)
+dnl 			with_64bit=no
+dnl 			;;
+dnl 		esac], [with_64bit=no])
+dnl AC_MSG_RESULT($with_64bit)
 
 AC_MSG_CHECKING(for port number specification)
 AC_ARG_WITH(port,
@@ -193,6 +202,19 @@ AC_ARG_WITH(timeout,
 	[AC_DEFINE_UNQUOTED(CONNECTTIMEOUT, 10)
 	AC_MSG_RESULT(10)])
 
+AC_MSG_CHECKING(whether to trust reverse DNS)
+AC_ARG_WITH(trustrevdns,
+	AC_HELP_STRING([--with-trustrevdns],[Trust reverse DNS information]),
+	[case "$withval" in
+	    yes)
+		AC_DEFINE(TRUST_REVERSE_DNS)
+		AC_MSG_RESULT(yes)
+		;;
+	    *)
+		AC_MSG_RESULT(no)
+		;;
+	esac],[AC_MSG_RESULT(no)])
+
 dnl ### Check for compiler et al. ###################################
 AC_PROG_CC
 AC_PROG_INSTALL
@@ -204,34 +226,25 @@ AC_AIX
 AC_C_CONST
 AC_C_PROTOTYPES
 
-AC_CHECK_SIZEOF(long)
-if test "$ac_cv_sizeof_long" -gt 4; then
-    if test "$with_64bit" != "yes"; then
-	AC_MSG_ERROR([cannot build on >32bit systems (to override use --with-64bit)])
-    else
-	AC_MSG_WARN([building a 64bit version of conserver - good luck!])
-    fi
-fi
+dnl AC_CHECK_SIZEOF(long)
+dnl if test "$ac_cv_sizeof_long" -gt 4; then
+dnl     if test "$with_64bit" != "yes"; then
+dnl 	AC_MSG_ERROR([cannot build on >32bit systems (to override use --with-64bit)])
+dnl     else
+dnl 	AC_MSG_WARN([building a 64bit version of conserver - good luck!])
+dnl     fi
+dnl fi
 
 dnl ### Checks for header files. ###################################
 AC_HEADER_STDC
 AC_CHECK_HEADERS(sys/ioctl.h)
 
-dnl ### POSIX terminal I/O
-AC_CHECK_HEADERS(termios.h)
-if test "$ac_cv_header_termios_h" != "yes"; then
-  dnl ### SysV terminal I/O
-  AC_CHECK_HEADERS(termio.h)
-  if test "$ac_cv_header_termio_h" != "yes"; then
-    dnl ### BSD terminal I/O
-    AC_CHECK_HEADERS(sgtty.h)
-    if test "$ac_cv_header_sgtty_h" != "yes"; then
-      AC_MSG_ERROR([no usable terminal interface detected])
-    fi
-  fi
+AC_SYS_POSIX_TERMIOS
+if test "$ac_cv_sys_posix_termios" != "yes"; then
+    AC_MSG_ERROR([POSIX termios interface required])
 fi
 
-AC_CHECK_HEADERS(unistd.h getopt.h sys/vlimit.h sys/resource.h ttyent.h sys/ttold.h sys/uio.h sys/proc.h sys/ioctl_compat.h usersec.h sys/select.h stropts.h sys/audit.h shadow.h sys/time.h crypt.h sysexits.h types.h)
+AC_CHECK_HEADERS(unistd.h getopt.h sys/vlimit.h sys/resource.h ttyent.h sys/ttold.h sys/uio.h sys/proc.h sys/ioctl_compat.h usersec.h sys/select.h stropts.h sys/audit.h shadow.h sys/time.h crypt.h sysexits.h types.h sys/sockio.h)
 AC_HEADER_TIME
 AC_HEADER_SYS_WAIT
 AC_TYPE_MODE_T
@@ -249,6 +262,14 @@ AC_CHECK_TYPE([in_addr_t],[AC_DEFINE(HAVE_IN_ADDR_T,1,
 AC_CHECK_TYPE([socklen_t],[AC_DEFINE(HAVE_SOCKLEN_T,1,
 	[Defined if socklen_t exists])],,[$ac_includes_default
 #include <sys/socket.h>])
+
+AC_MSG_CHECKING(for sa_len in struct sockaddr)
+AC_TRY_COMPILE([#include <sys/types.h>
+	#include <sys/socket.h>],
+	[struct sockaddr s; s.sa_len=0;],
+	[AC_MSG_RESULT(yes)
+	 AC_DEFINE(HAVE_SA_LEN)],
+	[AC_MSG_RESULT(no)])
 
 
 dnl ### Host specific checks. ######################################
@@ -299,12 +320,23 @@ AC_ARG_WITH(libwrap,
 		int deny_severity  = 0;
 		],[hosts_access((void *)0)],
 		[AC_MSG_RESULT(yes)
-		AC_DEFINE(USE_LIBWRAP)
-		CONSLIBS="$CONSLIBS -lwrap"
-		CONSLDFLAGS="$CONSLDFLAGS $WRAPLDFLAGS"
-		CONSCPPFLAGS="$CONSCPPFLAGS $WRAPCPPFLAGS"],
-		[AC_MSG_RESULT(no)])],)
-
+		 AC_DEFINE(USE_LIBWRAP)
+		 CONSLIBS="$CONSLIBS -lwrap"
+		 CONSLDFLAGS="$CONSLDFLAGS $WRAPLDFLAGS"
+		 CONSCPPFLAGS="$CONSCPPFLAGS $WRAPCPPFLAGS"],
+		[AC_MSG_RESULT(no)
+		 LIBS="$LIBS -lnsl"
+		 AC_MSG_CHECKING(for TCP wrappers library -lwrap with -lnsl)
+		 AC_TRY_LINK([#include <tcpd.h>
+		    int allow_severity = 0;
+		    int deny_severity  = 0;
+		    ],[hosts_access((void *)0)],
+		    [AC_MSG_RESULT(yes)
+		     AC_DEFINE(USE_LIBWRAP)
+		     CONSLIBS="$CONSLIBS -lwrap -lnsl"
+		     CONSLDFLAGS="$CONSLDFLAGS $WRAPLDFLAGS"
+		     CONSCPPFLAGS="$CONSCPPFLAGS $WRAPCPPFLAGS"],
+		    [AC_MSG_RESULT(no)])])],)
 	LIBS="$oLIBS"
 	CPPFLAGS="$oCPPFLAGS"
 	LDFLAGS="$oLDFLAGS"
@@ -390,38 +422,38 @@ AC_ARG_WITH(dmalloc,
 
 dnl ### Check for needed functions. ################################
 
-dnl The following basically stollen from the less-358 distribution, but
-dnl modified for my own purposes
-AC_MSG_CHECKING(for POSIX regex)
-AC_ARG_WITH(regex,
-    AC_HELP_STRING([--with-regex],
-	[Use regular expressions in conserver.passwd]),
-	[if test "$withval" = yes; then
-	    AC_TRY_RUN([
-		#include <sys/types.h>
-		#include <regex.h>
-		main() { regex_t r; regmatch_t rm; char *text = "xabcy";
-		if (regcomp(&r, "abc", 0)) exit(1);
-		if (regexec(&r, text, 1, &rm, 0)) exit(1);
-		if (rm.rm_so != 1) exit(1); /* check for correct offset */
-		exit(0); }
-	    ],have_posix_regex=yes,have_posix_regex=no,have_posix_regex=unknown)
-	    if test $have_posix_regex = yes; then
-	      AC_MSG_RESULT(yes)
-	      AC_DEFINE(HAVE_POSIX_REGCOMP)
-	    elif test $have_posix_regex = unknown; then
-		AC_TRY_LINK([
-		    #include <sys/types.h>
-		    #include <regex.h>],
-		[regex_t *r; regfree(r);],
-		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_POSIX_REGCOMP))
-	    else
-	      AC_MSG_RESULT(no)
-	    fi
-	else
-	    AC_MSG_RESULT(no)
-	fi],[AC_MSG_RESULT(no)])
+dnl dnl The following basically stollen from the less-358 distribution, but
+dnl dnl modified for my own purposes
+dnl AC_MSG_CHECKING(for POSIX regex)
+dnl AC_ARG_WITH(regex,
+dnl     AC_HELP_STRING([--with-regex],
+dnl 	[Use regular expressions in conserver.passwd]),
+dnl 	[if test "$withval" = yes; then
+dnl 	    AC_TRY_RUN([
+dnl 		#include <sys/types.h>
+dnl 		#include <regex.h>
+dnl 		main() { regex_t r; regmatch_t rm; char *text = "xabcy";
+dnl 		if (regcomp(&r, "abc", 0)) exit(1);
+dnl 		if (regexec(&r, text, 1, &rm, 0)) exit(1);
+dnl 		if (rm.rm_so != 1) exit(1); /* check for correct offset */
+dnl 		exit(0); }
+dnl 	    ],have_posix_regex=yes,have_posix_regex=no,have_posix_regex=unknown)
+dnl 	    if test $have_posix_regex = yes; then
+dnl 	      AC_MSG_RESULT(yes)
+dnl 	      AC_DEFINE(HAVE_POSIX_REGCOMP)
+dnl 	    elif test $have_posix_regex = unknown; then
+dnl 		AC_TRY_LINK([
+dnl 		    #include <sys/types.h>
+dnl 		    #include <regex.h>],
+dnl 		[regex_t *r; regfree(r);],
+dnl 		AC_MSG_RESULT(yes)
+dnl 		AC_DEFINE(HAVE_POSIX_REGCOMP))
+dnl 	    else
+dnl 	      AC_MSG_RESULT(no)
+dnl 	    fi
+dnl 	else
+dnl 	    AC_MSG_RESULT(no)
+dnl 	fi],[AC_MSG_RESULT(no)])
 
 AC_MSG_CHECKING(for PAM support)
 AC_ARG_WITH(pam,
@@ -451,8 +483,22 @@ AC_ARG_WITH(pam,
 	    AC_MSG_RESULT(no)
 	fi],[AC_MSG_RESULT(no)])
 
+dnl Checks for pty allocation...
+dnl According to the xemacs distribution:
+dnl   getpt()  is the preferred pty allocation method on glibc systems.
+dnl   _getpty() is the preferred pty allocation method on SGI systems.
+dnl   grantpt(), unlockpt(), ptsname() are defined by Unix98.
+dnl   openpty() is the preferred pty allocation method on BSD and Tru64 systems.
+dnl   openpty() might be declared in:
+dnl   - pty.h (Tru64 or Linux)
+dnl   - libutil.h (FreeBSD)
+dnl   - util.h (NetBSD)
+dnl Conserver doesn't support getpt() or _getpt() yet.
+AC_CHECK_HEADERS(pty.h libutil.h util.h)
+AC_CHECK_LIB(util, openpty)
+AC_CHECK_FUNCS(openpty)
 
-AC_CHECK_FUNCS(getopt strerror getrlimit getsid setsid getuserattr setgroups tcgetpgrp tcsetpgrp tcgetattr tcsetattr tcsendbreak setpgrp getutent setttyent getspnam setlinebuf setvbuf ptsname grantpt unlockpt sigaction setsockopt getdtablesize putenv memset memcpy memcmp sysconf getpassphrase getlogin)
+AC_CHECK_FUNCS(getopt strerror getrlimit getsid setsid getuserattr setgroups tcgetpgrp tcsetpgrp tcgetattr tcsetattr tcsendbreak setpgrp getutent setttyent getspnam setlinebuf setvbuf ptsname grantpt unlockpt sigaction setsockopt getdtablesize putenv memset memcpy memcmp memmove sysconf getlogin inet_aton)
 AC_FUNC_SETPGRP
 AC_CHECK_FUNC(strcasecmp,
 	[AC_DEFINE(HAVE_STRCASECMP, 1, [Define if strcasecmp is available])],

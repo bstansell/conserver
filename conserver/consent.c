@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.103 2003-04-06 05:32:20-07 bryan Exp $
+ *  $Id: consent.c,v 5.125 2003-08-15 14:24:39-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -38,35 +38,20 @@
  * Network console modifications by Robert Olson, olson@mcs.anl.gov.
  */
 
-#include <config.h>
+#include <compat.h>
 
-#include <sys/param.h>
-#include <sys/socket.h>
-#include <sys/file.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <stdio.h>
-#include <ctype.h>
-#include <signal.h>
 #include <pwd.h>
 
-#include <compat.h>
 #include <util.h>
-
 #include <consent.h>
 #include <client.h>
 #include <group.h>
+#include <access.h>
+#include <readcfg.h>
 #include <main.h>
 
 
-struct hostcache *hostcachelist = NULL;
-
 BAUD baud[] = {
-    {"Netwk", 0},
-    {"Local", 0},
 #if defined(B115200)
     {"115200", B115200},
 #endif
@@ -79,15 +64,24 @@ BAUD baud[] = {
 #if defined(B19200)
     {"19200", B19200},
 #endif
+#if defined(B9600)
     {"9600", B9600},
+#endif
+#if defined(B4800)
     {"4800", B4800},
+#endif
+#if defined(B2400)
     {"2400", B2400},
+#endif
 #if defined(B1800)
     {"1800", B1800},
 #endif
     {"1200", B1200},
 #if defined(B600)
     {"600", B600},
+#endif
+#if defined(B300)
+    {"300", B300},
 #endif
 };
 
@@ -105,51 +99,25 @@ FindBaud(pcMode)
     int i;
 
     for (i = 0; i < sizeof(baud) / sizeof(struct baud); ++i) {
-	if (0 != strncmp(pcMode, baud[i].acrate, strlen(baud[i].acrate)))
-	    continue;
-	return baud + i;
+	if (strcmp(pcMode, baud[i].acrate) == 0)
+	    return baud + i;
     }
-    return baud;
+    return (BAUD *)0;
 }
 
 
-PARITY parity[] = {
-#if HAVE_TERMIOS_H
-    {' ', 0, 0}
-    ,				/* Blank for network */
 # if !defined(PAREXT)
 #  define PAREXT	0
 # endif
-    {'e', PARENB | CS7, 0}
-    ,				/* even                 */
-    {'m', PARENB | CS7 | PARODD | PAREXT, 0}
-    ,				/* mark                 */
-    {'n', CS8, 0}
-    ,				/* pass 8 bits, no parity */
-    {'o', PARENB | CS7 | PARODD, 0}
-    ,				/* odd                  */
-    {'p', CS8, 0}
-    ,				/* pass 8 bits, no parity */
-    {'s', PARENB | CS7 | PAREXT, 0}
-    ,				/* space                */
-#else				/* ! HAVE_TERMIOS_H */
-    {'e', EVENP, ODDP}
-    ,				/* even                                 */
-    {'m', EVENP | ODDP, 0}
-    ,				/* mark                                 */
-    {'o', ODDP, EVENP}
-    ,				/* odd                                  */
-# if defined(PASS8)
-    {'n', PASS8, EVENP | ODDP}
-    ,				/* pass 8 bits, no parity               */
-    {'p', PASS8, EVENP | ODDP}
-    ,				/* pass 8 bits, no parity               */
-# endif
-    {'s', 0, EVENP | ODDP}	/* space                                */
-#endif
+struct parity parity[] = {
+    {"even", PARENB | CS7, 0},
+    {"mark", PARENB | CS7 | PARODD | PAREXT, 0},
+    {"none", CS8, 0},
+    {"odd", PARENB | CS7 | PARODD, 0},
+    {"space", PARENB | CS7 | PAREXT, 0},
 };
 
-/* find a parity on the end of a baud "9600even" -> EVEN		(ksb)
+/* find a parity "even" or "E" or "ev" -> EVEN
  */
 PARITY *
 #if PROTOTYPES
@@ -160,44 +128,37 @@ FindParity(pcMode)
 #endif
 {
     int i;
-    char acFirst;
 
-    while (isdigit((int)(*pcMode))) {
-	++pcMode;
-    }
-    acFirst = *pcMode;
-    if (isupper((int)(acFirst)))
-	acFirst = tolower(acFirst);
     for (i = 0; i < sizeof(parity) / sizeof(struct parity); ++i) {
-	if (acFirst != parity[i].ckey)
-	    continue;
-	return parity + i;
+	if (strcasecmp(pcMode, parity[i].key) == 0)
+	    return parity + i;
     }
-    return parity;
+    return (PARITY *)0;
 }
 
 
-#if HAVE_TERMIOS_H
 /* setup a tty device							(ksb)
  */
 static int
 #if PROTOTYPES
-TtyDev(CONSENT * pCE, fd_set * pfdSet)
+TtyDev(CONSENT *pCE)
 #else
-TtyDev(pCE, pfdSet)
+TtyDev(pCE)
     CONSENT *pCE;
-    fd_set *pfdSet;
 #endif
 {
     struct termios termp;
     struct stat stPerm;
+    int cofile;
+
+    cofile = FileFDNum(pCE->cofile);
 
     /* here we should fstat for `read-only' checks
      */
-    if (-1 == fstat(pCE->fdtty, &stPerm)) {
-	Error("[%s] fstat(%s(%d)): %s: forcing down", pCE->server.string,
-	      pCE->dfile.string, pCE->fdtty, strerror(errno));
-	ConsDown(pCE, pfdSet, 1);
+    if (-1 == fstat(cofile, &stPerm)) {
+	Error("[%s] fstat(%s(%d)): %s: forcing down", pCE->server,
+	      pCE->device, cofile, strerror(errno));
+	ConsDown(pCE, FLAGTRUE, FLAGTRUE);
 	return -1;
     } else if (0 == (stPerm.st_mode & 0222)) {
 	/* any device that is read-only we won't write to
@@ -208,11 +169,10 @@ TtyDev(pCE, pfdSet)
     /*
      * Get terminal attributes
      */
-    if (-1 == tcgetattr(pCE->fdtty, &termp)) {
-	Error("[%s] tcgetattr(%s(%d)): %s: forcing down",
-	      pCE->server.string, pCE->dfile.string, pCE->fdtty,
-	      strerror(errno));
-	ConsDown(pCE, pfdSet, 1);
+    if (-1 == tcgetattr(cofile, &termp)) {
+	Error("[%s] tcgetattr(%s(%d)): %s: forcing down", pCE->server,
+	      pCE->device, cofile, strerror(errno));
+	ConsDown(pCE, FLAGTRUE, FLAGTRUE);
 	return -1;
     }
 
@@ -224,13 +184,27 @@ TtyDev(pCE, pfdSet)
      *              isig    No signal generation
      * Turn on:     ixoff
      */
-    termp.c_iflag = IXON | IXOFF | BRKINT;
+    termp.c_iflag = BRKINT;
+    if (pCE->ixon == FLAGTRUE)
+	termp.c_iflag |= IXON;
+    if (pCE->ixany == FLAGTRUE)
+	termp.c_iflag |= IXANY;
+    if (pCE->ixoff == FLAGTRUE)
+	termp.c_iflag |= IXOFF;
     termp.c_oflag = 0;
     /* CLOCAL suggested by egan@us.ibm.com
      * carrier transitions result in dropped consoles otherwise
      */
     termp.c_cflag = CREAD | CLOCAL;
-    termp.c_cflag |= pCE->pparity->iset;
+    if (pCE->hupcl == FLAGTRUE)
+	termp.c_cflag |= HUPCL;
+    if (pCE->cstopb == FLAGTRUE)
+	termp.c_cflag |= CSTOPB;
+#if defined(CRTSCTS)
+    if (pCE->crtscts == FLAGTRUE)
+	termp.c_cflag |= CRTSCTS;
+#endif
+    termp.c_cflag |= pCE->parity->iset;
     termp.c_lflag = 0;
     /*
      * Set the VMIN == 1
@@ -240,184 +214,51 @@ TtyDev(pCE, pfdSet)
     termp.c_cc[VMIN] = 1;
     termp.c_cc[VTIME] = 1;
 
-    if (-1 == cfsetospeed(&termp, pCE->pbaud->irate)) {
-	Error("[%s] cfsetospeed(%s(%d)): %s: forcing down",
-	      pCE->server.string, pCE->dfile.string, pCE->fdtty,
-	      strerror(errno));
-	ConsDown(pCE, pfdSet, 1);
+    if (-1 == cfsetospeed(&termp, pCE->baud->irate)) {
+	Error("[%s] cfsetospeed(%s(%d)): %s: forcing down", pCE->server,
+	      pCE->device, cofile, strerror(errno));
+	ConsDown(pCE, FLAGTRUE, FLAGTRUE);
 	return -1;
     }
-    if (-1 == cfsetispeed(&termp, pCE->pbaud->irate)) {
-	Error("[%s] cfsetispeed(%s(%d)): %s: forcing down",
-	      pCE->server.string, pCE->dfile.string, pCE->fdtty,
-	      strerror(errno));
-	ConsDown(pCE, pfdSet, 1);
+    if (-1 == cfsetispeed(&termp, pCE->baud->irate)) {
+	Error("[%s] cfsetispeed(%s(%d)): %s: forcing down", pCE->server,
+	      pCE->device, cofile, strerror(errno));
+	ConsDown(pCE, FLAGTRUE, FLAGTRUE);
 	return -1;
     }
 
     /*
      * Set terminal attributes
      */
-    if (-1 == tcsetattr(pCE->fdtty, TCSADRAIN, &termp)) {
+    if (-1 == tcsetattr(cofile, TCSADRAIN, &termp)) {
 	Error("[%s] tcsetattr(%s(%d),TCSADRAIN): %s: forcing down",
-	      pCE->server.string, pCE->dfile.string, pCE->fdtty,
-	      strerror(errno));
-	ConsDown(pCE, pfdSet, 1);
+	      pCE->server, pCE->device, cofile, strerror(errno));
+	ConsDown(pCE, FLAGTRUE, FLAGTRUE);
 	return -1;
     }
 # if HAVE_STROPTS_H
     /*
      * eat all the streams modules upto and including ttcompat
      */
-    while (ioctl(pCE->fdtty, I_FIND, "ttcompat") == 1) {
-	ioctl(pCE->fdtty, I_POP, 0);
+    while (ioctl(cofile, I_FIND, "ttcompat") == 1) {
+	ioctl(cofile, I_POP, 0);
     }
 # endif
     pCE->fup = 1;
     return 0;
 }
-
-#else /* ! HAVE_TERMIOS_H */
-
-# if HAVE_SGTTY_H
-
-/* setup a tty device							(ksb)
- */
-static int
-#if PROTOTYPES
-TtyDev(CONSENT * pCE, fd_set * pfdSet)
-#else
-TtyDev(pCE)
-    CONSENT *pCE;
-    fd_set *pfdSet;
-#endif
-{
-    struct sgttyb sty;
-    struct tchars m_tchars;
-    struct ltchars m_ltchars;
-    struct stat stPerm;
-
-    /* here we should fstat for `read-only' checks
-     */
-    if (-1 == fstat(pCE->fdtty, &stPerm)) {
-	Error("[%s] fstat(%s(%d)): %s: forcing down", pCE->server.string,
-	      pCE->dfile.string, pCE->fdtty, strerror(errno));
-	ConsDown(pCE, pfdSet, 1);
-	return -1;
-    } else if (0 == (stPerm.st_mode & 0222)) {
-	/* any device that is read-only we won't write to
-	 */
-	pCE->fronly = 1;
-    }
-#  if defined(TIOCSSOFTCAR)
-    if (-1 == ioctl(pCE->fdtty, TIOCSSOFTCAR, &fSoftcar)) {
-	Error("[%s] ioctl(%s(%d),TIOCSSOFTCAR): %s: forcing down",
-	      pCE->server.string, pCE->dfile.string, pCE->fdtty,
-	      strerror(errno));
-	ConsDown(pCE, pfdSet, 1);
-	return -1;
-    }
-#  endif
-
-    /* stty 9600 raw cs7
-     */
-    if (-1 == ioctl(pCE->fdtty, TIOCGETP, (char *)&sty)) {
-	Error("[%s] ioctl(%s(%d),TIOCGETP): %s: forcing down",
-	      pCE->server.string, pCE->dfile.string, pCE->fdtty,
-	      strerror(errno));
-	ConsDown(pCE, pfdSet, 1);
-	return -1;
-    }
-    sty.sg_flags &= ~(ECHO | CRMOD | pCE->pparity->iclr);
-    sty.sg_flags |= (CBREAK | TANDEM | pCE->pparity->iset);
-    sty.sg_erase = -1;
-    sty.sg_kill = -1;
-    sty.sg_ispeed = pCE->pbaud->irate;
-    sty.sg_ospeed = pCE->pbaud->irate;
-    if (-1 == ioctl(pCE->fdtty, TIOCSETP, (char *)&sty)) {
-	Error("[%s] ioctl(%s(%d),TIOCSETP): %s: forcing down",
-	      pCE->server.string, pCE->dfile.string, pCE->fdtty,
-	      strerror(errno));
-	ConsDown(pCE, pfdSet, 1);
-	return -1;
-    }
-
-    /* stty undef all tty chars
-     * (in cbreak mode we may not need to this... but we do)
-     */
-    if (-1 == ioctl(pCE->fdtty, TIOCGETC, (char *)&m_tchars)) {
-	Error("[%s] ioctl(%s(%d),TIOCGETC): %s: forcing down",
-	      pCE->server.string, pCE->dfile.string, pCE->fdtty,
-	      strerror(errno));
-	ConsDown(pCE, pfdSet, 1);
-	return -1;
-    }
-    m_tchars.t_intrc = -1;
-    m_tchars.t_quitc = -1;
-    m_tchars.t_startc = -1;
-    m_tchars.t_stopc = -1;
-    m_tchars.t_eofc = -1;
-    m_tchars.t_brkc = -1;
-    if (-1 == ioctl(pCE->fdtty, TIOCSETC, (char *)&m_tchars)) {
-	Error("[%s] ioctl(%s(%d),TIOCSETC): %s: forcing down",
-	      pCE->server.string, pCE->dfile.string, pCE->fdtty,
-	      strerror(errno));
-	ConsDown(pCE, pfdSet, 1);
-	return -1;
-    }
-    if (-1 == ioctl(pCE->fdtty, TIOCGLTC, (char *)&m_ltchars)) {
-	Error("[%s] ioctl(%s(%d),TIOCGLTC): %s: forcing down",
-	      pCE->server.string, pCE->dfile.string, pCE->fdtty,
-	      strerror(errno));
-	ConsDown(pCE, pfdSet, 1);
-	return -1;
-    }
-    m_ltchars.t_werasc = -1;
-    m_ltchars.t_flushc = -1;
-    m_ltchars.t_lnextc = -1;
-    m_ltchars.t_suspc = -1;
-    m_ltchars.t_dsuspc = -1;
-    if (-1 == ioctl(pCE->fdtty, TIOCSLTC, (char *)&m_ltchars)) {
-	Error("[%s] ioctl(%s(%d),TIOCSLTC): %s: forcing down",
-	      pCE->server.string, pCE->dfile.string, pCE->fdtty,
-	      strerror(errno));
-	ConsDown(pCE, pfdSet, 1);
-	return -1;
-    }
-#  if HAVE_STROPTS_H
-    /* pop off the un-needed streams modules (on a sun3 machine esp.)
-     * (Idea by jrs@ecn.purdue.edu)
-     */
-    while (ioctl(pCE->fdtty, I_POP, 0) == 0) {
-	/* eat all the streams modules */ ;
-    }
-#  endif
-    pCE->fup = 1;
-    return 0;
-}
-# endif	/* HAVE_SGTTY_H */
-
-#endif /* HAVE_TERMIOS_H */
 
 /* setup a virtual device						(ksb)
  */
 static int
 #if PROTOTYPES
-VirtDev(CONSENT * pCE)
+VirtDev(CONSENT *pCE)
 #else
 VirtDev(pCE)
     CONSENT *pCE;
 #endif
 {
-# if HAVE_TERMIOS_H
     static struct termios n_tio;
-# else
-#  if HAVE_SGTTY_H
-    struct sgttyb sty;
-    struct tchars m_tchars;
-    struct ltchars m_ltchars;
-#  endif
-# endif
     int i;
     pid_t iNewGrp;
     extern char **environ;
@@ -428,13 +269,12 @@ VirtDev(pCE)
 
     switch (pCE->ipid = fork()) {
 	case -1:
+	    pCE->ipid = 0;
 	    return -1;
 	case 0:
 	    thepid = getpid();
 	    break;
 	default:
-	    Verbose("[%s] pid %lu on %s", pCE->server.string, pCE->ipid,
-		    pCE->acslave.string);
 	    fflush(stderr);
 	    pCE->fup = 1;
 	    return 0;
@@ -462,7 +302,8 @@ VirtDev(pCE)
      */
     i = GetMaxFiles();
     for ( /* i above */ ; --i > 2;) {
-	close(i);
+	if (i != pCE->execSlaveFD)
+	    close(i);
     }
     /* leave 2 until we *have to close it*
      */
@@ -472,15 +313,15 @@ VirtDev(pCE)
 # if HAVE_SETSID
     iNewGrp = setsid();
     if (-1 == iNewGrp) {
-	Error("[%s] setsid(): %s", pCE->server.string, strerror(errno));
+	Error("[%s] setsid(): %s", pCE->server, strerror(errno));
 	iNewGrp = getpid();
     }
 # else
     iNewGrp = getpid();
 # endif
 
-    if (0 != open(pCE->acslave.string, O_RDWR, 0) || 1 != dup(0)) {
-	Error("[%s] fd sync error", pCE->server.string);
+    if (dup(pCE->execSlaveFD) != 0 || dup(pCE->execSlaveFD) != 1) {
+	Error("[%s] fd sync error", pCE->server);
 	Bye(EX_OSERR);
     }
 # if HAVE_STROPTS_H  && !defined(_AIX)
@@ -488,28 +329,27 @@ VirtDev(pCE)
      * under PTX (others?) we have to push the compatibility
      * streams modules `ptem', `ld', and `ttcompat'
      */
-    Debug(1, "VirtDev(): pushing ptemp onto pseudo-terminal");
+    CONDDEBUG((1, "VirtDev(): pushing ptemp onto pseudo-terminal"));
     ioctl(0, I_PUSH, "ptem");
-    Debug(1, "VirtDev(): pushing ldterm onto pseudo-terminal");
+    CONDDEBUG((1, "VirtDev(): pushing ldterm onto pseudo-terminal"));
     ioctl(0, I_PUSH, "ldterm");
-    Debug(1, "VirtDev(): pushing ttcompat onto pseudo-terminal");
+    CONDDEBUG((1, "VirtDev(): pushing ttcompat onto pseudo-terminal"));
     ioctl(0, I_PUSH, "ttcompat");
-    Debug(1, "VirtDev(): done pushing modules onto pseudo-terminal");
+    CONDDEBUG((1, "VirtDev(): done pushing modules onto pseudo-terminal"));
 # endif
 
-# if HAVE_TERMIOS_H
-#  if HAVE_TCGETATTR
-    if (0 != tcgetattr(0, &n_tio))
-#  else
-    if (0 != ioctl(0, TCGETS, &n_tio))
-#  endif
-    {
-	Error("[%s] ioctl(0,TCGETS): %s", pCE->server.string,
-	      strerror(errno));
+    if (0 != tcgetattr(0, &n_tio)) {
+	Error("[%s] tcgetattr(0): %s", pCE->server, strerror(errno));
 	Bye(EX_OSERR);
     }
     n_tio.c_iflag &= ~(IGNCR | IUCLC);
-    n_tio.c_iflag |= ICRNL | IXON | IXANY;
+    n_tio.c_iflag |= ICRNL;
+    if (pCE->ixon == FLAGTRUE)
+	n_tio.c_iflag |= IXON;
+    if (pCE->ixany == FLAGTRUE)
+	n_tio.c_iflag |= IXANY;
+    if (pCE->ixoff == FLAGTRUE)
+	n_tio.c_iflag |= IXOFF;
     n_tio.c_oflag &=
 	~(OLCUC | ONOCR | ONLRET | OFILL | NLDLY | CRDLY | TABDLY | BSDLY);
     n_tio.c_oflag |= OPOST | ONLCR;
@@ -525,93 +365,19 @@ VirtDev(pCE)
     n_tio.c_cc[VSTART] = '\021';
     n_tio.c_cc[VSTOP] = '\023';
     n_tio.c_cc[VSUSP] = '\032';
-#  if HAVE_TCSETATTR
-    if (0 != tcsetattr(0, TCSANOW, &n_tio))
-#  else
-    if (0 != ioctl(0, TCSETS, &n_tio))
-#  endif
-    {
-	Error("[%s] ioctl(0,TCSETS): %s", pCE->server.string,
+    if (0 != tcsetattr(0, TCSANOW, &n_tio)) {
+	Error("[%s] tcsetattr(0,TCSANOW): %s", pCE->server,
 	      strerror(errno));
 	Bye(EX_OSERR);
     }
 
     tcsetpgrp(0, iNewGrp);
-# else /* ! HAVE_TERMIOS_H */
-    /* stty 9600 raw cs7
-     */
-    if (-1 == ioctl(0, TIOCGETP, (char *)&sty)) {
-	Error("[%s] ioctl(0,TIOCGETP): %s", pCE->server.string,
-	      strerror(errno));
-	Bye(EX_OSERR);
-    }
-    sty.sg_flags &= ~(CBREAK | TANDEM | pCE->pparity->iclr);
-    sty.sg_flags |= (ECHO | CRMOD | pCE->pparity->iset);
-    sty.sg_erase = '\b';
-    sty.sg_kill = '\025';
-    sty.sg_ispeed = pCE->pbaud->irate;
-    sty.sg_ospeed = pCE->pbaud->irate;
-    if (-1 == ioctl(0, TIOCSETP, (char *)&sty)) {
-	Error("[%s] ioctl(0,TIOCSETP): %s", pCE->server.string,
-	      strerror(errno));
-	Bye(EX_OSERR);
-    }
-
-    /* stty undef all tty chars
-     * (in cbreak mode we may not need to this... but we do)
-     */
-    if (-1 == ioctl(0, TIOCGETC, (char *)&m_tchars)) {
-	Error("[%s] ioctl(0,TIOCGETC): %s", pCE->server.string,
-	      strerror(errno));
-	Bye(EX_OSERR);
-    }
-    m_tchars.t_intrc = '\003';
-    m_tchars.t_quitc = '\034';
-    m_tchars.t_startc = '\021';
-    m_tchars.t_stopc = '\023';
-    m_tchars.t_eofc = '\004';
-    m_tchars.t_brkc = '\033';
-    if (-1 == ioctl(0, TIOCSETC, (char *)&m_tchars)) {
-	Error("[%s] ioctl(0,TIOCSETC): %s", pCE->server.string,
-	      strerror(errno));
-	Bye(EX_OSERR);
-    }
-    if (-1 == ioctl(0, TIOCGLTC, (char *)&m_ltchars)) {
-	Error("[%s] ioctl(0,TIOCGLTC): %s", pCE->server.string,
-	      strerror(errno));
-	Bye(EX_OSERR);
-    }
-    m_ltchars.t_werasc = '\027';
-    m_ltchars.t_flushc = '\017';
-    m_ltchars.t_lnextc = '\026';
-    m_ltchars.t_suspc = '\032';
-    m_ltchars.t_dsuspc = '\031';
-    if (-1 == ioctl(0, TIOCSLTC, (char *)&m_ltchars)) {
-	Error("[%s] ioctl(0,TIOCSLTC): %s", pCE->server.string,
-	      strerror(errno));
-	Bye(EX_OSERR);
-    }
-
-    /* give us a process group to work in
-     */
-    ioctl(0, TIOCGPGRP, (char *)&i);
-#  ifndef SETPGRP_VOID
-    setpgrp(0, i);
-#  endif
-    ioctl(0, TIOCSPGRP, (char *)&iNewGrp);
-#  ifndef SETPGRP_VOID
-    setpgrp(0, iNewGrp);
-#  endif
-# endif	/* HAVE_TERMIOS_H */
-
-    close(2);
-    dup(1);			/* better be 2, but it is too late now */
 
     /* if the command is null we should run root's shell, directly
      * if we can't find root's shell run /bin/sh
      */
     pcShell = "/bin/sh";
-    if (pCE->pccmd.used <= 1) {
+    if (pCE->exec == (char *)0) {
 	static char *apcArgv[] = {
 	    "-shell", "-i", (char *)0
 	};
@@ -627,108 +393,71 @@ VirtDev(pCE)
 	    "/bin/sh", "-ce", (char *)0, (char *)0
 	};
 
-	apcArgv[2] = pCE->pccmd.string;
+	apcArgv[2] = pCE->exec;
 	ppcArgv = apcArgv;
     }
+
+    close(2);
+    dup(1);			/* better be 2, but it is too late now */
+
     execve(pcShell, ppcArgv, environ);
-    Error("[%s] execve(): %s", pCE->server.string, strerror(errno));
+    Error("[%s] execve(): %s", pCE->server, strerror(errno));
     Bye(EX_OSERR);
     return -1;
 }
 
 /* down a console, virtual or real					(ksb)
+ *
+ * this should be kept pretty simple, 'cause the config file reading code
+ * can come along and reconfigure a console out from under this - and it
+ * expects to be able to call ConsDown() to shut it down.  so, only mess
+ * with the "runtime" members of the structure here.
  */
 void
 #if PROTOTYPES
-ConsDown(CONSENT * pCE, fd_set * pfdSet, short downHard)
+ConsDown(CONSENT *pCE, FLAG downHard, FLAG force)
 #else
-ConsDown(pCE, pfdSet, downHard)
+ConsDown(pCE, downHard, force)
     CONSENT *pCE;
-    fd_set *pfdSet;
-    short downHard;
+    FLAG downHard;
+    FLAG force;
 #endif
 {
-    if (-1 != pCE->ipid) {
-	Debug(1, "ConsDown(): sending pid %lu signal %d",
-	      (unsigned long)pCE->ipid, SIGHUP);
+    if (force != FLAGTRUE &&
+	!(FileBufEmpty(pCE->fdlog) && FileBufEmpty(pCE->cofile))) {
+	pCE->ioState = ISFLUSHING;
+	return;
+    }
+
+    if (pCE->ipid != 0) {
+	CONDDEBUG((1, "ConsDown(): sending pid %lu signal %d",
+		   (unsigned long)pCE->ipid, SIGHUP));
 	kill(pCE->ipid, SIGHUP);
-	pCE->ipid = -1;
+	pCE->ipid = 0;
     }
-    if (-1 != pCE->fdtty) {
-	if ((fd_set *) 0 != pfdSet)
-	    FD_CLR(pCE->fdtty, pfdSet);
-	close(pCE->fdtty);
-	pCE->fdtty = -1;
+    if (pCE->cofile != (CONSFILE *)0) {
+	int cofile = FileFDNum(pCE->cofile);
+	FD_CLR(cofile, &rinit);
+	FD_CLR(cofile, &winit);
+	FileClose(&pCE->cofile);
     }
-    if ((CONSFILE *) 0 != pCE->fdlog) {
+    if (pCE->fdlog != (CONSFILE *)0) {
 	if (pCE->nolog) {
 	    TagLogfile(pCE, "Console logging restored");
 	}
 	TagLogfile(pCE, "Console down");
+	FD_CLR(FileFDNum(pCE->fdlog), &winit);
 	FileClose(&pCE->fdlog);
-	pCE->fdlog = (CONSFILE *) 0;
+    }
+    if (pCE->type == EXEC && pCE->execSlaveFD != 0) {
+	close(pCE->execSlaveFD);
+	pCE->execSlaveFD = 0;
     }
     pCE->fup = 0;
     pCE->nolog = 0;
     pCE->autoReUp = 0;
     pCE->downHard = downHard;
-}
-
-int
-#if PROTOTYPES
-CheckHostCache(const char *hostname)
-#else
-CheckHostCache(hostname)
-    const char *hostname;
-#endif
-{
-    struct hostcache *p;
-    p = hostcachelist;
-    while (p != NULL) {
-	if (0 == strcasecmp(hostname, p->hostname.string)) {
-	    return 1;
-	}
-	p = p->next;
-    }
-    return 0;
-}
-
-void
-#if PROTOTYPES
-AddHostCache(const char *hostname)
-#else
-AddHostCache(hostname)
-    const char *hostname;
-#endif
-{
-    struct hostcache *n;
-    if ((struct hostcache *)0 ==
-	(n = (struct hostcache *)calloc(1, sizeof(struct hostcache)))) {
-	Error("AddHostCache(): calloc(): %s", strerror(errno));
-	return;
-    }
-    BuildString(hostname, &n->hostname);
-    n->next = hostcachelist;
-    hostcachelist = n;
-}
-
-void
-#if PROTOTYPES
-ClearHostCache(void)
-#else
-ClearHostCache()
-#endif
-{
-    struct hostcache *p, *n;
-    p = hostcachelist;
-    while (p != NULL) {
-	n = p->next;
-	if (p->hostname.allocated)
-	    free(p->hostname.string);
-	free(p);
-	p = n;
-    }
-    hostcachelist = NULL;
+    pCE->ioState = ISDISCONNECTED;
 }
 
 /* set up a console the way it should be for use to work with it	(ksb)
@@ -737,26 +466,22 @@ ClearHostCache()
  */
 void
 #if PROTOTYPES
-ConsInit(CONSENT * pCE, fd_set * pfdSet, short useHostCache)
+ConsInit(CONSENT *pCE)
 #else
-ConsInit(pCE, pfdSet, useHostCache)
+ConsInit(pCE)
     CONSENT *pCE;
-    fd_set *pfdSet;
-    short useHostCache;
 #endif
 {
     time_t tyme;
-    extern int FallBack PARAMS((STRING *, STRING *));
-
-    if (!useHostCache)
-	ClearHostCache();
+    extern int FallBack PARAMS((char **, int *));
+    int cofile = -1;
+    int ret;
 
     /* clean up old stuff
      */
     if (pCE->fup) {
-	ConsDown(pCE, pfdSet, 0);
-	usleep(500000);		/* pause 0.50 sec to let things settle a bit */
-	ResetMark();
+	ConsDown(pCE, FLAGFALSE, FLAGTRUE);
+	usleep(250000);		/* pause 0.25 sec to let things settle a bit */
     }
 
     pCE->autoReUp = 0;
@@ -767,173 +492,175 @@ ConsInit(pCE, pfdSet, useHostCache)
 
     /* try to open them again
      */
-    if ((CONSFILE *) 0 ==
-	(pCE->fdlog =
-	 FileOpen(pCE->lfile.string, O_RDWR | O_CREAT | O_APPEND, 0644))) {
-	Error("[%s] FileOpen(%s): %s: forcing down", pCE->server.string,
-	      pCE->lfile.string, strerror(errno));
-	ConsDown(pCE, pfdSet, 1);
-	return;
+    if (pCE->logfile != (char *)0) {
+	if ((CONSFILE *)0 ==
+	    (pCE->fdlog =
+	     FileOpen(pCE->logfile, O_RDWR | O_CREAT | O_APPEND, 0644))) {
+	    Error("[%s] FileOpen(%s): %s: forcing down", pCE->server,
+		  pCE->logfile, strerror(errno));
+	    ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+	    return;
+	}
     }
 
     TagLogfile(pCE, "Console up");
 
-    if (0 != pCE->fvirtual) {
-	if (-1 == (pCE->fdtty = FallBack(&pCE->acslave, &pCE->dfile))) {
-	    Error("[%s] failed to allocate pseudo-tty: %s: forcing down",
-		  pCE->server.string, strerror(errno));
-	    ConsDown(pCE, pfdSet, 1);
-	    return;
-	}
-    } else if (pCE->isNetworkConsole) {
-	struct sockaddr_in port;
-	struct hostent *hp;
-	size_t one = 1;
-	int flags;
-	fd_set fds;
-	struct timeval tv;
+    switch (pCE->type) {
+	case UNKNOWN:		/* shut up gcc */
+	    break;
+	case EXEC:
+	    if ((cofile =
+		 FallBack(&pCE->execSlave, &pCE->execSlaveFD)) == -1) {
+		Error
+		    ("[%s] failed to allocate pseudo-tty: %s: forcing down",
+		     pCE->server, strerror(errno));
+		ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+		return;
+	    }
+	    if ((pCE->cofile =
+		 FileOpenFD(cofile, simpleFile)) == (CONSFILE *)0) {
+		Error
+		    ("[%s] FileOpenFD(%d,simpleFile) failed: forcing down",
+		     pCE->server, cofile);
+		ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+		return;
+	    }
+	    VirtDev(pCE);
+	    pCE->ioState = ISNORMAL;
+	    break;
+	case HOST:
+	    {
+		struct sockaddr_in port;
+		struct hostent *hp;
+		size_t one = 1;
 
-	if (CheckHostCache(pCE->networkConsoleHost.string)) {
-	    Error("[%s] cached previous timeout: %s: forcing down",
-		  pCE->server.string, pCE->networkConsoleHost.string);
-	    ConsDown(pCE, pfdSet, 1);
-	    return;
-	}
-	usleep(100000);		/* Not all terminal servers can keep up */
-	ResetMark();
+		usleep(100000);	/* Not all terminal servers can keep up */
 
 #if HAVE_MEMSET
-	memset((void *)&port, 0, sizeof(port));
+		memset((void *)&port, 0, sizeof(port));
 #else
-	bzero((char *)&port, sizeof(port));
+		bzero((char *)&port, sizeof(port));
 #endif
 
-	if ((hp = gethostbyname(pCE->networkConsoleHost.string)) == NULL) {
-	    Error("[%s] gethostbyname(%s): %s: forcing down",
-		  pCE->server.string, pCE->networkConsoleHost.string,
-		  hstrerror(h_errno));
-	    ConsDown(pCE, pfdSet, 1);
-	    return;
-	}
+		if ((hp = gethostbyname(pCE->host)) == NULL) {
+		    Error("[%s] gethostbyname(%s): %s: forcing down",
+			  pCE->server, pCE->host, hstrerror(h_errno));
+		    ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+		    return;
+		}
 #if HAVE_MEMCPY
-	memcpy(&port.sin_addr.s_addr, hp->h_addr, hp->h_length);
+		memcpy(&port.sin_addr.s_addr, hp->h_addr_list[0],
+		       hp->h_length);
 #else
-	bcopy(hp->h_addr, &port.sin_addr.s_addr, hp->h_length);
+		bcopy(hp->h_addr_list[0], &port.sin_addr.s_addr,
+		      hp->h_length);
 #endif
-	port.sin_family = hp->h_addrtype;
-	port.sin_port = htons(pCE->networkConsolePort);
+		port.sin_family = hp->h_addrtype;
+		port.sin_port = htons(pCE->port);
 
-	if ((pCE->fdtty = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-	    Error("[%s] socket(AF_INET,SOCK_STREAM): %s: forcing down",
-		  pCE->server.string, strerror(errno));
-	    ConsDown(pCE, pfdSet, 1);
-	    return;
-	}
-	if (setsockopt
-	    (pCE->fdtty, SOL_SOCKET, SO_KEEPALIVE, (char *)&one,
-	     sizeof(one)) < 0) {
-	    Error("[%s] setsockopt(%u,SO_KEEPALIVE): %s: forcing down",
-		  pCE->server.string, pCE->fdtty, strerror(errno));
-	    ConsDown(pCE, pfdSet, 1);
-	    return;
-	}
+		if ((cofile = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		    Error
+			("[%s] socket(AF_INET,SOCK_STREAM): %s: forcing down",
+			 pCE->server, strerror(errno));
+		    ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+		    return;
+		}
+		if (setsockopt
+		    (cofile, SOL_SOCKET, SO_KEEPALIVE, (char *)&one,
+		     sizeof(one)) < 0) {
+		    Error
+			("[%s] setsockopt(%u,SO_KEEPALIVE): %s: forcing down",
+			 pCE->server, cofile, strerror(errno));
+		    ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+		    return;
+		}
 
-	if ((flags = fcntl(pCE->fdtty, F_GETFL)) >= 0) {
-	    flags |= O_NONBLOCK;
-	    if (fcntl(pCE->fdtty, F_SETFL, flags) < 0) {
-		Error("[%s] fcntl(%u,F_SETFL): %s: forcing down",
-		      pCE->server.string, pCE->fdtty, strerror(errno));
-		ConsDown(pCE, pfdSet, 1);
+		if (!SetFlags(cofile, O_NONBLOCK, 0)) {
+		    ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+		    return;
+		}
+
+		if ((ret =
+		     connect(cofile, (struct sockaddr *)&port,
+			     sizeof(port)))
+		    < 0) {
+		    if (errno != EINPROGRESS) {
+			Error("[%s] connect(%u): %s: forcing down",
+			      pCE->server, cofile, strerror(errno));
+			ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+			return;
+		    }
+		}
+	    }
+	    if ((pCE->cofile =
+		 FileOpenFD(cofile, simpleSocket)) == (CONSFILE *)0) {
+		Error
+		    ("[%s] FileOpenFD(%d,simpleSocket) failed: forcing down",
+		     pCE->server, cofile);
+		ConsDown(pCE, FLAGTRUE, FLAGTRUE);
 		return;
 	    }
-	} else {
-	    Error("[%s] fcntl(%u,F_GETFL): %s: forcing down",
-		  pCE->server.string, pCE->fdtty, strerror(errno));
-	    ConsDown(pCE, pfdSet, 1);
-	    return;
-	}
+	    if (ret == 0) {
+		pCE->ioState = ISNORMAL;
+		pCE->stateTimer = 0;
+		pCE->fup = 1;
+	    } else {
+		pCE->ioState = INCONNECT;
+		pCE->stateTimer = time((time_t *)0) + CONNECTTIMEOUT;
+		pCE->fup = 1;
+	    }
+	    break;
+	case DEVICE:
+	    if (-1 ==
+		(cofile = open(pCE->device, O_RDWR | O_NDELAY, 0600))) {
 
-	if (connect(pCE->fdtty, (struct sockaddr *)&port, sizeof(port)) <
-	    0) {
-	    if (errno != EINPROGRESS) {
-		Error("[%s] connect(%u): %s: forcing down",
-		      pCE->server.string, pCE->fdtty, strerror(errno));
-		ConsDown(pCE, pfdSet, 1);
+		Error("[%s] open(%s): %s: forcing down", pCE->server,
+		      pCE->device, strerror(errno));
+		ConsDown(pCE, FLAGTRUE, FLAGTRUE);
 		return;
 	    }
-	}
-
-	tv.tv_sec = CONNECTTIMEOUT;
-	tv.tv_usec = 0;
-	FD_ZERO(&fds);
-	FD_SET(pCE->fdtty, &fds);
-
-	if ((one = select(pCE->fdtty + 1, NULL, &fds, NULL, &tv)) < 0) {
-	    Error("[%s] select(%u): %s: forcing down", pCE->server.string,
-		  pCE->fdtty, strerror(errno));
-	    ConsDown(pCE, pfdSet, 1);
-	    return;
-	}
-
-	if (one == 0) {		/* Timeout */
-	    AddHostCache(pCE->networkConsoleHost.string);
-	    Error("[%s] connect timeout: forcing down", pCE->server.string,
-		  strerror(errno));
-	    ConsDown(pCE, pfdSet, 1);
-	    return;
-	} else {		/* Response */
-	    socklen_t slen;
-	    flags = 0;
-	    slen = sizeof(flags);
-	    /* So, getsockopt seems to return -1 if there is something
-	       interesting in SO_ERROR under solaris...sheesh.  So,
-	       the error message has the small change it's not accurate. */
-	    if (getsockopt
-		(pCE->fdtty, SOL_SOCKET, SO_ERROR, (char *)&flags,
-		 &slen) < 0) {
-		Error("[%s] getsockopt(%u,SO_ERROR): %s: forcing down",
-		      pCE->server.string, pCE->fdtty, strerror(errno));
-		ConsDown(pCE, pfdSet, 1);
+	    if ((pCE->cofile =
+		 FileOpenFD(cofile, simpleFile)) == (CONSFILE *)0) {
+		Error
+		    ("[%s] FileOpenFD(%d,simpleFile) failed: forcing down",
+		     pCE->server, cofile);
+		ConsDown(pCE, FLAGTRUE, FLAGTRUE);
 		return;
 	    }
-	    if (flags != 0) {
-		Error("[%s] connect(%u): %s: forcing down",
-		      pCE->server.string, pCE->fdtty, strerror(flags));
-		ConsDown(pCE, pfdSet, 1);
-		return;
-	    }
-	}
+	    TtyDev(pCE);
+	    pCE->ioState = ISNORMAL;
+	    break;
+    }
 
-# if POKE_ANNEX
-	/*
-	 * Poke the connection to get the annex to wake up and
-	 * register this connection.
-	 */
-	write(pCE->fdtty, "\r\n", 2);
-# endif
-    } else if (-1 ==
-	       (pCE->fdtty =
-		open(pCE->dfile.string, O_RDWR | O_NDELAY, 0600))) {
-	Error("[%s] open(%s): %s: forcing down", pCE->server.string,
-	      pCE->dfile.string, strerror(errno));
-	ConsDown(pCE, pfdSet, 1);
+    if (!pCE->fup) {
+	pCE->ioState = ISDISCONNECTED;
 	return;
     }
-    FD_SET(pCE->fdtty, pfdSet);
 
-    /* ok, now setup the device
-     */
-    if (pCE->fvirtual) {
-	VirtDev(pCE);
-    } else if (pCE->isNetworkConsole) {
-	pCE->fup = 1;
-    } else {
-	TtyDev(pCE, pfdSet);
+    switch (pCE->type) {
+	case UNKNOWN:		/* shut up gcc */
+	    break;
+	case EXEC:
+	    Verbose("[%s] pid %lu on %s", pCE->server, pCE->ipid,
+		    pCE->execSlave);
+	    break;
+	case HOST:
+	    Verbose("[%s] port %hu on %s", pCE->server, pCE->port,
+		    pCE->host);
+	    break;
+	case DEVICE:
+	    Verbose("[%s] at %s%c on %s", pCE->server, pCE->baud->acrate,
+		    pCE->parity->key[0], pCE->device);
+	    break;
     }
+
+    FD_SET(cofile, &rinit);
+    if (maxfd < cofile + 1)
+	maxfd = cofile + 1;
 
     /* If we have marks, adjust the next one so that it's in the future */
     if (pCE->nextMark > 0) {
-	tyme = time((time_t *) 0);
+	tyme = time((time_t *)0);
 	if (tyme >= pCE->nextMark) {
 	    /* Add as many pCE->mark values as necessary so that we move
 	     * beyond the current time.
@@ -943,8 +670,210 @@ ConsInit(pCE, pfdSet, useHostCache)
 	}
     }
 
-    if (pCE->downHard && pCE->fup) {
-	Msg("[%s] console up", pCE->server.string);
-	pCE->downHard = 0;
+    if (pCE->downHard == FLAGTRUE) {
+	Msg("[%s] console up", pCE->server);
+	pCE->downHard = FLAGFALSE;
     }
+}
+
+int
+#if PROTOTYPES
+AddrsMatch(char *addr1, char *addr2)
+#else
+AddrsMatch(addr1, addr2)
+    char *addr1;
+    char *addr2;
+#endif
+{
+    /* so, since we might use inet_addr, we're going to use
+     * (in_addr_t)(-1) as a sign of an invalid ip address.
+     * sad, but true.
+     */
+    in_addr_t inAddr1 = (in_addr_t) (-1);
+    in_addr_t inAddr2 = (in_addr_t) (-1);
+#if HAVE_INET_ATON
+    struct in_addr inetAddr1;
+    struct in_addr inetAddr2;
+#endif
+
+    /* first try simple character string match */
+    if (strcasecmp(addr1, addr2) == 0)
+	return 1;
+
+    /* now try ip address match (could have leading zeros or something) */
+#if HAVE_INET_ATON
+    if (inet_aton(addr1, &inetAddr1) != 0)
+	inAddr1 = inetAddr1.s_addr;
+    if (inet_aton(addr2, &inetAddr2) != 0)
+	inAddr2 = inetAddr2.s_addr;
+#else
+    inAddr1 = inet_addr(addr1);
+    inAddr2 = inet_addr(addr2);
+#endif
+
+    /* if both are ip addresses, we just match */
+    if (inAddr1 != (in_addr_t) (-1) && inAddr2 != (in_addr_t) (-1))
+	return !
+#if HAVE_MEMCMP
+	    memcmp(&inAddr1, &inAddr2, sizeof(inAddr1))
+#else
+	    bcmp(&inAddr1, &inAddr2, sizeof(inAddr1))
+#endif
+	    ;
+
+    /* both are hostnames...this sucks 'cause we have to copy one
+     * list and compare it to the other
+     */
+    if (inAddr1 == (in_addr_t) (-1) && inAddr2 == (in_addr_t) (-1)) {
+	struct hostent *he;
+	int i, j, c;
+	in_addr_t *addrs;
+
+	if ((he = gethostbyname(addr1)) == (struct hostent *)0) {
+	    Error("AddrsMatch(): gethostbyname(%s): %s", addr1,
+		  hstrerror(h_errno));
+	    return 0;
+	}
+	if (4 != he->h_length || AF_INET != he->h_addrtype) {
+	    Error
+		("AddrsMatch(): gethostbyname(%s): wrong address size (4 != %d) or address family (%d != %d)",
+		 addr1, he->h_length, AF_INET, he->h_addrtype);
+	    return 0;
+	}
+	for (i = 0; he->h_addr_list[i] != (char *)0; i++);
+	c = i;
+	addrs = (in_addr_t *) calloc(i, sizeof(in_addr_t));
+	if (addrs == (in_addr_t *) 0)
+	    OutOfMem();
+	for (i = 0; i < c; i++) {
+#if HAVE_MEMCPY
+	    memcpy(&(addrs[i]), he->h_addr_list[i], he->h_length);
+#else
+	    bcopy(he->h_addr_list[i], &(addrs[i]), he->h_length);
+#endif
+	}
+
+	/* now process the second hostname */
+	if ((he = gethostbyname(addr2)) == (struct hostent *)0) {
+	    Error("AddrsMatch(): gethostbyname(%s): %s", addr2,
+		  hstrerror(h_errno));
+	    free(addrs);
+	    return 0;
+	}
+	if (4 != he->h_length || AF_INET != he->h_addrtype) {
+	    Error
+		("AddrsMatch(): gethostbyname(%s): wrong address size (4 != %d) or address family (%d != %d)",
+		 addr2, he->h_length, AF_INET, he->h_addrtype);
+	    free(addrs);
+	    return 0;
+	}
+	for (j = 0; he->h_addr_list[j] != (char *)0; j++) {
+	    for (i = 0; i < c; i++) {
+		if (
+#if HAVE_MEMCMP
+		       memcmp(&(addrs[i]), he->h_addr_list[j],
+			      he->h_length)
+#else
+		       bcmp(&(addrs[i]), he->h_addr_list[j], he->h_length)
+#endif
+		       == 0) {
+		    free(addrs);
+		    return 1;
+		}
+	    }
+	}
+	free(addrs);
+    } else {			/* one hostname, one ip addr */
+	in_addr_t *iaddr;
+	char *addr;
+	struct hostent *he;
+	int i;
+
+	if (inAddr1 == (in_addr_t) (-1)) {
+	    addr = addr1;
+	    iaddr = &inAddr2;
+	} else {
+	    addr = addr2;
+	    iaddr = &inAddr1;
+	}
+	if ((he = gethostbyname(addr)) == (struct hostent *)0) {
+	    Error("AddrsMatch(): gethostbyname(%s): %s", addr,
+		  hstrerror(h_errno));
+	    return 0;
+	}
+	if (4 != he->h_length || AF_INET != he->h_addrtype) {
+	    Error
+		("AddrsMatch(): wrong address size (4 != %d) or address family (%d != %d)",
+		 he->h_length, AF_INET, he->h_addrtype);
+	    return 0;
+	}
+	for (i = 0; he->h_addr_list[i] != (char *)0; i++) {
+	    if (
+#if HAVE_MEMCMP
+		   memcmp(iaddr, he->h_addr_list[i], he->h_length)
+#else
+		   bcmp(iaddr, he->h_addr_list[i], he->h_length)
+#endif
+		   == 0)
+		return 1;
+	}
+    }
+    return 0;
+}
+
+/* thread ther list of uniq console server machines, aliases for	(ksb)
+ * machines will screw us up
+ */
+REMOTE *
+#if PROTOTYPES
+FindUniq(REMOTE *pRCAll)
+#else
+FindUniq(pRCAll)
+    REMOTE *pRCAll;
+#endif
+{
+    REMOTE *pRC;
+
+    /* INV: tail of the list we are building always contains only
+     * uniq hosts, or the empty list.
+     */
+    if (pRCAll == (REMOTE *)0)
+	return (REMOTE *)0;
+
+    pRCAll->pRCuniq = FindUniq(pRCAll->pRCnext);
+
+    /* if it is in the returned list of uniq hosts, return that list
+     * else add us by returning our node
+     */
+    for (pRC = pRCAll->pRCuniq; (REMOTE *)0 != pRC; pRC = pRC->pRCuniq) {
+	if (AddrsMatch(pRC->rhost, pRCAll->rhost))
+	    return pRCAll->pRCuniq;
+    }
+    return pRCAll;
+}
+
+void
+#if PROTOTYPES
+DestroyRemoteConsole(REMOTE *pRCList)
+#else
+DestroyRemoteConsole(pRCList)
+    REMOTE *pRCList;
+#endif
+{
+    NAMES *name = (NAMES *)0;
+
+    if (pRCList == (REMOTE *)0)
+	return;
+    if (pRCList->rserver != (char *)0)
+	free(pRCList->rserver);
+    if (pRCList->rhost != (char *)0)
+	free(pRCList->rhost);
+    while (pRCList->aliases != (NAMES *)0) {
+	name = pRCList->aliases->next;
+	if (pRCList->aliases->name != (char *)0)
+	    free(pRCList->aliases->name);
+	free(pRCList->aliases);
+	pRCList->aliases = name;
+    }
+    free(pRCList);
 }

@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.36 2003-03-17 08:54:53-08 bryan Exp $
+ *  $Id: consent.h,v 5.46 2003-08-18 20:01:16-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -46,60 +46,111 @@ typedef struct baud {		/* a baud rate table                    */
 } BAUD;
 
 typedef struct parity {		/* a parity bits table                  */
-    char ckey;
+    char *key;
     int iset;
     int iclr;
 } PARITY;
 
+typedef enum consType {
+    UNKNOWN = 0,
+    DEVICE,
+    EXEC,
+    HOST
+} CONSTYPE;
+
+typedef struct names {
+    char *name;
+    struct names *next;
+} NAMES;
+
+typedef struct consentUsers {
+    NAMES *user;
+    struct consentUsers *next;
+} CONSENTUSERS;
+
+/* we calloc() these things, so we're trying to make everything be
+ * "empty" when it's got a zero value
+ */
 typedef struct consent {	/* console information                  */
-    STRING server;		/* server name                          */
-    STRING dfile;		/* device file                          */
-    STRING lfile;		/* log file                             */
-    BAUD *pbaud;		/* the baud on this console port        */
-    PARITY *pparity;		/* the parity on this line              */
+    /*** config file settings ***/
+    char *server;		/* server name                          */
+    CONSTYPE type;		/* console type                         */
+    NAMES *aliases;		/* aliases for server name              */
+    /* type == DEVICE */
+    char *device;		/* device file                          */
+    BAUD *baud;			/* the baud on this console port        */
+    PARITY *parity;		/* the parity on this line              */
+    FLAG hupcl;			/* use HUPCL                            */
+    FLAG cstopb;		/* use two stop bits                    */
+    FLAG ixon;			/* XON/XOFF flow control on output      */
+    FLAG ixany;			/* any character to restart output      */
+    FLAG ixoff;			/* XON/XOFF flow control on input       */
+#if defined(CRTSCTS)
+    FLAG crtscts;		/* use hardware flow control            */
+#endif
+    /* type == HOST */
+    char *host;			/* hostname                             */
+    unsigned short port;	/* port number                          */
+    /* type == EXEC */
+    char *exec;			/* exec command                         */
+    /* */
+    char *master;		/* master hostname                      */
+    /* */
+    unsigned short breakNum;	/* break type [1-9]                     */
+    /* */
+    char *logfile;		/* logfile                              */
+    /* timestamp stuff */
     int mark;			/* Mark (chime) interval                */
     long nextMark;		/* Next mark (chime) time               */
-    unsigned short breakType;	/* break type [1-9]                     */
-    unsigned short autoReUp;	/* is it coming back up automatically?  */
-    unsigned short downHard;	/* did it go down unexpectedly?         */
+    FLAG activitylog;		/* log attach/detach/bump               */
+    FLAG breaklog;		/* log breaks sent                      */
+    /* options */
+    FLAG ondemand;		/* bring up on-demand                   */
+    FLAG reinitoncc;		/* open if down on client connect       */
+    FLAG striphigh;		/* strip high-bit of console data       */
+    FLAG autoreinit;		/* auto-reinitialize if failed          */
+    FLAG unloved;		/* copy "unloved" data to stdout        */
 
-    /* Used if network console */
-    int isNetworkConsole;
-    STRING networkConsoleHost;
-    unsigned short networkConsolePort;
-    int telnetState;
-
-    /* used if virtual console */
-    STRING acslave;		/* pseudo-device slave side             */
-    int fvirtual;		/* is a pty device we use as a console  */
-    STRING pccmd;		/* virtual console command              */
-    pid_t ipid;			/* pid of virtual command               */
-
-    /* only used in child */
-    int nolog;			/* don't log output                     */
+    /*** runtime settings ***/
     CONSFILE *fdlog;		/* the local log file                   */
-    int fdtty;			/* the port to talk to machine on       */
-    int activitylog;		/* log attach/detach/bump               */
-    int breaklog;		/* log breaks sent                      */
-    unsigned short fup;		/* we setup this line?                  */
-    unsigned short fronly;	/* we can only read this console        */
-    struct client *pCLon;	/* clients on this console              */
-    struct client *pCLwr;	/* client that is writting on console   */
+    CONSFILE *cofile;		/* the port to talk to machine on       */
+    char *execSlave;		/* pseudo-device slave side             */
+    int execSlaveFD;		/* fd of slave side                     */
+    pid_t ipid;			/* pid of virtual command               */
+    STRING *wbuf;		/* write() buffer                       */
+    int wbufIAC;		/* next IAC location in wbuf            */
+    IOSTATE ioState;		/* state of the socket                  */
+    time_t stateTimer;		/* timer for ioState states             */
+
+    /*** state information ***/
     char acline[132 * 2 + 2];	/* max chars we will call a line        */
     int iend;			/* length of data stored in acline      */
+    int telnetState;		/* state for telnet negotiations        */
+    unsigned short autoReUp;	/* is it coming back up automatically?  */
+    FLAG downHard;		/* did it go down unexpectedly?         */
+    unsigned short nolog;	/* don't log output                     */
+    unsigned short fup;		/* we setup this line?                  */
+    unsigned short fronly;	/* we can only read this console        */
+
+    /*** list management ***/
+    struct client *pCLon;	/* clients on this console              */
+    struct client *pCLwr;	/* client that is writting on console   */
+    CONSENTUSERS *rw;		/* rw users                             */
+    CONSENTUSERS *ro;		/* ro users                             */
     struct consent *pCEnext;	/* next console entry                   */
 } CONSENT;
 
-struct hostcache {
-    STRING hostname;
-    struct hostcache *next;
-};
+typedef struct remote {		/* console at another host              */
+    struct remote *pRCnext;	/* next remote console we know about    */
+    struct remote *pRCuniq;	/* list of uniq remote servers          */
+    char *rserver;		/* remote server name                   */
+    char *rhost;		/* remote host to call to get it        */
+    NAMES *aliases;		/* aliases for remote server name       */
+} REMOTE;
 
 extern PARITY *FindParity PARAMS((char *));
 extern BAUD *FindBaud PARAMS((char *));
-extern void ConsInit PARAMS((CONSENT *, fd_set *, short));
-extern void ConsDown PARAMS((CONSENT *, fd_set *, short));
-extern int CheckHostCache PARAMS((const char *));
-extern void AddHostCache PARAMS((const char *));
-extern void ClearHostCache PARAMS((void));
-extern void ClearHostCache PARAMS((void));
+extern void ConsInit PARAMS((CONSENT *));
+extern void ConsDown PARAMS((CONSENT *, FLAG, FLAG));
+extern REMOTE *FindUniq PARAMS((REMOTE *));
+extern void DestroyRemoteConsole PARAMS((REMOTE *));

@@ -1,5 +1,5 @@
 /*
- *  $Id: access.h,v 5.22 2003-03-06 10:13:41-08 bryan Exp $
+ *  $Id: access.h,v 5.26 2003-08-10 11:11:20-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -39,21 +39,11 @@
 
 typedef struct access {
     char ctrust;		/* how much do we trust the host        */
-    int ilen;			/* length (strlen) of pcwho             */
     char *pcwho;		/* what is the hosts name/ip number     */
     int isCIDR;			/* is this a CIDR addr (or hostname?)   */
     struct access *pACnext;	/* next access list                     */
 } ACCESS;
 
-typedef struct remote {		/* console at another host              */
-    struct remote *pRCnext;	/* next remote console we know about    */
-    struct remote *pRCuniq;	/* list of uniq remote servers          */
-    STRING rserver;		/* remote server name                   */
-    STRING rhost;		/* remote host to call to get it        */
-} REMOTE;
-
-extern REMOTE *FindUniq PARAMS((REMOTE *));
-extern char AccType PARAMS((struct in_addr *, char *));
+extern char AccType PARAMS((struct in_addr *, char **));
 extern void SetDefAccess PARAMS((struct in_addr *, char *));
-extern void DestroyRemoteConsole PARAMS((REMOTE *));
 extern void DestroyAccessList PARAMS((ACCESS *));

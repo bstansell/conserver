@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.122 2003-04-06 05:31:13-07 bryan Exp $
+ *  $Id: main.c,v 5.157 2003-09-22 08:33:58-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -27,24 +27,11 @@
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <config.h>
+#include <compat.h>
 
-#include <sys/param.h>
-#include <sys/socket.h>
-#include <sys/file.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <stdio.h>
-#include <ctype.h>
-#include <signal.h>
 #include <pwd.h>
 
-#include <compat.h>
 #include <util.h>
-
 #include <consent.h>
 #include <client.h>
 #include <group.h>
@@ -53,43 +40,39 @@
 #include <readcfg.h>
 #include <version.h>
 
+#include <net/if.h>
+#if HAVE_SYS_SOCKIO_H
+# include <sys/sockio.h>
+#endif
 #if HAVE_OPENSSL
-#include <openssl/opensslv.h>
+# include <openssl/opensslv.h>
 #endif
 
 
-int fAll = 0, fSoftcar = 0, fNoinit = 0, fVersion = 0, fStrip =
-    0, fDaemon = 0, fUseLogfile = 0, fReopen = 0, fReopenall =
-    0, fNoautoreup = 0, fNoredir = 0;
+int fAll = 0, fNoinit = 0, fVersion = 0, fStrip = 0, fDaemon = 0, fReopen =
+    0, fNoautoreup = 0, fSyntaxOnly = 0;
 
 char chDefAcc = 'r';
 
-char *pcLogfile = LOGFILEPATH;
 char *pcConfig = CONFIGFILE;
-char *pcPasswd = PASSWDFILE;
-char *pcPort = DEFPORT;
-char *pcBasePort = DEFBASEPORT;
-STRING *defaultShell = (STRING *) 0;
-int domainHack = 0;
 int isMaster = 1;
 int cMaxMemb = MAXMEMB;
-char *pcAddress = NULL;
 in_addr_t bindAddr;
 unsigned short bindPort;
 unsigned short bindBasePort;
+static STRING *startedMsg = (STRING *)0;
+CONFIG *optConf = (CONFIG *)0;
+CONFIG *config = (CONFIG *)0;
+char *interface = (char *)0;
 
 struct sockaddr_in in_port;
-struct in_addr acMyAddr;
-char acMyHost[1024];		/* staff.cc.purdue.edu                  */
 
 #if HAVE_OPENSSL
-SSL_CTX *ctx = (SSL_CTX *) 0;
-int fReqEncryption = 1;
-char *pcCredFile = (char *)0;
-DH *dh512 = (DH *) 0;
-DH *dh1024 = (DH *) 0;
-DH *dh2048 = (DH *) 0;
-DH *dh4096 = (DH *) 0;
+SSL_CTX *ctx = (SSL_CTX *)0;
+DH *dh512 = (DH *)0;
+DH *dh1024 = (DH *)0;
+DH *dh2048 = (DH *)0;
+DH *dh4096 = (DH *)0;
 
 
 DH *
@@ -292,7 +275,7 @@ GetDH4096()
 
 DH *
 #if PROTOTYPES
-TmpDHCallback(SSL * ssl, int is_export, int keylength)
+TmpDHCallback(SSL *ssl, int is_export, int keylength)
 #else
 TmpDHCallback(ssl, is_export, keylength)
     SSL *ssl;
@@ -300,22 +283,23 @@ TmpDHCallback(ssl, is_export, keylength)
     int keylength;
 #endif
 {
-    Debug(1, "TmpDHCallback(): asked for a DH key length %u", keylength);
+    CONDDEBUG((1, "TmpDHCallback(): asked for a DH key length %u",
+	       keylength));
     switch (keylength) {
 	case 512:
-	    if (dh512 == (DH *) 0)
+	    if (dh512 == (DH *)0)
 		dh512 = GetDH512();
 	    return dh512;
 	case 1024:
-	    if (dh1024 == (DH *) 0)
+	    if (dh1024 == (DH *)0)
 		dh1024 = GetDH1024();
 	    return dh1024;
 	case 2048:
-	    if (dh2048 == (DH *) 0)
+	    if (dh2048 == (DH *)0)
 		dh2048 = GetDH2048();
 	    return dh2048;
 	default:
-	    if (dh4096 == (DH *) 0)
+	    if (dh4096 == (DH *)0)
 		dh4096 = GetDH4096();
 	    return dh4096;
     }
@@ -328,13 +312,13 @@ SetupSSL(void)
 SetupSSL()
 #endif
 {
-    if (ctx == (SSL_CTX *) 0) {
+    if (ctx == (SSL_CTX *)0) {
 	SSL_load_error_strings();
 	if (!SSL_library_init()) {
 	    Error("SetupSSL(): SSL_library_init() failed");
 	    Bye(EX_SOFTWARE);
 	}
-	if ((ctx = SSL_CTX_new(SSLv23_method())) == (SSL_CTX *) 0) {
+	if ((ctx = SSL_CTX_new(SSLv23_method())) == (SSL_CTX *)0) {
 	    Error("SetupSSL(): SSL_CTX_new() failed");
 	    Bye(EX_SOFTWARE);
 	}
@@ -343,17 +327,19 @@ SetupSSL()
 		("SetupSSL(): could not load SSL default CA file and/or directory");
 	    Bye(EX_SOFTWARE);
 	}
-	if (pcCredFile != (char *)0) {
-	    if (SSL_CTX_use_certificate_chain_file(ctx, pcCredFile) != 1) {
+	if (config->sslcredentials != (char *)0) {
+	    if (SSL_CTX_use_certificate_chain_file
+		(ctx, config->sslcredentials) != 1) {
 		Error
 		    ("SetupSSL(): could not load SSL certificate from `%s'",
-		     pcCredFile);
+		     config->sslcredentials);
 		Bye(EX_SOFTWARE);
 	    }
 	    if (SSL_CTX_use_PrivateKey_file
-		(ctx, pcCredFile, SSL_FILETYPE_PEM) != 1) {
-		Error("SetupSSL(): could not SSL private key from `%s'",
-		      pcCredFile);
+		(ctx, config->sslcredentials, SSL_FILETYPE_PEM) != 1) {
+		Error
+		    ("SetupSSL(): could not load SSL private key from `%s'",
+		     config->sslcredentials);
 		Bye(EX_SOFTWARE);
 	    }
 	}
@@ -386,22 +372,30 @@ ReopenLogfile(void)
 ReopenLogfile()
 #endif
 {
+    static int tag = 1;
     /* redirect stdout and stderr to the logfile.
      *
      * first time through any problems will show up (stderr still there).
      * after that, all bets are off...probably not see the errors (well,
      * aside from the tail of the old logfile, if it was rolled).
      */
-    if (!fUseLogfile)
+    if (!fDaemon || config->logfile == (char *)0)
 	return;
 
     close(1);
-    if (1 != open(pcLogfile, O_WRONLY | O_CREAT | O_APPEND, 0644)) {
-	Error("ReopenLogfile(): open(%s): %s", pcLogfile, strerror(errno));
+    if (1 != open(config->logfile, O_WRONLY | O_CREAT | O_APPEND, 0644)) {
+	tag = 0;
+	Error("ReopenLogfile(): open(%s): %s", config->logfile,
+	      strerror(errno));
 	Bye(EX_TEMPFAIL);
     }
     close(2);
     dup(1);
+    if (isMaster && tag) {
+	Msg("%s", THIS_VERSION);
+	Msg("%s", startedMsg->string);
+    }
+    tag = 0;
 }
 
 /* become a daemon							(ksb)
@@ -418,6 +412,7 @@ Daemonize()
     int td;
 #endif
 
+    Msg("daemonizing");
     SimpleSignal(SIGQUIT, SIG_IGN);
     SimpleSignal(SIGINT, SIG_IGN);
 #if defined(SIGTTOU)
@@ -453,7 +448,7 @@ Daemonize()
 #if HAVE_SETSID
     setsid();
 #else
-    setpgrp(0, getpid());
+    tcsetpgrp(0, getpid());
 
     /* lose our controlling terminal
      */
@@ -476,7 +471,7 @@ Usage(wantfull)
 #endif
 {
     static char u_terse[] =
-	"[-7dDEFhinRouvV] [-a type] [-m max] [-M addr] [-p port] [-b port] [-c cred] [-C config] [-P passwd] [-L logfile] [-O min]";
+	"[-7dDEFhinoRSuvV] [-a type] [-m max] [-M addr] [-p port] [-b port] [-c cred] [-C config] [-P passwd] [-L logfile] [-O min]";
     static char *full[] = {
 	"7          strip the high bit of all console data",
 	"a type     set the default access type",
@@ -506,12 +501,13 @@ Usage(wantfull)
 	"p port     port to listen on",
 	"P passwd   give a new passwd file to the server process",
 	"R          disable automatic client redirection",
+	"S          syntax check of configuration file",
 	"u          copy \"unloved\" console data to stdout",
 	"v          be verbose on startup",
 	"V          output version info",
 	(char *)0
     };
-    fprintf(stderr, "%s: usage %s\n", progname, u_terse);
+    fprintf(stderr, "usage: %s %s\n", progname, u_terse);
     if (wantfull) {
 	int i;
 	for (i = 0; full[i] != (char *)0; i++)
@@ -528,8 +524,8 @@ Version()
 Version()
 #endif
 {
-    static STRING *acA1 = (STRING *) 0;
-    static STRING *acA2 = (STRING *) 0;
+    static STRING *acA1 = (STRING *)0;
+    static STRING *acA2 = (STRING *)0;
     int i;
     char *optionlist[] = {
 #if HAVE_DMALLOC
@@ -544,15 +540,12 @@ Version()
 #if HAVE_PAM
 	"pam",
 #endif
-#if HAVE_POSIX_REGCOMP
-	"regex",
-#endif
 	(char *)0
     };
 
-    if (acA1 == (STRING *) 0)
+    if (acA1 == (STRING *)0)
 	acA1 = AllocString();
-    if (acA2 == (STRING *) 0)
+    if (acA2 == (STRING *)0)
 	acA2 = AllocString();
 
     isMultiProc = 0;
@@ -561,57 +554,15 @@ Version()
     Msg("default access type `%c'", chDefAcc);
     Msg("default escape sequence `%s%s'", FmtCtl(DEFATTN, acA1),
 	FmtCtl(DEFESC, acA2));
-    Msg("configuration in `%s'", pcConfig);
-    Msg("password in `%s'", pcPasswd);
-    Msg("logfile is `%s'", pcLogfile);
-    Msg("pidfile is `%s'", PIDFILE);
-    Msg("limited to %d member%s per group", cMaxMemb,
-	cMaxMemb == 1 ? "" : "s");
+    Msg("default configuration in `%s'", CONFIGFILE);
+    Msg("default password in `%s'", PASSWDFILE);
+    Msg("default logfile is `%s'", LOGFILEPATH);
+    Msg("default pidfile is `%s'", PIDFILE);
+    Msg("default limit is %d member%s per group", MAXMEMB,
+	MAXMEMB == 1 ? "" : "s");
+    Msg("default primary port referenced as `%s'", DEFPORT);
+    Msg("default secondary base port referenced as `%s'", DEFBASEPORT);
 
-    /* Look for non-numeric characters */
-    for (i = 0; pcPort[i] != '\000'; i++)
-	if (!isdigit((int)pcPort[i]))
-	    break;
-
-    if (pcPort[i] == '\000') {
-	/* numeric only */
-	bindPort = atoi(pcPort);
-	Msg("on port %hu (referenced as `%s')", bindPort, pcPort);
-    } else {
-	/* non-numeric only */
-	struct servent *pSE;
-	if ((struct servent *)0 == (pSE = getservbyname(pcPort, "tcp"))) {
-	    Error("Version(): getservbyname(%s): %s", pcPort,
-		  strerror(errno));
-	} else {
-	    bindPort = ntohs((unsigned short)pSE->s_port);
-	    Msg("on port %hu (referenced as `%s')", bindPort, pcPort);
-	}
-    }
-
-    /* Look for non-numeric characters */
-    for (i = 0; pcBasePort[i] != '\000'; i++)
-	if (!isdigit((int)pcBasePort[i]))
-	    break;
-
-    if (pcBasePort[i] == '\000') {
-	/* numeric only */
-	bindBasePort = atoi(pcBasePort);
-	Msg("secondary channel base port %hu (referenced as `%s')",
-	    bindBasePort, pcBasePort);
-    } else {
-	/* non-numeric only */
-	struct servent *pSE;
-	if ((struct servent *)0 ==
-	    (pSE = getservbyname(pcBasePort, "tcp"))) {
-	    Error("Version(): getservbyname(%s): %s", pcBasePort,
-		  strerror(errno));
-	} else {
-	    bindBasePort = ntohs((unsigned short)pSE->s_port);
-	    Msg("secondary channel base port %hu (referenced as `%s')",
-		bindBasePort, pcBasePort);
-	}
-    }
     BuildString((char *)0, acA1);
     if (optionlist[0] == (char *)0)
 	BuildString("none", acA1);
@@ -658,39 +609,159 @@ DestroyDataStructures()
     REMOTE *pRC;
     ACCESS *pAC;
 
-    while (pGroups != (GRPENT *) 0) {
+    while (pGroups != (GRPENT *)0) {
 	pGE = pGroups->pGEnext;
 	DestroyGroup(pGroups);
 	pGroups = pGE;
     }
 
-    while (pRCList != (REMOTE *) 0) {
+    while (pRCList != (REMOTE *)0) {
 	pRC = pRCList->pRCnext;
 	DestroyRemoteConsole(pRCList);
 	pRCList = pRC;
     }
 
-    while (pACList != (ACCESS *) 0) {
+    while (pACList != (ACCESS *)0) {
 	pAC = pACList->pACnext;
 	DestroyAccessList(pACList);
 	pACList = pAC;
     }
+    DestroyConsentUsers(&pADList);
+
+    DestroyConfig(pConfig);
+    DestroyConfig(optConf);
+    DestroyConfig(config);
 
 #if HAVE_OPENSSL
-    if (ctx != (SSL_CTX *) 0)
+    if (ctx != (SSL_CTX *)0)
 	SSL_CTX_free(ctx);
-    if (dh512 != (DH *) 0)
+    if (dh512 != (DH *)0)
 	DH_free(dh512);
-    if (dh1024 != (DH *) 0)
+    if (dh1024 != (DH *)0)
 	DH_free(dh1024);
-    if (dh2048 != (DH *) 0)
+    if (dh2048 != (DH *)0)
 	DH_free(dh2048);
-    if (dh4096 != (DH *) 0)
+    if (dh4096 != (DH *)0)
 	DH_free(dh4096);
 #endif
 
+    if (myAddrs != (struct in_addr *)0)
+	free(myAddrs);
+
     DestroyBreakList();
     DestroyStrings();
+    DestroyUserList();
+}
+
+void
+#if PROTOTYPES
+SummarizeDataStructures(void)
+#else
+SummarizeDataStructures()
+#endif
+{
+    GRPENT *pGE;
+    REMOTE *pRC;
+    ACCESS *pAC;
+    STRING *str;
+    CONSENT *pCE;
+    NAMES *usr;
+    int count;
+    long size;
+    long total = 0;
+    extern STRING *allStrings;
+
+    if (!fDebug)
+	return;
+
+    for (size = 0, count = 0, pGE = pGroups; pGE != (GRPENT *)0;
+	 pGE = pGE->pGEnext, count++) {
+	size += sizeof(GRPENT);
+    }
+    CONDDEBUG((1, "Memory Usage (GRPENT objects): %ld (%d)", size, count));
+    total += size;
+
+    for (size = 0, count = 0, pGE = pGroups; pGE != (GRPENT *)0;
+	 pGE = pGE->pGEnext) {
+	for (pCE = pGE->pCElist; pCE != (CONSENT *)0;
+	     pCE = pCE->pCEnext, count++) {
+	    size += strlen(pCE->server) + sizeof(CONSENT);
+	    if (pCE->host != (char *)0)
+		size += strlen(pCE->server);
+	    if (pCE->device != (char *)0)
+		size += strlen(pCE->device);
+	    if (pCE->exec != (char *)0)
+		size += strlen(pCE->exec);
+	    if (pCE->master != (char *)0)
+		size += strlen(pCE->master);
+	    if (pCE->logfile != (char *)0)
+		size += strlen(pCE->logfile);
+	    if (pCE->execSlave != (char *)0)
+		size += strlen(pCE->execSlave);
+	    if (pCE->fdlog != (CONSFILE *)0)
+		size += sizeof(CONSFILE);
+	    if (pCE->cofile != (CONSFILE *)0)
+		size += sizeof(CONSFILE);
+	    if (pCE->aliases != (NAMES *)0) {
+		NAMES *n;
+		for (n = pCE->aliases; n != (NAMES *)0; n = n->next) {
+		    size += sizeof(NAMES) + strlen(n->name);
+		}
+	    }
+	    if (pCE->ro) {
+		CONSENTUSERS *u;
+		for (u = pCE->ro; u != (CONSENTUSERS *)0; u = u->next) {
+		    size += sizeof(CONSENTUSERS) + strlen(u->user->name);
+		}
+	    }
+	    if (pCE->rw) {
+		CONSENTUSERS *u;
+		for (u = pCE->rw; u != (CONSENTUSERS *)0; u = u->next) {
+		    size += sizeof(CONSENTUSERS) + strlen(u->user->name);
+		}
+	    }
+	}
+    }
+    CONDDEBUG((1, "Memory Usage (CONSENT objects): %ld (%d)", size,
+	       count));
+    total += size;
+
+    for (size = 0, count = 0, pRC = pRCList; pRC != (REMOTE *)0;
+	 pRC = pRC->pRCnext, count++) {
+	size += strlen(pRC->rserver) + strlen(pRC->rhost) + sizeof(REMOTE);
+	if (pRC->aliases != (NAMES *)0) {
+	    NAMES *n;
+	    for (n = pRC->aliases; n != (NAMES *)0; n = n->next) {
+		size += sizeof(NAMES) + strlen(n->name);
+	    }
+	}
+    }
+    CONDDEBUG((1, "Memory Usage (REMOTE objects): %ld (%d)", size, count));
+    total += size;
+
+    for (size = 0, count = 0, pAC = pACList; pAC != (ACCESS *)0;
+	 pAC = pAC->pACnext, count++) {
+	size += strlen(pAC->pcwho) + sizeof(ACCESS);
+    }
+    CONDDEBUG((1, "Memory Usage (ACCESS objects): %ld (%d)", size, count));
+    total += size;
+
+    for (size = 0, count = 0, str = allStrings; str != (STRING *)0;
+	 str = str->next, count++) {
+	size += str->allocated + sizeof(STRING);
+    }
+    CONDDEBUG((1, "Memory Usage (STRING objects): %ld (%d)", size, count));
+    total += size;
+
+    for (size = 0, count = 0, usr = userList; usr != (NAMES *)0;
+	 usr = usr->next, count++) {
+	size += strlen(usr->name) + sizeof(NAMES);
+    }
+    CONDDEBUG((1, "Memory Usage (userList objects): %ld (%d)", size,
+	       count));
+    total += size;
+
+    CONDDEBUG((1, "Memory Usage (total): %ld", total));
 }
 
 void
@@ -705,69 +776,287 @@ DumpDataStructures()
     REMOTE *pRC;
     char *empty = "<empty>";
 
+#define EMPTYSTR(x) x == (char *)0 ? empty : x
     if (!fDebug)
 	return;
 
-    for (pGE = pGroups; pGE != (GRPENT *) 0; pGE = pGE->pGEnext) {
-	Debug(1,
-	      "DumpDataStructures(): group: id=%u pid=%lu, port=%hu, imembers=%d",
-	      pGE->id, pGE->port, (unsigned long)pGE->pid, pGE->imembers);
+    SummarizeDataStructures();
 
-	for (pCE = pGE->pCElist; pCE != (CONSENT *) 0; pCE = pCE->pCEnext) {
-	    if (pCE->pccmd.string == (char *)0)
-		pCE->pccmd.string = empty;
-	    if (pCE->server.string == (char *)0)
-		pCE->server.string = empty;
-	    if (pCE->dfile.string == (char *)0)
-		pCE->dfile.string = empty;
-	    if (pCE->lfile.string == (char *)0)
-		pCE->lfile.string = empty;
-	    if (pCE->networkConsoleHost.string == (char *)0)
-		pCE->networkConsoleHost.string = empty;
-	    if (pCE->acslave.string == (char *)0)
-		pCE->acslave.string = empty;
+    for (pGE = pGroups; pGE != (GRPENT *)0; pGE = pGE->pGEnext) {
+	CONDDEBUG((1,
+		   "DumpDataStructures(): group: id=%u pid=%lu, port=%hu, imembers=%d",
+		   pGE->id, pGE->port, (unsigned long)pGE->pid,
+		   pGE->imembers));
 
-	    Debug(1,
-		  "DumpDataStructures():  server=%s, dfile=%s, lfile=%s",
-		  pCE->server.string, pCE->dfile.string,
-		  pCE->lfile.string);
-	    Debug(1,
-		  "DumpDataStructures():  mark=%d, nextMark=%ld, breakType=%d",
-		  pCE->mark, pCE->nextMark, pCE->breakType);
+	for (pCE = pGE->pCElist; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
+	    switch (pCE->type) {
+		case DEVICE:
+		    CONDDEBUG((1,
+			       "DumpDataStructures():  server=%s, type=DEVICE",
+			       EMPTYSTR(pCE->server)));
+		    CONDDEBUG((1,
+			       "DumpDataStructures():  baud=%s, parity=%s",
+			       pCE->baud->acrate, pCE->parity->key));
+		    break;
+		case EXEC:
+		    CONDDEBUG((1,
+			       "DumpDataStructures():  server=%s, type=EXEC",
+			       EMPTYSTR(pCE->server)));
+		    CONDDEBUG((1,
+			       "DumpDataStructures():  execSlave=%s, exec=%s, ipid=%lu",
+			       EMPTYSTR(pCE->execSlave),
+			       EMPTYSTR(pCE->exec),
+			       (unsigned long)pCE->ipid));
 
-	    Debug(1,
-		  "DumpDataStructures():  isNetworkConsole=%d, networkConsoleHost=%s",
-		  pCE->isNetworkConsole, pCE->networkConsoleHost.string);
-	    Debug(1,
-		  "DumpDataStructures():  networkConsolePort=%hu, telnetState=%d, autoReup=%hu",
-		  pCE->networkConsolePort, pCE->telnetState,
-		  pCE->autoReUp);
-
-	    Debug(1,
-		  "DumpDataStructures():  downHard=%hu, baud=%s, parity=%c",
-		  pCE->downHard, pCE->pbaud->acrate, pCE->pparity->ckey);
-
-	    Debug(1,
-		  "DumpDataStructures():  fvirtual=%d, acslave=%s, pccmd=%s, ipid=%lu",
-		  pCE->fvirtual, pCE->acslave.string, pCE->pccmd.string,
-		  (unsigned long)pCE->ipid);
-
-	    Debug(1,
-		  "DumpDataStructures():  nolog=%d, fdtty=%d, activitylog=%d, breaklog=%d",
-		  pCE->nolog, pCE->fdtty, pCE->activitylog, pCE->breaklog);
-	    Debug(1, "DumpDataStructures():  fup=%d, fronly=%d", pCE->fup,
-		  pCE->fronly);
-	    Debug(1, "DumpDataStructures():  ------");
+		    break;
+		case HOST:
+		    CONDDEBUG((1,
+			       "DumpDataStructures():  server=%s, type=HOST",
+			       EMPTYSTR(pCE->server)));
+		    CONDDEBUG((1,
+			       "DumpDataStructures():  host=%s, port=%hu, telnetState=%d",
+			       EMPTYSTR(pCE->host), pCE->port,
+			       pCE->telnetState));
+		    break;
+		case UNKNOWN:
+		    CONDDEBUG((1,
+			       "DumpDataStructures():  server=%s, type=UNKNOWN",
+			       EMPTYSTR(pCE->server)));
+		    break;
+	    }
+	    if (pCE->aliases != (NAMES *)0) {
+		NAMES *n;
+		for (n = pCE->aliases; n != (NAMES *)0; n = n->next) {
+		    CONDDEBUG((1, "DumpDataStructures():  alias=%s",
+			       n->name));
+		}
+	    }
+	    CONDDEBUG((1,
+		       "DumpDataStructures():  fup=%d, fronly=%d, logfile=%s, breakNum=%d",
+		       pCE->fup, pCE->fronly, EMPTYSTR(pCE->logfile),
+		       pCE->breakNum));
+	    CONDDEBUG((1,
+		       "DumpDataStructures():  mark=%d, nextMark=%ld, autoReup=%hu, downHard=%s",
+		       pCE->mark, pCE->nextMark, pCE->autoReUp,
+		       pCE->downHard == FLAGTRUE ? "true" : "false"));
+	    CONDDEBUG((1,
+		       "DumpDataStructures():  nolog=%d, cofile=%d, activitylog=%s, breaklog=%s",
+		       pCE->nolog, FileFDNum(pCE->cofile),
+		       pCE->activitylog == FLAGTRUE ? "true" : "false",
+		       pCE->breaklog == FLAGTRUE ? "true" : "false"));
+	    CONDDEBUG((1,
+		       "DumpDataStructures():  ixon=%s, ixany=%s, ixoff=%s",
+		       pCE->ixon == FLAGTRUE ? "true" : "false",
+		       pCE->ixany == FLAGTRUE ? "true" : "false",
+		       pCE->ixoff == FLAGTRUE ? "true" : "false"));
+	    CONDDEBUG((1,
+		       "DumpDataStructures():  autoreinit=%s, hupcl=%s, cstopb=%s, ondemand=%s",
+		       pCE->autoreinit == FLAGTRUE ? "true" : "false",
+		       pCE->hupcl == FLAGTRUE ? "true" : "false",
+		       pCE->cstopb == FLAGTRUE ? "true" : "false",
+		       pCE->ondemand == FLAGTRUE ? "true" : "false"));
+#if defined(CRTSCTS)
+	    CONDDEBUG((1, "DumpDataStructures():  crtscts=%s",
+		       pCE->crtscts == FLAGTRUE ? "true" : "false"));
+#endif
+	    CONDDEBUG((1,
+		       "DumpDataStructures():  reinitoncc=%s, striphigh=%s, unloved=%s",
+		       pCE->reinitoncc == FLAGTRUE ? "true" : "false",
+		       pCE->striphigh == FLAGTRUE ? "true" : "false",
+		       pCE->unloved == FLAGTRUE ? "true" : "false"));
+	    if (pCE->ro) {
+		CONSENTUSERS *u;
+		for (u = pCE->ro; u != (CONSENTUSERS *)0; u = u->next) {
+		    CONDDEBUG((1, "DumpDataStructures():  ro=%s",
+			       u->user->name));
+		}
+	    }
+	    if (pCE->rw) {
+		CONSENTUSERS *u;
+		for (u = pCE->rw; u != (CONSENTUSERS *)0; u = u->next) {
+		    CONDDEBUG((1, "DumpDataStructures():  rw=%s",
+			       u->user->name));
+		}
+	    }
+	    CONDDEBUG((1, "DumpDataStructures():  ------"));
 	}
     }
-    for (pRC = pRCList; (REMOTE *) 0 != pRC; pRC = pRC->pRCnext) {
-	if (pRC->rserver.string == (char *)0)
-	    pRC->rserver.string = empty;
-	if (pRC->rhost.string == (char *)0)
-	    pRC->rhost.string = empty;
-	Debug(1, "DumpDataStructures(): remote: rserver=%s, rhost =%s",
-	      pRC->rserver.string, pRC->rhost.string);
+    for (pRC = pRCList; (REMOTE *)0 != pRC; pRC = pRC->pRCnext) {
+	CONDDEBUG((1, "DumpDataStructures(): remote: rserver=%s, rhost=%s",
+		   EMPTYSTR(pRC->rserver), EMPTYSTR(pRC->rhost)));
+	if (pRC->aliases != (NAMES *)0) {
+	    NAMES *n;
+	    for (n = pRC->aliases; n != (NAMES *)0; n = n->next) {
+		CONDDEBUG((1, "DumpDataStructures():  alias=%s", n->name));
+	    }
+	}
     }
+}
+
+/* fills the myAddrs array with host interface addresses */
+void
+#if PROTOTYPES
+ProbeInterfaces(void)
+#else
+ProbeInterfaces()
+#endif
+{
+#ifdef SIOCGIFCONF
+    struct ifconf ifc;
+    struct ifreq *ifr;
+#ifdef SIOCGIFFLAGS
+    struct ifreq ifrcopy;
+#endif
+    int sock;
+    int r = 0, m = 0;
+    int bufsize = 2048;
+    int count = 0;
+
+    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+	Error("ProbeInterfaces(): socket(): %s", strerror(errno));
+	Bye(EX_OSERR);
+    }
+
+    while (bufsize) {
+	ifc.ifc_len = bufsize;
+	ifc.ifc_req = (struct ifreq *)malloc(ifc.ifc_len);
+	if (ifc.ifc_req == (struct ifreq *)0)
+	    OutOfMem();
+	if (ioctl(sock, SIOCGIFCONF, &ifc) != 0) {
+	    free(ifc.ifc_req);
+	    close(sock);
+	    Error("ProbeInterfaces(): ioctl(SIOCGIFCONF): %s",
+		  strerror(errno));
+	    Bye(EX_OSERR);
+	}
+	/* if the return size plus a 512 byte "buffer zone" is less than
+	 * the buffer we passed in (bufsize), we're done.  otherwise
+	 * allocate a bigger buffer and try again.  with a too-small
+	 * buffer, some implementations (freebsd) will fill the buffer
+	 * best it can (leaving a gap - returning <=bufsize) and others
+	 * (linux) will return a buffer length the same size as passed
+	 * in (==bufsize).  so, we'll assume a 512 byte gap would have
+	 * been big enough to put one more record and as long as we have
+	 * that "buffer zone", we should have all the interfaces.
+	 */
+	if (ifc.ifc_len + 512 < bufsize)
+	    break;
+	free(ifc.ifc_req);
+	bufsize += 2048;
+    }
+
+    /* this is probably way overkill, but better to kill a few bytes
+     * than loop through looking for valid interfaces that are up
+     * twice, huh?
+     */
+    count = ifc.ifc_len / sizeof(*ifr);
+    CONDDEBUG((1, "ProbeInterfaces(): ifc_len==%d max_count==%d",
+	       ifc.ifc_len, count));
+
+    /* set up myAddrs array */
+    if (myAddrs != (struct in_addr *)0)
+	free(myAddrs);
+    myAddrs = (struct in_addr *)0;
+    if (count == 0) {
+	free(ifc.ifc_req);
+	close(sock);
+	return;
+    }
+    myAddrs = (struct in_addr *)calloc(count + 1, sizeof(struct in_addr));
+    if (myAddrs == (struct in_addr *)0)
+	OutOfMem();
+
+    for (m = r = 0; r < ifc.ifc_len;) {
+	struct sockaddr *sa;
+	ifr = (struct ifreq *)&ifc.ifc_buf[r];
+	sa = (struct sockaddr *)&ifr->ifr_addr;
+	/* don't use less than a ifreq sized chunk */
+	if ((ifc.ifc_len - r) < sizeof(*ifr))
+	    break;
+#ifdef HAVE_SA_LEN
+	if (sa->sa_len > sizeof(ifr->ifr_addr))
+	    r += sizeof(ifr->ifr_name) + sa->sa_len;
+	else
+#endif
+	    r += sizeof(*ifr);
+
+	if (sa->sa_family == AF_INET) {
+	    struct sockaddr_in *sin = (struct sockaddr_in *)sa;
+#ifdef SIOCGIFFLAGS
+	    /* make sure the interface is up */
+	    ifrcopy = *ifr;
+	    if ((ioctl(sock, SIOCGIFFLAGS, &ifrcopy) == 0) &&
+		((ifrcopy.ifr_flags & IFF_UP) == 0))
+		continue;
+#endif
+	    CONDDEBUG((1, "ProbeInterfaces(): name=%s addr=%s",
+		       ifr->ifr_name, inet_ntoa(sin->sin_addr)));
+#if HAVE_MEMCPY
+	    memcpy(&myAddrs[m], &(sin->sin_addr), sizeof(struct in_addr));
+#else
+	    bcopy(&(sin->sin_addr), &myAddrs[m], sizeof(struct in_addr));
+#endif
+	    Verbose("interface address %s (%s)", inet_ntoa(myAddrs[m]),
+		    ifr->ifr_name);
+	    m++;
+	}
+    }
+    if (m == 0) {
+	free(myAddrs);
+	myAddrs = (struct in_addr *)0;
+    }
+    close(sock);
+    free(ifc.ifc_req);
+#else /* use the hostname like the old code did (but use all addresses!) */
+    int count;
+    struct hostent *he;
+
+    Verbose("using hostname for interface addresses");
+    if ((struct hostent *)0 == (he = gethostbyname(myHostname))) {
+	Error("ProbeInterfaces(): gethostbyname(%s): %s", myHostname,
+	      hstrerror(h_errno));
+	return;
+    }
+    if (4 != he->h_length || AF_INET != he->h_addrtype) {
+	Error
+	    ("ProbeInterfaces(): gethostbyname(%s): wrong address size (4 != %d) or address family (%d != %d)",
+	     myHostname, he->h_length, AF_INET, he->h_addrtype);
+	return;
+    }
+
+    for (count = 0; he->h_addr_list[count] != (char *)0; count++);
+    if (myAddrs != (struct in_addr *)0)
+	free(myAddrs);
+    myAddrs = (struct in_addr *)0;
+    if (bindAddr != INADDR_ANY)
+	count++;
+    if (count == 0)
+	return;
+    myAddrs = (struct in_addr *)calloc(count + 1, sizeof(struct in_addr));
+    if (myAddrs == (struct in_addr *)0)
+	OutOfMem();
+    if (bindAddr != INADDR_ANY) {
+	count--;
+#if HAVE_MEMCPY
+	memcpy(&(myAddrs[count].s_addr), &bindAddr, sizeof(in_addr_t));
+#else
+	bcopy(&bindAddr, &(myAddrs[count].s_addr), sizeof(in_addr_t));
+#endif
+	Verbose("interface address %s (-M option)",
+		inet_ntoa(myAddrs[count]));
+    }
+    for (count--; count >= 0; count--) {
+#if HAVE_MEMCPY
+	memcpy(&(myAddrs[count].s_addr), he->h_addr_list[count],
+	       he->h_length);
+#else
+	bcopy(he->h_addr_list[count], &(myAddrs[count].s_addr),
+	      he->h_length);
+#endif
+	Verbose("interface address %s (hostname address)",
+		inet_ntoa(myAddrs[count]));
+    }
+#endif
 }
 
 /* find out where/who we are						(ksb)
@@ -788,17 +1077,18 @@ main(argc, argv)
 #endif
 {
     int i;
-    FILE *fpConfig;
-    struct hostent *hpMe;
-    static char acOpts[] = "7a:b:c:C:dDEFhiL:m:M:noO:p:P:RsuVv";
+    FILE *fpConfig = (FILE *)0;
+    static char acOpts[] = "7a:b:c:C:dDEFhiL:m:M:noO:p:P:RSuVv";
     extern int optopt;
     extern char *optarg;
     struct passwd *pwd;
     char *origuser = (char *)0;
     char *curuser = (char *)0;
-    int curuid;
-    GRPENT *pGE;
-    CONSENT *pCE;
+    int curuid = 0;
+    GRPENT *pGE = (GRPENT *)0;
+#if HAVE_INET_ATON
+    struct in_addr inetaddr;
+#endif
 
     isMultiProc = 1;		/* make sure stuff has the pid */
 
@@ -811,6 +1101,14 @@ main(argc, argv)
 
     setpwent();
 
+    /* if we read from stdin (by accident) we don't wanna block.
+     * we just don't want any more input at this point.
+     */
+    close(0);
+    if (0 != open("/dev/null", O_RDWR, 0644)) {
+	Error("open(/dev/null): %s", strerror(errno));
+	Bye(EX_OSFILE);
+    }
 #if HAVE_SETLINEBUF
     setlinebuf(stdout);
     setlinebuf(stderr);
@@ -820,22 +1118,13 @@ main(argc, argv)
     setvbuf(stderr, NULL, _IOLBF, BUFSIZ);
 #endif
 
-
-    gethostname(acMyHost, sizeof(acMyHost));
-    if ((struct hostent *)0 == (hpMe = gethostbyname(acMyHost))) {
-	Error("gethostbyname(%s): %s", acMyHost, hstrerror(h_errno));
-	Bye(EX_TEMPFAIL);
-    }
-    if (4 != hpMe->h_length || AF_INET != hpMe->h_addrtype) {
-	Error("wrong address size (4 != %d) or adress family (%d != %d)",
-	      hpMe->h_length, AF_INET, hpMe->h_addrtype);
-	Bye(EX_TEMPFAIL);
-    }
-#if HAVE_MEMCPY
-    memcpy(&acMyAddr, hpMe->h_addr, hpMe->h_length);
-#else
-    bcopy(hpMe->h_addr, &acMyAddr, hpMe->h_length);
-#endif
+    /* prep the config options */
+    if ((optConf = (CONFIG *)calloc(1, sizeof(CONFIG)))
+	== (CONFIG *)0)
+	OutOfMem();
+    if ((config = (CONFIG *)calloc(1, sizeof(CONFIG)))
+	== (CONFIG *)0)
+	OutOfMem();
 
     while (EOF != (i = getopt(argc, argv, acOpts))) {
 	switch (i) {
@@ -843,11 +1132,11 @@ main(argc, argv)
 		fStrip = 1;
 		break;
 	    case 'a':
-		chDefAcc = '\000' == *optarg ? 'r' : *optarg;
-		if (isupper((int)(chDefAcc))) {
-		    chDefAcc = tolower(chDefAcc);
-		}
-		switch (chDefAcc) {
+		optConf->defaultaccess = *optarg;
+		if (isupper((int)(optConf->defaultaccess)))
+		    optConf->defaultaccess =
+			tolower(optConf->defaultaccess);
+		switch (optConf->defaultaccess) {
 		    case 'r':
 		    case 'a':
 		    case 't':
@@ -858,11 +1147,14 @@ main(argc, argv)
 		}
 		break;
 	    case 'b':
-		pcBasePort = optarg;
+		if ((optConf->secondaryport = strdup(optarg)) == (char *)0)
+		    OutOfMem();
 		break;
 	    case 'c':
 #if HAVE_OPENSSL
-		pcCredFile = optarg;
+		if ((optConf->sslcredentials =
+		     strdup(optarg)) == (char *)0)
+		    OutOfMem();
 #endif
 		break;
 	    case 'C':
@@ -870,14 +1162,13 @@ main(argc, argv)
 		break;
 	    case 'd':
 		fDaemon = 1;
-		fUseLogfile = 1;
 		break;
 	    case 'D':
 		fDebug++;
 		break;
 	    case 'E':
 #if HAVE_OPENSSL
-		fReqEncryption = 0;
+		optConf->sslrequired = FLAGFALSE;
 #endif
 		break;
 	    case 'F':
@@ -890,13 +1181,19 @@ main(argc, argv)
 		fNoinit = 1;
 		break;
 	    case 'L':
-		pcLogfile = optarg;
+		if ((optConf->logfile = strdup(optarg)) == (char *)0)
+		    OutOfMem();
 		break;
 	    case 'm':
 		cMaxMemb = atoi(optarg);
+		if (cMaxMemb <= 0) {
+		    Error("ignoring invalid -m option (%d <= 0)",
+			  cMaxMemb);
+		    cMaxMemb = MAXMEMB;
+		}
 		break;
 	    case 'M':
-		pcAddress = optarg;
+		interface = optarg;
 		break;
 	    case 'n':
 		/* noop now */
@@ -907,19 +1204,21 @@ main(argc, argv)
 		break;
 	    case 'O':
 		/* How often to try opening all down consoles, in minutes */
-		fReopenall = atoi(optarg);
+		optConf->reinitcheck = atoi(optarg);
 		break;
 	    case 'p':
-		pcPort = optarg;
+		if ((optConf->primaryport = strdup(optarg)) == (char *)0)
+		    OutOfMem();
 		break;
 	    case 'P':
-		pcPasswd = optarg;
+		if ((optConf->passwdfile = strdup(optarg)) == (char *)0)
+		    OutOfMem();
 		break;
 	    case 'R':
-		fNoredir = 1;
+		optConf->redirect = FLAGFALSE;
 		break;
-	    case 's':
-		fSoftcar ^= 1;
+	    case 'S':
+		fSyntaxOnly = 1;
 		break;
 	    case 'u':
 		fAll = 1;
@@ -939,27 +1238,9 @@ main(argc, argv)
 	}
     }
 
-    if (cMaxMemb <= 0) {
-	Error("ignoring invalid -m option (%d <= 0)", cMaxMemb);
-	cMaxMemb = MAXMEMB;
-    }
-
-    /* if we read from stdin (by accident) we don't wanna block.
-     * we just don't want any more input at this point.
-     */
-    close(0);
-    if (0 != open("/dev/null", O_RDWR, 0644)) {
-	Error("open(/dev/null): %s", strerror(errno));
-	Bye(EX_OSFILE);
-    }
-
     if (fVersion) {
 	Version();
 	Bye(EX_OK);
-    }
-
-    if (fDaemon) {
-	Daemonize();
     }
 
     Msg("%s", THIS_VERSION);
@@ -969,15 +1250,6 @@ main(argc, argv)
 #endif
     curuid = getuid();
 
-    if (defaultShell == (STRING *) 0)
-	defaultShell = AllocString();
-    if ((pwd = getpwuid(0)) != (struct passwd *)0 &&
-	pwd->pw_shell[0] != '\000') {
-	BuildString(pwd->pw_shell, defaultShell);
-    } else {
-	BuildString("/bin/sh", defaultShell);
-    }
-
     if ((struct passwd *)0 != (pwd = getpwuid(curuid)))
 	curuser = pwd->pw_name;
 
@@ -985,126 +1257,219 @@ main(argc, argv)
     if (curuser != (char *)0 && curuser[0] == '\000')
 	curuser = (char *)0;
 
+    if (startedMsg == (STRING *)0)
+	startedMsg = AllocString();
     if (curuser == (char *)0)
 	if (origuser == (char *)0)
-	    Msg("started as uid %d by uid %d", curuid, curuid);
+	    BuildStringPrint(startedMsg, "started as uid %d by uid %d",
+			     curuid, curuid);
 	else
-	    Msg("started as uid %d by `%s'", curuid, origuser);
+	    BuildStringPrint(startedMsg, "started as uid %d by `%s'",
+			     curuid, origuser);
     else
-	Msg("started as `%s' by `%s'", curuser,
-	    (origuser == (char *)0) ? curuser : origuser);
+	BuildStringPrint(startedMsg, "started as `%s' by `%s'", curuser,
+			 (origuser == (char *)0) ? curuser : origuser);
     endpwent();
+    Msg("%s", startedMsg->string);
 
 #if HAVE_GETSPNAM && !HAVE_PAM
-    if (0 != geteuid()) {
-	Msg("Warning: running as a non-root user - any shadow password usage will most likely fail!");
+    if (!fSyntaxOnly && (geteuid() != 0)) {
+	Msg("warning: running as a non-root user - any shadow password usage will most likely fail!");
     }
 #endif
 
-    if (pcAddress == NULL) {
+    if (fSyntaxOnly)
+	Msg("performing configuration file syntax check");
+
+    /* set up the address to bind to */
+    if (interface == (char *)0 ||
+	(interface[0] == '*' && interface[1] == '\000'))
 	bindAddr = INADDR_ANY;
-    } else {
-	bindAddr = inet_addr(pcAddress);
-	if (bindAddr == (in_addr_t) (-1)) {
-	    Error("inet_addr(%s): %s", pcAddress, "invalid IP address");
+    else {
+#if HAVE_INET_ATON
+	if (inet_aton(interface, &inetaddr) == 0) {
+	    Error("inet_aton(%s): %s", interface, "invalid IP address");
 	    Bye(EX_OSERR);
 	}
-	acMyAddr.s_addr = bindAddr;
+	bindAddr = inetaddr.s_addr;
+#else
+	bindAddr = inet_addr(interface);
+	if (bindAddr == (in_addr_t) (-1)) {
+	    Error("inet_addr(%s): %s", interface, "invalid IP address");
+	    Bye(EX_OSERR);
+	}
+#endif
     }
     if (fDebug) {
 	struct in_addr ba;
 	ba.s_addr = bindAddr;
-	Debug(1, "main(): bind address set to `%s'", inet_ntoa(ba));
+	CONDDEBUG((1, "main(): bind address set to `%s'", inet_ntoa(ba)));
     }
 
-    if (pcPort == NULL) {
-	Error
-	    ("main(): severe error - pcPort is NULL????  how can that be?");
-	Bye(EX_SOFTWARE);
+    /* must do all this so IsMe() works right */
+    if (gethostname(myHostname, MAXHOSTNAME) != 0) {
+	Error("gethostname(): %s", interface, strerror(errno));
+	Bye(EX_OSERR);
     }
+    ProbeInterfaces();
+
+
+    /* read the config file */
+    if ((FILE *)0 == (fpConfig = fopen(pcConfig, "r"))) {
+	Error("fopen(%s): %s", pcConfig, strerror(errno));
+	Bye(EX_NOINPUT);
+    }
+    ReadCfg(pcConfig, fpConfig);
+    fclose(fpConfig);
+
+    /* set up the port to bind to */
+    if (optConf->primaryport != (char *)0)
+	config->primaryport = strdup(optConf->primaryport);
+    else if (pConfig->primaryport != (char *)0)
+	config->primaryport = strdup(pConfig->primaryport);
+    else
+	config->primaryport = strdup(DEFPORT);
+    if (config->primaryport == (char *)0)
+	OutOfMem();
 
     /* Look for non-numeric characters */
-    for (i = 0; pcPort[i] != '\000'; i++)
-	if (!isdigit((int)pcPort[i]))
+    for (i = 0; config->primaryport[i] != '\000'; i++)
+	if (!isdigit((int)config->primaryport[i]))
 	    break;
 
-    if (pcPort[i] == '\000') {
+    if (config->primaryport[i] == '\000') {
 	/* numeric only */
-	bindPort = atoi(pcPort);
+	bindPort = atoi(config->primaryport);
     } else {
 	/* non-numeric only */
 	struct servent *pSE;
-	if ((struct servent *)0 == (pSE = getservbyname(pcPort, "tcp"))) {
-	    Error("getservbyname(%s): %s", pcPort, strerror(errno));
+	if ((struct servent *)0 ==
+	    (pSE = getservbyname(config->primaryport, "tcp"))) {
+	    Error("getservbyname(%s): %s", config->primaryport,
+		  strerror(errno));
 	    Bye(EX_OSERR);
 	} else {
 	    bindPort = ntohs((unsigned short)pSE->s_port);
 	}
     }
 
+    /* set up the secondary port to bind to */
+    if (optConf->secondaryport != (char *)0)
+	config->secondaryport = strdup(optConf->secondaryport);
+    else if (pConfig->secondaryport != (char *)0)
+	config->secondaryport = strdup(pConfig->secondaryport);
+    else
+	config->secondaryport = strdup(DEFBASEPORT);
+    if (config->secondaryport == (char *)0)
+	OutOfMem();
+
     /* Look for non-numeric characters */
-    for (i = 0; pcBasePort[i] != '\000'; i++)
-	if (!isdigit((int)pcBasePort[i]))
+    for (i = 0; config->secondaryport[i] != '\000'; i++)
+	if (!isdigit((int)config->secondaryport[i]))
 	    break;
 
-    if (pcBasePort[i] == '\000') {
+    if (config->secondaryport[i] == '\000') {
 	/* numeric only */
-	bindBasePort = atoi(pcBasePort);
+	bindBasePort = atoi(config->secondaryport);
     } else {
 	/* non-numeric only */
 	struct servent *pSE;
 	if ((struct servent *)0 ==
-	    (pSE = getservbyname(pcBasePort, "tcp"))) {
-	    Error("getservbyname(%s): %s", pcBasePort, strerror(errno));
+	    (pSE = getservbyname(config->secondaryport, "tcp"))) {
+	    Error("getservbyname(%s): %s", config->secondaryport,
+		  strerror(errno));
 	    Bye(EX_OSERR);
 	} else {
 	    bindBasePort = ntohs((unsigned short)pSE->s_port);
 	}
     }
 
-    /* read the config file
-     */
-    if ((FILE *) 0 == (fpConfig = fopen(pcConfig, "r"))) {
-	Error("fopen(%s): %s", pcConfig, strerror(errno));
-	Bye(EX_NOINPUT);
-    }
+    if (optConf->passwdfile != (char *)0)
+	config->passwdfile = strdup(optConf->passwdfile);
+    else if (pConfig->passwdfile != (char *)0)
+	config->passwdfile = strdup(pConfig->passwdfile);
+    else
+	config->passwdfile = strdup(PASSWDFILE);
+    if (config->passwdfile == (char *)0)
+	OutOfMem();
 
-    ReadCfg(pcConfig, fpConfig);
+    if (optConf->logfile != (char *)0)
+	config->logfile = strdup(optConf->logfile);
+    else if (pConfig->logfile != (char *)0)
+	config->logfile = strdup(pConfig->logfile);
+    else
+	config->logfile = strdup(LOGFILEPATH);
+    if (config->logfile == (char *)0)
+	OutOfMem();
 
-    if (pGroups == (GRPENT *) 0 && pRCList == (REMOTE *) 0) {
+    if (optConf->reinitcheck != 0)
+	config->reinitcheck = optConf->reinitcheck;
+    else if (pConfig->reinitcheck != 0)
+	config->reinitcheck = pConfig->reinitcheck;
+    else
+	config->reinitcheck = 0;
+
+    if (optConf->defaultaccess != '\000')
+	config->defaultaccess = optConf->defaultaccess;
+    else if (pConfig->defaultaccess != '\000')
+	config->defaultaccess = pConfig->defaultaccess;
+    else
+	config->defaultaccess = chDefAcc;
+
+    if (optConf->redirect != FLAGUNKNOWN)
+	config->redirect = optConf->redirect;
+    else if (pConfig->redirect != FLAGUNKNOWN)
+	config->redirect = pConfig->redirect;
+    else
+	config->redirect = FLAGTRUE;
+
+#if HAVE_OPENSSL
+    if (optConf->sslrequired != FLAGUNKNOWN)
+	config->sslrequired = optConf->sslrequired;
+    else if (pConfig->sslrequired != FLAGUNKNOWN)
+	config->sslrequired = pConfig->sslrequired;
+    else
+	config->sslrequired = FLAGTRUE;
+
+    if (optConf->sslcredentials != (char *)0)
+	config->sslcredentials = optConf->sslcredentials;
+    else if (pConfig->sslcredentials != (char *)0)
+	config->sslcredentials = pConfig->sslcredentials;
+    else
+	config->sslcredentials = (char *)0;
+#endif
+
+    if (pGroups == (GRPENT *)0 && pRCList == (REMOTE *)0) {
 	Error("no consoles found in configuration file");
-    } else {
+    } else if (!fSyntaxOnly) {
 #if HAVE_OPENSSL
 	/* Prep the SSL layer */
 	SetupSSL();
 #endif
 
+	if (fDaemon)
+	    Daemonize();
+
 	/* if no one can use us we need to come up with a default
 	 */
-	if (pACList == (ACCESS *) 0) {
-	    SetDefAccess(&acMyAddr, acMyHost);
-	}
+	if (pACList == (ACCESS *)0)
+	    SetDefAccess(myAddrs, myHostname);
 
 	/* spawn all the children, so fix kids has an initial pid
 	 */
-	for (pGE = pGroups; pGE != (GRPENT *) 0; pGE = pGE->pGEnext) {
+	for (pGE = pGroups; pGE != (GRPENT *)0; pGE = pGE->pGEnext) {
 	    if (pGE->imembers == 0)
 		continue;
 
 	    Spawn(pGE);
 
 	    Verbose("group #%d pid %lu on port %hu", pGE->id,
-		    (unsigned long)pGE->pid, ntohs(pGE->port));
-	    for (pCE = pGE->pCElist; pCE != (CONSENT *) 0;
-		 pCE = pCE->pCEnext) {
-		if (-1 != pCE->fdtty)
-		    close(pCE->fdtty);
-	    }
+		    (unsigned long)pGE->pid, pGE->port);
 	}
 
 	if (fVerbose) {
 	    ACCESS *pACtmp;
-	    for (pACtmp = pACList; pACtmp != (ACCESS *) 0;
+	    for (pACtmp = pACList; pACtmp != (ACCESS *)0;
 		 pACtmp = pACtmp->pACnext) {
 		Verbose("access type `%c' for `%s'", pACtmp->ctrust,
 			pACtmp->pcwho);
@@ -1112,12 +1477,13 @@ main(argc, argv)
 	}
 
 	pRCUniq = FindUniq(pRCList);
+
 	/* output unique console server peers?
 	 */
 	if (fVerbose) {
 	    REMOTE *pRC;
-	    for (pRC = pRCUniq; (REMOTE *) 0 != pRC; pRC = pRC->pRCuniq) {
-		Verbose("peer server on `%s'", pRC->rhost.string);
+	    for (pRC = pRCUniq; (REMOTE *)0 != pRC; pRC = pRC->pRCuniq) {
+		Verbose("peer server on `%s'", pRC->rhost);
 	    }
 	}
 
@@ -1135,7 +1501,9 @@ main(argc, argv)
 
     Msg("terminated");
     endpwent();
-    fclose(fpConfig);
-    Bye(EX_OK);
+    if (fSyntaxOnly && fErrorPrinted)
+	Bye(EX_DATAERR);
+    else
+	Bye(EX_OK);
     return EX_OK;		/* never gets here clears the compiler warning */
 }

@@ -1,26 +1,54 @@
 #
-# $Id: conserver.cf,v 1.4 2001-06-28 10:24:01-07 bryan Exp $
+# $Id: conserver.cf,v 1.5 2003-07-04 11:05:04-07 bryan Exp $
 #
 # The character '&' in logfile names are substituted with the console
-# name.  Any logfile name that doesn't begin with a '/' has LOGDIR
-# prepended to it.  So, most consoles will just have a '&' as the logfile
-# name which causes /var/consoles/<consolename> to be used.
+# name.
 #
-LOGDIR=/var/consoles
+default full {
+	rw *;
+}
+default * {
+	logfile /var/consoles/&;
+	timestamp "";
+	include full;
+}
 #
 # list of consoles we serve
-#    name : tty[@host] : baud[parity] : logfile : [mark-interval(m|h|d|l)][+]
-#    name : !host : port : logfile : [mark-interval(m|h|d|l)][+]
-#    name : |command : : logfile : [mark-interval(m|h|d|l)][+]
 #
-tweety:!ts1:2002:&:
-bambam:!ts1:2003:&:
-shell:|::/dev/null:
-telnet:|telnet host::/dev/null:
-ttya:/dev/ttya:9600p:&:
-%%
+console tweety {
+	master localhost;
+	type host;
+	host ts1;
+	port 2002;
+}
+console bambam {
+	master localhost;
+	type host;
+	host ts1;
+	port 2003;
+}
+console shell {
+	master localhost;
+	logfile /dev/null;
+	type exec;
+	exec "";
+}
+console telnet {
+	master localhost;
+	logfile /dev/null;
+	type exec;
+	exec telnet host;
+}
+console ttya {
+	master localhost;
+	type device;
+	device /dev/ttya;
+	baud 9600;
+	parity none;
+}
 #
 # list of clients we allow
-# {trusted|allowed|rejected} : machines
 #
-allowed: 127.0.0.1 gnac.com
+access * {
+	allowed 127.0.0.1 gnac.com;
+}

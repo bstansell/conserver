@@ -10,20 +10,6 @@ Bryan Stansell
 
 ---------------------------------------------------------------------------
 
-- usleep() statements, can they be removed and mimiced with some sort
-  of console state thing and a timer?  Aaron Burt <aaron@osdl.org>
-  users email.
-
-- OpenSSL sockets have been make blocking instead of keeping the
-  underlying socket non-blocking.  Why?  It requires much more work to
-  deal with non-blocking sockets and OpenSSL.  Not impossible, just have
-  to rewrite a lot of the code to handle the extra special cases.  Perhaps
-  by ignoring renegotiations this can be ignored, but I'm not sure.
-
-- checks for EPIPE during write() should really be done, but, for the
-  most part, consoles and clients will come around and we'll see
-  problems on the read().
-
 - Singular logging so that swatch/logsurfer can watch for errors across
   the board - unloved output comes close
 
@@ -40,37 +26,30 @@ Bryan Stansell
     in regards to --use-libwrap code
 
 - alternate (md5) password encryption support in conserver.passwd
+    - actually happens if the crypt() call supports it, like under linux
+    - hpux has bigcrypt() also, which we support, so maybe we're covered
 
 - config file examples for various configurations
 
 - per-line timestamps
     - only when not connected?
 
-- flow control configuration (hardcoded on, i think)
-
 - pipe input/output (console <-> program) via 'console'
     - some apps (net-ups thing, gdb) might need to talk to user
-
-- group permissions (better user management in general)
-
-- 64-bit compilation support (have a patch set contributed, somewhere, i think)
 
 - autologout?  setting per console?  gack, would have to interpret data.
 
 - "listen" capability (watch all/multiple consoles)
 
-- break sequences - need .5 second delays (or delays in general?)
-
-- aliases for console entries
+- send data to multiple consoles (carbon copy) -
+    Steve Lammert <slammert@panasas.com>
 
 - authentication to terminal servers (ssh, passphrase, whatever)
-
-- "not" or "except" in passwd file (!console).
-
-- multi-homed/multi-ip hosts not supported well
-    - other names/ip addrs not detected as local, necessarily
-    - acls don't look at aliases properly
-    - the whole thing needs some serious help
+    - ssh should probably just be handled by invoking the ssh command.
+      so, that's really already covered, no?
+    - passphrase...hmmm..could really use some sort of send/expect
+      thing here.  you could write a wrapper script of sorts, but it
+      really would be nice to have a raw socket and do the right thing.
 
 - cyclades ts1000/2000 port : "Moses, Joel" <jmoses@deloitte.com>
 
@@ -94,20 +73,6 @@ Bryan Stansell
 
 - suggestions by Trevor Fiatal <trevor@seven.com>
     - include server hostname on 'console -x' output
-    - non-interactively be able to
-	- disconnect a single user-to-port session
-	- disconnect all sessions to a given port
-	- disconnect all sessions registered to a particular user
-    - non-interactively be able to send messages to
-	- all sessions open by a particular user
-	  console -t user "Time to go home."
-	- a particular user-session
-	  console -t user@managed-host "Please disconnect from this host."
-	- all users on a given host
-	  console -t @managed-host "I am taking over this host."
-
-- support 2 stop bits (as well as other stty-type options in console
-  definitions) : Kelly Setzer <setzer@placemark.com>
 
 - ability to configure strings to be sent to a console whenever it is
   (re)opened (eg. a termserver login) : Greg A. Woods
@@ -119,7 +84,6 @@ Bryan Stansell
 - show attach/detach events to/of spy console clients : Greg A. Woods
   <woods@planix.com>
 
-
 #
-#  $Id: TODO,v 1.27 2003-01-27 17:47:27-08 bryan Exp $
+#  $Id: TODO,v 1.36 2003-08-24 15:11:03-07 bryan Exp $
 #

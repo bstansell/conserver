@@ -6,6 +6,7 @@ exec_prefix = @exec_prefix@
 sbindir = @sbindir@
 sysconfdir = @sysconfdir@
 mandir = @mandir@
+exampledir = $(prefix)/share/examples/conserver
 
 ### Installation programs and flags
 INSTALL = @INSTALL@
@@ -31,13 +32,16 @@ CONSERVER_HDRS = ../config.h $(top_srcdir)/compat.h $(srcdir)/access.h \
 		 $(srcdir)/client.h $(srcdir)/consent.h $(srcdir)/group.h \
 		 $(srcdir)/main.h $(srcdir)/master.h $(srcdir)/readcfg.h \
 		 $(srcdir)/util.h
-ALL = conserver
+ALL = conserver convert
 
 
 all: $(ALL)
 
 conserver: $(CONSERVER_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o conserver $(CONSERVER_OBJS) $(LIBS)
+
+convert: convert.o util.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o convert convert.o util.o $(LIBS)
 
 .c.o:
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
@@ -53,7 +57,7 @@ install: conserver
 	$(INSTALL_PROGRAM) conserver $(DESTDIR)$(sbindir)
 	$(MKDIR) $(DESTDIR)$(mandir)/man8
 	$(INSTALL) conserver.man $(DESTDIR)$(mandir)/man8/conserver.8
-	$(MKDIR) $(DESTDIR)$(sysconfdir)
-	[ -f $(DESTDIR)$(sysconfdir)/conserver.rc ] || $(INSTALL) conserver.rc $(DESTDIR)$(sysconfdir)
+	$(MKDIR) $(DESTDIR)$(exampledir)
+	$(INSTALL) conserver.rc $(DESTDIR)$(exampledir)
 
 .PHONY: clean distclean install

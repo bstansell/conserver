@@ -24,17 +24,22 @@ Systems Tested
     compile conserver.  If anyone has more to add to this list (or
     something on the list doesn't work any more), please let me know.
 
-	Solaris 2.5.1 thru 9 (sparc/x86), gcc
+	AIX 4.3.3/5.1/5.2, native cc
 	BSDI BSD/OS 3.X, gcc
-	MacOS X
+	Cygwin (w2k),gcc 2.95.3
+	DEC Tru64 4.0, gcc
+	DEC Tru64 4.0/5.1, native cc
+	FreeBSD 4.2/4.8/5.1 (x86), gcc
+	HP-UX 10.20, gcc
+	HP-UX 11.10 parisc and ia64, native cc
+	Irix 6.15, native cc
 	Linux 2.2.18 (x86), gcc
 	Linux 2.4.2 (x86), gcc
-	FreeBSD 4.2 (x86), gcc
-	cygwin (w2k),gcc 2.95.3
-	DEC Tru64 4.0, gcc
-	DEC Tru64 4.0/5.1, DEC cc
-	HP-UX 10.20, gcc
-	AIX 4.3.3, AIX cc
+	Linux ia64, native gcc
+	Linux RedHat 6.2 and 7.2 (x86), native gcc
+	MacOS X, native gcc
+	Solaris 2.5.1 thru 9 (sparc/x86), gcc
+	Solaris 7/8, native cc
 
 
 Contributions
@@ -50,5 +55,5 @@ Contributions
     http://www.columbia.edu/acis/sy/unixdev/zinc
 
 #
-#  $Id: README,v 1.21 2002-09-23 10:10:11-07 bryan Exp $
+#  $Id: README,v 1.22 2003-08-23 12:34:24-07 bryan Exp $
 #

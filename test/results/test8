@@ -1,8 +1,8 @@
 [Enter `^Ec?' for help]
 [halt list]
- 0  `\z'
- 1  `\z'
- 2  `\r~^b'
- 3  `#.reset -x\r'
- 4  `hiya there\r'
+ 0 - 250ms, `\z'
+ 1 - 250ms, `\z'
+ 2 - 250ms, `\r~^b'
+ 3 - 250ms, `#.'
+ 4 - 250ms, `hiya there\r'
 [disconnect]

@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.60 2003-03-17 08:38:40-08 bryan Exp $
+ *  $Id: client.c,v 5.69 2003-08-15 14:24:39-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -34,33 +34,27 @@
  * 4. This notice may not be removed or altered.
  */
 
-#include <config.h>
-
-#include <sys/param.h>
-#include <sys/socket.h>
-#include <sys/file.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <stdio.h>
-#include <ctype.h>
-#include <signal.h>
-#include <pwd.h>
-
 #include <compat.h>
-#include <util.h>
 
+#include <util.h>
 #include <consent.h>
+#include <access.h>
 #include <client.h>
 #include <group.h>
+
+#if defined(USE_LIBWRAP)
+#include <syslog.h>
+#include <tcpd.h>
+int allow_severity = LOG_INFO;
+int deny_severity = LOG_WARNING;
+#endif
 
 
 /* find the next guy who wants to write on the console			(ksb)
  */
 CONSCLIENT *
 #if PROTOTYPES
-FindWrite(CONSCLIENT * pCL)
+FindWrite(CONSCLIENT *pCL)
 #else
 FindWrite(pCL)
     CONSCLIENT *pCL;
@@ -71,10 +65,11 @@ FindWrite(pCL)
      * most recent or some such... I guess it doesn't matter that
      * much.
      */
-    for ( /*passed in */ ; (CONSCLIENT *) 0 != pCL; pCL = pCL->pCLnext) {
-	if (!pCL->fwantwr)
+    for ( /*passed in */ ; (CONSCLIENT *)0 != pCL; pCL = pCL->pCLnext) {
+	if (!pCL->fwantwr || pCL->fro)
 	    continue;
-	if (!pCL->pCEto->fup || pCL->pCEto->fronly)
+	if (!(pCL->pCEto->fup && pCL->pCEto->ioState == ISNORMAL) ||
+	    pCL->pCEto->fronly)
 	    break;
 	pCL->fwantwr = 0;
 	pCL->fwr = 1;
@@ -83,10 +78,10 @@ FindWrite(pCL)
 	} else {
 	    FileWrite(pCL->fd, "\r\n[attached]\r\n", -1);
 	}
-	TagLogfileAct(pCL->pCEto, "%s attached", pCL->acid.string);
+	TagLogfileAct(pCL->pCEto, "%s attached", pCL->acid->string);
 	return pCL;
     }
-    return (CONSCLIENT *) 0;
+    return (CONSCLIENT *)0;
 }
 
 /* replay last iBack lines of the log file upon connect to console	(ksb)
@@ -97,7 +92,7 @@ FindWrite(pCL)
  */
 void
 #if PROTOTYPES
-Replay(CONSFILE * fdLog, CONSFILE * fdOut, int iBack)
+Replay(CONSFILE *fdLog, CONSFILE *fdOut, int iBack)
 #else
 Replay(fdLog, fdOut, iBack)
     CONSFILE *fdLog;
@@ -116,8 +111,8 @@ Replay(fdLog, fdOut, iBack)
     struct stat stLog;
     struct lines {
 	int is_mark;
-	STRING line;
-	STRING mark_end;
+	STRING *line;
+	STRING *mark_end;
     } *lines;
     int n_lines;
     int ln;
@@ -130,7 +125,7 @@ Replay(fdLog, fdOut, iBack)
     unsigned long dmallocMarkReplay = 0;
 #endif
 
-    if ((CONSFILE *) 0 == fdLog) {
+    if ((CONSFILE *)0 == fdLog) {
 	FileWrite(fdOut, "[no log file on this console]\r\n", -1);
 	return;
     }
@@ -160,6 +155,10 @@ Replay(fdLog, fdOut, iBack)
     if ((struct lines *)0 == lines) {
 	OutOfMem();
     }
+    for (i = 0; i < n_lines; i++) {
+	lines[i].mark_end = AllocString();
+	lines[i].line = AllocString();
+    }
     ln = -1;
 
     /* loop as long as there is data in the file or we have not found
@@ -185,7 +184,7 @@ Replay(fdLog, fdOut, iBack)
 		goto common_exit;
 	    }
 #endif
-	    if ((r = FileRead(fdLog, buf, BUFSIZ)) <= 0) {
+	    if ((r = FileRead(fdLog, buf, BUFSIZ)) < 0) {
 		goto common_exit;
 	    }
 	    bp = buf + r;
@@ -199,21 +198,21 @@ Replay(fdLog, fdOut, iBack)
 
 		/* reverse the text to put it in forward order
 		 */
-		u = lines[ln].line.used - 1;
+		u = lines[ln].line->used - 1;
 		for (i = 0; i < u / 2; i++) {
 		    int temp;
 
-		    temp = lines[ln].line.string[i];
-		    lines[ln].line.string[i]
-			= lines[ln].line.string[u - i - 1];
-		    lines[ln].line.string[u - i - 1] = temp;
+		    temp = lines[ln].line->string[i];
+		    lines[ln].line->string[i]
+			= lines[ln].line->string[u - i - 1];
+		    lines[ln].line->string[u - i - 1] = temp;
 		}
 
 		/* see if this line is a MARK
 		 */
-		if (lines[ln].line.used > 0 &&
-		    lines[ln].line.string[0] == '[') {
-		    i = sscanf(lines[ln].line.string + 1,
+		if (lines[ln].line->used > 0 &&
+		    lines[ln].line->string[0] == '[') {
+		    i = sscanf(lines[ln].line->string + 1,
 			       "-- MARK -- %3c %3c %d %d:%d:%d %d]\r\n",
 			       dummy, dummy, &j, &j, &j, &j, &j);
 		    is_mark = (i == 7);
@@ -227,27 +226,23 @@ Replay(fdLog, fdOut, iBack)
 		    /* this is a mark and the previous line is also
 		     * a mark, so make (or continue) that range
 		     */
-		    if (0 == lines[ln - 1].mark_end.allocated) {
+		    if (0 == lines[ln - 1].mark_end->allocated) {
 			/* this is a new range - shuffle pointers
 			 *
 			 * remember that we are moving backward
 			 */
-			lines[ln - 1].mark_end = lines[ln - 1].line;
-			lines[ln - 1].line.string = (char *)0;
-			lines[ln - 1].line.used = 0;
-			lines[ln - 1].line.allocated = 0;
+			*(lines[ln - 1].mark_end) = *(lines[ln - 1].line);
+			InitString(lines[ln - 1].line);
 		    }
 		    /* if unallocated, cheat and shuffle pointers */
-		    if (0 == lines[ln - 1].line.allocated) {
-			lines[ln - 1].line = lines[ln].line;
-			lines[ln].line.string = (char *)0;
-			lines[ln].line.used = 0;
-			lines[ln].line.allocated = 0;
+		    if (0 == lines[ln - 1].line->allocated) {
+			*(lines[ln - 1].line) = *(lines[ln].line);
+			InitString(lines[ln].line);
 		    } else {
-			BuildString((char *)0, &lines[ln - 1].line);
-			BuildString(lines[ln].line.string,
-				    &lines[ln - 1].line);
-			BuildString((char *)0, &lines[ln].line);
+			BuildString((char *)0, lines[ln - 1].line);
+			BuildString(lines[ln].line->string,
+				    lines[ln - 1].line);
+			BuildString((char *)0, lines[ln].line);
 		    }
 		    ln--;
 		}
@@ -268,14 +263,14 @@ Replay(fdLog, fdOut, iBack)
 	if (ln < 0) {
 	    ln = 0;
 	}
-	BuildStringChar(ch, &lines[ln].line);
+	BuildStringChar(ch, lines[ln].line);
 
 	/* if we've processed "a lot" of data for a line, then bail
 	 * why?  there must be some very long non-newline terminated
 	 * strings and if we just keep going back, we could spew lots
 	 * of data and chew up lots of memory
 	 */
-	if (lines[ln].line.used > MAXREPLAYLINELEN) {
+	if (lines[ln].line->used > MAXREPLAYLINELEN) {
 	    break;
 	}
     }
@@ -284,18 +279,18 @@ Replay(fdLog, fdOut, iBack)
 
     /* if we got back to beginning of file but saw some data, include it
      */
-    if (ln >= 0 && lines[ln].line.used > 0) {
+    if (ln >= 0 && lines[ln].line->used > 0) {
 
 	/* reverse the text to put it in forward order
 	 */
-	u = lines[ln].line.used - 1;
+	u = lines[ln].line->used - 1;
 	for (i = 0; i < u / 2; i++) {
 	    int temp;
 
-	    temp = lines[ln].line.string[i];
-	    lines[ln].line.string[i]
-		= lines[ln].line.string[u - i - 1];
-	    lines[ln].line.string[u - i - 1] = temp;
+	    temp = lines[ln].line->string[i];
+	    lines[ln].line->string[i]
+		= lines[ln].line->string[u - i - 1];
+	    lines[ln].line->string[u - i - 1] = temp;
 	}
 	ln++;
     }
@@ -303,16 +298,16 @@ Replay(fdLog, fdOut, iBack)
     /* copy the lines into the buffer and put them in order
      */
     for (i = ln - 1; i >= 0; i--) {
-	if (lines[i].is_mark && 0 != lines[i].mark_end.used) {
+	if (lines[i].is_mark && 0 != lines[i].mark_end->used) {
 	    int mark_len;
 
 	    /* output the start of the range, stopping at the ']'
 	     */
-	    s = strrchr(lines[i].line.string, ']');
+	    s = strrchr(lines[i].line->string, ']');
 	    if ((char *)0 != s) {
 		*s = '\000';
 	    }
-	    FileWrite(fdOut, lines[i].line.string, -1);
+	    FileWrite(fdOut, lines[i].line->string, -1);
 	    FileWrite(fdOut, " .. ", -1);
 
 	    /* build the end string by removing the leading "[-- MARK -- "
@@ -320,24 +315,24 @@ Replay(fdLog, fdOut, iBack)
 	     */
 	    mark_len = sizeof("[-- MARK -- ") - 1;
 
-	    s = strrchr(lines[i].mark_end.string + mark_len, ']');
+	    s = strrchr(lines[i].mark_end->string + mark_len, ']');
 	    if ((char *)0 != s) {
 		*s = '\000';
 	    }
-	    FileWrite(fdOut, lines[i].mark_end.string + mark_len, -1);
+	    FileWrite(fdOut, lines[i].mark_end->string + mark_len, -1);
 	    FileWrite(fdOut, " -- MARK --]\r\n", -1);
-	    u = lines[i].mark_end.used;
-	    s = lines[i].mark_end.string;
+	    u = lines[i].mark_end->used;
+	    s = lines[i].mark_end->string;
 	} else
-	    FileWrite(fdOut, lines[i].line.string, -1);
+	    FileWrite(fdOut, lines[i].line->string, -1);
     }
 
   common_exit:
 
     if ((struct lines *)0 != lines) {
 	for (i = 0; i < n_lines; i++) {
-	    DestroyString(&lines[i].mark_end);
-	    DestroyString(&lines[i].line);
+	    DestroyString(lines[i].mark_end);
+	    DestroyString(lines[i].line);
 	}
 	free(lines);
 	lines = (struct lines *)0;
@@ -347,7 +342,7 @@ Replay(fdLog, fdOut, iBack)
 	buf = (char *)0;
     }
 #if HAVE_DMALLOC && DMALLOC_MARK_REPLAY
-    Debug(1, "Replay(): dmalloc / MarkReplay");
+    CONDDEBUG((1, "Replay(): dmalloc / MarkReplay"));
     dmalloc_log_changed(dmallocMarkReplay, 1, 0, 1);
 #endif
 }
@@ -408,7 +403,7 @@ static HELP aHLTable[] = {
  */
 void
 #if PROTOTYPES
-HelpUser(CONSCLIENT * pCL)
+HelpUser(CONSCLIENT *pCL)
 #else
 HelpUser(pCL)
     CONSCLIENT *pCL;
@@ -418,9 +413,9 @@ HelpUser(pCL)
     static char
       acH1[] = "help]\r\n", acH2[] = "help spy mode]\r\n", acEoln[] =
 	"\r\n";
-    static STRING *acLine = (STRING *) 0;
+    static STRING *acLine = (STRING *)0;
 
-    if (acLine == (STRING *) 0)
+    if (acLine == (STRING *)0)
 	acLine = AllocString();
 
     iCmp = WHEN_ALWAYS | WHEN_SPY;
@@ -469,4 +464,60 @@ HelpUser(pCL)
 	BuildString(acEoln, acLine);
 	FileWrite(pCL->fd, acLine->string, -1);
     }
+}
+
+int
+#if PROTOTYPES
+ClientAccessOk(CONSCLIENT *pCL)
+#else
+ClientAccessOk(pCL)
+    CONSCLIENT *pCL;
+#endif
+{
+    char *peername = (char *)0;
+    socklen_t so;
+    int cfd;
+    struct sockaddr_in in_port;
+    int retval = 1;
+    int getpeer = -1;
+
+    cfd = FileFDNum(pCL->fd);
+    pCL->caccess = 'r';
+#if defined(USE_LIBWRAP)
+    {
+	struct request_info request;
+	request_init(&request, RQ_DAEMON, progname, RQ_FILE, cfd, 0);
+	fromhost(&request);
+	if (!hosts_access(&request)) {
+	    FileWrite(pCL->fd, "access from your host refused\r\n", -1);
+	    retval = 0;
+	    goto setpeer;
+	}
+    }
+#endif
+
+    so = sizeof(in_port);
+    if (-1 ==
+	(getpeer = getpeername(cfd, (struct sockaddr *)&in_port, &so))) {
+	FileWrite(pCL->fd, "getpeername failed\r\n", -1);
+	retval = 0;
+	goto setpeer;
+    }
+    pCL->caccess = AccType(&in_port.sin_addr, &peername);
+    if (pCL->caccess == 'r') {
+	FileWrite(pCL->fd, "access from your host refused\r\n", -1);
+	retval = 0;
+    }
+
+  setpeer:
+    if (pCL->peername != (STRING *)0) {
+	BuildString((char *)0, pCL->peername);
+	if (peername != (char *)0)
+	    BuildString(peername, pCL->peername);
+	else if (getpeer != -1)
+	    BuildString(inet_ntoa(in_port.sin_addr), pCL->peername);
+	else
+	    BuildString("<unknown>", pCL->peername);
+    }
+    return retval;
 }
