@@ -1,5 +1,5 @@
 /*
- *  $Id: main.h,v 5.52 2004/04/13 18:12:00 bryan Exp $
+ *  $Id: main.h,v 5.53 2004/05/21 04:15:17 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -44,7 +44,6 @@ extern unsigned short bindPort, bindBasePort;
 extern char *pcConfig;
 extern int cMaxMemb;
 extern struct sockaddr_in in_port;
-extern int isMaster;
 extern CONFIG *optConf;
 extern CONFIG *config;
 extern CONFIG defConfig;

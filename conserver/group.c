@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.298 2004/05/07 15:39:51 bryan Exp $
+ *  $Id: group.c,v 5.301 2004/05/25 00:38:15 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -1610,8 +1610,8 @@ PutConsole(pCEServing, c, quote)
      * quote == 2, telnet - processed by telnet protocol
      * if console != telnet, 1 == 2
      */
-    if (quote == 1 && pCEServing->type == HOST && !pCEServing->raw &&
-	c == IAC) {
+    if (quote == 1 && pCEServing->type == HOST &&
+	pCEServing->raw != FLAGTRUE && c == IAC) {
 	BuildStringChar((char)c, pCEServing->wbuf);
 	if (pCEServing->wbufIAC == 0)
 	    pCEServing->wbufIAC = pCEServing->wbuf->used;
@@ -1685,11 +1685,11 @@ ExpandString(str, pCE, breaknum)
 		++octs;
 		oct = oct * 8 + (s - '0');
 		continue;
-	    } else if (s == 'd' && pCE != (CONSENT *)0) {
+	    } else if (s == 'd') {
 		PutConsole(pCE, IAC, 0);
 		PutConsole(pCE, '0' + breaknum, 0);
 		continue;
-	    } else if (s == 'z' && pCE != (CONSENT *)0) {
+	    } else if (s == 'z') {
 		PutConsole(pCE, IAC, 0);
 		PutConsole(pCE, BREAK, 0);
 		continue;
@@ -2148,7 +2148,7 @@ CommandInfo(pGE, pCLServing, pCEServing, tyme)
 	    case HOST:
 		FilePrint(pCLServing->fd, FLAGTRUE, "!:%s,%hu,%s",
 			  pCE->host, pCE->netport,
-			  (pCE->raw ? "raw" : "telnet"));
+			  (pCE->raw == FLAGTRUE ? "raw" : "telnet"));
 		break;
 	    case DEVICE:
 		FilePrint(pCLServing->fd, FLAGTRUE, "/:%s,%s%c",
@@ -2407,7 +2407,7 @@ DoConsoleRead(pCEServing)
     CONDDEBUG((1, "DoConsoleRead(): read %d bytes from fd %d", nr,
 	       cofile));
 
-    if (pCEServing->type == HOST && !pCEServing->raw) {
+    if (pCEServing->type == HOST && pCEServing->raw != FLAGTRUE) {
 	/* Do a little Telnet Protocol interpretation
 	 * state = 0: normal
 	 *       = 1: Saw a IAC char
@@ -3933,11 +3933,19 @@ FlushConsole(pCEServing)
     }
 
     if (pCEServing->wbuf->used > 1) {
+	char *iac = StringChar(pCEServing->wbuf, 0, (char)IAC);
+	CONDDEBUG((1, "Kiddie(): hunting for new IAC for [%s]",
+		   pCEServing->server));
+	if (iac == (char *)0)
+	    pCEServing->wbufIAC = 0;
+	else
+	    pCEServing->wbufIAC = (iac - pCEServing->wbuf->string) + 2;
 	CONDDEBUG((1,
 		   "Kiddie(): watching writability for fd %d 'cause we have buffered data",
 		   FileFDNum(pCEServing->cofile)));
 	FD_SET(FileFDNum(pCEServing->cofile), &winit);
     } else {
+	pCEServing->wbufIAC = 0;
 	if (FileBufEmpty(pCEServing->cofile)) {
 	    CONDDEBUG((1,
 		       "Kiddie(): removing writability for fd %d 'cause we don't have buffered data",

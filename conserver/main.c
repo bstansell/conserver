@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.180 2004/05/07 03:42:49 bryan Exp $
+ *  $Id: main.c,v 5.185 2004/05/25 23:03:01 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -40,11 +40,7 @@
 #include <readcfg.h>
 #include <version.h>
 
-#include <net/if.h>
 #include <dirent.h>
-#if HAVE_SYS_SOCKIO_H
-# include <sys/sockio.h>
-#endif
 #if HAVE_OPENSSL
 # include <openssl/opensslv.h>
 #endif
@@ -54,9 +50,8 @@ int fAll = 0, fNoinit = 0, fVersion = 0, fStrip = 0, fReopen =
     0, fNoautoreup = 0, fSyntaxOnly = 0;
 
 char *pcConfig = CONFIGFILE;
-int isMaster = 1;
 int cMaxMemb = MAXMEMB;
-in_addr_t bindAddr;
+in_addr_t bindAddr = INADDR_ANY;
 unsigned short bindPort;
 unsigned short bindBasePort;
 static STRING *startedMsg = (STRING *)0;
@@ -604,6 +599,9 @@ Version()
 #if TRUST_REVERSE_DNS
 	"trustrevdns",
 #endif
+#if USE_UNIX_DOMAIN_SOCKETS
+	"uds",
+#endif
 	(char *)0
     };
 
@@ -651,10 +649,12 @@ Version()
     BuildStringChar('0' + DMALLOC_VERSION_MINOR, acA1);
     BuildStringChar('.', acA1);
     BuildStringChar('0' + DMALLOC_VERSION_PATCH, acA1);
+#if defined(DMALLOC_VERSION_BETA)
     if (DMALLOC_VERSION_BETA != 0) {
 	BuildString("-b", acA1);
 	BuildStringChar('0' + DMALLOC_VERSION_BETA, acA1);
     }
+#endif
     Msg("dmalloc version: %s", acA1->string);
 #endif
 #if HAVE_OPENSSL
@@ -720,6 +720,8 @@ DestroyDataStructures()
     DestroyBreakList();
     DestroyStrings();
     DestroyUserList();
+    if (substData != (SUBST *) 0)
+	free(substData);
 }
 
 void
@@ -851,13 +853,13 @@ DumpDataStructures()
     GRPENT *pGE;
     CONSENT *pCE;
     REMOTE *pRC;
-    char *empty = "<empty>";
 
 #if HAVE_DMALLOC && DMALLOC_MARK_MAIN
     CONDDEBUG((1, "DumpDataStructures(): dmalloc / MarkMain"));
     dmalloc_log_changed(dmallocMarkMain, 1, 0, 1);
 #endif
-#define EMPTYSTR(x) x == (char *)0 ? empty : x
+#define EMPTYSTR(x) x == (char *)0 ? "(null)" : x
+#define FLAGSTR(x) x == FLAGTRUE ? "true" : (x == FLAGFALSE ? "false" : "unset")
     if (!fDebug)
 	return;
 
@@ -896,9 +898,9 @@ DumpDataStructures()
 			       "DumpDataStructures():  server=%s, type=HOST",
 			       EMPTYSTR(pCE->server)));
 		    CONDDEBUG((1,
-			       "DumpDataStructures():  host=%s, raw=%hu, netport=%hu, port=%hu, telnetState=%d",
-			       EMPTYSTR(pCE->host), pCE->raw, pCE->netport,
-			       pCE->port, pCE->telnetState));
+			       "DumpDataStructures():  host=%s, raw=%s, netport=%hu, port=%hu, telnetState=%d",
+			       EMPTYSTR(pCE->host), FLAGSTR(pCE->raw),
+			       pCE->netport, pCE->port, pCE->telnetState));
 		    break;
 		case UNKNOWNTYPE:
 		    CONDDEBUG((1,
@@ -920,32 +922,27 @@ DumpDataStructures()
 	    CONDDEBUG((1,
 		       "DumpDataStructures():  mark=%d, nextMark=%ld, autoReup=%hu, downHard=%s",
 		       pCE->mark, pCE->nextMark, pCE->autoReUp,
-		       pCE->downHard == FLAGTRUE ? "true" : "false"));
+		       FLAGSTR(pCE->downHard)));
 	    CONDDEBUG((1,
 		       "DumpDataStructures():  nolog=%d, cofile=%d, activitylog=%s, breaklog=%s",
 		       pCE->nolog, FileFDNum(pCE->cofile),
-		       pCE->activitylog == FLAGTRUE ? "true" : "false",
-		       pCE->breaklog == FLAGTRUE ? "true" : "false"));
+		       FLAGSTR(pCE->activitylog), FLAGSTR(pCE->breaklog)));
 	    CONDDEBUG((1,
 		       "DumpDataStructures():  ixon=%s, ixany=%s, ixoff=%s",
-		       pCE->ixon == FLAGTRUE ? "true" : "false",
-		       pCE->ixany == FLAGTRUE ? "true" : "false",
-		       pCE->ixoff == FLAGTRUE ? "true" : "false"));
+		       FLAGSTR(pCE->ixon), FLAGSTR(pCE->ixany),
+		       FLAGSTR(pCE->ixoff)));
 	    CONDDEBUG((1,
 		       "DumpDataStructures():  autoreinit=%s, hupcl=%s, cstopb=%s, ondemand=%s",
-		       pCE->autoreinit == FLAGTRUE ? "true" : "false",
-		       pCE->hupcl == FLAGTRUE ? "true" : "false",
-		       pCE->cstopb == FLAGTRUE ? "true" : "false",
-		       pCE->ondemand == FLAGTRUE ? "true" : "false"));
+		       FLAGSTR(pCE->autoreinit), FLAGSTR(pCE->hupcl),
+		       FLAGSTR(pCE->cstopb), FLAGSTR(pCE->ondemand)));
 #if defined(CRTSCTS)
 	    CONDDEBUG((1, "DumpDataStructures():  crtscts=%s",
-		       pCE->crtscts == FLAGTRUE ? "true" : "false"));
+		       FLAGSTR(pCE->crtscts)));
 #endif
 	    CONDDEBUG((1,
 		       "DumpDataStructures():  reinitoncc=%s, striphigh=%s, unloved=%s",
-		       pCE->reinitoncc == FLAGTRUE ? "true" : "false",
-		       pCE->striphigh == FLAGTRUE ? "true" : "false",
-		       pCE->unloved == FLAGTRUE ? "true" : "false"));
+		       FLAGSTR(pCE->reinitoncc), FLAGSTR(pCE->striphigh),
+		       FLAGSTR(pCE->unloved)));
 	    CONDDEBUG((1,
 		       "DumpDataStructures():  initpid=%lu, initcmd=%s, initfile=%d",
 		       (unsigned long)pCE->initpid, EMPTYSTR(pCE->initcmd),
@@ -981,188 +978,6 @@ DumpDataStructures()
 	    }
 	}
     }
-}
-
-/* fills the myAddrs array with host interface addresses */
-void
-#if PROTOTYPES
-ProbeInterfaces(void)
-#else
-ProbeInterfaces()
-#endif
-{
-#ifdef SIOCGIFCONF
-    struct ifconf ifc;
-    struct ifreq *ifr;
-#ifdef SIOCGIFFLAGS
-    struct ifreq ifrcopy;
-#endif
-    int sock;
-    int r = 0, m = 0;
-    int bufsize = 2048;
-    int count = 0;
-
-    /* if we use -M, just fill the array with that interface */
-    if (bindAddr != INADDR_ANY) {
-	myAddrs = (struct in_addr *)calloc(2, sizeof(struct in_addr));
-	if (myAddrs == (struct in_addr *)0)
-	    OutOfMem();
-#if HAVE_MEMCPY
-	memcpy(&(myAddrs[0].s_addr), &bindAddr, sizeof(in_addr_t));
-#else
-	bcopy(&bindAddr, &(myAddrs[0].s_addr), sizeof(in_addr_t));
-#endif
-	Verbose("interface address %s (-M option)", inet_ntoa(myAddrs[0]));
-	return;
-    }
-
-    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-	Error("ProbeInterfaces(): socket(): %s", strerror(errno));
-	Bye(EX_OSERR);
-    }
-
-    while (bufsize) {
-	ifc.ifc_len = bufsize;
-	ifc.ifc_req = (struct ifreq *)malloc(ifc.ifc_len);
-	if (ifc.ifc_req == (struct ifreq *)0)
-	    OutOfMem();
-	if (ioctl(sock, SIOCGIFCONF, &ifc) != 0) {
-	    free(ifc.ifc_req);
-	    close(sock);
-	    Error("ProbeInterfaces(): ioctl(SIOCGIFCONF): %s",
-		  strerror(errno));
-	    Bye(EX_OSERR);
-	}
-	/* if the return size plus a 512 byte "buffer zone" is less than
-	 * the buffer we passed in (bufsize), we're done.  otherwise
-	 * allocate a bigger buffer and try again.  with a too-small
-	 * buffer, some implementations (freebsd) will fill the buffer
-	 * best it can (leaving a gap - returning <=bufsize) and others
-	 * (linux) will return a buffer length the same size as passed
-	 * in (==bufsize).  so, we'll assume a 512 byte gap would have
-	 * been big enough to put one more record and as long as we have
-	 * that "buffer zone", we should have all the interfaces.
-	 */
-	if (ifc.ifc_len + 512 < bufsize)
-	    break;
-	free(ifc.ifc_req);
-	bufsize += 2048;
-    }
-
-    /* this is probably way overkill, but better to kill a few bytes
-     * than loop through looking for valid interfaces that are up
-     * twice, huh?
-     */
-    count = ifc.ifc_len / sizeof(*ifr);
-    CONDDEBUG((1, "ProbeInterfaces(): ifc_len==%d max_count==%d",
-	       ifc.ifc_len, count));
-
-    /* set up myAddrs array */
-    if (myAddrs != (struct in_addr *)0)
-	free(myAddrs);
-    myAddrs = (struct in_addr *)0;
-    if (count == 0) {
-	free(ifc.ifc_req);
-	close(sock);
-	return;
-    }
-    myAddrs = (struct in_addr *)calloc(count + 1, sizeof(struct in_addr));
-    if (myAddrs == (struct in_addr *)0)
-	OutOfMem();
-
-    for (m = r = 0; r < ifc.ifc_len;) {
-	struct sockaddr *sa;
-	ifr = (struct ifreq *)&ifc.ifc_buf[r];
-	sa = (struct sockaddr *)&ifr->ifr_addr;
-	/* don't use less than a ifreq sized chunk */
-	if ((ifc.ifc_len - r) < sizeof(*ifr))
-	    break;
-#ifdef HAVE_SA_LEN
-	if (sa->sa_len > sizeof(ifr->ifr_addr))
-	    r += sizeof(ifr->ifr_name) + sa->sa_len;
-	else
-#endif
-	    r += sizeof(*ifr);
-
-	if (sa->sa_family == AF_INET) {
-	    struct sockaddr_in *sin = (struct sockaddr_in *)sa;
-#ifdef SIOCGIFFLAGS
-	    /* make sure the interface is up */
-	    ifrcopy = *ifr;
-	    if ((ioctl(sock, SIOCGIFFLAGS, &ifrcopy) == 0) &&
-		((ifrcopy.ifr_flags & IFF_UP) == 0))
-		continue;
-#endif
-	    CONDDEBUG((1, "ProbeInterfaces(): name=%s addr=%s",
-		       ifr->ifr_name, inet_ntoa(sin->sin_addr)));
-#if HAVE_MEMCPY
-	    memcpy(&myAddrs[m], &(sin->sin_addr), sizeof(struct in_addr));
-#else
-	    bcopy(&(sin->sin_addr), &myAddrs[m], sizeof(struct in_addr));
-#endif
-	    Verbose("interface address %s (%s)", inet_ntoa(myAddrs[m]),
-		    ifr->ifr_name);
-	    m++;
-	}
-    }
-    if (m == 0) {
-	free(myAddrs);
-	myAddrs = (struct in_addr *)0;
-    }
-    close(sock);
-    free(ifc.ifc_req);
-#else /* use the hostname like the old code did (but use all addresses!) */
-    int count;
-    struct hostent *he;
-
-    /* if we use -M, just fill the array with that interface */
-    if (bindAddr != INADDR_ANY) {
-	myAddrs = (struct in_addr *)calloc(2, sizeof(struct in_addr));
-	if (myAddrs == (struct in_addr *)0)
-	    OutOfMem();
-#if HAVE_MEMCPY
-	memcpy(&(myAddrs[0].s_addr), &bindAddr, sizeof(in_addr_t));
-#else
-	bcopy(&bindAddr, &(myAddrs[0].s_addr), sizeof(in_addr_t));
-#endif
-	Verbose("interface address %s (-M option)", inet_ntoa(myAddrs[0]));
-	return;
-    }
-
-    Verbose("using hostname for interface addresses");
-    if ((struct hostent *)0 == (he = gethostbyname(myHostname))) {
-	Error("ProbeInterfaces(): gethostbyname(%s): %s", myHostname,
-	      hstrerror(h_errno));
-	return;
-    }
-    if (4 != he->h_length || AF_INET != he->h_addrtype) {
-	Error
-	    ("ProbeInterfaces(): gethostbyname(%s): wrong address size (4 != %d) or address family (%d != %d)",
-	     myHostname, he->h_length, AF_INET, he->h_addrtype);
-	return;
-    }
-
-    for (count = 0; he->h_addr_list[count] != (char *)0; count++);
-    if (myAddrs != (struct in_addr *)0)
-	free(myAddrs);
-    myAddrs = (struct in_addr *)0;
-    if (count == 0)
-	return;
-    myAddrs = (struct in_addr *)calloc(count + 1, sizeof(struct in_addr));
-    if (myAddrs == (struct in_addr *)0)
-	OutOfMem();
-    for (count--; count >= 0; count--) {
-#if HAVE_MEMCPY
-	memcpy(&(myAddrs[count].s_addr), he->h_addr_list[count],
-	       he->h_length);
-#else
-	bcopy(he->h_addr_list[count], &(myAddrs[count].s_addr),
-	      he->h_length);
-#endif
-	Verbose("interface address %s (hostname address)",
-		inet_ntoa(myAddrs[count]));
-    }
-#endif
 }
 
 /* This makes sure a directory exists and tries to create it if it
@@ -1290,9 +1105,9 @@ main(argc, argv)
 
     thepid = getpid();
     if ((char *)0 == (progname = strrchr(argv[0], '/'))) {
-	progname = StrDup(argv[0]);
+	progname = argv[0];
     } else {
-	progname = StrDup(++progname);
+	++progname;
     }
 
     setpwent();
@@ -1354,7 +1169,7 @@ main(argc, argv)
 #endif
 		break;
 	    case 'C':
-		pcConfig = StrDup(optarg);
+		pcConfig = optarg;
 		break;
 	    case 'd':
 		optConf->daemonmode = FLAGTRUE;
@@ -1520,7 +1335,7 @@ main(argc, argv)
 	Error("gethostname(): %s", strerror(errno));
 	Bye(EX_OSERR);
     }
-    ProbeInterfaces();
+    ProbeInterfaces(bindAddr);
 
     /* initialize the timers */
     for (i = 0; i < T_MAX; i++)

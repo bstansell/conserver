@@ -1,5 +1,5 @@
 /*
- *  $Id: access.c,v 5.71 2003/11/20 13:56:38 bryan Exp $
+ *  $Id: access.c,v 5.73 2004/05/23 16:44:25 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -171,7 +171,8 @@ AccType(addr, peername)
 		     hname = he->h_aliases[a++]) {
 		    if ((revNames[a] = StrDup(hname)) == (char *)0)
 			break;
-		    CONDDEBUG((1,"AccType(): revNames[%d]='%s'", a, hname));
+		    CONDDEBUG((1, "AccType(): revNames[%d]='%s'", a,
+			       hname));
 		}
 	    }
 	}
@@ -280,11 +281,26 @@ SetDefAccess(pAddr, pHost)
     char *pHost;
 #endif
 {
-    char *pcDomain;
-    char *addr;
     ACCESS *a;
 
+    while (pACList != (ACCESS *)0) {
+	a = pACList->pACnext;
+	DestroyAccessList(pACList);
+	pACList = a;
+    }
+
+#if USE_UNIX_DOMAIN_SOCKETS
+    if ((pACList = (ACCESS *)calloc(1, sizeof(ACCESS))) == (ACCESS *)0)
+	OutOfMem();
+    if ((pACList->pcwho = StrDup("127.0.0.1")) == (char *)0)
+	OutOfMem();
+    pACList->ctrust = 'a';
+    CONDDEBUG((1, "SetDefAccess(): trust=%c, who=%s", pACList->ctrust,
+	       pACList->pcwho));
+#else
     while (pAddr->s_addr != (in_addr_t) 0) {
+	char *addr;
+
 	addr = inet_ntoa(*pAddr);
 	if ((a = (ACCESS *)calloc(1, sizeof(ACCESS))) == (ACCESS *)0)
 	    OutOfMem();
@@ -298,21 +314,7 @@ SetDefAccess(pAddr, pHost)
 		   pACList->pcwho));
 	pAddr++;
     }
-
-    if ((char *)0 == (pcDomain = strchr(pHost, '.')))
-	return;
-    ++pcDomain;
-
-    if ((a = (ACCESS *)calloc(1, sizeof(ACCESS))) == (ACCESS *)0)
-	OutOfMem();
-    if ((a->pcwho = StrDup(pcDomain)) == (char *)0)
-	OutOfMem();
-    a->ctrust = 'a';
-    a->pACnext = pACList;
-    pACList = a;
-
-    CONDDEBUG((1, "SetDefAccess(): trust=%c, who=%s", pACList->ctrust,
-	       pACList->pcwho));
+#endif
 }
 
 void

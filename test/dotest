@@ -14,6 +14,7 @@ cleanup()
 	[ "$i" != "conserver.log" ] && [ -f "$i" ] && rm -f "$i";
     done
     [ "$exitval" = 0 ] && rm -f conserver.log
+    [ -d 127.0.0.1 ] && sleep 1 && rm -rf 127.0.0.1
     exit $exitval
 }
 
@@ -25,7 +26,7 @@ dotest()
 	eval "$2" > test.out 2>&1
     else
 	echo "$1" | \
-	    ../console/console -M 127.0.0.1 -p 7777 shell > test.out 2>&1
+	    ../console/console -n -C /dev/null -M 127.0.0.1 -p 7777 shell > test.out 2>&1
     fi
     if [ "$record" ]; then
 	echo "recorded"
@@ -72,7 +73,7 @@ sleep 3
 
 [ ! -d results ] && mkdir results
 
-dotest EVAL "../console/console -M 127.0.0.1 -p 7777 -u | sed -e 's/[0-9][0-9]*//g' -e 's/[ 	][ 	]*/ /g'"
+dotest EVAL "../console/console -n -C /dev/null -M 127.0.0.1 -p 7777 -u | sed -e 's/[0-9][0-9]*//g' -e 's/[ 	][ 	]*/ /g'"
 dotest 'c?c.'
 dotest 'cl?c.'
 dotest 'cdc.'
@@ -84,14 +85,14 @@ cp test2.cf c.cf
 kill -1 $pid
 sleep 3
 
-dotest EVAL "../console/console -M 127.0.0.1 -p 7777 -u | sed -e 's/[0-9][0-9]*//g' -e 's/[ 	][ 	]*/ /g'"
+dotest EVAL "../console/console -n -C /dev/null -M 127.0.0.1 -p 7777 -u | sed -e 's/[0-9][0-9]*//g' -e 's/[ 	][ 	]*/ /g'"
 dotest 'c?c.'
 dotest 'cl?c.'
 dotest 'cdc.'
 dotest 'coc.'
 
-dotest EVAL "echo 'tu.' | ../console/console -M 127.0.0.1 -p 7777 -e 'tu' shell"
-dotest EVAL "../console/console -M 127.0.0.1 -p 7777 -R | sed -e 's/ [^ ]*$//'"
-dotest EVAL "../console/console -M 127.0.0.1 -p 7777 -x | sed -e 's/ on [^ ]* */ on /'"
+dotest EVAL "echo 'tu.' | ../console/console -n -C /dev/null -M 127.0.0.1 -p 7777 -e 'tu' shell"
+dotest EVAL "../console/console -n -C /dev/null -M 127.0.0.1 -p 7777 -R | sed -e 's/ [^ ]*$//'"
+dotest EVAL "../console/console -n -C /dev/null -M 127.0.0.1 -p 7777 -x | sed -e 's/ on [^ ]* */ on /'"
 
 cleanup

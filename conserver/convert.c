@@ -1,5 +1,5 @@
 /*
- *  $Id: convert.c,v 1.8 2003/11/20 13:56:38 bryan Exp $
+ *  $Id: convert.c,v 1.9 2004/05/21 04:15:17 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -41,6 +41,10 @@
 #include <master.h>
 #include <main.h>
 
+
+SECTION sections[] = {
+    {(char *)0, (void *)0, (void *)0, (void *)0, (void *)0}
+};
 
 void
 DestroyDataStructures()
@@ -139,7 +143,7 @@ ReadLine2(fp, save, iLine)
     if (!peek && (ret == (char *)0)) {
 	(*iLine)++;
 	wholeline = BuildString(bufstr->string, wholestr);
-	if (wholeline[0] == '\000')
+	if (wholeline != (char *)0 && wholeline[0] == '\000')
 	    wholeline = (char *)0;
     }
 

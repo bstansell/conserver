@@ -1,5 +1,8 @@
 /* config.h.in.  Generated from configure.in by autoheader.  */
 
+/* Client config file path */
+#undef CLIENTCONFIGFILE
+
 /* Config file path */
 #undef CONFIGFILE
 

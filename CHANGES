@@ -1,6 +1,22 @@
 				CHANGES
 				=======
 
+version 8.1.6 (May 25, 2004):
+	- added ability to configure client via sytem-wide console.cf
+	  file and per-user .consolerc - suggested by Erik Sjolund
+	  <erik.sjolund@sbc.su.se>
+	- fixed bug where break strings were not properly sent -
+	  reported by Tim Small <tim@buttersideup.com>
+	- fixed bug in config file 'protocol' value handling - reported
+	  by Kees Cook <kees@osdl.org>
+	- conserver no longer uses the local domain name in the default
+	  access list (the default list is only created if no access
+	  list is specified in the configuration file) - inspired by
+	  William P LePera <lepera@us.ibm.com>
+	- added a 'terminal' console configuration block for printing
+	  strings when attaching and detaching from consoles - suggested
+	  by Richard Threadgill <richardt@tellme.com>
+
 version 8.1.5 (May 7, 2004):
 	- changed remaining O_NDELAY flags to O_NONBLOCK
 	- added PROTOCOLS file to describe the client/server protocol
@@ -722,5 +738,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.174 2004/05/07 16:04:58 bryan Exp $
+#  $Id: CHANGES,v 1.179 2004/05/26 00:14:07 bryan Exp $
 #

@@ -86,26 +86,14 @@ Bryan Stansell
     - not even sure if this is possible w/o confusing the client,
       but maybe with the new 8.1.0 client-server protocol, we can!
 
-- send a string when connected to a console, so you can set the
-  xterm title, for example : Richard Threadgill <richardt@tellme.com>
-    - this probably requires a client config file, so could play well
-      with the client config file requirement above
-
 - allow for very long replays (hundres of lines) : John Stoffel
   <stoffel@lucent.com>
 
 - log rotation by date : Tom Pachla <tom.pachla@nlc-bnc.ca>
 
-- client config file (for -M, etc?) : Erik Sjolund
-  <erik.sjolund@sbc.su.se>
-
 - strict file permission checks on conserver.passwd/conserver.cf : Erik
   Sjolund <erik.sjolund@sbc.su.se>
 
-- embedded startup delays per remote host...or "group" of consoles in
-  some way 'cause some ssh connections to console servers need
-  significant throttling : Jay McCanta <mccantaj@amgen.com>
-
 #
-#  $Id: TODO,v 1.47 2004/03/12 17:34:49 bryan Exp $
+#  $Id: TODO,v 1.49 2004/05/25 00:38:11 bryan Exp $
 #

@@ -1,5 +1,5 @@
 /*
- *  $Id: cutil.c,v 1.116 2004/03/19 05:23:21 bryan Exp $
+ *  $Id: cutil.c,v 1.118 2004/05/25 00:38:15 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -10,6 +10,10 @@
 
 #include <cutil.h>
 
+#include <net/if.h>
+#if HAVE_SYS_SOCKIO_H
+# include <sys/sockio.h>
+#endif
 #if HAVE_OPENSSL
 #include <openssl/ssl.h>
 #endif
@@ -29,6 +33,7 @@ fd_set winit;
 int maxfd = 0;
 int debugLineNo = 0;
 char *debugFileName = (char *)0;
+int isMaster = 1;
 
 /* in the routines below (the init code) we can bomb if malloc fails	(ksb)
  */
@@ -2122,6 +2127,189 @@ PruneSpace(string)
 	return string;
 }
 
+/* fills the myAddrs array with host interface addresses */
+void
+#if PROTOTYPES
+ProbeInterfaces(in_addr_t bindAddr)
+#else
+ProbeInterfaces(bindAddr)
+    in_addr_t bindAddr;
+#endif
+{
+#ifdef SIOCGIFCONF
+    struct ifconf ifc;
+    struct ifreq *ifr;
+#ifdef SIOCGIFFLAGS
+    struct ifreq ifrcopy;
+#endif
+    int sock;
+    int r = 0, m = 0;
+    int bufsize = 2048;
+    int count = 0;
+
+    /* if we use -M, just fill the array with that interface */
+    if (bindAddr != INADDR_ANY) {
+	myAddrs = (struct in_addr *)calloc(2, sizeof(struct in_addr));
+	if (myAddrs == (struct in_addr *)0)
+	    OutOfMem();
+#if HAVE_MEMCPY
+	memcpy(&(myAddrs[0].s_addr), &bindAddr, sizeof(in_addr_t));
+#else
+	bcopy(&bindAddr, &(myAddrs[0].s_addr), sizeof(in_addr_t));
+#endif
+	Verbose("interface address %s (-M option)", inet_ntoa(myAddrs[0]));
+	return;
+    }
+
+    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+	Error("ProbeInterfaces(): socket(): %s", strerror(errno));
+	Bye(EX_OSERR);
+    }
+
+    while (bufsize) {
+	ifc.ifc_len = bufsize;
+	ifc.ifc_req = (struct ifreq *)malloc(ifc.ifc_len);
+	if (ifc.ifc_req == (struct ifreq *)0)
+	    OutOfMem();
+	if (ioctl(sock, SIOCGIFCONF, &ifc) != 0) {
+	    free(ifc.ifc_req);
+	    close(sock);
+	    Error("ProbeInterfaces(): ioctl(SIOCGIFCONF): %s",
+		  strerror(errno));
+	    Bye(EX_OSERR);
+	}
+	/* if the return size plus a 512 byte "buffer zone" is less than
+	 * the buffer we passed in (bufsize), we're done.  otherwise
+	 * allocate a bigger buffer and try again.  with a too-small
+	 * buffer, some implementations (freebsd) will fill the buffer
+	 * best it can (leaving a gap - returning <=bufsize) and others
+	 * (linux) will return a buffer length the same size as passed
+	 * in (==bufsize).  so, we'll assume a 512 byte gap would have
+	 * been big enough to put one more record and as long as we have
+	 * that "buffer zone", we should have all the interfaces.
+	 */
+	if (ifc.ifc_len + 512 < bufsize)
+	    break;
+	free(ifc.ifc_req);
+	bufsize += 2048;
+    }
+
+    /* this is probably way overkill, but better to kill a few bytes
+     * than loop through looking for valid interfaces that are up
+     * twice, huh?
+     */
+    count = ifc.ifc_len / sizeof(*ifr);
+    CONDDEBUG((1, "ProbeInterfaces(): ifc_len==%d max_count==%d",
+	       ifc.ifc_len, count));
+
+    /* set up myAddrs array */
+    if (myAddrs != (struct in_addr *)0)
+	free(myAddrs);
+    myAddrs = (struct in_addr *)0;
+    if (count == 0) {
+	free(ifc.ifc_req);
+	close(sock);
+	return;
+    }
+    myAddrs = (struct in_addr *)calloc(count + 1, sizeof(struct in_addr));
+    if (myAddrs == (struct in_addr *)0)
+	OutOfMem();
+
+    for (m = r = 0; r < ifc.ifc_len;) {
+	struct sockaddr *sa;
+	ifr = (struct ifreq *)&ifc.ifc_buf[r];
+	sa = (struct sockaddr *)&ifr->ifr_addr;
+	/* don't use less than a ifreq sized chunk */
+	if ((ifc.ifc_len - r) < sizeof(*ifr))
+	    break;
+#ifdef HAVE_SA_LEN
+	if (sa->sa_len > sizeof(ifr->ifr_addr))
+	    r += sizeof(ifr->ifr_name) + sa->sa_len;
+	else
+#endif
+	    r += sizeof(*ifr);
+
+	if (sa->sa_family == AF_INET) {
+	    struct sockaddr_in *sin = (struct sockaddr_in *)sa;
+#ifdef SIOCGIFFLAGS
+	    /* make sure the interface is up */
+	    ifrcopy = *ifr;
+	    if ((ioctl(sock, SIOCGIFFLAGS, &ifrcopy) == 0) &&
+		((ifrcopy.ifr_flags & IFF_UP) == 0))
+		continue;
+#endif
+	    CONDDEBUG((1, "ProbeInterfaces(): name=%s addr=%s",
+		       ifr->ifr_name, inet_ntoa(sin->sin_addr)));
+#if HAVE_MEMCPY
+	    memcpy(&myAddrs[m], &(sin->sin_addr), sizeof(struct in_addr));
+#else
+	    bcopy(&(sin->sin_addr), &myAddrs[m], sizeof(struct in_addr));
+#endif
+	    Verbose("interface address %s (%s)", inet_ntoa(myAddrs[m]),
+		    ifr->ifr_name);
+	    m++;
+	}
+    }
+    if (m == 0) {
+	free(myAddrs);
+	myAddrs = (struct in_addr *)0;
+    }
+    close(sock);
+    free(ifc.ifc_req);
+#else /* use the hostname like the old code did (but use all addresses!) */
+    int count;
+    struct hostent *he;
+
+    /* if we use -M, just fill the array with that interface */
+    if (bindAddr != INADDR_ANY) {
+	myAddrs = (struct in_addr *)calloc(2, sizeof(struct in_addr));
+	if (myAddrs == (struct in_addr *)0)
+	    OutOfMem();
+#if HAVE_MEMCPY
+	memcpy(&(myAddrs[0].s_addr), &bindAddr, sizeof(in_addr_t));
+#else
+	bcopy(&bindAddr, &(myAddrs[0].s_addr), sizeof(in_addr_t));
+#endif
+	Verbose("interface address %s (-M option)", inet_ntoa(myAddrs[0]));
+	return;
+    }
+
+    Verbose("using hostname for interface addresses");
+    if ((struct hostent *)0 == (he = gethostbyname(myHostname))) {
+	Error("ProbeInterfaces(): gethostbyname(%s): %s", myHostname,
+	      hstrerror(h_errno));
+	return;
+    }
+    if (4 != he->h_length || AF_INET != he->h_addrtype) {
+	Error
+	    ("ProbeInterfaces(): gethostbyname(%s): wrong address size (4 != %d) or address family (%d != %d)",
+	     myHostname, he->h_length, AF_INET, he->h_addrtype);
+	return;
+    }
+
+    for (count = 0; he->h_addr_list[count] != (char *)0; count++);
+    if (myAddrs != (struct in_addr *)0)
+	free(myAddrs);
+    myAddrs = (struct in_addr *)0;
+    if (count == 0)
+	return;
+    myAddrs = (struct in_addr *)calloc(count + 1, sizeof(struct in_addr));
+    if (myAddrs == (struct in_addr *)0)
+	OutOfMem();
+    for (count--; count >= 0; count--) {
+#if HAVE_MEMCPY
+	memcpy(&(myAddrs[count].s_addr), he->h_addr_list[count],
+	       he->h_length);
+#else
+	bcopy(he->h_addr_list[count], &(myAddrs[count].s_addr),
+	      he->h_length);
+#endif
+	Verbose("interface address %s (hostname address)",
+		inet_ntoa(myAddrs[count]));
+    }
+#endif
+}
+
 int
 #if PROTOTYPES
 IsMe(char *id)
@@ -2387,4 +2575,726 @@ ParseIACBuf(cfp, msg, len)
 	}
     }
     return l;
+}
+
+/* the format of the file should be as follows
+ *
+ * <section keyword> [section name] {
+ *      <item keyword> [item value];
+ *                   .
+ *                   .
+ * }
+ *
+ * whitespace gets retained in [section name], and [item value]
+ * values.  for example,
+ *
+ *    users  bryan  todd ;
+ *
+ *  will give users the value of 'bryan  todd'.  the leading and
+ *  trailing whitespace is nuked, but the middle stuff isn't.
+ *
+ *  a little note about the 'state' var...
+ *      START = before <section keyword>
+ *      NAME = before [section name]
+ *      LEFTB = before left curly brace
+ *      KEY = before <item keyword>
+ *      VALUE = before [item value]
+ *      SEMI = before semi-colon
+ */
+
+typedef enum states {
+    START,
+    NAME,
+    LEFTB,
+    KEY,
+    VALUE,
+    SEMI
+} STATES;
+
+typedef enum tokens {
+    DONE,
+    LEFTBRACE,
+    RIGHTBRACE,
+    SEMICOLON,
+    WORD,
+    INCLUDE
+} TOKEN;
+
+int line = 1;			/* current line number */
+char *file = (char *)0;
+
+TOKEN
+#if PROTOTYPES
+GetWord(FILE *fp, int *line, short spaceok, STRING *word)
+#else
+GetWord(fp, line, spaceok, word)
+    FILE *fp;
+    int *line;
+    short spaceok;
+    STRING *word;
+#endif
+{
+    int c;
+    short backslash = 0;
+    short quote = 0;
+    short comment = 0;
+    short sawQuote = 0;
+    short quotedBackslash = 0;
+    char *include = "include";
+    short checkInc = -1;
+    /* checkInc == -3, saw #include
+     *          == -2, saw nothin'
+     *          == -1, saw \n or start of file
+     *          == 0, saw "\n#"
+     */
+
+    BuildString((char *)0, word);
+    while ((c = fgetc(fp)) != EOF) {
+	if (c == '\n') {
+	    (*line)++;
+	    if (checkInc == -2)
+		checkInc = -1;
+	}
+	if (comment) {
+	    if (c == '\n')
+		comment = 0;
+	    if (checkInc >= 0) {
+		if (include[checkInc] == '\000') {
+		    if (isspace(c))
+			checkInc = -3;
+		} else if (c == include[checkInc])
+		    checkInc++;
+		else
+		    checkInc = -2;
+	    } else if (checkInc == -3) {
+		static STRING *fname = (STRING *)0;
+		if (fname == (STRING *)0)
+		    fname = AllocString();
+		if (fname->used != 0 || !isspace(c)) {
+		    if (c == '\n') {
+			if (fname->used > 0) {
+			    while (fname->used > 1 && isspace((int)
+							      (fname->
+							       string
+							       [fname->
+								used -
+								2])))
+				fname->used--;
+			    if (fname->used > 0)
+				fname->string[fname->used - 1] = '\000';
+			}
+			checkInc = -2;
+			if (fname->used > 0) {
+			    BuildString((char *)0, word);
+			    BuildString(fname->string, word);
+			    BuildString((char *)0, fname);
+			    return INCLUDE;
+			}
+		    } else
+			BuildStringChar(c, fname);
+		}
+	    }
+	    continue;
+	}
+	if (backslash) {
+	    BuildStringChar(c, word);
+	    backslash = 0;
+	    continue;
+	}
+	if (quote) {
+	    if (c == '"') {
+		if (quotedBackslash) {
+		    BuildStringChar(c, word);
+		    quotedBackslash = 0;
+		} else
+		    quote = 0;
+	    } else {
+		if (quotedBackslash) {
+		    BuildStringChar('\\', word);
+		    quotedBackslash = 0;
+		}
+		if (c == '\\')
+		    quotedBackslash = 1;
+		else
+		    BuildStringChar(c, word);
+	    }
+	    continue;
+	}
+	if (c == '\\') {
+	    backslash = 1;
+	} else if (c == '#') {
+	    comment = 1;
+	    if (checkInc == -1)
+		checkInc = 0;
+	} else if (c == '"') {
+	    quote = 1;
+	    sawQuote = 1;
+	} else if (isspace(c)) {
+	    if (word->used <= 1)
+		continue;
+	    if (spaceok) {
+		BuildStringChar(c, word);
+		continue;
+	    }
+	  gotword:
+	    while (word->used > 1 &&
+		   isspace((int)(word->string[word->used - 2])))
+		word->used--;
+	    if (word->used > 0)
+		word->string[word->used - 1] = '\000';
+	    return WORD;
+	} else if (c == '{') {
+	    if (word->used <= 1 && !sawQuote) {
+		BuildStringChar(c, word);
+		return LEFTBRACE;
+	    } else {
+		ungetc(c, fp);
+		goto gotword;
+	    }
+	} else if (c == '}') {
+	    if (word->used <= 1 && !sawQuote) {
+		BuildStringChar(c, word);
+		return RIGHTBRACE;
+	    } else {
+		ungetc(c, fp);
+		goto gotword;
+	    }
+	} else if (c == ';') {
+	    if (word->used <= 1 && !sawQuote) {
+		BuildStringChar(c, word);
+		return SEMICOLON;
+	    } else {
+		ungetc(c, fp);
+		goto gotword;
+	    }
+	} else {
+	    BuildStringChar(c, word);
+	}
+    }
+    /* this should only happen in rare cases */
+    if (quotedBackslash) {
+	BuildStringChar('\\', word);
+	quotedBackslash = 0;
+    }
+    /* if we saw "valid" data, it's a word */
+    if (word->used > 1 || sawQuote)
+	goto gotword;
+    return DONE;
+}
+
+void
+#if PROTOTYPES
+ParseFile(char *filename, FILE *fp, int level)
+#else
+ParseFile(filename, fp, level)
+    char *filename;
+    FILE *fp;
+    int level;
+#endif
+{
+    /* things that should be used between recursions */
+    static STATES state = START;
+    static STRING *word = (STRING *)0;
+    static short spaceok = 0;
+    static int secIndex = 0;
+    static int keyIndex = 0;
+
+    /* other stuff that's local to each recursion */
+    char *p;
+    TOKEN token = DONE;
+    int nextline = 1;		/* "next" line number */
+
+    if (level >= 10) {
+	if (isMaster)
+	    Error("ParseFile(): nesting too deep, not parsing `%s'",
+		  filename);
+	return;
+    }
+
+    /* set some globals */
+    line = 1;
+    file = filename;
+
+    /* if we're parsing the base file, set static vars */
+    if (level == 0) {
+	state = START;
+	spaceok = 0;
+	secIndex = 0;
+	keyIndex = 0;
+    }
+
+    /* initialize local things */
+    if (word == (STRING *)0)
+	word = AllocString();
+
+    while ((token = GetWord(fp, &nextline, spaceok, word)) != DONE) {
+	if (token == INCLUDE) {
+	    FILE *lfp;
+	    if ((FILE *)0 == (lfp = fopen(word->string, "r"))) {
+		if (isMaster)
+		    Error("ParseFile(): fopen(%s): %s", word->string,
+			  strerror(errno));
+	    } else {
+		char *fname;
+		/* word gets destroyed, so save the name */
+		fname = StrDup(word->string);
+		ParseFile(fname, lfp, level + 1);
+		fclose(lfp);
+		free(fname);
+	    }
+	} else {
+	    switch (state) {
+		case START:
+		    switch (token) {
+			case WORD:
+			    for (secIndex = 0;
+				 (p = sections[secIndex].id) != (char *)0;
+				 secIndex++) {
+				if (strcasecmp(word->string, p) == 0) {
+				    CONDDEBUG((1,
+					       "ReadCfg(): got keyword '%s' [%s:%d]",
+					       word->string, file, line));
+				    state = NAME;
+				    break;
+				}
+			    }
+			    if (state == START) {
+				if (isMaster)
+				    Error("invalid keyword '%s' [%s:%d]",
+					  word->string, file, line);
+			    }
+			    break;
+			case LEFTBRACE:
+			case RIGHTBRACE:
+			case SEMICOLON:
+			    if (isMaster)
+				Error("invalid token '%s' [%s:%d]",
+				      word->string, file, line);
+			    break;
+			case DONE:	/* just shutting up gcc */
+			case INCLUDE:	/* just shutting up gcc */
+			    break;
+		    }
+		    break;
+		case NAME:
+		    switch (token) {
+			case WORD:
+			    (*sections[secIndex].begin) (word->string);
+			    state = LEFTB;
+			    break;
+			case RIGHTBRACE:
+			    if (isMaster)
+				Error("premature token '%s' [%s:%d]",
+				      word->string, file, line);
+			    state = START;
+			    break;
+			case LEFTBRACE:
+			case SEMICOLON:
+			    if (isMaster)
+				Error("invalid token '%s' [%s:%d]",
+				      word->string, file, line);
+			    break;
+			case DONE:	/* just shutting up gcc */
+			case INCLUDE:	/* just shutting up gcc */
+			    break;
+		    }
+		    break;
+		case LEFTB:
+		    switch (token) {
+			case LEFTBRACE:
+			    state = KEY;
+			    break;
+			case RIGHTBRACE:
+			    if (isMaster)
+				Error("premature token '%s' [%s:%d]",
+				      word->string, file, line);
+			    (*sections[secIndex].abort) ();
+			    state = START;
+			    break;
+			case SEMICOLON:
+			    if (isMaster)
+				Error("invalid token '%s' [%s:%d]",
+				      word->string, file, line);
+			    break;
+			case WORD:
+			    if (isMaster)
+				Error("invalid word '%s' [%s:%d]",
+				      word->string, file, line);
+			    break;
+			case DONE:	/* just shutting up gcc */
+			case INCLUDE:	/* just shutting up gcc */
+			    break;
+		    }
+		    break;
+		case KEY:
+		    switch (token) {
+			case WORD:
+			    for (keyIndex = 0;
+				 (p =
+				  sections[secIndex].items[keyIndex].id) !=
+				 (char *)0; keyIndex++) {
+				if (strcasecmp(word->string, p) == 0) {
+				    CONDDEBUG((1,
+					       "got keyword '%s' [%s:%d]",
+					       word->string, file, line));
+				    state = VALUE;
+				    break;
+				}
+			    }
+			    if (state == KEY) {
+				if (isMaster)
+				    Error("invalid keyword '%s' [%s:%d]",
+					  word->string, file, line);
+			    }
+			    break;
+			case RIGHTBRACE:
+			    (*sections[secIndex].end) ();
+			    state = START;
+			    break;
+			case LEFTBRACE:
+			    if (isMaster)
+				Error("invalid token '%s' [%s:%d]",
+				      word->string, file, line);
+			    break;
+			case SEMICOLON:
+			    if (isMaster)
+				Error("premature token '%s' [%s:%d]",
+				      word->string, file, line);
+			case DONE:	/* just shutting up gcc */
+			case INCLUDE:	/* just shutting up gcc */
+			    break;
+		    }
+		    break;
+		case VALUE:
+		    switch (token) {
+			case WORD:
+			    (*sections[secIndex].items[keyIndex].
+			     reg) (word->string);
+			    state = SEMI;
+			    break;
+			case SEMICOLON:
+			    if (isMaster)
+				Error("invalid token '%s' [%s:%d]",
+				      word->string, file, line);
+			    state = KEY;
+			    break;
+			case RIGHTBRACE:
+			    if (isMaster)
+				Error("premature token '%s' [%s:%d]",
+				      word->string, file, line);
+			    (*sections[secIndex].abort) ();
+			    state = START;
+			    break;
+			case LEFTBRACE:
+			    if (isMaster)
+				Error("invalid token '%s' [%s:%d]",
+				      word->string, file, line);
+			    break;
+			case DONE:	/* just shutting up gcc */
+			case INCLUDE:	/* just shutting up gcc */
+			    break;
+		    }
+		    break;
+		case SEMI:
+		    switch (token) {
+			case SEMICOLON:
+			    state = KEY;
+			    break;
+			case RIGHTBRACE:
+			    if (isMaster)
+				Error("premature token '%s' [%s:%d]",
+				      word->string, file, line);
+			    (*sections[secIndex].abort) ();
+			    state = START;
+			    break;
+			case LEFTBRACE:
+			    if (isMaster)
+				Error("invalid token '%s' [%s:%d]",
+				      word->string, file, line);
+			    break;
+			case WORD:
+			    if (isMaster)
+				Error("invalid word '%s' [%s:%d]",
+				      word->string, file, line);
+			    break;
+			case DONE:	/* just shutting up gcc */
+			case INCLUDE:	/* just shutting up gcc */
+			    break;
+		    }
+		    break;
+	    }
+	    switch (state) {
+		case NAME:
+		case VALUE:
+		    spaceok = 1;
+		    break;
+		case KEY:
+		case LEFTB:
+		case START:
+		case SEMI:
+		    spaceok = 0;
+		    break;
+	    }
+	}
+	line = nextline;
+    }
+
+    if (level == 0) {
+	int i;
+
+	/* check for proper ending of file and do any cleanup */
+	switch (state) {
+	    case START:
+		break;
+	    case KEY:
+	    case LEFTB:
+	    case VALUE:
+	    case SEMI:
+		(*sections[secIndex].abort) ();
+		/* fall through */
+	    case NAME:
+		if (isMaster)
+		    Error("premature EOF seen [%s:%d]", file, line);
+		break;
+	}
+
+	/* now clean up all the temporary space used */
+	for (i = 0; sections[i].id != (char *)0; i++) {
+	    (*sections[i].destroy) ();
+	}
+    }
+}
+
+void
+#if PROTOTYPES
+ProcessSubst(SUBST * s, char **repl, char **str, char *name, char *id)
+#else
+ProcessSubst(s, repl, str, name, id)
+    SUBST *s;
+    char **repl;
+    char **str;
+    char *name;
+    char *id;
+#endif
+{
+    /*
+     * (CONSENT *pCE) and (char **repl) are used when a replacement is to
+     * actually happen...repl is the string to munch, pCE holds the data.
+     *
+     * (char **str) is used to store a copy of (char *id), if it passes
+     * the format check.
+     *
+     * the idea is that this is first called when the config file is read,
+     * putting the result in (char **str).  then we call it again, near
+     * the end, permuting (char **repl) with values from (CONSENT *pCE) with
+     * the saved string now coming in as (char *id).  got it?
+     *
+     * you could pass all arguments in...then both types of actions occur.
+     */
+    char *p;
+    char *repfmt[255];
+    unsigned short repnum;
+    int i;
+
+    enum repstate {
+	REP_BEGIN,
+	REP_LTR,
+	REP_EQ,
+	REP_INT,
+	REP_END
+    } state;
+
+    if (str != (char **)0) {
+	if (*str != (char *)0) {
+	    free(*str);
+	    *str = (char *)0;
+	}
+    }
+
+    if ((id == (char *)0) || (*id == '\000'))
+	return;
+
+    repnum = 0;
+    state = REP_BEGIN;
+
+    for (i = 0; i < 256; i++)
+	repfmt[i] = (char *)0;
+
+    for (p = id; *p != '\000'; p++) {
+	switch (state) {
+	    case REP_BEGIN:
+		/* must be printable */
+		if (*p == ',' || !isgraph((int)(*p)))
+		    goto subst_err;
+
+		/* make sure we haven't seen this replacement char yet */
+		repnum = (unsigned short)(*p);
+		if (repfmt[repnum] != (char *)0) {
+		    if (isMaster)
+			Error
+			    ("substitution characters of `%s' option are the same [%s:%d]",
+			     name, file, line);
+		    return;
+		}
+		state = REP_LTR;
+		break;
+	    case REP_LTR:
+		if (*p != '=')
+		    goto subst_err;
+		state = REP_EQ;
+		break;
+	    case REP_EQ:
+		repfmt[repnum] = p;
+		if (s->tokens[(unsigned)(*(repfmt[repnum]))] != ISNOTHING)
+		    state = REP_INT;
+		else
+		    goto subst_err;
+		break;
+	    case REP_INT:
+		if (*p == 'd' || *p == 'x' || *p == 'X') {
+		    if (s->tokens[(unsigned)(*(repfmt[repnum]))] !=
+			ISNUMBER)
+			goto subst_err;
+		    state = REP_END;
+		} else if (*p == 's') {
+		    if (s->tokens[(unsigned)(*(repfmt[repnum]))] !=
+			ISSTRING)
+			goto subst_err;
+		    state = REP_END;
+		} else if (!isdigit((int)(*p)))
+		    goto subst_err;
+		break;
+	    case REP_END:
+		if (*p != ',')
+		    goto subst_err;
+		state = REP_BEGIN;
+		break;
+	}
+    }
+
+    if (state != REP_END) {
+      subst_err:
+	if (isMaster)
+	    Error
+		("invalid `%s' specification `%s' (char #%d: `%c') [%s:%d]",
+		 name, id, (p - id) + 1, *p, file, line);
+	return;
+    }
+
+    if (str != (char **)0) {
+	if ((*str = StrDup(id)) == (char *)0)
+	    OutOfMem();
+    }
+
+    if (s != (SUBST *) 0 && repl != (char **)0) {
+	static STRING *result = (STRING *)0;
+
+	if (result == (STRING *)0)
+	    result = AllocString();
+	BuildString((char *)0, result);
+
+	for (p = *repl; *p != '\000'; p++) {
+	    if (repfmt[(unsigned short)(*p)] != (char *)0) {
+		char *r = repfmt[(unsigned short)(*p)];
+		int plen = 0;
+		char *c = (char *)0;
+		int o = 0;
+
+		if (s->tokens[(unsigned)(*r)] == ISSTRING) {
+		    /* check the pattern for a length */
+		    if (isdigit((int)(*(r + 1))))
+			plen = atoi(r + 1);
+
+		    /* this should never return zero, but just in case */
+		    if ((*s->callback) (*r, &c, (int *)0) == 0)
+			c = "";
+		    plen -= strlen(c);
+
+		    /* pad it out, if necessary */
+		    for (i = 0; i < plen; i++)
+			BuildStringChar(' ', result);
+
+		    /* throw in the string */
+		    BuildString(c, result);
+		} else {
+		    int i = 0;
+		    unsigned short port = 0;
+		    unsigned short base = 0;
+		    int padzero = 0;
+		    static STRING *num = (STRING *)0;
+
+		    if (num == (STRING *)0)
+			num = AllocString();
+		    BuildString((char *)0, num);
+
+		    /* this should never return zero, but just in case */
+		    if ((*s->callback) (*r, (char **)0, &i) == 0)
+			port = 0;
+		    else
+			port = (unsigned short)i;
+
+		    /* check the pattern for a length and padding */
+		    for (c = r + 1; *c != '\000'; c++)
+			if (!isdigit((int)(*c)))
+			    break;
+		    if (c != r + 1) {
+			plen = atoi(r + 1);
+			padzero = (r[1] == '0');
+		    }
+
+		    /* check for base */
+		    switch (*c) {
+			case 'd':
+			    base = 10;
+			    break;
+			case 'x':
+			case 'X':
+			    base = 16;
+			    break;
+			default:
+			    return;
+		    }
+		    while (port >= base) {
+			if (port % base >= 10)
+			    BuildStringChar((port % base) - 10 +
+					    (*c == 'x' ? 'a' : 'A'), num);
+			else
+			    BuildStringChar((port % base) + '0', num);
+			port /= base;
+		    }
+		    if (port >= 10)
+			BuildStringChar(port - 10 +
+					(*c == 'x' ? 'a' : 'A'), num);
+		    else
+			BuildStringChar(port + '0', num);
+
+		    /* if we're supposed to be a certain length, pad it */
+		    while (num->used - 1 < plen) {
+			if (padzero == 0)
+			    BuildStringChar(' ', num);
+			else
+			    BuildStringChar('0', num);
+		    }
+
+		    /* reverse the text to put it in forward order */
+		    o = num->used - 1;
+		    for (i = 0; i < o / 2; i++) {
+			char temp;
+
+			temp = num->string[i];
+			num->string[i]
+			    = num->string[o - i - 1];
+			num->string[o - i - 1] = temp;
+		    }
+		    BuildStringN(num->string, o, result);
+		}
+	    } else
+		BuildStringChar(*p, result);
+	}
+	free(*repl);
+	if ((*repl = StrDup(result->string)) == (char *)0)
+	    OutOfMem();
+    }
+
+    return;
 }

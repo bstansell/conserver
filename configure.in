@@ -4,6 +4,7 @@ AH_TEMPLATE([DEFPORT], [Socket used to communicate])
 AH_TEMPLATE([DEFBASEPORT], [Base socket used for secondary channel])
 AH_TEMPLATE([MASTERHOST], [Hostname of console server])
 AH_TEMPLATE([CONFIGFILE], [Config file path])
+AH_TEMPLATE([CLIENTCONFIGFILE], [Client config file path])
 AH_TEMPLATE([PASSWDFILE], [Password file path])
 AH_TEMPLATE([LOGFILEPATH], [Logfile path])
 AH_TEMPLATE([MAXMEMB], [Number of consoles per child process])
@@ -97,6 +98,26 @@ AC_ARG_WITH(master,
 	esac],
 	[AC_DEFINE_UNQUOTED(MASTERHOST, "console")
 	AC_MSG_RESULT('console')])
+
+AC_MSG_CHECKING(for client configuration filename)
+AC_ARG_WITH(ccffile,
+	AS_HELP_STRING([--with-ccffile=CFFILE],[Specify client config filename @<:@SYSCONFDIR/console.cf@:>@]),
+	[case "$withval" in
+	    yes|no)
+		AC_DEFINE_UNQUOTED(CLIENTCONFIGFILE, [SYSCONFDIR "/console.cf"])
+		AC_MSG_RESULT('$sysconfdir/console.cf')
+		;;
+	    [[\\/]]* | ?:[[\\/]]* )
+		AC_DEFINE_UNQUOTED(CLIENTCONFIGFILE, ["$withval"])
+		AC_MSG_RESULT('$withval')
+		;;
+	    *)
+		AC_DEFINE_UNQUOTED(CLIENTCONFIGFILE, [SYSCONFDIR "/$withval"])
+		AC_MSG_RESULT('$sysconfdir/$withval')
+		;;
+	esac],
+	[AC_DEFINE_UNQUOTED(CLIENTCONFIGFILE, [SYSCONFDIR "/console.cf"])
+	AC_MSG_RESULT('$sysconfdir/console.cf')])
 
 AC_MSG_CHECKING(for configuration filename)
 AC_ARG_WITH(cffile,
@@ -233,6 +254,7 @@ AC_ARG_WITH(extmsgs,
 	esac],[AC_MSG_RESULT(no)])
 
 AC_MSG_CHECKING(whether to use Unix domain sockets)
+cons_with_uds="NO"
 AC_ARG_WITH(uds,
 	AS_HELP_STRING([--with-uds@<:@=DIR@:>@    ],
 	    [Use Unix domain sockets for client/server communication @<:@/tmp/conserver@:>@]),
@@ -241,6 +263,7 @@ AC_ARG_WITH(uds,
 		AC_DEFINE_UNQUOTED(UDSDIR, "/tmp/conserver")
 		AC_DEFINE(USE_UNIX_DOMAIN_SOCKETS)
 		AC_MSG_RESULT([/tmp/conserver])
+		cons_with_uds="YES"
 		;;
 	    no)
 		AC_MSG_RESULT(no)
@@ -249,6 +272,7 @@ AC_ARG_WITH(uds,
 		AC_DEFINE_UNQUOTED(UDSDIR, "$withval")
 		AC_DEFINE(USE_UNIX_DOMAIN_SOCKETS)
 		AC_MSG_RESULT('$withval')
+		cons_with_uds="YES"
 		if expr "$withval" : '/' >/dev/null 2>&1; then
 		    :
 		else
@@ -343,6 +367,7 @@ AC_SEARCH_LIBS(crypt,crypt)
 AC_SUBST(CONSLIBS)
 AC_SUBST(CONSCPPFLAGS)
 AC_SUBST(CONSLDFLAGS)
+cons_with_libwrap="NO"
 AC_ARG_WITH(libwrap,
     AS_HELP_STRING([--with-libwrap@<:@=PATH@:>@],
 	[Compile in libwrap (tcp_wrappers) support]),
@@ -370,6 +395,7 @@ AC_ARG_WITH(libwrap,
 		int deny_severity  = 0;
 		],[hosts_access((void *)0)],
 		[AC_MSG_RESULT(yes)
+		 cons_with_libwrap="YES"
 		 AC_DEFINE(USE_LIBWRAP)
 		 CONSLIBS="$CONSLIBS -lwrap"
 		 CONSLDFLAGS="$CONSLDFLAGS $WRAPLDFLAGS"
@@ -382,6 +408,7 @@ AC_ARG_WITH(libwrap,
 		    int deny_severity  = 0;
 		    ],[hosts_access((void *)0)],
 		    [AC_MSG_RESULT(yes)
+		     cons_with_libwrap="YES"
 		     AC_DEFINE(USE_LIBWRAP)
 		     CONSLIBS="$CONSLIBS -lwrap -lnsl"
 		     CONSLDFLAGS="$CONSLDFLAGS $WRAPLDFLAGS"
@@ -393,6 +420,7 @@ AC_ARG_WITH(libwrap,
     fi]
 )
 
+cons_with_openssl="NO"
 AC_ARG_WITH(openssl,
     AS_HELP_STRING([--with-openssl@<:@=PATH@:>@],
 	[Compile in OpenSSL support]),
@@ -419,6 +447,7 @@ AC_ARG_WITH(openssl,
 	    AC_TRY_LINK([#include <openssl/ssl.h>
 		],[SSL_library_init()],
 		[AC_MSG_RESULT(yes)
+		cons_with_openssl="YES"
 		AC_DEFINE(HAVE_OPENSSL)
 		have_openssl=yes],
 		[AC_MSG_RESULT(no)])],)
@@ -431,6 +460,7 @@ AC_ARG_WITH(openssl,
     fi]
 )
 
+cons_with_dmalloc="NO"
 AC_ARG_WITH(dmalloc,
     AS_HELP_STRING([--with-dmalloc@<:@=PATH@:>@],
 	[Compile in dmalloc support]),
@@ -457,6 +487,7 @@ AC_ARG_WITH(dmalloc,
 	    AC_TRY_LINK([#include <dmalloc.h>
 		],[dmalloc_debug(0)],
 		[AC_MSG_RESULT(yes)
+		cons_with_dmalloc="YES"
 		AC_DEFINE(HAVE_DMALLOC)
 		have_dmalloc=yes],
 		[AC_MSG_RESULT(no)])],)
@@ -505,6 +536,7 @@ dnl 	else
 dnl 	    AC_MSG_RESULT(no)
 dnl 	fi],[AC_MSG_RESULT(no)])
 
+cons_with_pam="NO"
 AC_MSG_CHECKING(for PAM support)
 AC_ARG_WITH(pam,
     AS_HELP_STRING([--with-pam],
@@ -517,6 +549,7 @@ AC_ARG_WITH(pam,
 		AC_MSG_CHECKING(for PAM library -lpam)
 		AC_TRY_LINK_FUNC([pam_start],
 		    [AC_MSG_RESULT(yes)
+		    cons_with_pam="YES"
 		    AC_DEFINE(HAVE_PAM)
 		    CONSLIBS="$CONSLIBS -lpam"],
 		    [LIBS="$LIBS -ldl"
@@ -524,6 +557,7 @@ AC_ARG_WITH(pam,
 		    AC_MSG_CHECKING(for PAM library -lpam with -ldl)
 		    AC_TRY_LINK_FUNC([pam_end],
 			[AC_MSG_RESULT(yes)
+			cons_with_pam="YES"
 			AC_DEFINE(HAVE_PAM)
 			CONSLIBS="$CONSLIBS -lpam -ldl"],
 			[AC_MSG_RESULT(no)])])],)
@@ -566,3 +600,16 @@ dnl ### Create output files. #######################################
 AC_CONFIG_FILES([Makefile conserver/Makefile conserver.cf/Makefile console/Makefile autologin/Makefile contrib/chat/Makefile])
 AC_CONFIG_FILES([conserver/conserver.rc], [chmod +x conserver/conserver.rc])
 AC_OUTPUT
+
+[
+echo "=============================================================="
+echo "                      Feature Summary"
+echo ""
+echo "  Unix domain sockets (--with-uds)    : $cons_with_uds"
+echo "         TCP wrappers (--with-libwrap): $cons_with_libwrap"
+echo "              OpenSSL (--with-openssl): $cons_with_openssl"
+echo "              dmalloc (--with-dmalloc): $cons_with_dmalloc"
+echo "          PAM support (--with-pam)    : $cons_with_pam"
+echo ""
+echo "=============================================================="
+]

@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.h,v 5.39 2004/05/07 03:42:49 bryan Exp $
+ *  $Id: readcfg.h,v 5.40 2004/05/25 23:03:01 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -43,6 +43,7 @@ extern ACCESS *pACList;		/* `who do you love' (or trust) */
 extern CONSENTUSERS *pADList;	/* list of admin users */
 extern BREAKS breakList[9];	/* list of break sequences */
 extern CONFIG *pConfig;		/* settings seen by config parser */
+extern SUBST *substData;	/* substitution function data */
 
 extern void ReadCfg PARAMS((char *, FILE *));
 extern void ReReadCfg PARAMS((int));

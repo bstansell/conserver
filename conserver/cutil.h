@@ -1,5 +1,5 @@
 /*
- *  $Id: cutil.h,v 1.61 2004/03/10 02:55:45 bryan Exp $
+ *  $Id: cutil.h,v 1.63 2004/05/25 00:38:15 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -89,6 +89,37 @@ typedef struct consFile {
 #endif
 } CONSFILE;
 
+typedef struct item {
+    char *id;
+    void (*reg) PARAMS((char *));
+} ITEM;
+
+typedef struct section {
+    char *id;
+    void (*begin) PARAMS((char *));
+    void (*end) PARAMS((void));
+    void (*abort) PARAMS((void));
+    void (*destroy) PARAMS((void));
+    ITEM *items;
+} SECTION;
+
+typedef enum substToken {
+    ISNOTHING = 0,
+    ISNUMBER,
+    ISSTRING
+} SUBSTTOKEN;
+
+typedef struct subst {
+    SUBSTTOKEN tokens[255];
+    /* data for callback function
+     */
+    void *data;
+    /* function to retrieve a value (as a char* or int or both) for
+     * a substitution
+     */
+    int (*callback) PARAMS((char, char **, int *));
+} SUBST;
+
 extern int isMultiProc, fDebug, fVerbose, fErrorPrinted;
 extern char *progname;
 extern pid_t thepid;
@@ -100,6 +131,10 @@ extern fd_set winit;
 extern int maxfd;
 extern int debugLineNo;
 extern char *debugFileName;
+extern int line;		/* used by ParseFile */
+extern char *file;		/* used by ParseFile */
+extern SECTION sections[];	/* used by ParseFile */
+extern int isMaster;
 
 extern const char *StrTime PARAMS((time_t *));
 extern void Debug PARAMS((int, char *, ...));
@@ -157,6 +192,10 @@ extern char *StrDup PARAMS((char *));
 extern int ParseIACBuf PARAMS((CONSFILE *, void *, int *));
 extern void *MemMove PARAMS((void *, void *, size_t));
 extern char *StringChar PARAMS((STRING *, int, char));
+extern void ParseFile PARAMS((char *, FILE *, int));
+extern void ProbeInterfaces PARAMS((in_addr_t));
+extern void ProcessSubst
+PARAMS((SUBST *, char **, char **, char *, char *));
 #if HAVE_OPENSSL
 extern SSL *FileGetSSL PARAMS((CONSFILE *));
 extern void FileSetSSL PARAMS((CONSFILE *, SSL *));

@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.56 2004/02/20 14:58:14 bryan Exp $
+ *  $Id: consent.h,v 5.57 2004/05/21 04:38:02 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -96,7 +96,7 @@ typedef struct consent {	/* console information                  */
     unsigned short port;	/* port number   |      portinc * port  */
     unsigned short portbase;	/* port base                            */
     unsigned short portinc;	/* port increment                       */
-    unsigned short raw;		/* raw or telnet protocol?              */
+    FLAG raw;			/* raw or telnet protocol?              */
     /* type == EXEC */
     char *exec;			/* exec command                         */
     char *execsubst;		/* exec substitution pattern            */

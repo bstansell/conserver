@@ -1,6 +1,6 @@
 .\" @(#)conserver.8 01/06/91 OSU CIS; Thomas A. Fine
-.\" $Id: conserver.man,v 1.46 2004/04/13 18:19:26 bryan Exp $
-.TH CONSERVER 8 "2004/04/13" "conserver-8.1.5" "conserver"
+.\" $Id: conserver.man,v 1.47 2004/05/21 04:15:17 bryan Exp $
+.TH CONSERVER 8 "2004/05/21" "conserver-8.1.6" "conserver"
 .SH NAME
 conserver \- console server daemon
 .SH SYNOPSIS
@@ -297,8 +297,9 @@ However, if
 was used to enable Unix domain sockets for client/server communication,
 this points conserver to the directory where it should store the sockets.
 The default
-.IR master
-directory, ``/tmp/conserver'',
+.I master
+directory
+.RB (`` /tmp/conserver '')
 may be changed at compile time using the
 .B --with-uds
 option.
@@ -454,7 +455,7 @@ The following default file locations may be overridden
 at compile time or by the command-line options described above.
 Run
 .B conserver \-V
-(with no other options) to see the defaults set at compile time.
+to see the defaults set at compile time.
 .PP
 .PD 0
 .TP 25

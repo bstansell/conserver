@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.164 2004/04/20 01:30:13 bryan Exp $
+ *  $Id: console.c,v 5.167 2004/05/25 23:03:25 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -34,6 +34,7 @@
 #include <getpassword.h>
 #include <cutil.h>
 #include <version.h>
+#include <readconf.h>
 #if HAVE_OPENSSL
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -41,24 +42,11 @@
 #endif
 
 
-int fReplay = 0, fVersion = 0, fStrip = 0;
+int fReplay = 0, fVersion = 0;
 int showExecData = 1;
-#if HAVE_OPENSSL
-int fReqEncryption = 1;
-int fAllowUnencrypted = 0;
-char *pcCredFile = (char *)0;
-#endif
 int chAttn = -1, chEsc = -1;
-char *pcInMaster =
-#if USE_UNIX_DOMAIN_SOCKETS
-    UDSDIR;
-#else
-    MASTERHOST;			/* which machine is current */
-#endif
-char *pcPort = DEFPORT;
 unsigned short bindPort;
 CONSFILE *cfstdout;
-char *pcUser = (char *)0;
 int disconnectCount = 0;
 STRING *execCmd = (STRING *)0;
 CONSFILE *execCmdFile = (CONSFILE *)0;
@@ -67,6 +55,8 @@ CONSFILE *gotoConsole = (CONSFILE *)0;
 CONSFILE *prevConsole = (CONSFILE *)0;
 char *gotoName = (char *)0;
 char *prevName = (char *)0;
+CONFIG *optConf = (CONFIG *)0;
+CONFIG *config = (CONFIG *)0;
 
 #if HAVE_OPENSSL
 SSL_CTX *ctx = (SSL_CTX *)0;
@@ -92,15 +82,17 @@ SetupSSL()
 	    Error("Could not load SSL default CA file and/or directory");
 	    Bye(EX_UNAVAILABLE);
 	}
-	if (pcCredFile != (char *)0) {
-	    if (SSL_CTX_use_certificate_chain_file(ctx, pcCredFile) != 1) {
+	if (config->sslcredentials != (char *)0) {
+	    if (SSL_CTX_use_certificate_chain_file
+		(ctx, config->sslcredentials) != 1) {
 		Error("Could not load SSL certificate from '%s'",
-		      pcCredFile);
+		      config->sslcredentials);
 		Bye(EX_UNAVAILABLE);
 	    }
 	    if (SSL_CTX_use_PrivateKey_file
-		(ctx, pcCredFile, SSL_FILETYPE_PEM) != 1) {
-		Error("Could not SSL private key from '%s'", pcCredFile);
+		(ctx, config->sslcredentials, SSL_FILETYPE_PEM) != 1) {
+		Error("Could not SSL private key from '%s'",
+		      config->sslcredentials);
 		Bye(EX_UNAVAILABLE);
 	    }
 	}
@@ -191,54 +183,56 @@ Usage(wantfull)
 #endif
 {
     static char *full[] = {
-	"7       strip the high bit off all console data",
-	"a(A)    attach politely (and replay last 20 lines)",
-	"b(B)    send broadcast message to all users (on master)",
+	"7         strip the high bit off all console data",
+	"a(A)      attach politely (and replay last 20 lines)",
+	"b(B)      send broadcast message to all users (on master)",
 #if HAVE_OPENSSL
-	"c cred  load an SSL certificate and key from the PEM encoded file",
+	"c cred    load an SSL certificate and key from the PEM encoded file",
 #else
-	"c cred  ignored - encryption not compiled into code",
+	"c cred    ignored - encryption not compiled into code",
 #endif
-	"d       disconnect [user][@console]",
-	"D       enable debug output, sent to stderr",
-	"e esc   set the initial escape characters",
+	"C config  override per-user config file",
+	"d         disconnect [user][@console]",
+	"D         enable debug output, sent to stderr",
+	"e esc     set the initial escape characters",
 #if HAVE_OPENSSL
-	"E       don't attempt encrypted connections",
+	"E         don't attempt encrypted connections",
 #else
-	"E       ignored - encryption not compiled into code",
+	"E         ignored - encryption not compiled into code",
 #endif
-	"f(F)    force read/write connection (and replay)",
-	"h       output this message",
-	"i(I)    display information in machine-parseable form (on master)",
-	"l user  use username instead of current username",
-	"M mach  master server to poll first",
-	"p port  port to connect to",
-	"P       display pids of daemon(s)",
-	"q(Q)    send a quit command to the (master) server",
-	"r(R)    display (master) daemon version (think 'r'emote version)",
-	"s(S)    spy on a console (and replay)",
-	"t       send a text message to [user][@console]",
-	"u       show users on the various consoles",
+	"f(F)      force read/write connection (and replay)",
+	"h         output this message",
+	"i(I)      display information in machine-parseable form (on master)",
+	"l user    use username instead of current username",
+	"M master  master server to poll first",
+	"n         do not read system-wide config file",
+	"p port    port to connect to",
+	"P         display pids of daemon(s)",
+	"q(Q)      send a quit command to the (master) server",
+	"r(R)      display (master) daemon version (think 'r'emote version)",
+	"s(S)      spy on a console (and replay)",
+	"t         send a text message to [user][@console]",
+	"u         show users on the various consoles",
 #if HAVE_OPENSSL
-	"U       allow unencrypted connections if SSL not available",
+	"U         allow unencrypted connections if SSL not available",
 #else
-	"U       ignored - encryption not compiled into code",
+	"U         ignored - encryption not compiled into code",
 #endif
-	"v       be more verbose",
-	"V       show version information",
-	"w(W)    show who is on which console (on master)",
-	"x       examine ports and baud rates",
+	"v         be more verbose",
+	"V         show version information",
+	"w(W)      show who is on which console (on master)",
+	"x         examine ports and baud rates",
 	(char *)0
     };
 
     fprintf(stderr,
-	    "usage: %s [-aAfFsS] [-7DEUv] [-c cred] [-M mach] [-p port] [-e esc] [-l username] console\n",
+	    "usage: %s [-aAfFsS] [-7DEnUv] [-c cred] [-C config] [-M master] [-p port] [-e esc] [-l username] console\n",
 	    progname);
     fprintf(stderr,
-	    "       %s [-hiIPrRuVwWx] [-7DEUv] [-c cred] [-M mach] [-p port] [-d [user][@console]] [-[bB] message] [-t [user][@console] message]\n",
+	    "       %s [-hiIPrRuVwWx] [-7DEnUv] [-c cred] [-C config] [-M master] [-p port] [-d [user][@console]] [-[bB] message] [-t [user][@console] message]\n",
 	    progname);
     fprintf(stderr,
-	    "       %s [-qQ] [-7DEUv] [-c cred] [-M mach] [-p port]\n",
+	    "       %s [-qQ] [-7DEnUv] [-c cred] [-C config] [-M master] [-p port]\n",
 	    progname);
 
     if (wantfull) {
@@ -273,6 +267,9 @@ Version()
 #if HAVE_PAM
 	"pam",
 #endif
+#if USE_UNIX_DOMAIN_SOCKETS
+	"uds",
+#endif
 	(char *)0
     };
 
@@ -290,6 +287,8 @@ Version()
 #endif
     Msg("default escape sequence `%s%s\'", FmtCtl(DEFATTN, acA1),
 	FmtCtl(DEFESC, acA2));
+    Msg("default site-wide configuration in `%s'", CLIENTCONFIGFILE);
+    Msg("default per-user configuration in `%s'", "$HOME/.consolerc");
 
     BuildString((char *)0, acA1);
     if (optionlist[0] == (char *)0)
@@ -310,10 +309,12 @@ Version()
     BuildStringChar('0' + DMALLOC_VERSION_MINOR, acA1);
     BuildStringChar('.', acA1);
     BuildStringChar('0' + DMALLOC_VERSION_PATCH, acA1);
+#if defined(DMALLOC_VERSION_BETA)
     if (DMALLOC_VERSION_BETA != 0) {
 	BuildString("-b", acA1);
 	BuildStringChar('0' + DMALLOC_VERSION_BETA, acA1);
     }
+#endif
     Msg("dmalloc version: %s", acA1->string);
 #endif
 #if HAVE_OPENSSL
@@ -388,7 +389,7 @@ ValidateEsc()
 {
     unsigned char c1, c2;
 
-    if (!fStrip)
+    if (config->striphigh != FLAGTRUE)
 	return;
 
     if (chAttn == -1 || chEsc == -1) {
@@ -463,7 +464,7 @@ GetPort(pcToHost, sPort)
 #if USE_UNIX_DOMAIN_SOCKETS
     if (portPath == (STRING *)0)
 	portPath = AllocString();
-    BuildStringPrint(portPath, "%s/%hu", pcInMaster, sPort);
+    BuildStringPrint(portPath, "%s/%hu", config->master, sPort);
     port.sun_family = AF_UNIX;
     if (portPath->used > sizeof(port.sun_path)) {
 	Error("GetPort: path to socket too long: %s", portPath->string);
@@ -607,7 +608,15 @@ DestroyDataStructures()
     C2Cooked();
     if (cfstdout != (CONSFILE *)0)
 	FileUnopen(cfstdout);
+    DestroyConfig(pConfig);
+    DestroyConfig(optConf);
+    DestroyConfig(config);
+    DestroyTerminal(pTerm);
+    if (myAddrs != (struct in_addr *)0)
+	free(myAddrs);
     DestroyStrings();
+    if (substData != (SUBST *) 0)
+	free(substData);
 }
 
 char *
@@ -946,6 +955,129 @@ DoExec(pcf)
 
 void
 #if PROTOTYPES
+ExpandString(char *str, CONSFILE *c)
+#else
+ExpandString(str, c)
+    char *str;
+    CONSFILE *c;
+#endif
+{
+    char s;
+    short backslash = 0;
+    short cntrl = 0;
+    char oct = '\000';
+    short octs = 0;
+    static STRING *exp = (STRING *)0;
+
+    if (str == (char *)0 || c == (CONSFILE *)0)
+	return;
+
+    if (exp == (STRING *)0)
+	exp = AllocString();
+
+    BuildString((char *)0, exp);
+
+    backslash = 0;
+    cntrl = 0;
+    while ((s = (*str++)) != '\000') {
+	if (octs > 0 && octs < 3 && s >= '0' && s <= '7') {
+	    ++octs;
+	    oct = oct * 8 + (s - '0');
+	    continue;
+	}
+	if (octs != 0) {
+	    BuildStringChar(oct, exp);
+	    octs = 0;
+	    oct = '\000';
+	}
+	if (backslash) {
+	    backslash = 0;
+	    if (s == 'a')
+		s = '\a';
+	    else if (s == 'b')
+		s = '\b';
+	    else if (s == 'f')
+		s = '\f';
+	    else if (s == 'n')
+		s = '\n';
+	    else if (s == 'r')
+		s = '\r';
+	    else if (s == 't')
+		s = '\t';
+	    else if (s == 'v')
+		s = '\v';
+	    else if (s == '^')
+		s = '^';
+	    else if (s >= '0' && s <= '7') {
+		++octs;
+		oct = oct * 8 + (s - '0');
+		continue;
+	    }
+	    BuildStringChar(s, exp);
+	    continue;
+	}
+	if (cntrl) {
+	    cntrl = 0;
+	    if (s == '?')
+		s = 0x7f;	/* delete */
+	    else
+		s = s & 0x1f;
+	    BuildStringChar(s, exp);
+	    continue;
+	}
+	if (s == '\\') {
+	    backslash = 1;
+	    continue;
+	}
+	if (s == '^') {
+	    cntrl = 1;
+	    continue;
+	}
+	BuildStringChar(s, exp);
+    }
+
+    if (octs != 0)
+	BuildStringChar(oct, exp);
+
+    if (backslash)
+	BuildStringChar('\\', exp);
+
+    if (cntrl)
+	BuildStringChar('^', exp);
+
+    if (exp->used > 1)
+	FileWrite(c, FLAGFALSE, exp->string, exp->used - 1);
+}
+
+void
+#if PROTOTYPES
+PrintSubst(CONSFILE *pcf, char *pcMach, char *string, char *subst)
+#else
+PrintSubst(pcf, pcMach, string, subst)
+    CONSFILE *pcf;
+    char *pcMach;
+    char *string;
+    char *subst;
+#endif
+{
+    if (string == (char *)0)
+	return;
+
+    if (subst != (char *)0) {
+	char *str;
+	if ((str = StrDup(string)) == (char *)0)
+	    OutOfMem();
+	substData->data = (void *)config;
+	config->console = pcMach;
+	ProcessSubst(substData, &str, (char **)0, (char *)0, subst);
+	ExpandString(str, pcf);
+	free(str);
+    } else
+	ExpandString(string, pcf);
+}
+
+void
+#if PROTOTYPES
 Interact(CONSFILE *pcf, char *pcMach)
 #else
 Interact(pcf, pcMach)
@@ -962,8 +1094,10 @@ Interact(pcf, pcMach)
     /* if this is true, it means we successfully moved to a new console
      * so we need to close the old one.
      */
-    if (prevConsole != (CONSFILE *)0)
+    if (prevConsole != (CONSFILE *)0) {
 	FileClose(&prevConsole);
+	PrintSubst(cfstdout, prevName, pTerm->detach, pTerm->detachsubst);
+    }
     if (prevName != (char *)0) {
 	free(prevName);
 	prevName = (char *)0;
@@ -975,6 +1109,8 @@ Interact(pcf, pcMach)
 	FilePrint(cfstdout, FLAGFALSE, "[returning to `%s'", pcMach);
 	FileWrite(pcf, FLAGFALSE, "\n", 1);
     }
+
+    PrintSubst(cfstdout, pcMach, pTerm->attach, pTerm->attachsubst);
 
     C2Raw();
 
@@ -1024,7 +1160,7 @@ Interact(pcf, pcMach)
 		    FilePrint(pcf, FLAGFALSE, "%c%c", OB_IAC, OB_ABRT);
 		    FileSetQuoteIAC(pcf, FLAGTRUE);
 		} else {
-		    if (fStrip) {
+		    if (config->striphigh == FLAGTRUE) {
 			for (i = 0; i < nc; ++i)
 			    acMesg[i] &= 127;
 		    }
@@ -1091,7 +1227,7 @@ Interact(pcf, pcMach)
 		    }
 		    continue;
 		}
-		if (fStrip) {
+		if (config->striphigh == FLAGTRUE) {
 		    for (i = 0; i < l; ++i)
 			acMesg[i] &= 127;
 		}
@@ -1123,7 +1259,7 @@ Interact(pcf, pcMach)
 		}
 	    }
 	    if (execCmdFile == (CONSFILE *)0) {
-		if (fStrip) {
+		if (config->striphigh == FLAGTRUE) {
 		    for (i = 0; i < nc; ++i)
 			acMesg[i] &= 127;
 		}
@@ -1154,7 +1290,11 @@ Interact(pcf, pcMach)
 	    }
 	}
     }
+
     C2Cooked();
+
+    PrintSubst(cfstdout, pcMach, pTerm->detach, pTerm->detachsubst);
+
     if (fVerbose)
 	printf("Console %s closed.\n", pcMach);
 }
@@ -1386,7 +1526,7 @@ DoCmds(master, pports, cmdi)
 	    continue;
 	}
 #if HAVE_OPENSSL
-	if (fReqEncryption) {
+	if (config->sslenabled == FLAGTRUE) {
 	    FileWrite(pcf, FLAGFALSE, "ssl\r\n", 5);
 	    t = ReadReply(pcf, 0);
 	    if (strcmp(t, "ok\r\n") == 0) {
@@ -1397,7 +1537,7 @@ DoCmds(master, pports, cmdi)
 		    FileClose(&pcf);
 		    continue;
 		}
-	    } else if (fAllowUnencrypted == 0) {
+	    } else if (config->sslrequired == FLAGTRUE) {
 		Error("Encryption not supported by server `%s'",
 		      serverName);
 		FileClose(&pcf);
@@ -1406,7 +1546,7 @@ DoCmds(master, pports, cmdi)
 	}
 #endif
 
-	FilePrint(pcf, FLAGFALSE, "login %s\r\n", pcUser);
+	FilePrint(pcf, FLAGFALSE, "login %s\r\n", config->username);
 
 	t = ReadReply(pcf, 0);
 	if (strncmp(t, "passwd?", 7) == 0) {
@@ -1425,7 +1565,7 @@ DoCmds(master, pports, cmdi)
 	    if (tmpString->used <= 1) {
 		char *pass;
 		BuildStringPrint(tmpString, "Enter %s@%s's password: ",
-				 pcUser, hostname);
+				 config->username, hostname);
 		pass = GetPassword(tmpString->string);
 		if (pass == (char *)0) {
 		    Error("could not get password from tty for `%s'",
@@ -1590,13 +1730,15 @@ main(argc, argv)
     int opt;
     int fLocal;
     static STRING *acPorts = (STRING *)0;
-    static char acOpts[] = "7aAb:B:c:d:De:EfFhiIl:M:p:PqQrRsSt:uUvVwWx";
+    static char acOpts[] = "7aAb:B:c:C:d:De:EfFhiIl:M:np:PqQrRsSt:uUvVwWx";
     extern int optind;
     extern int optopt;
     extern char *optarg;
     static STRING *textMsg = (STRING *)0;
     int cmdi;
     static STRING *consoleName = (STRING *)0;
+    short readSystemConf = 1;
+    char *userConf = (char *)0;
 
     isMultiProc = 0;		/* make sure stuff DOESN'T have the pid */
 
@@ -1613,6 +1755,17 @@ main(argc, argv)
 	++progname;
     }
 
+    /* prep the config options */
+    if ((optConf = (CONFIG *)calloc(1, sizeof(CONFIG))) == (CONFIG *)0)
+	OutOfMem();
+    if ((config = (CONFIG *)calloc(1, sizeof(CONFIG))) == (CONFIG *)0)
+	OutOfMem();
+    if ((pConfig = (CONFIG *)calloc(1, sizeof(CONFIG))) == (CONFIG *)0)
+	OutOfMem();
+    /* and the terminal options */
+    if ((pTerm = (TERM *)calloc(1, sizeof(TERM))) == (TERM *)0)
+	OutOfMem();
+
     /* command line parsing
      */
     pcCmd = (char *)0;
@@ -1620,7 +1773,7 @@ main(argc, argv)
     while ((opt = getopt(argc, argv, acOpts)) != EOF) {
 	switch (opt) {
 	    case '7':		/* strip high-bit */
-		fStrip = 1;
+		optConf->striphigh = FLAGTRUE;
 		break;
 
 	    case 'A':		/* attach with log replay */
@@ -1641,9 +1794,15 @@ main(argc, argv)
 		    OutOfMem();
 		break;
 
+	    case 'C':
+		userConf = optarg;
+		break;
+
 	    case 'c':
 #if HAVE_OPENSSL
-		pcCredFile = optarg;
+		if ((optConf->sslcredentials =
+		     StrDup(optarg)) == (char *)0)
+		    OutOfMem();
 #endif
 		break;
 
@@ -1661,12 +1820,13 @@ main(argc, argv)
 
 	    case 'E':
 #if HAVE_OPENSSL
-		fReqEncryption = 0;
+		optConf->sslenabled = FLAGFALSE;
 #endif
 		break;
 
 	    case 'e':		/* set escape chars */
-		ParseEsc(optarg);
+		if ((optConf->escape = StrDup(optarg)) == (char *)0)
+		    OutOfMem();
 		break;
 
 	    case 'F':		/* force attach with log replay */
@@ -1684,15 +1844,22 @@ main(argc, argv)
 		break;
 
 	    case 'l':
-		pcUser = optarg;
+		if ((optConf->username = StrDup(optarg)) == (char *)0)
+		    OutOfMem();
 		break;
 
 	    case 'M':
-		pcInMaster = optarg;
+		if ((optConf->master = StrDup(optarg)) == (char *)0)
+		    OutOfMem();
+		break;
+
+	    case 'n':
+		readSystemConf = 0;
 		break;
 
 	    case 'p':
-		pcPort = optarg;
+		if ((optConf->port = StrDup(optarg)) == (char *)0)
+		    OutOfMem();
 		break;
 
 	    case 'P':		/* send a pid command to the server     */
@@ -1737,7 +1904,7 @@ main(argc, argv)
 
 	    case 'U':
 #if HAVE_OPENSSL
-		fAllowUnencrypted = 1;
+		optConf->sslrequired = FLAGFALSE;
 #endif
 		break;
 
@@ -1783,6 +1950,109 @@ main(argc, argv)
 	Bye(EX_OK);
     }
 
+    ProbeInterfaces(INADDR_ANY);
+
+    if (readSystemConf)
+	ReadConf(CLIENTCONFIGFILE, FLAGFALSE);
+
+    if (userConf == (char *)0) {
+	/* read the config files */
+	char *h = (char *)0;
+
+	if (((h = getenv("HOME")) == (char *)0) &&
+	    ((pwdMe = getpwuid(getuid())) == (struct passwd *)0)) {
+	    Error("$HOME does not exist and getpwuid fails: %d: %s",
+		  (int)(getuid()), strerror(errno));
+	} else {
+	    if (h == (char *)0) {
+		if (pwdMe->pw_dir == (char *)0 ||
+		    pwdMe->pw_dir[0] == '\000') {
+		    Error("Home directory for uid %d is not defined",
+			  (int)(getuid()));
+		    Bye(EX_UNAVAILABLE);
+		} else {
+		    h = pwdMe->pw_dir;
+		}
+	    }
+	}
+	if (h != (char *)0) {
+	    BuildTmpString((char *)0);
+	    BuildTmpString(h);
+	    h = BuildTmpString("/.consolerc");
+	    ReadConf(h, FLAGFALSE);
+	    BuildTmpString((char *)0);
+	}
+    } else
+	ReadConf(userConf, FLAGTRUE);
+
+    if (optConf->striphigh != FLAGUNKNOWN)
+	config->striphigh = optConf->striphigh;
+    else if (pConfig->striphigh != FLAGUNKNOWN)
+	config->striphigh = pConfig->striphigh;
+    else
+	config->striphigh = FLAGFALSE;
+
+    if (optConf->escape != (char *)0)
+	ParseEsc(optConf->escape);
+    else if (pConfig->escape != (char *)0)
+	ParseEsc(pConfig->escape);
+
+    if (optConf->username != (char *)0)
+	config->username = StrDup(optConf->username);
+    else if (pConfig->username != (char *)0)
+	config->username = StrDup(pConfig->username);
+    else
+	config->username = (char *)0;
+
+    if (optConf->master != (char *)0 && optConf->master[0] != '\000')
+	config->master = StrDup(optConf->master);
+    else if (pConfig->master != (char *)0 && pConfig->master[0] != '\000')
+	config->master = StrDup(pConfig->master);
+    else
+	config->master = StrDup(
+#if USE_UNIX_DOMAIN_SOCKETS
+				   UDSDIR
+#else
+				   MASTERHOST	/* which machine is current */
+#endif
+	    );
+    if (config->master == (char *)0)
+	OutOfMem();
+
+    if (optConf->port != (char *)0 && optConf->port[0] != '\000')
+	config->port = StrDup(optConf->port);
+    else if (pConfig->port != (char *)0 && pConfig->port[0] != '\000')
+	config->port = StrDup(pConfig->port);
+    else
+	config->port = StrDup(DEFPORT);
+    if (config->port == (char *)0)
+	OutOfMem();
+
+#if HAVE_OPENSSL
+    if (optConf->sslcredentials != (char *)0 &&
+	optConf->sslcredentials[0] != '\000')
+	config->sslcredentials = StrDup(optConf->sslcredentials);
+    else if (pConfig->sslcredentials != (char *)0 &&
+	     pConfig->sslcredentials[0] != '\000')
+	config->sslcredentials = StrDup(pConfig->sslcredentials);
+    else
+	config->sslcredentials = (char *)0;
+
+    if (optConf->sslenabled != FLAGUNKNOWN)
+	config->sslenabled = optConf->sslenabled;
+    else if (pConfig->sslenabled != FLAGUNKNOWN)
+	config->sslenabled = pConfig->sslenabled;
+    else
+	config->sslenabled = FLAGTRUE;
+
+    if (optConf->sslrequired != FLAGUNKNOWN)
+	config->sslrequired = optConf->sslrequired;
+    else if (pConfig->sslrequired != FLAGUNKNOWN)
+	config->sslrequired = pConfig->sslrequired;
+    else
+	config->sslrequired = FLAGTRUE;
+#endif
+
     /* finish resolving the command to do */
     if (pcCmd == (char *)0) {
 	pcCmd = "attach";
@@ -1813,23 +2083,20 @@ main(argc, argv)
 	Bye(EX_UNAVAILABLE);
     }
 #if !USE_UNIX_DOMAIN_SOCKETS
-    /* if we somehow lost the port (or got an empty string), reset */
-    if (pcPort == (char *)0 || pcPort[0] == '\000')
-	pcPort = DEFPORT;
-
     /* Look for non-numeric characters */
-    for (opt = 0; pcPort[opt] != '\000'; opt++)
-	if (!isdigit((int)pcPort[opt]))
+    for (opt = 0; config->port[opt] != '\000'; opt++)
+	if (!isdigit((int)config->port[opt]))
 	    break;
 
-    if (pcPort[opt] == '\000') {
+    if (config->port[opt] == '\000') {
 	/* numeric only */
-	bindPort = atoi(pcPort);
+	bindPort = atoi(config->port);
     } else {
 	/* non-numeric only */
 	struct servent *pSE;
-	if ((pSE = getservbyname(pcPort, "tcp")) == (struct servent *)0) {
-	    Error("getservbyname(%s) failed", pcPort);
+	if ((pSE =
+	     getservbyname(config->port, "tcp")) == (struct servent *)0) {
+	    Error("getservbyname(%s) failed", config->port);
 	    Bye(EX_UNAVAILABLE);
 	} else {
 	    bindPort = ntohs((u_short) pSE->s_port);
@@ -1837,24 +2104,28 @@ main(argc, argv)
     }
 #endif
 
-    if (pcUser == (char *)0 || pcUser[0] == '\000') {
-	if (((pcUser = getenv("LOGNAME")) == (char *)0) &&
-	    ((pcUser = getenv("USER")) == (char *)0) &&
+    if (config->username == (char *)0 || config->username[0] == '\000') {
+	if (config->username != (char *)0)
+	    free(config->username);
+	if (((config->username = getenv("LOGNAME")) == (char *)0) &&
+	    ((config->username = getenv("USER")) == (char *)0) &&
 	    ((pwdMe = getpwuid(getuid())) == (struct passwd *)0)) {
 	    Error
 		("$LOGNAME and $USER do not exist and getpwuid fails: %d: %s",
 		 (int)(getuid()), strerror(errno));
 	    Bye(EX_UNAVAILABLE);
 	}
-	if (pcUser == (char *)0) {
+	if (config->username == (char *)0) {
 	    if (pwdMe->pw_name == (char *)0 || pwdMe->pw_name[0] == '\000') {
 		Error("Username for uid %d does not exist",
 		      (int)(getuid()));
 		Bye(EX_UNAVAILABLE);
 	    } else {
-		pcUser = pwdMe->pw_name;
+		config->username = pwdMe->pw_name;
 	    }
 	}
+	if ((config->username = StrDup(config->username)) == (char *)0)
+	    OutOfMem();
     }
 
     if (execCmd == (STRING *)0)
@@ -1866,7 +2137,7 @@ main(argc, argv)
 
     BuildString((char *)0, acPorts);
     BuildStringChar('@', acPorts);
-    BuildString(pcInMaster, acPorts);
+    BuildString(config->master, acPorts);
 
 #if HAVE_OPENSSL
     SetupSSL();			/* should only do if we want ssl - provide flag! */
@@ -1890,7 +2161,7 @@ main(argc, argv)
 
     for (;;) {
 	if (gotoConsole == (CONSFILE *)0)
-	    DoCmds(pcInMaster, acPorts->string, cmdi);
+	    DoCmds(config->master, acPorts->string, cmdi);
 	else
 	    Interact(gotoConsole, gotoName);
 

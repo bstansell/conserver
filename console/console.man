@@ -1,15 +1,17 @@
-.\" $Id: console.man,v 1.48 2004/04/20 01:30:13 bryan Exp $
-.TH CONSOLE 1 "2004/04/20" "conserver-8.1.5" "conserver"
+.\" $Id: console.man,v 1.51 2004/05/25 00:38:15 bryan Exp $
+.TH CONSOLE 1 "2004/05/25" "conserver-8.1.6" "conserver"
 .SH NAME
 console \- console server client program
 .SH SYNOPSIS
 .B console
 .RB [ \-aAfFsS ]
-.RB [ \-7DEUv ]
+.RB [ \-7DEnUv ]
 .RB [ \-c
 .IR cred ]
+.RB [ \-C
+.IR config ]
 .BR [ \-M
-.IR mach ]
+.IR master ]
 .BR [ \-p
 .IR port ]
 .BR [ \-e
@@ -20,11 +22,13 @@ console \- console server client program
 .br
 .B console
 .RB [ \-hiIPrRuVwWx ]
-.RB [ \-7DEUv ]
+.RB [ \-7DEnUv ]
 .RB [ \-c
 .IR cred ]
+.RB [ \-C
+.IR config ]
 .RB [ \-M
-.IR mach ]
+.IR master ]
 .RB [ \-p
 .IR port ]
 .RB [ \-d
@@ -37,11 +41,13 @@ console \- console server client program
 .br
 .B console
 .RB [ \-qQ ]
-.RB [ \-7DEUv ]
+.RB [ \-7DEnUv ]
 .RB [ \-c
 .IR cred ]
+.RB [ \-C
+.IR config ]
 .RB [ \-M
-.IR mach ]
+.IR master ]
 .RB [ \-p
 .IR port ]
 .SH DESCRIPTION
@@ -120,6 +126,10 @@ to users on the primary server.
 Load an SSL certificate and key from the PEM encoded file
 .IR cred .
 .TP
+.BI \-C config
+Use the per-user configuration file
+.IR conf .
+.TP
 .B \-d
 Disconnect the users specified by
 .IR user @ console .
@@ -187,19 +197,34 @@ uses $USER if its uid matches the user's real uid,
 or $LOGNAME if its uid matches the user's real uid,
 or else the name associated with the user's real uid.
 .TP
-.BI \-M mach
+.BI \-M master
 The
 .B console
 client program polls
-.I mach
+.I master
 as the primary server,
 rather than the default set at compile time (typically
 .RB `` console '').
 The default
-.I mach
+.I master
 may be changed at compile time using the
 .B --with-master
 option.
+If
+.B --with-uds
+is used to enable Unix domain sockets, however, this option points
+.B console
+to the directory which holds those sockets.
+The default
+.I master
+directory
+.RB (`` /tmp/conserver '')
+may be changed at compile time using the
+.B --with-uds
+option.
+.TP
+.BI \-n
+Do not read the system-wide configuration file.
 .TP
 .BI \-p port
 Set the port to connect to.
@@ -211,6 +236,9 @@ may be changed at compile time
 using the
 .B --with-port
 option.
+If the
+.B --with-uds
+option was used, this option is ignored.
 .TP
 .B \-P
 Display the pid of the master daemon process on each server.
@@ -395,6 +423,311 @@ The idletimeout configuration option for the console.
 .TP
 .I idlestring
 The idlestring configuration option for the console.
+.SH CONFIGURATION
+.B Console
+reads configuration information from the system-wide configuration file
+.RB ( console.cf ),
+then the per-user configuration file
+.RB ( .consolerc ),
+and then applies command-line arguments.
+Each configuration location can override the previous.
+The same happens when parsing an individual file - the later entries
+always override the earlier entries.
+Because of that, you should put ``global'' defaults first and
+more specific defaults second.
+.PP
+The configuration file is read using the same parser as 
+.BR conserver.cf (5),
+and you should check that manpage for parser details.
+.B Console
+recognizes the following configuration blocks.
+.TP 8
+.B config
+.RI [ " hostname " | " ipaddr " ]
+.br
+Define a configuration block for the host named
+.I hostname
+or using the address
+.IR ipaddr .
+If the value of ``*'' is used, the configuration block will be applied to
+all hosts.
+.RS
+.TP 15
+.B escape
+.I esc
+.br
+Set the escape sequence (see the
+.B \-e
+command-line flag).
+.TP
+.B master
+.I master
+.br
+Set the default master to
+.I master
+(see the
+.B \-M
+command-line flag).
+.TP
+.B port
+.I port
+.br
+Set the default port to
+.I port
+(see the
+.B \-p
+command-line flag).
+.TP
+.B sslcredentials
+.I filename
+.br
+Set the
+.SM SSL
+credentials file location (see the
+.B \-c
+command-line flag).
+.TP
+.B sslenabled
+.RB [ " yes " | " true "
+.RB | " on " | " no "
+.RB | " false " | " off " ]
+.br
+Set whether or not encryption is attempted when talking to servers (see the
+.B \-E
+command-line flag).
+.TP
+.B sslrequired
+.RB [ " yes " | " true "
+.RB | " on " | " no "
+.RB | " false " | " off " ]
+.br
+Set whether or not encryption is required when talking to servers (see the
+.B \-U
+command-line flag).
+.TP
+.B striphigh
+.RB [ " yes " | " true "
+.RB | " on " | " no "
+.RB | " false " | " off " ]
+.br
+Set whether or not to strip the high bit off all data received
+(see the
+.B \-7
+command-line flag).
+.TP
+.B username
+.I user
+.br
+Set the username passed to the server to
+.I user
+(see the
+.B \-l
+command-line flag).
+.RE
+.TP 8
+.B terminal
+.I type
+.br
+Define a configuration block when using a terminal of type
+.IR type .
+If the value of ``*'' is used, the configuration block will be applied to
+all terminal types.
+.RS
+.TP 15
+.B attach
+.RI [ " string "
+| "" ]
+.br
+Set a
+.I string
+to print when successfully attached to a console.
+Character substitions will be performed based on the
+.B attachsubst
+value and occur
+.I before
+interpretation of the special characters below.
+If the null string (``""'') is used, no string will be printed.
+.I string
+is a simple character string with the exception of `\e'
+and `^':
+.RS
+.RS
+.sp
+.PD 0
+.TP 6
+.B \ea
+alert
+.TP
+.B \eb
+backspace
+.TP
+.B \ef
+form-feed
+.TP
+.B \en
+newline
+.TP
+.B \er
+carriage-return
+.TP
+.B \et
+tab
+.TP
+.B \ev
+vertical-tab
+.TP
+.B \e\e
+backslash
+.TP
+.B \e^
+circumflex
+.TP
+.BI \e ooo
+octal representation of a character (where
+.I ooo
+is one to three octal digits)
+.TP
+.BI \e c
+character
+.I c
+.TP
+.B ^?
+delete
+.TP
+.BI ^ c
+control character
+.RI ( c
+is ``and''ed with 0x1f)
+.PD
+.RE
+.RE
+.IP
+An interesting use of
+.B attach
+and
+.B attachsubst
+would be:
+.RS
+.IP
+.ft CR
+.nf
+terminal xterm {
+    attach "^[]0;conserver: U@C^G";
+    attachsubst U=us,C=cs;
+}
+.fi
+.ft
+.RE
+.TP
+.B attachsubst
+[\f2c\fP=\f2t\fP[\f2n\fP]\f2f\fP[,...]
+| "" ]
+.br
+Perform character substitutions on the
+.B attach
+value.
+A series of replacements can be defined by specifying a
+comma-separated list of
+\f2c\fP=\f2t\fP[\f2n\fP]\f2f\fP
+sequences where
+.I c
+is any printable character,
+.I t
+specifies the replacement value,
+.I n
+is a field length (optional),
+and
+.I f
+is the format string.
+.I t
+can be one of the characters below, catagorized as a string replacement
+or a numeric replacement, which dictates the use of the
+.I n
+and
+.I f
+fields.
+.RS
+.RS
+.sp
+.PD 0
+.TP
+String Replacement
+.TP
+.B u
+username
+.TP
+.B c
+console name
+.sp
+.PP
+Numeric Replacement
+.TP
+none available (yet)
+.PD
+.RE
+.RE
+.IP
+For string replacements, if the replacement isn't at least
+.I n
+characters, it will be padded with space characters on the left.
+.I f
+must be `s'.
+For numeric replacements, the value will be formatted to at least
+.I n
+characters, padded with 0s if
+.I n
+begins with a 0, and space characters otherwise.
+.I f
+must be either `d', `x' or `X', specifying a decimal, lower-case
+hexadecimal, or an uppercase hexadecimal conversion.
+If the null string (``""'') is used, no replacements will be done.
+.TP 15
+.B detach
+.RI [ " string "
+| "" ]
+.br
+Set a
+.I string
+to print once detached from a console.
+Character substitions will be performed based on the
+.B detachsubst
+value.
+See the
+.B attach
+option for an explanation of
+.IR string .
+If the null string (``""'') is used, no string will be printed.
+.TP
+.B detachsubst
+[\f2c\fP=\f2t\fP[\f2n\fP]\f2f\fP[,...]
+| "" ]
+.br
+Perform character substitutions on the
+.B detach
+value.
+See the
+.B attachsubst
+option for an explanation of the format string.
+.RE
+.PP
+A simple configuration to set a new default escape sequence and override
+the master location would be:
+.IP
+.ft CR
+.nf
+# override options for all hosts
+config * {
+    master localhost;
+    escape ^Ee;
+}
+# set things more specific to host1
+# note: if the entries were reversed, host1
+# would also use localhost.
+config host1 {
+    master console1;
+}
+.fi
+.ft
 .SH "ESCAPE SEQUENCES"
 The connection can be controlled by a two-character escape sequence, followed
 by a command.
@@ -574,6 +907,22 @@ or number of days is displayed.
 console \-e "^[1" lv426
 Requests a connection to the host ``lv426'' with the escape characters
 set to ``escape one''.
+.SH FILES
+.PP
+The following default file locations may be overridden
+at compile time or by the command-line options described above.
+Run
+.B console \-V
+to see the defaults set at compile time.
+.PP
+.PD 0
+.TP 25
+.B /etc/console.cf
+system-wide configuration file
+.TP
+.B $HOME/.consolerc
+per-user configuration file
+.PD
 .SH BUGS
 It is possible to create a loop of console connections, with ugly results.
 Never run
