@@ -1,6 +1,13 @@
 				CHANGES
 				=======
 
+version 7.1.3 (Oct 16, 2001):
+	- NetBSD 1.5 termios bug/compatibility - patch by Andreas Wrede
+	  <aew.conserver@planix.com>
+	- Missing quotes broke ^ecl1 code - reported by William Charles
+	  <william.charles@db.com>
+	- Alternate break code didn't exist for local ports
+
 version 7.1.2 (Oct 15, 2001):
 	- fixed line-based timestamp code - reported by Benn Oshrin
 	  <benno@columbia.edu>
@@ -240,5 +247,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.48 2001-10-15 22:37:08-07 bryan Exp $
+#  $Id: CHANGES,v 1.50 2001-10-16 21:32:33-07 bryan Exp $
 #

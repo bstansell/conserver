@@ -61,6 +61,7 @@ Detailed Instructions
 	--with-maxmemb=MAXMEMB  Specify maximum consoles per process [16]
 	--with-maxgrp=MAXGRP    Specify maximum number of processes [32]
 	--with-timeout=TIMEOUT  Specify connect() timeout in seconds [10]
+	--with-libwrap[=PATH]   Compile in libwrap (tcp_wrappers) support
 
       Not surprisingly, some match the old conserver/cons.h items...here
       they are for reference:
@@ -119,5 +120,5 @@ Detailed Instructions
     - That's it!  Just start up the console server and enjoy!
 
 #
-#  $Id: INSTALL,v 1.18 2001-08-04 21:11:09-07 bryan Exp $
+#  $Id: INSTALL,v 1.19 2001-10-15 23:22:03-07 bryan Exp $
 #

@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.138 2001-10-15 17:17:27-07 bryan Exp $
+ *  $Id: group.c,v 5.140 2001-10-16 21:29:01-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -1311,59 +1311,64 @@ Kiddie(pGE, sfd)
 
 			/* send a break
 			 */
-			if (pCEServing->isNetworkConsole) {
-			    if (acIn[i] == 1) {
+			if (acIn[i] == '1') {
+			    Debug("Sending a break to %s",
+				  pCEServing->server);
+			    if (pCEServing->isNetworkConsole) {
 				char haltseq[2];
 
 				haltseq[0] = IAC;
 				haltseq[1] = BREAK;
 				write(pCEServing->fdtty, haltseq, 2);
 			    } else {
-				char haltseq[3];
-
-				/* The default Solaris 8 `alternate' break... */
-				haltseq[0] = 0x0D;	/* CR     */
-				haltseq[1] = 0x7E;	/* Tilde  */
-				haltseq[2] = 0x02;	/* Ctrl-B */
-				write(pCEServing->fdtty, haltseq, 3);
-			    }
-			} else {
 #if HAVE_TERMIO_H
-			    if (-1 ==
-				ioctl(pCEServing->fdtty, TCSBRK,
-				      (char *)0)) {
-				fileWrite(pCLServing->fd, "failed]\r\n",
-					  -1);
-				continue;
-			    }
+				if (-1 ==
+				    ioctl(pCEServing->fdtty, TCSBRK,
+					  (char *)0)) {
+				    fileWrite(pCLServing->fd,
+					      "failed]\r\n", -1);
+				    continue;
+				}
 #else
 # if HAVE_TCSENDBREAK
-			    if (-1 == tcsendbreak(pCEServing->fdtty, 0)) {
-				fileWrite(pCLServing->fd, "failed]\r\n",
-					  -1);
-				continue;
-			    }
+				if (-1 ==
+				    tcsendbreak(pCEServing->fdtty, 0)) {
+				    fileWrite(pCLServing->fd,
+					      "failed]\r\n", -1);
+				    continue;
+				}
 # else
 #  if HAVE_TERMIOS_H
-			    if (-1 ==
-				ioctl(pCEServing->fdtty, TIOCSBRK,
-				      (char *)0)) {
-				fileWrite(pCLServing->fd, "failed]\r\n",
-					  -1);
-				continue;
-			    }
-			    fileWrite(pCLServing->fd, "- ", -1);
-			    sleep(1);
-			    if (-1 ==
-				ioctl(pCEServing->fdtty, TIOCCBRK,
-				      (char *)0)) {
-				fileWrite(pCLServing->fd, "failed]\r\n",
-					  -1);
-				continue;
-			    }
+				if (-1 ==
+				    ioctl(pCEServing->fdtty, TIOCSBRK,
+					  (char *)0)) {
+				    fileWrite(pCLServing->fd,
+					      "failed]\r\n", -1);
+				    continue;
+				}
+				fileWrite(pCLServing->fd, "- ", -1);
+				sleep(1);
+				if (-1 ==
+				    ioctl(pCEServing->fdtty, TIOCCBRK,
+					  (char *)0)) {
+				    fileWrite(pCLServing->fd,
+					      "failed]\r\n", -1);
+				    continue;
+				}
 #  endif
 # endif
 #endif
+			    }
+			} else {
+			    char haltseq[3];
+
+			    Debug("Sending an alt-break to %s",
+				  pCEServing->server);
+			    /* The default Solaris 8 `alternate' break... */
+			    haltseq[0] = 0x0D;	/* CR     */
+			    haltseq[1] = 0x7E;	/* Tilde  */
+			    haltseq[2] = 0x02;	/* Ctrl-B */
+			    write(pCEServing->fdtty, haltseq, 3);
 			}
 			fileWrite(pCLServing->fd, "sent]\r\n", -1);
 			continue;

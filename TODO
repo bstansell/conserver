@@ -53,6 +53,7 @@ Bryan Stansell
 - alternate break (^ecl2) sends 'CR-~-^B' sequence (solaris 8 default)
     - probably should be able to redefine it like the escape sequence
     - to support older alt-break code it would need .5 second delays
+    - ^ecl1 should really just "do the right thing" based on config file
 
 - aliases for console entries
 
@@ -112,5 +113,5 @@ Bryan Stansell
   things) once instead of leaving it down.
 
 #
-#  $Id: TODO,v 1.15 2001-10-15 17:19:17-07 bryan Exp $
+#  $Id: TODO,v 1.16 2001-10-16 00:13:27-07 bryan Exp $
 #

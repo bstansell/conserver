@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.70 2001-08-28 15:23:04-07 bryan Exp $
+ *  $Id: consent.c,v 5.71 2001-10-16 12:02:30-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -204,11 +204,11 @@ TtyDev(pCE)
     termp.c_cflag |= pCE->pparity->iset;
     termp.c_lflag = 0;
     /*
-     * Set the VMIN == 128
+     * Set the VMIN == 1
      * Set the VTIME == 1 (0.1 sec)
      * Don't bother with the control characters as they are not used
      */
-    termp.c_cc[VMIN] = 128;
+    termp.c_cc[VMIN] = 1;
     termp.c_cc[VTIME] = 1;
 
     if (-1 == cfsetospeed(&termp, pCE->pbaud->irate)) {
