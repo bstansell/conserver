@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.h,v 5.10 2001-02-21 17:26:06-08 bryan Exp $
+ *  $Id: readcfg.h,v 5.12 2001-07-06 17:11:47-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -38,18 +38,14 @@
  * from a file, into these structures
  */
 
-extern GRPENT
-	aGroups[MAXGRP];		/* group info			*/
-extern CONSENT
-	aConsoles[MAXGRP*MAXMEMB];	/* console list			*/
-extern REMOTE
-	*pRCList;		/* list of remote consoles we know about */
-extern ACCESS
-	*pACList;		/* `who do you love' (or trust)		*/
+extern GRPENT aGroups[MAXGRP];	/* group info                   */
+extern CONSENT aConsoles[MAXGRP * MAXMEMB];	/* console list                 */
+extern REMOTE *pRCList;		/* list of remote consoles we know about */
+extern ACCESS *pACList;		/* `who do you love' (or trust)         */
 
 extern int
-	iAccess;		/* how many access restrictions we have	*/
+  iAccess;			/* how many access restrictions we have */
 extern int
-	iLocal;			/* how many local consoles we have	*/
+  iLocal;			/* how many local consoles we have      */
 
 extern void ReadCfg();

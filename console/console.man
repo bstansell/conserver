@@ -1,194 +1,279 @@
-.\" $Id: console.man,v 1.6 2001-07-05 01:39:15-07 bryan Exp $
-.TH CONSOLE 8 "Local"
+.\" $Id: console.man,v 1.11 2001-07-26 10:25:24-07 bryan Exp $
+.TH CONSOLE 1 "Local"
 .SH NAME
 console \- console server client program
 .SH SYNOPSIS
-\fBconsole\fP [\-\fBaAfFsS\fP] [\-\fBrv\fP] [\-\fBe\fP \fIesc\fP] [\-\fBM\fP \fImach\fP] \fIconsole\fP
+\fBconsole\fP [\fB\-aAfFGsS\fP] [\fB\-7Dv\fP] [\fB\-M\fP \fImach\fP]
+[\fB\-p\fP \fIport\fP] [\fB\-e\fP \fIesc\fP] [\fB\-l\fP \fIuser\fP]
+\fIconsole\fP
 .br
-\fBconsole\fP [\-\fBv\fP] [\-\fBhdDPuVwx\fP] [\-\fBb\fP \fImessage\fP]
+\fBconsole\fP [\fB\-hPrRuVwx\fP] [\fB\-7Dv\fP] [\fB\-M\fP \fImach\fP]
+[\fB\-p\fP \fIport\fP] [\fB\-b\fP \fImessage\fP]
 .br
-\fBconsole\fP [\-\fBqQ\fP] [\-\fBM\fP \fImach\fP]
+\fBconsole\fP [\fB\-qQ\fP] [\fB\-7Dv\fP] [\fB\-M\fP \fImach\fP]
+[\fB\-p\fP \fIport\fP]
 .SH DESCRIPTION
 .B Console
-is used to manipulate console terminals remotely or poll running
-\fIconserver\fP(8) daemons for status information.
+is used to manipulate console terminals remotely or to poll running
+\fBconserver\fP(8) daemons for status information.
+.PP
+In the first form above,
+.B console
+asks the user's password before
+granting interactive access to a console (on a non-trusted system),
+since such a session may provide single-user access.
+Only as much of the console name as is required to
+identify it uniquely to the server is required.
+.PP
+For non-interactive options,
+.B console
+outputs only the requested information and exits.
 .PP
 .B Console
-queries the user for the their passwd before
-granting interactive access to a console (on a non-trusted system)
-since such a session may provide single-user access.
-.PP
-In the non-interactive mode
+knows only of a primary
+.B conserver
+host
+(see the \fB\-M\fP option below),
+to which it initially connects.
+In a multi-server environment, the primary server may refer
+the client to a different server handling the requested console,
+or it will provide a list of all servers if required
+(as when
 .B console
-outputs only the requested information.
+is invoked with the
+.RB ` \-r '
+option).
+.B Console
+then opens connections to the appropriate server(s).
+It is not necessary for the user of
+.B console
+to know which server manages which consoles,
+as long as
+.B console
+knows a valid primary server
+and all available consoles are listed in the primary server's
+configuration file.
 .SH OPTIONS
+.PP
+Options may be given as separate arguments (e.g., \fB\-v -w\fP)
+or clustered (e.g., \fB\-vw\fP).
+Options and their arguments may be separated by optional white space.
+Option arguments containing spaces or other characters special to the shell
+must be quoted.
+.TP
+.B \-7
+Strip the high bit off of all data received,
+whether from user input or from the server,
+before any processing occurs.
+Disallows escape sequence characters with the high bit set.
 .TP
 .B \-a
-Access a console with a two-way connection (this is the default).
+Access a console with a two-way (read-write) connection (this is the default).
+The connection is dropped to spy mode if someone else is attached read-write.
 .TP
 .BI \-b message
 Broadcast a \fImessage\fP to all users connected to the console server.
 .TP
-.B \-d
-Display daemon versions.  The \fIconsole\fP client connects to each
-server to request its version information.  The uppercase varient of
-this option only requests the primary server's version.
-.TP
 .B \-D
-Same as \fB\-d\fP but just acts on the local server.
+Enable debugging output.
 .TP
 .BI \-e esc
-Set the initial two character escape sequence to
+Set the initial two-character escape sequence to
 those represented by \fIesc\fP.
-Any of the forms output by \fIcat\fP(1)'s \-\fBv\fP option
-are accepted.  The default value is ``^Ec''.
+Any of the forms output by \fBcat\fP(1)'s \-\fBv\fP option
+are accepted.  The default value is ``\fB^Ec\fP''.
 .TP
 .B \-f
 Same as \fB\-a\fP except it will force any existing connection into spy mode.
+.TP
+.B \-G
+Request a raw connection to the group control virtual console;
+this is only useful for learning the protocol used by the
+interactive sequence.
 .TP
 .B \-h
 Display a brief help message.
 .TP
 .BI \-l user
-Sets the username used for authentication to \fIuser\fP.
+Set the login name used for authentication to \fIuser\fP.
+By default, \fBconsole\fP uses $USER if its uid matches the user's real uid,
+or $LOGNAME if its uid matches the user's real uid,
+or else the name associated with the user's real uid.
 .TP
 .BI \-M mach
-The \fIconsole\fP client program polls \fImach\fP as the primary server,
-rather than the hard coded default (``console'').
+The \fBconsole\fP client program polls \fImach\fP as the primary server,
+rather than the default set at compile time (typically ``\fBconsole\fP'').
+The default \fImach\fP may be changed at compile time using the
+\fB--with-master\fP option.
 .TP
 .BI \-p port
-Set the port to connect to.  The default \fIport\fP is set at compile time
-using the --with-port option.
+Set the port to connect to.  This may be either a port number
+or a service name.  The default \fIport\fP may be changed at compile time
+using the \fB--with-port\fP option.
 .TP
 .B \-P
-Display the pids of the master daemon processes.
+Display the pid of the master daemon process on each server.
 .TP
 .B \-q
-The \fIconsole\fP client requests the server daemon quit (shutdown).
-A password is sent in the protocol stream, if none is required for
-the local host to shutdown the server just press return.
+The \fBconsole\fP client requests that the server daemon quit (shut down).
+A password is sent in the protocol stream; if none is required for
+the local host to shut down the server, just press <return>.
 .TP
 .B \-Q
-Same as \fB\-q\fP but just acts on the local server.
+Same as \fB\-q\fP but just acts on the primary server.
 .TP
 .B \-r
-Request a raw connection to the group control virtual console,
-this is only useful for learning the protocol used by the
-interactive sequence.
+Display daemon versions.  The \fBconsole\fP client connects to each
+server to request its version information.
+.TP
+.B \-R
+Same as \fB\-r\fP but just acts on the primary server.
 .TP
 .B \-s
-Requests a read-only (spy mode) connection.
-If this mode all the escape sequences (below) work, or report errors,
+Request a read-only (spy mode) connection.
+In this mode all the escape sequences (below) work, or report errors,
 but all other keyboard input is discarded.
 .TP
 .B \-u
-Show a list of all consoles with status and attached users.
-.TP
-.B \-U
-Same as \fB\-u\fP.
-.TP
-.B \-V
-Output the version of the console client program.
+Show a list of all consoles with status (`up' or `down')
+and attached users (\fIuser\fP@\fIhost\fP if attached read-write,
+`<spies>' if only users in spy mode, or `<none>').
 .TP
 .B \-v
-Be more verbose during when building the connection(s).
+Be more verbose when building the connection(s).
 Use this option in combination with any of `show' options (below)
 for added benefit.
 .TP
-.B \-w
-Show a list of all connections to consoles.
+.B \-V
+Output the version and settings of the console client program
+and then exit.
 .TP
-.B \-W
-Same as \fB\-w\fP.
+.B \-w
+Show a list of all who are currently connected to consoles,
+including the hostnames where the \fBconsole\fP connections originate
+and the idle times.  This is useful to see if anybody is actively
+using the console system if it becomes necessary to shut down
+\fBconserver\fP.
 .TP
 .B \-x
 Show a list of consoles and devices.
 .PP
 The \fB\-A\fP, \fB\-F\fP, or \fB\-S\fP options have the same effect as
-their lower case variants.
-In addition they each request the last 20 lines of the console output after
-making the connection.
-.PP
-Any default (\fB\-a\fP) connection is dropped to spy mode if
-someone else is attached read-write.
+their lower-case variants.
+In addition, they each request the last 20 lines of the console output after
+making the connection (as if `\fB^Ecr\fP' were typed).
 .SH "ESCAPE SEQUENCES"
-The connection can be controlled by a two character escape sequence, followed
+The connection can be controlled by a two-character escape sequence, followed
 by a command.  The default escape sequence is ``control-E c''
-(octal 005 143).  Commands are:
+(octal 005 143).
+(The escape sequences are actually processed by the server; see the
+.BR conserver (8)
+man page for more information.)
+Commands are:
 .sp
-.TS
-c l.
-a	switch to attach mode
-c	toggle flow control (don't do this)
-d	down the current console
-e	change the escape sequence to the next two characters
-f	force a switch to attach mode
-g	group info
-L	toggle logging on/off
-l1	send a 3-second serial line break (might halt a Sun)
-	("ell" then "one", not the L1 key)
-o	reopen the line to clear errors (silo overflows)
-p	replay the last 60 lines of output
-r	replay the last 20 lines of output
-s	switch to spy mode
-u	show other users on this port
-v	show the version of the group server
-w	who is using this console
-x	examine this group's devices and modes.
-z	suspend this connection
-?	display list of commands
-^M	continue, ignore the escape sequence
-^R	replay the last line only
-\.	disconnect
-.TE
-.sp
+.PD 0
+.IP a
+attach read-write if nobody already is
+.IP c
+toggle flow control (don't do this)
+.IP d
+down the current console
+.IP e\fIcc\fP
+change the escape sequence to the next two characters
+.IP f
+forcibly attach read-write
+.IP g
+group info
+.IP L
+toggle logging on/off
+.IP l1
+send a 3-second serial line break (might halt a Sun)
+("ell" then "one", not the L1 key)
+.IP o
+close (if open) and reopen the line (to clear errors (silo overflows))
+and the log file
+.IP p
+replay the last 60 lines of output
+.IP r
+replay the last 20 lines of output
+.IP s
+switch to spy mode (read-only)
+.IP u
+show status of hosts/users in this group
+.IP v
+show the version of the group server
+.IP w
+who is using this console
+.IP x
+examine this group's devices and modes
+.IP z
+suspend this connection
+.IP ?
+display list of commands
+.IP "^M (return)"
+continue, ignore the escape sequence
+.IP "^R (ctrl-R)"
+replay the last line only
+.IP \\\fIooo\fP
+send character having octal code \fIooo\fP
+(must specify three octal digits)
+.IP \.
+disconnect
+.PD
 .PP
 If any other character is hit after the escape sequence, all three characters
 will be discarded.
 Note that a line break or a down command
 can only be sent from a full two-way attachment.
 To send the escape sequence through the connection one must redefine
-the outer escape sequence.
+the outer escape sequence, or use \fB^Ec\\\fP\fIooo\fP to send the
+first escape character before typing the second character directly.
 .PP
-In the \-u output, the login \fB<none>\fP indicates no one is
-viewing that console, the login \fB<spies>\fP indicates that
+In the \fB\-u\fP output, the login ``<none>'' indicates no one is
+viewing that console, and the login ``<spies>'' indicates that
 no one has a full two-way attachment.  When no one is attached to
-a console its output is cloned to the stdout of the server process.
+a console its output is cloned to the stdout of the server process
+if \fBconserver\fP was started with the \fB\-u\fP option.
 .SH EXAMPLES
 .TP
 console \-u
 Outputs something like:
 .sp
 .RS
-.TS
-l18 l l.
+.ta 18n 24n
 dumb	up	<none>
+.br
 expert	up	ksb@mentor
+.br
 tyro	up	<spies>
+.br
 mentor	up	<none>
+.br
 sage	up	fine@cis
-.TE
+.DT
 .RE
-.sp
+.IP
 The \fB<none>\fP indicates no one is viewing \fIdumb\fP or \fImentor\fP,
 the \fB<spies>\fP indicates only read-only connections exist for \fItyro\fP,
-other \fIlogin\fP@\fIhost\fP entries are the currently attached
+and
+other \fIlogin\fP@\fIhost\fP entries indicate users attached read-write to
 \fIsage\fP and \fIexpert\fP.
 .TP
 console \-w
 Outputs something like:
 .sp
 .RS
-.TS
-l18 l l.
-ksb@extra	attach 2days	expert
-file@cis	attach 21:46	sage
-dmr@alice	spy     0:04	tyro
-.TE
+.ta 18n 26n 32n
+ksb@extra	attach	2days	expert
+.br
+file@cis	attach	21:46	sage
+.br
+dmr@alice	spy	\00:04	tyro
+.DT
 .RE
-.sp
-The third column is the idle time of the user.  Either hours:minutes or number
-of days is displayed.
+.IP
+The third column is the idle time of the user.
+Either \fIhours\fP:\fIminutes\fP or number of days is displayed.
 .TP
 console \-e \*(lq^[1\*(rq lv426
 Requests a connection to the host ``lv426'' with the escape characters
@@ -198,15 +283,17 @@ Connections suspended under Dynix sometimes break the kernel when
 resumed.
 .PP
 It is possible to create a loop of console connections, with ugly results.
-Never run \fIconsole\fP from within a console connection (unless you set each
+Never run \fBconsole\fP from within a console connection (unless you set each
 escape sequence differently).
 .PP
-The \fB\-r\fP option doesn't help to explain how connections get built.
+The \fB\-G\fP option doesn't help to explain how connections get built.
 .SH AUTHORS
-Thomas A. Fine, Ohio State Computer Science.
+Thomas A. Fine, Ohio State Computer Science
 .br
 Kevin Braunsdorf, Purdue University Computing Center
 .br
 Bryan Stansell, conserver.com
 .SH "SEE ALSO"
-conserver.cf(5), conserver(8)
+.BR conserver.cf (5),
+.BR conserver.passwd (5),
+.BR conserver (8)

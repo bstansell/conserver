@@ -129,6 +129,53 @@ or support implied by the distribution of the software.
 </P>
 
 <P>
+
+So, what the heck is up with all the different conserver versions?
+Well, the original authors are continuing to distribute their own
+threads of the software so you have three main threads (as far as I
+know).  First, there's Tom Fine's thread at <A
+HREF="http://hea-www.harvard.edu/~fine/Tech/console-server.html">http://hea-www.harvard.edu/~fine/Tech/console-server.html</A>.
+He isn't actively developing it, however, according to the website.
+Next, there's Kevin Braunsdorf's version at <A
+HREF="ftp://ftp.physics.purdue.edu/pub/pundits/">ftp://ftp.physics.purdue.edu/pub/pundits/</A>.
+Kevin is semi-actively working on his thread.  Doesn't look like any
+new versions have been out since August 2000 (version 8.5), but maybe
+this info will be out of date by the time you read this.  Lastly, the
+conserver.com version is based on Kevin's "5.21-Beta" distribution, but
+since <B>HEAVILY</B> modified and enhanced (more details in the
+"Origin" section above).
+
+</P>
+
+<P>
+
+If I were looking for a conserver package I would either use Kevin's
+latest distribution or the conserver.com distribution.  Which one?
+Well, obviously I'm biased and believe the conserver.com distribution
+should be your choice, but Kevin's does have UPS (serial port line
+toggling bits) that the conserver.com version doesn't have.  What does
+the conserver.com distribution have?  Well, in reality, too many things
+to list.  You'll have to look at the <A
+HREF="http://www.conserver.com/CHANGES">CHANGES</A> file and see the
+enhancements, bug fixes, and general development since the original.
+Don't let the version numbers fool you - you'll have to compare and
+contrast for yourself.
+
+</P>
+
+<H3>Downloading</H3>
+
+<P>
+The current version, released on RELEASE_DATE, is <A
+HREF="http://www.conserver.com/7.1.0.tar.gz">
+7.1.0.tar.gz</A>.  You can get it via <A
+HREF="ftp://ftp.conserver.com/conserver/7.1.0.tar.gz">FTP</A>
+or <A HREF="http://www.conserver.com/7.1.0.tar.gz">HTTP</A>.
+See the <A HREF="http://www.conserver.com/CHANGES">CHANGES</A> file for
+information on the latest updates.
+</P>
+
+<P>
 As of version 6.1.7, the packaging and numbering scheme has changed.  I
 used to package conserver as conserver-GNAC-v.vv.  Since GNAC (now <A
 HREF="http://www.certaintysolutions.com/">Certainty Solutions</A>) has
@@ -139,18 +186,6 @@ original authors and I couldn't come up with a good replacement for the
 GNAC name - sad, but true.
 </P>
 
-<H3>Downloading</H3>
-
-<P>
-The current version is <A
-HREF="http://www.conserver.com/7.0.3.tar.gz">
-7.0.3.tar.gz</A>.  You can get it via <A
-HREF="ftp://ftp.conserver.com/conserver/7.0.3.tar.gz">FTP</A>
-or <A HREF="http://www.conserver.com/7.0.3.tar.gz">HTTP</A>.
-See the <A HREF="http://www.conserver.com/CHANGES">CHANGES</A> file for
-information on the latest updates.
-</P>
-
 <H3>Installation</H3>
 
 <P>
@@ -158,6 +193,24 @@ Check the
 <A HREF="http://www.conserver.com/INSTALL">INSTALL</A>
 file for instructions.
 </P>
+
+<H3>Systems Tested</H3>
+
+<P>
+Here's a list of systems that I've been told can successfully compile conserver.  If anyone has more to add to this list, please let me know.
+</P>
+<UL>
+<LI>Solaris 2.5.1 thru 8 (sparc/x86), gcc
+<LI>BSDI 3.X, gcc
+<LI>MacOS X
+<LI>Linux 2.2.18 (x86), gcc
+<LI>Linux 2.4.2 (x86), gcc
+<LI>FreeBSD 4.2 (x86), gcc
+<LI>cygwin (w2k),gcc 2.95.3
+<LI>DEC Tru64 4.0, gcc
+<LI>DEC Tru64 4.0/5.1, DEC cc
+<LI>HP-UX 10.20, gcc
+</UL>
 
 <H3>Other Good Information</H3>
 

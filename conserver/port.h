@@ -1,5 +1,5 @@
 /*
- *  $Id: port.h,v 1.26 2001-07-05 00:14:06-07 bryan Exp $
+ *  $Id: port.h,v 1.28 2001-07-17 14:14:36-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -61,34 +61,8 @@
 
 /* communication constants
  */
-#define OB_SUSP		'Z'		/* suspended by server		*/
-#define OB_DROP		'.'		/* dropped by server		*/
-
-/* Due to C's poor man's macros the macro below would break if statements,
- * What we want
- *	macro()			{ stuff }
- * but the syntax gives us
- *	macro()			{ stuff };
- *
- * the extra semicolon breaks if statements!
- * Of course, the one we use makes lint scream:
- *	macro()			do { stuff } while (0)
- *
- * which is a statement and makes if statements safe
- */
-#if defined(lint)
-extern int shut_up_lint;
-#else
-# define shut_up_lint	0
-#endif
-
-/* this macro efficently outputs a constant string to a fd
- * of course it doesn't check the write :-(
- */
-#define CSTROUT(Mfd, Mstr)	do {	\
-	static char _ac[] = Mstr; \
-	write(Mfd, _ac, sizeof(_ac)-1); \
-	} while (shut_up_lint)
+#define OB_SUSP		'Z'	/* suspended by server          */
+#define OB_DROP		'.'	/* dropped by server            */
 
 /* For legacy compile-time setting of the port...
  */

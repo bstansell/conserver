@@ -41,3 +41,4 @@ distclean:
 	done
 	rm -f config.cache config.log config.status config.h Makefile
 
+.PHONY: autologin autologin.install clean distclean install all

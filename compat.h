@@ -1,27 +1,6 @@
 #include <config.h>
 
 
-/* hpux doesn't have getdtablesize() and they don't provide a macro
- * in non-KERNEL cpp mode
- */
-#ifndef HAVE_GETDTABLESIZE
-# ifdef HAVE_GETRLIMIT
-static int
-getdtablesize()
-{
-	auto struct rlimit rl;
-
-	(void)getrlimit(RLIMIT_NOFILE, &rl);
-	return rl.rlim_cur;
-}
-# else /* ! HAVE_GETRLIMIT */
-#  ifndef OPEN_MAX
-#   define OPEN_MAX		64
-#  endif
-#  define getdtablesize()	OPEN_MAX
-# endif /* HAVE_GETRLIMIT */
-#endif /* ! HAVE_GETDTABLESIZE */
-
 #if STDC_HEADERS
 # include <string.h>
 # include <stdlib.h>
@@ -84,20 +63,40 @@ typedef long fd_set;
 # include <sys/ttold.h>
 #endif
 
-
-/* which type does wait(2) take for status location
- */
+#if HAVE_TYPES_H
 #include <sys/types.h>
-#if HAVE_SYS_WAIT_H
-# include <sys/wait.h>
-#else
-# define WEXITSTATUS(stat_val)	((unsigned)(stat_val) >> 8)
 #endif
 
-#ifdef HAVE_SIGACTION
-extern void Set_signal(int isg, RETSIGTYPE (*disp)(int));
+#if HAVE_SYS_WAIT_H
+# include <sys/wait.h>
+#endif
+#define LO(s) ((unsigned)((s) & 0377))
+#define HI(s) ((unsigned)(((s) >> 8) & 0377))
+#if !defined(WIFEXITED)
+#define WIFEXITED(s) (LO(s)==0)
+#endif
+#if !defined(WEXITSTATUS)
+#define WEXITSTATUS(s) HI(s)
+#endif
+#if !defined(WIFSIGNALED)
+#define WIFSIGNALED(s) ((LO(s)>0)&&(HI(s)==0))
+#endif
+#if !defined(WTERMSIG)
+#define WTERMSIG(s) (LO(s)&0177)
+#endif
+#if !defined(WIFSTOPPED)
+#define WIFSTOPPED(s) ((LO(s)==0177)&&(HI(s)!=0))
+#endif
+#if !defined(WSTOPSIG)
+#define WSTOPSIG(s) HI(s)
+#endif
+
+#if HAVE_SYSEXITS_H
+#include <sysexits.h>
 #else
-# define Set_signal(sig, disp)	(void)signal((sig), (disp))
+#define EX_OK 0
+#define EX_UNAVAILABLE 69
+#define EX_TEMPFAIL 75
 #endif
 
 #include <errno.h>
@@ -215,6 +214,6 @@ extern char *h_errlist[];
 #ifndef ONOCR
 #define ONOCR 0
 #endif
-#ifndef ONLRET 
-#define ONLRET 0      
+#ifndef ONLRET
+#define ONLRET 0
 #endif

@@ -24,7 +24,7 @@
 case "$1" in
   start)
     echo -n "Starting conserver: "
-    daemon conserver -d -n
+    daemon conserver -d
     echo
     touch /var/lock/subsys/conserver
     ;;

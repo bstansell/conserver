@@ -1,5 +1,5 @@
 /*
- *  $Id: group.h,v 5.15 2001-06-28 02:05:22-07 bryan Exp $
+ *  $Id: group.h,v 5.17 2001-07-11 12:48:01-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -34,15 +34,15 @@
  * 4. This notice may not be removed or altered.
  */
 
-#define MAXPSWDLEN	16	/* max length of encrypted password	*/
+#define MAXPSWDLEN	16	/* max length of encrypted password     */
 
-typedef struct grpent {		/* group info				*/
-	int port;		/* port group listens on		*/
-	int pid;		/* pid of server for group		*/
-	int imembers;		/* number of consoles in this group	*/
-	CONSENT *pCElist;	/* list of consoles in this group	*/
-	CONSCLIENT *pCLall;		/* all clients to scan after select	*/
-	char passwd[MAXPSWDLEN];/* encrypted password for this group	*/
+typedef struct grpent {		/* group info                           */
+    unsigned short port;	/* port group listens on                */
+    int pid;			/* pid of server for group              */
+    int imembers;		/* number of consoles in this group     */
+    CONSENT *pCElist;		/* list of consoles in this group       */
+    CONSCLIENT *pCLall;		/* all clients to scan after select     */
+    char passwd[MAXPSWDLEN];	/* encrypted password for this group    */
 } GRPENT;
 
 

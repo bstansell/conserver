@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.28 2001-06-29 00:26:39-07 bryan Exp $
+ *  $Id: client.c,v 5.32 2001-07-23 00:54:11-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -50,8 +50,9 @@
 #include <pwd.h>
 
 #include <compat.h>
-
 #include <port.h>
+#include <util.h>
+
 #include <consent.h>
 #include <client.h>
 #include <group.h>
@@ -61,29 +62,29 @@
  */
 CONSCLIENT *
 FindWrite(pCL)
-CONSCLIENT *pCL;
+    CONSCLIENT *pCL;
 {
-	/* return the first guy to have the `want write' bit set
-	 * (tell him of the promotion, too)  we could look for the
-	 * most recent or some such... I guess it doesn't matter that
-	 * much.
-	 */
-	for (/*passed in*/; (CONSCLIENT *)0 != pCL; pCL = pCL->pCLnext) {
-		if (!pCL->fwantwr)
-			continue;
-		if (!pCL->pCEto->fup || pCL->pCEto->fronly)
-			break;
-		pCL->fwantwr = 0;
-		pCL->fwr = 1;
-		if ( pCL->pCEto->nolog ) {
-		    CSTROUT(pCL->fd, "\r\n[attached (nologging)]\r\n");
-		} else {
-		    CSTROUT(pCL->fd, "\r\n[attached]\r\n");
-		}
-		tagLogfile(pCL->pCEto, "%s attached", pCL->acid);
-		return pCL;
+    /* return the first guy to have the `want write' bit set
+     * (tell him of the promotion, too)  we could look for the
+     * most recent or some such... I guess it doesn't matter that
+     * much.
+     */
+    for ( /*passed in */ ; (CONSCLIENT *) 0 != pCL; pCL = pCL->pCLnext) {
+	if (!pCL->fwantwr)
+	    continue;
+	if (!pCL->pCEto->fup || pCL->pCEto->fronly)
+	    break;
+	pCL->fwantwr = 0;
+	pCL->fwr = 1;
+	if (pCL->pCEto->nolog) {
+	    fileWrite(pCL->fd, "\r\n[attached (nologging)]\r\n", -1);
+	} else {
+	    fileWrite(pCL->fd, "\r\n[attached]\r\n", -1);
 	}
-	return (CONSCLIENT *)0;
+	tagLogfile(pCL->pCEto, "%s attached", pCL->acid);
+	return pCL;
+    }
+    return (CONSCLIENT *) 0;
 }
 
 /* show a character as a string so the user cannot mistake it for	(ksb)
@@ -93,34 +94,34 @@ CONSCLIENT *pCL;
  */
 char *
 FmtCtl(ci, pcIn)
-int ci;
-char *pcIn;
+    int ci;
+    char *pcIn;
 {
-	register char *pcOut = pcIn;
-	unsigned char c;
+    char *pcOut = pcIn;
+    unsigned char c;
 
-	c = ci & 0xff;
-	if (c > 127) {
-		c -= 128;
-		*pcOut++ = 'M';
-		*pcOut++ = '-';
-	}
+    c = ci & 0xff;
+    if (c > 127) {
+	c -= 128;
+	*pcOut++ = 'M';
+	*pcOut++ = '-';
+    }
 
-	if (c < ' ' || c == '\177') {
-		*pcOut++ = '^';
-		*pcOut++ = c ^ 0100;
-		*pcOut = '\000';
-	} else if (c == ' ') {
-		(void)strcpy(pcOut, "<space>");
-	} else if (c == '^') {
-		(void)strcpy(pcOut, "<circumflex>");
-	} else if (c == '\\') {
-		(void)strcpy(pcOut, "<backslash>");
-	} else {
-		*pcOut++ = c;
-		*pcOut = '\000';
-	}
-	return pcIn;
+    if (c < ' ' || c == '\177') {
+	*pcOut++ = '^';
+	*pcOut++ = c ^ 0100;
+	*pcOut = '\000';
+    } else if (c == ' ') {
+	(void)strcpy(pcOut, "<space>");
+    } else if (c == '^') {
+	(void)strcpy(pcOut, "<circumflex>");
+    } else if (c == '\\') {
+	(void)strcpy(pcOut, "<backslash>");
+    } else {
+	*pcOut++ = c;
+	*pcOut = '\000';
+    }
+    return pcIn;
 }
 
 /* replay last iBack lines of the log file upon connect to console	(ksb)
@@ -131,58 +132,60 @@ char *pcIn;
  */
 void
 Replay(fdLog, fdOut, iBack)
-int fdLog, fdOut, iBack;
+    CONSFILE *fdLog;
+    CONSFILE *fdOut;
+    int iBack;
 {
-	register int tot, nCr;
-	register char *pc;
-	register off_t where;
-	auto char bf[MAXREPLAY+2];
-	auto struct stat stLog;
+    int tot, nCr;
+    char *pc;
+    off_t where;
+    char bf[MAXREPLAY + 2];
+    struct stat stLog;
 
-	if (-1 == fdLog) {
-		CSTROUT(fdOut, "[no log file on this console]\r\n");
-		return;
-	}
+    if ((CONSFILE *) 0 == fdLog) {
+	fileWrite(fdOut, "[no log file on this console]\r\n", -1);
+	return;
+    }
 
-	/* find the size of the file
-	 */
-	if (0 != fstat(fdLog, & stLog)) {
-		return;
-	}
+    /* find the size of the file
+     */
+    if (0 != fileStat(fdLog, &stLog)) {
+	return;
+    }
 
-	if (MAXREPLAY > stLog.st_size) {
-		where = 0L;
-	} else {
-		where = stLog.st_size - MAXREPLAY;
-	}
+    if (MAXREPLAY > stLog.st_size) {
+	where = 0L;
+    } else {
+	where = stLog.st_size - MAXREPLAY;
+    }
 
 #if defined(SEEK_SET)
-	/* PTX and maybe other Posix systems
-	 */
-	if (lseek(fdLog, where, SEEK_SET) < 0) {
-		return;
-	}
+    /* PTX and maybe other Posix systems
+     */
+    if (fileSeek(fdLog, where, SEEK_SET) < 0) {
+	return;
+    }
 #else
-	if (lseek(fdLog, where, L_SET) < 0) {
-		return;
-	}
+    if (fileSeek(fdLog, where, L_SET) < 0) {
+	return;
+    }
 #endif
 
-	if ((tot = read(fdLog, bf, MAXREPLAY)) <= 0) {
-		return;
-	}
-	bf[tot] = '@';
+    if ((tot = fileRead(fdLog, bf, MAXREPLAY)) <= 0) {
+	return;
+    }
+    bf[tot] = '@';
 
-	pc = & bf[tot];
-	nCr = 0;
-	while (--pc != bf) {
-		if ('\n' == *pc && iBack == nCr++) {
-			++pc;	/* get rid of a blank line */
-			break;
-		}
+    pc = &bf[tot];
+    nCr = 0;
+    while (--pc != bf) {
+	if ('\n' == *pc && iBack == nCr++) {
+	    ++pc;		/* get rid of a blank line */
+	    break;
 	}
+    }
 
-	(void)write(fdOut, pc, tot-(pc - bf));
+    (void)fileWrite(fdOut, pc, tot - (pc - bf));
 }
 
 
@@ -191,91 +194,90 @@ int fdLog, fdOut, iBack;
 #define WHEN_SPY	0x01
 #define WHEN_ATTACH	0x02
 #define WHEN_VT100	0x04
-#define WHEN_EXPERT	0x08	/* ZZZ no way to set his yet	*/
+#define WHEN_EXPERT	0x08	/* ZZZ no way to set his yet    */
 #define WHEN_ALWAYS	0x40
 
 #define HALFLINE	40
 typedef struct HLnode {
-	int iwhen;
-	char actext[HALFLINE];
+    int iwhen;
+    char actext[HALFLINE];
 } HELP;
 
 static HELP aHLTable[] = {
-	{ WHEN_ALWAYS,	".    disconnect"},
-	{ WHEN_ALWAYS,	"a    attach read/write"},
-	{ WHEN_ATTACH,	"c    toggle flow control"},
-	{ WHEN_ATTACH,	"d    down a console"},
-	{ WHEN_ALWAYS,	"e    change escape sequence"},
-	{ WHEN_ALWAYS,	"f    force attach read/write"},
-	{ WHEN_ALWAYS,	"g    group info"},
-	{ WHEN_ATTACH,	"L    toggle logging on/off"},
-	{ WHEN_ATTACH,	"l1   send break (halt host!)"},
-	{ WHEN_ALWAYS,	"o    (re)open the tty and log file"},
-	{ WHEN_ALWAYS,	"p    replay the last 60 lines"},
-	{ WHEN_ALWAYS,	"r    replay the last 20 lines"},
-	{ WHEN_ATTACH,	"s    spy read only"},
-	{ WHEN_ALWAYS,	"u    show host status"},
-	{ WHEN_ALWAYS,	"v    show version info"},
-	{ WHEN_ALWAYS,	"w    who is on this console"},
-	{ WHEN_ALWAYS,	"x    show console baud info"},
-	{ WHEN_ALWAYS,	"z    suspend the connection"},
-	{ WHEN_ALWAYS,	"<cr> ignore/abort command"},
-	{ WHEN_ALWAYS,	"?    print this message"},
-	{ WHEN_ALWAYS,	"^R   short replay"},
-	{ WHEN_ATTACH, "\\ooo send character by octal code"},
-	{ WHEN_EXPERT,	"^I   toggle tab expansion"},
-	{ WHEN_EXPERT,	";    change to another console"},
-	{ WHEN_EXPERT,	"+(-) do (not) drop line"},
-	{ WHEN_VT100,	"PF1  print this message"},
-	{ WHEN_VT100,	"PF2  disconnect"},
-	{ WHEN_VT100,	"PF3  replay the last 20 lines"},
-	{ WHEN_VT100,	"PF4  spy read only"}
+    {WHEN_ALWAYS, ".    disconnect"},
+    {WHEN_ALWAYS, "a    attach read/write"},
+    {WHEN_ATTACH, "c    toggle flow control"},
+    {WHEN_ATTACH, "d    down a console"},
+    {WHEN_ALWAYS, "e    change escape sequence"},
+    {WHEN_ALWAYS, "f    force attach read/write"},
+    {WHEN_ALWAYS, "g    group info"},
+    {WHEN_ATTACH, "L    toggle logging on/off"},
+    {WHEN_ATTACH, "l1   send break (halt host!)"},
+    {WHEN_ALWAYS, "o    (re)open the tty and log file"},
+    {WHEN_ALWAYS, "p    replay the last 60 lines"},
+    {WHEN_ALWAYS, "r    replay the last 20 lines"},
+    {WHEN_ATTACH, "s    spy read only"},
+    {WHEN_ALWAYS, "u    show host status"},
+    {WHEN_ALWAYS, "v    show version info"},
+    {WHEN_ALWAYS, "w    who is on this console"},
+    {WHEN_ALWAYS, "x    show console baud info"},
+    {WHEN_ALWAYS, "z    suspend the connection"},
+    {WHEN_ALWAYS, "<cr> ignore/abort command"},
+    {WHEN_ALWAYS, "?    print this message"},
+    {WHEN_ALWAYS, "^R   short replay"},
+    {WHEN_ATTACH, "\\ooo send character by octal code"},
+    {WHEN_EXPERT, "^I   toggle tab expansion"},
+    {WHEN_EXPERT, ";    change to another console"},
+    {WHEN_EXPERT, "+(-) do (not) drop line"},
+    {WHEN_VT100, "PF1  print this message"},
+    {WHEN_VT100, "PF2  disconnect"},
+    {WHEN_VT100, "PF3  replay the last 20 lines"},
+    {WHEN_VT100, "PF4  spy read only"}
 };
 
 /* list the commands we know for the user				(ksb)
  */
 void
 HelpUser(pCL)
-CONSCLIENT *pCL;
+    CONSCLIENT *pCL;
 {
-	register int i, j, iCmp;
-	static char
-		acH1[] = "help]\r\n",
-		acH2[] = "help spy mode]\r\n",
-		acEoln[] = "\r\n";
-	auto char acLine[HALFLINE*2+3];
+    int i, j, iCmp;
+    static char
+      acH1[] = "help]\r\n", acH2[] = "help spy mode]\r\n", acEoln[] =
+	"\r\n";
+    char acLine[HALFLINE * 2 + 3];
 
-	iCmp = WHEN_ALWAYS|WHEN_SPY;
-	if (pCL->fwr) {
-		(void)write(pCL->fd, acH1, sizeof(acH1)-1);
-		iCmp |= WHEN_ATTACH;
-	} else {
-		(void)write(pCL->fd, acH2, sizeof(acH2)-1);
-	}
-	if ('\033' == pCL->ic[0] && 'O' == pCL->ic[1]) {
-		iCmp |= WHEN_VT100;
-	}
+    iCmp = WHEN_ALWAYS | WHEN_SPY;
+    if (pCL->fwr) {
+	(void)fileWrite(pCL->fd, acH1, sizeof(acH1) - 1);
+	iCmp |= WHEN_ATTACH;
+    } else {
+	(void)fileWrite(pCL->fd, acH2, sizeof(acH2) - 1);
+    }
+    if ('\033' == pCL->ic[0] && 'O' == pCL->ic[1]) {
+	iCmp |= WHEN_VT100;
+    }
 
+    acLine[0] = '\000';
+    for (i = 0; i < sizeof(aHLTable) / sizeof(HELP); ++i) {
+	if (0 == (aHLTable[i].iwhen & iCmp)) {
+	    continue;
+	}
+	if ('\000' == acLine[0]) {
+	    acLine[0] = ' ';
+	    (void)strcpy(acLine + 1, aHLTable[i].actext);
+	    continue;
+	}
+	for (j = strlen(acLine); j < HALFLINE + 1; ++j) {
+	    acLine[j] = ' ';
+	}
+	(void)strcpy(acLine + j, aHLTable[i].actext);
+	(void)strcat(acLine + j, acEoln);
+	(void)fileWrite(pCL->fd, acLine, -1);
 	acLine[0] = '\000';
-	for (i = 0; i < sizeof(aHLTable)/sizeof(HELP); ++i) {
-		if (0 == (aHLTable[i].iwhen & iCmp)) {
-			continue;
-		}
-		if ('\000' == acLine[0]) {
-			acLine[0] = ' ';
-			(void)strcpy(acLine+1, aHLTable[i].actext);
-			continue;
-		}
-		for (j = strlen(acLine); j < HALFLINE+1; ++j) {
-			acLine[j] = ' ';
-		}
-		(void)strcpy(acLine+j, aHLTable[i].actext);
-		(void)strcat(acLine+j, acEoln);
-		(void)write(pCL->fd, acLine, strlen(acLine));
-		acLine[0] = '\000';
-	}
-	if ('\000' != acLine[0]) {
-		(void)strcat(acLine, acEoln);
-		(void)write(pCL->fd, acLine, strlen(acLine));
-	}
+    }
+    if ('\000' != acLine[0]) {
+	(void)strcat(acLine, acEoln);
+	(void)fileWrite(pCL->fd, acLine, -1);
+    }
 }

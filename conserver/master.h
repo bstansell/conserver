@@ -1,5 +1,5 @@
 /*
- *  $Id: master.h,v 5.10 2001-02-21 17:26:06-08 bryan Exp $
+ *  $Id: master.h,v 5.11 2001-07-09 02:16:53-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -38,3 +38,4 @@
  * stuff the master process needs
  */
 extern void Master();
+extern void SignalKids();

@@ -1,5 +1,5 @@
 /*
- *  $Id: access.c,v 5.26 2001-07-03 02:07:34-07 bryan Exp $
+ *  $Id: access.c,v 5.35 2001-07-23 00:45:49-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -51,29 +51,17 @@
 #include <pwd.h>
 
 #include <compat.h>
-
 #include <port.h>
+#include <util.h>
+
 #include <access.h>
 #include <consent.h>
 #include <client.h>
 #include <group.h>
 #include <readcfg.h>
 #include <main.h>
-#include <output.h>
 
 
-
-/* in the routines below (the init code) we can bomb if malloc fails	(ksb)
- */
-void
-OutOfMem()
-{
-	static char acNoMem[] = ": out of memory\n";
-
-	write(2, progname, strlen(progname));
-	write(2, acNoMem, sizeof(acNoMem)-1);
-	exit(45);
-}
 
 /* Compare an Internet address (IPv4 expected), with an address pattern
  * passed as a character string representing an address in the Internet
@@ -89,8 +77,8 @@ OutOfMem()
  */
 int
 AddrCmp(addr, pattern)
-struct in_addr *addr;
-char *pattern;
+    struct in_addr *addr;
+    char *pattern;
 {
     unsigned long int hostaddr, pattern_addr, netmask;
     char buf[200], *p, *slash_posn;
@@ -98,21 +86,20 @@ char *pattern;
     slash_posn = strchr(pattern, '/');
     if (slash_posn != NULL) {
 	if (strlen(pattern) >= sizeof(buf))
-	    return 1;	/* too long to handle */
+	    return 1;		/* too long to handle */
 	strncpy(buf, pattern, sizeof(buf));
-	buf[slash_posn-pattern] = '\0';	/* isolate the address */
+	buf[slash_posn - pattern] = '\0';	/* isolate the address */
 	p = buf;
-    }
-    else
+    } else
 	p = pattern;
 
     pattern_addr = inet_addr(p);
     if (pattern_addr == -1)
-	return 1;	/* malformed address */
+	return 1;		/* malformed address */
 
     if (slash_posn) {
 	/* convert explicit netmask */
-	int mask_bits = atoi(slash_posn+1);
+	int mask_bits = atoi(slash_posn + 1);
 	for (netmask = 0; mask_bits > 0; --mask_bits)
 	    netmask = 0x80000000 | (netmask >> 1);
     } else {
@@ -125,107 +112,112 @@ char *pattern;
 	else if (IN_CLASSC(ia))
 	    netmask = IN_CLASSC_NET;
 	else
-	    return 1;	/* unsupported address class */
+	    return 1;		/* unsupported address class */
     }
     netmask = htonl(netmask);
     if (~netmask & pattern_addr)
-	netmask = 0xffffffff;		/* compare entire addresses */
-    hostaddr = *(unsigned long int*)addr;
+	netmask = 0xffffffff;	/* compare entire addresses */
+    hostaddr = *(unsigned long int *)addr;
 
-    Debug( "Access check:       host=%lx(%lx/%lx)", hostaddr & netmask, hostaddr, netmask );
-    Debug( "Access check:        acl=%lx(%lx/%lx)", pattern_addr & netmask, pattern_addr, netmask );
+    Debug("Access check:       host=%lx(%lx/%lx)", hostaddr & netmask,
+	  hostaddr, netmask);
+    Debug("Access check:        acl=%lx(%lx/%lx)", pattern_addr & netmask,
+	  pattern_addr, netmask);
     return (hostaddr & netmask) != (pattern_addr & netmask);
 }
 
 /* return the access type for a given host entry			(ksb)
  */
 char
-AccType(addr,hname)
-struct in_addr *addr;
-char *hname;
+AccType(addr, hname)
+    struct in_addr *addr;
+    char *hname;
 {
-	register int i;
-	register char *pcName;
-	register int len;
+    int i;
+    char *pcName;
+    int len;
 
-	if ( fDebug ) {
-	    if (hname)
-		Debug( "Access check: hostname=%s, ip=%s", hname, inet_ntoa(*addr) );
-	    else
-		Debug( "Access check: hostname=<unresolvable>, ip=%s", inet_ntoa(*addr) );
+    if (fDebug) {
+	if (hname)
+	    Debug("Access check: hostname=%s, ip=%s", hname,
+		  inet_ntoa(*addr));
+	else
+	    Debug("Access check: hostname=<unresolvable>, ip=%s",
+		  inet_ntoa(*addr));
+    }
+    for (i = 0; i < iAccess; ++i) {
+	Debug("Access check:    who=%s, trust=%c", pACList[i].pcwho,
+	      pACList[i].ctrust);
+	if (pACList[i].isCIDR != 0) {
+	    if (0 == AddrCmp(addr, pACList[i].pcwho)) {
+		return pACList[i].ctrust;
+	    }
+	    continue;
 	}
-	for (i = 0; i < iAccess; ++i) {
-		Debug( "Access check:    who=%s, trust=%c", pACList[i].pcwho, pACList[i].ctrust );
-		if (isdigit((int)(pACList[i].pcwho[0]))) {
-			if (0 == AddrCmp(addr, pACList[i].pcwho)) {
-				return pACList[i].ctrust;
-			}
-			continue;
+	if (hname && hname[0] != '\000') {
+	    pcName = hname;
+	    len = strlen(pcName);
+	    while (len >= pACList[i].ilen) {
+		Debug("Access check:       name=%s", pcName);
+		if (0 == strcmp(pcName, pACList[i].pcwho)) {
+		    return pACList[i].ctrust;
 		}
-		if (hname && hname[0] != '\000') {
-		    pcName = hname;
-		    len = strlen(pcName);
-		    while (len >= pACList[i].ilen) {
-			    Debug( "Access check:       name=%s", pcName );
-			    if (0 == strcmp(pcName, pACList[i].pcwho)) {
-				    return pACList[i].ctrust;
-			    }
-			    pcName = strchr(pcName, '.');
-			    if ((char *)0 == pcName) {
-				    break;
-			    }
-			    ++pcName;
-			    len = strlen(pcName);
-		    }
+		pcName = strchr(pcName, '.');
+		if ((char *)0 == pcName) {
+		    break;
 		}
+		++pcName;
+		len = strlen(pcName);
+	    }
 	}
-	return chDefAcc;
+    }
+    return chDefAcc;
 }
 
 /* we know iAccess == 0, we want to setup a nice default access list	(ksb)
  */
 void
 SetDefAccess(hpLocal)
-struct hostent *hpLocal;
+    struct hostent *hpLocal;
 {
-	register char *pcWho, *pcDomain;
-	register int iLen;
-	char *addr;
-	struct in_addr *aptr;
+    char *pcWho, *pcDomain;
+    int iLen;
+    char *addr;
+    struct in_addr *aptr;
 
-	aptr = (struct in_addr *)(hpLocal->h_addr);
-	addr = inet_ntoa(*aptr);
-	pACList = (ACCESS *)calloc(3, sizeof(ACCESS));
-	if ((ACCESS *)0 == pACList) {
-		OutOfMem();
-	}
-	if ((char *)0 == (pcWho = malloc(strlen(addr)+1))) {
-		OutOfMem();
-	}
-	strcpy(pcWho, addr);
-	pACList[iAccess].ctrust = 'a';
-	pACList[iAccess].ilen = strlen(pcWho);
-	pACList[iAccess].pcwho = pcWho;
+    aptr = (struct in_addr *)(hpLocal->h_addr);
+    addr = inet_ntoa(*aptr);
+    pACList = (ACCESS *) calloc(3, sizeof(ACCESS));
+    if ((ACCESS *) 0 == pACList) {
+	OutOfMem();
+    }
+    if ((char *)0 == (pcWho = malloc(strlen(addr) + 1))) {
+	OutOfMem();
+    }
+    strcpy(pcWho, addr);
+    pACList[iAccess].ctrust = 'a';
+    pACList[iAccess].ilen = strlen(pcWho);
+    pACList[iAccess].pcwho = pcWho;
 
-	Debug( "Access list prime: trust=%c, who=%s", pACList[iAccess].ctrust,
-		pACList[iAccess].pcwho );
+    Debug("Access list prime: trust=%c, who=%s", pACList[iAccess].ctrust,
+	  pACList[iAccess].pcwho);
 
-	iAccess++;
+    iAccess++;
 
-	if ((char *)0 == (pcDomain = strchr(hpLocal->h_name, '.'))) {
-		return;
-	}
-	++pcDomain;
-	iLen = strlen(pcDomain);
-	pcWho = malloc(iLen+1);
-	pACList[iAccess].ctrust = 'a';
-	pACList[iAccess].ilen = iLen;
-	pACList[iAccess].pcwho = strcpy(pcWho, pcDomain);
+    if ((char *)0 == (pcDomain = strchr(hpLocal->h_name, '.'))) {
+	return;
+    }
+    ++pcDomain;
+    iLen = strlen(pcDomain);
+    pcWho = malloc(iLen + 1);
+    pACList[iAccess].ctrust = 'a';
+    pACList[iAccess].ilen = iLen;
+    pACList[iAccess].pcwho = strcpy(pcWho, pcDomain);
 
-	Debug( "Access list prime: trust=%c, who=%s", pACList[iAccess].ctrust,
-		pACList[iAccess].pcwho );
+    Debug("Access list prime: trust=%c, who=%s", pACList[iAccess].ctrust,
+	  pACList[iAccess].pcwho);
 
-	iAccess++;
+    iAccess++;
 }
 
 /* thread ther list of uniq console server machines, aliases for	(ksb)
@@ -233,27 +225,26 @@ struct hostent *hpLocal;
  */
 REMOTE *
 FindUniq(pRCAll)
-register REMOTE *pRCAll;
+    REMOTE *pRCAll;
 {
-	register REMOTE *pRC;
+    REMOTE *pRC;
 
-	/* INV: tail of the list we are building always contains only
-	 * uniq hosts, or the empty list.
-	 */
-	if ((REMOTE *)0 == pRCAll) {
-		return (REMOTE *)0;
+    /* INV: tail of the list we are building always contains only
+     * uniq hosts, or the empty list.
+     */
+    if ((REMOTE *) 0 == pRCAll) {
+	return (REMOTE *) 0;
+    }
+
+    pRCAll->pRCuniq = FindUniq(pRCAll->pRCnext);
+
+    /* if it is in the returned list of uniq hosts, return that list
+     * else add us by returning our node
+     */
+    for (pRC = pRCAll->pRCuniq; (REMOTE *) 0 != pRC; pRC = pRC->pRCuniq) {
+	if (0 == strcmp(pRC->rhost, pRCAll->rhost)) {
+	    return pRCAll->pRCuniq;
 	}
-
-	pRCAll->pRCuniq = FindUniq(pRCAll->pRCnext);
-
-	/* if it is in the returned list of uniq hosts, return that list
-	 * else add us by returning our node
-	 */
-	for (pRC = pRCAll->pRCuniq; (REMOTE *)0 != pRC; pRC = pRC->pRCuniq) {
-		if (0 == strcmp(pRC->rhost, pRCAll->rhost)) {
-			return pRCAll->pRCuniq;
-		}
-	}
-	return pRCAll;
+    }
+    return pRCAll;
 }
-

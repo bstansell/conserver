@@ -26,17 +26,15 @@ LIBS	= @LIBS@
 ### Makefile rules - no user-servicable parts below
 
 CONSERVER_OBJS = access.o client.o consent.o group.o main.o master.o \
-		 readcfg.o fallback.o output.o
+		 readcfg.o fallback.o util.o
 CONSERVER_HDRS = ../config.h $(top_srcdir)/compat.h $(srcdir)/access.h \
 		 $(srcdir)/client.h $(srcdir)/consent.h $(srcdir)/group.h \
 		 $(srcdir)/main.h $(srcdir)/master.h $(srcdir)/readcfg.h \
-		 $(srcdir)/output.h
+		 $(srcdir)/util.h
 ALL = conserver
 
 
 all: $(ALL)
-
-.PHONY: clean distclean install
 
 conserver: $(CONSERVER_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o conserver $(CONSERVER_OBJS) $(LIBS)
@@ -57,3 +55,5 @@ install: conserver
 	$(INSTALL) conserver.man $(DESTDIR)$(mandir)/man8/conserver.8
 	$(MKDIR) $(DESTDIR)$(sysconfdir)
 	[ -f $(DESTDIR)$(sysconfdir)/conserver.rc ] || $(INSTALL) conserver.rc $(DESTDIR)$(sysconfdir)
+
+.PHONY: clean distclean install

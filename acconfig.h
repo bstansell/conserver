@@ -4,6 +4,11 @@
 #undef DEFPORT
 
 /*
+ * Base socket used for secondary channel
+ */
+#undef DEFBASEPORT
+
+/*
  * Hostname of console server
  */
 #undef MASTERHOST
@@ -32,11 +37,6 @@
  * Number of child processes
  */
 #undef MAXGRP
-
-/*
- * Clear parity (high-bit) [true/false setting]
- */
-#undef CPARITY
 
 /*
  * TCP connection timeout

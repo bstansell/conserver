@@ -14,8 +14,6 @@ MKDIR = @MKDIR@
 
 all:
 
-.PHONY: clean distclean install
-
 clean:
 	rm -f *~ *.o $(ALL) core
 
@@ -23,6 +21,8 @@ distclean: clean
 	rm -f Makefile
 
 install:
-	$(MKDIR) $(DESTDIR)$(mandir)/man8
-	$(INSTALL) conserver.cf.man $(DESTDIR)$(mandir)/man8/conserver.cf.8
+	$(MKDIR) $(DESTDIR)$(mandir)/man5
+	$(INSTALL) conserver.cf.man $(DESTDIR)$(mandir)/man5/conserver.cf.5
+	$(INSTALL) conserver.passwd.man $(DESTDIR)$(mandir)/man5/conserver.passwd.5
 
+.PHONY: clean distclean install

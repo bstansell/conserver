@@ -1,19 +1,19 @@
-.\" $Id: conserver.cf.man,v 1.10 2001-07-05 01:39:00-07 bryan Exp $
+.\" $Id: conserver.cf.man,v 1.15 2001-07-26 10:23:16-07 bryan Exp $
 .\" @(#)constab.5 01/06/91 OSU CIS; Thomas A. Fine
-.TH CONSERVER.CF 4 "Local"
+.TH CONSERVER.CF 5 "Local"
 .SH NAME
-conserver.cf \- table of server console terminals used by conserver(8)
+conserver.cf \- console configuration file for conserver(8)
 .SH SYNOPSIS
 .br
-LOGDIR=\fIlogdirectory\fP
+.BI \s-1LOGDIR\s0= logdirectory
 .br
-TIMESTAMP=\fItimestamp-spec\fP
+.BI \s-1TIMESTAMP\s0= timestamp-spec
 .br
-\fIserver\fP:\fIdevice\fP[@\fIconserver\fP]:\fIbaud\fP:\fIlogfile\fP:\fItimestamp-spec\fP
+\fIname\fP:\fIdevice\fP[@\fIconserver\fP]:\fIbaud\fP:\fIlogfile\fP:\fItimestamp-spec\fP
 .br
-\fIserver\fP:!\fIhost\fP[@\fIconserver\fP]:\fIport\fP:\fIlogfile\fP:\fItimestamp-spec\fP
+\fIname\fP:!\fItermserver\fP[@\fIconserver\fP]:\fIport\fP:\fIlogfile\fP:\fItimestamp-spec\fP
 .br
-\fIserver\fP:|\fIcommand\fP[@\fIconserver\fP]::\fIlogfile\fP:\fItimestamp-spec\fP
+\fIname\fP:|\fIcommand\fP[@\fIconserver\fP]::\fIlogfile\fP:\fItimestamp-spec\fP
 .br
 \fB%%\fP
 .br
@@ -21,128 +21,155 @@ TIMESTAMP=\fItimestamp-spec\fP
 .SH DESCRIPTION
 .B Conserver.cf
 is the configuration file for
-.IR conserver (8).
+.BR conserver (8).
+It is read once upon startup;
+modifications to the file take effect only upon restarting \fBconserver\fP.
 All lines starting with the pound sign `#' are considered comment lines.
 Blank lines are ignored.
 .PP
 The first section of the file has lines that are separated into
-six colon-separated fields:
-.PP
-\fIserver\fP name - this doesn't have to be the name of the server;
-it is used to refer to the server when using the console program.
-.PP
-\fIdevice\fP file name - the full path name of the device for this server.
+five colon-separated fields.  Leading and trailing white space in each
+field is ignored.
+.TP
+.I name
+the unique name by which this connection is referred to
+when using the \fBconsole\fP program.
+This is typically the name of the host whose console is being monitored.
+.TP
+.I device
+the full path name of the device for this line.
 The \fIbaud\fP rate is the speed and parity for this console.
 Speed may be given as an integer,
 parity only requires the first letter of any of: even, odd, mark, space.
 For no parity, use the character `p'.
-.PP
-!\fIhost\fP - the hostname of the server to connect to.
+.TP
+.BI ! termserver
+the hostname of the terminal server to connect to.
 A socket connection will be made to port \fIport\fP (an integer).
+.TP
+.BI | command
+the command to invoke on the console server.
 .PP
-|\fIcommand\fP - the command to invoke on the console server.
-.PP
-\fIdevice\fP, !\fIhost\fP, and |\fIcommand\fP may contain a remote
-console server name (ex. \fIhost\fP@\fIconserver\fP) in which case
-the conserver will send connections for this server to \fIconserver\fP.
-.PP
-\fIlogfile\fP - the full path name of file where all output from
-this server is logged.  Any occurance of `&' will be replaced with
-the \fIserver\fP name.  Any path that doesn't begin with a `/' will
-have \fIlogdirectory\fP (value of LOGDIR) prepended to it.
-.PP
-\fItimestamp-spec\fP - specifies the time between
-timestamps applied to the console log file and activity logging.
+\fIdevice\fP, !\fItermserver\fP, and |\fIcommand\fP may be followed by
+a remote console server name in the form ``\fB@\fP\fIconserver\fP'',
+in which case the conserver daemon will send connections for \fIname\fP
+to the conserver running on the host named \fIconserver\fP.
+When the ``\fB@\fP\fIconserver\fP'' notation is used,
+\fBconserver\fP recognizes consoles it should manage locally
+by comparing the IP address of \fIconserver\fP
+against the IP address of the name returned by gethostname().
+Thus, it will recognize host aliases, but not names that map to
+different IP addresses that may exist on the same host,
+so care must be used in specifying the hostname.
+Since \fBconserver\fP does recognize its own hostname,
+the same cf file may be used by all servers in a network
+if every console line includes a ``\fB@\fP\fIconserver\fP'' specification.
+.TP
+.I logfile
+the full path name of file where all output from
+this host is logged.  Any occurrence of `&' will be replaced with
+\fIname\fP.  Any path that doesn't begin with a `/' will
+have \fIlogdirectory\fP (as specified in the nearest preceding
+\fB\s-1LOGDIR=\s0\fP
+line) prepended to it.
+.TP
+.I timestamp-spec
+specifies the time between
+timestamps applied to the console log file and
+whether to log read/write connection actions.
 The format of the specification is
-[\fImark-interval\fP(\fIm\fP|\fIh\fP|\fId\fP|\fIl\fP)][\fIa\fP].
-The timestamps look like `[-- MARK -- Mon Jan 25 14:46:56 PST 1999]'.  The `m',
-`h', and `d' tags specify `minutes', `hours', and `days'.  The `l' tag
+[\fImark-interval\fP[\fBm\fP|\fBh\fP|\fBd\fP|\fBl\fP]][\fBa\fP].
+The timestamps look like `[-- MARK -- Mon Jan 25 14:46:56 PST 1999]'.
+The `\fBm\fP', `\fBh\fP', and `\fBd\fP' tags specify
+`minutes' (the default), `hours', and `days'.  The `\fBl\fP' tag
 specifies `lines' and will cause timestamps of the form
 `[Mon Jan 25 14:46:56 PST 1999]' to
 be placed every \fImark-interval\fP lines (a newline character signifies
-a new line). So, `5h' specifies every 5 hours and `2l' specifies every
-two lines.  An `a' can be specified to add activity logs to the
-logfile: `attached', `detached', and `bumped' messages.
-.PP
-A default \fItimestamp-spec\fP can be specified by using the TIMESTAMP=
-syntax.  All consoles below the TIMESTAMP= line will have use that
-\fItimestamp-spec\fP unless overridden.  To turn off marks for a specific
+a new line). So, `5h' specifies every five hours and `2l' specifies every
+two lines.
+An `\fBa\fP' can be specified to add logs of
+`attached', `detached', and `bumped' actions,
+including the user's name and the host from which the
+\fBconsole\fP connection was made,
+to the logfile.
+.IP
+A default \fItimestamp-spec\fP can be specified by using the
+\fB\s-1TIMESTAMP=\s0\fP syntax.
+All consoles below the \fB\s-1TIMESTAMP=\s0\fP line will use that
+\fItimestamp-spec\fP unless overridden on a per-line basis,
+and until superseded by another \fB\s-1TIMESTAMP=\s0\fP line.
+To turn off marks for a specific
 console, use a \fImark-interval\fP of zero.
 .PP
-This section is terminated with a `%%' token on a line by itself.
+This section is terminated with a `\fB%%\fP' token on a line by itself.
 .PP
 The next section of the file contains a list of hosts and addresses
-which are allowed to connect to the console server.  Three levels
-of access all allowed, ``trust'', ``allow'',
-and ``refuse''.
-The access modifier is followed by a colon and a list of addresses or
-host names.
-Any complete suffix of a host name my be used to allow access for all hosts
+which are allowed to connect to the console server.
+.B Conserver
+looks for the first match in the config file
+for a client's IP address (or network),
+or hostname (or domain) if it is able to do a reverse lookup on the IP address,
+to determine the level of access to be granted.
+Three levels of access may be specified: ``\fBtrust\fP'', ``\fBallow\fP'',
+and ``\fBrefuse\fP''.
+The access level is followed by a colon and a space-separated list of
+addresses or host names.
+Any number of any combination of these levels may be specified,
+bearing in mind that conserver uses the first match for each incoming
+client connection, so order is important.
+.PP
+Any complete suffix of a host name may be used to define access for all hosts
 in that subdomain.
-For example `cc.purdue.edu' will allow `mentor.cc.purdue.edu'
+For example, `\fBcc.purdue.edu\fP' will allow `mentor.cc.purdue.edu'
 and `mace.cc.purdue.edu', but not `pucc.purdue.edu' or `hack.purdue.edu'.
-For IP addresses, optional netmasks may be specified.  For example `192.168.1.0'
-will allow the class C space of 192.168.1.0.  `192.168.1.0/25' will only allow
+For IP addresses, optional netmask lengths may be specified
+in CIDR `/' notation.
+For example, `\fB192.168.1.0\fP' will allow the class C space of 192.168.1.0,
+but `\fB192.168.1.0/25\fP' will allow
 only the lower half of that same address space (192.168.1.0 thru 192.168.1.127).
 .SH EXAMPLE
-# server:path:baud:/usr/adm/logfile:mark
-.br
+# name:path:baud:/usr/adm/logfile:mark
+.nf
 LOGDIR=/tmp
-.br
 #
-.br
 # This logs to /tmp/treelog...
-.br
 tree:/dev/ttyj0:9600e:&log:
-.br
 #
-.br
 # This logs to /tmp/fishlog...
-.br
 fish:/dev/ttyj1:4800e:fishlog:
-.br
 #
-.br
 # Now we're defaulting to /var/tmp for logfiles...
-.br
 LOGDIR=/var/tmp
-.br
 #
-.br
 # So, this is /var/tmp/birdlog
-.br
 bird:/dev/ttyj2:4800m:&log:
-.br
 #
-.br
 # And this is /var/tmp/solarlog...
-.br
 solar:|telnet solar::solarlog:
-.br
 #
-.br
 # Now things are all in /var/consoles/<console name>
-.br
 LOGDIR=/var/consoles
-.br
 shell:|::&:
-.br
 #
-.br
-# This opens a connection to port 2003 of ts1...
-.br
+# These open connections to ports 2003 and 2004 of ts1...
 tribe:!ts1:2003:&:
-.br
 reptile:!ts1:2004:&:
-.br
+#
+# This opens /dev/ttyh0 if running on extra.cc.purdue.edu;
+# otherwise, clients are redirected to that host.
 mentor:/dev/ttyh0@extra.cc.purdue.edu:2400e:&:
-.br
 %%
-.br
+#
 # access restrictions
-.br
+# (note that the "badhost.cc.purdue.edu" entry must appear
+# before the "cc.purdue.edu" entry if connections from
+# "badhost" are to be rejected, since only the first match
+# is used)
+#
 trusted: console.cc.purdue.edu 128.210.7.90
-.br
+refuse: badhost.cc.purdue.edu
 allow: cc.purdue.edu stat.cc.purdue.edu
 .SH "SEE ALSO"
-console(1), conserver(8)
+.BR console (1),
+.BR conserver.passwd (5),
+.BR conserver (8)

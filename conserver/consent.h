@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.19 2001-06-28 11:14:30-07 bryan Exp $
+ *  $Id: consent.h,v 5.22 2001-07-23 00:28:00-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -40,55 +40,56 @@
 
 /* stuff to keep track of a console entry
  */
-typedef struct baud {		/* a baud rate table			*/
-	char acrate[8];
-	int irate;
+typedef struct baud {		/* a baud rate table                    */
+    char acrate[8];
+    int irate;
 } BAUD;
 
-typedef struct parity {		/* a parity bits table			*/
-	char ckey;
-	int iset;
-	int iclr;
+typedef struct parity {		/* a parity bits table                  */
+    char ckey;
+    int iset;
+    int iclr;
 } PARITY;
 
-#define MAXSERVLEN	32	/* max length of server name		*/
-#define MAXDEVLEN	512	/* max length of /dev/ttyax		*/
-#define MAXLOGLEN	1024	/* max length of /usr/adm/consoles/foo	*/
-#define MAXTTYLINE	(133*2)	/* max length of a single buf'd line	*/
-#define ALARMTIME	60	/* time between chimes			*/
+#define MAXSERVLEN	32	/* max length of server name            */
+#define MAXDEVLEN	512	/* max length of /dev/ttyax             */
+#define MAXLOGLEN	1024	/* max length of /usr/adm/consoles/foo  */
+#define MAXTTYLINE	(133*2)	/* max length of a single buf'd line    */
+#define ALARMTIME	60	/* time between chimes                  */
 
-typedef struct consent {	/* console information			*/
-	char server[MAXSERVLEN];/* server name				*/
-	char dfile[MAXDEVLEN];	/* device file				*/
-	char lfile[MAXLOGLEN];	/* log file				*/
-	BAUD *pbaud;		/* the baud on this console port	*/
-	PARITY *pparity;	/* the parity on this line		*/
-	int mark;		/* Mark (chime) interval		*/
-	long nextMark;		/* Next mark (chime) time		*/
+typedef struct consent {	/* console information                  */
+    char server[MAXSERVLEN];	/* server name                          */
+    char dfile[MAXDEVLEN];	/* device file                          */
+    char lfile[MAXLOGLEN];	/* log file                             */
+    BAUD *pbaud;		/* the baud on this console port        */
+    PARITY *pparity;		/* the parity on this line              */
+    int mark;			/* Mark (chime) interval                */
+    long nextMark;		/* Next mark (chime) time               */
 
- 	/* Used if network console */
- 	int isNetworkConsole;
-	char networkConsoleHost[MAXSERVLEN];
-	int networkConsolePort;
+    /* Used if network console */
+    int isNetworkConsole;
+    char networkConsoleHost[MAXSERVLEN];
+    int networkConsolePort;
+    int telnetState;
 
-	/* used if virtual console */
-	char acslave[MAXDEVLEN];/* pseudo-device slave side		*/
-	int fvirtual;		/* is a pty device we use as a console	*/
-	char *pccmd;		/* virtual console command		*/
-	int ipid;		/* pid of virtual command		*/
+    /* used if virtual console */
+    char acslave[MAXDEVLEN];	/* pseudo-device slave side             */
+    int fvirtual;		/* is a pty device we use as a console  */
+    char *pccmd;		/* virtual console command              */
+    int ipid;			/* pid of virtual command               */
 
-	/* only used in child */
-	int nolog;		/* don't log output			*/
-	int fdlog;		/* the local log file			*/
-	int fdtty;		/* the port to talk to machine on	*/
-	int activitylog;	/* log attach/detach/bump		*/
-	short int fup;		/* we setup this line?			*/
-	short int fronly;	/* we can only read this console	*/
-	short int iend;		/* like icursor in CONSCLIENT		*/
-	short int inamelen;	/* strlen(server)			*/
-	struct client *pCLon;	/* clients on this console		*/
-	struct client *pCLwr;	/* client that is writting on console	*/
-	char acline[132*2+2];	/* max chars we will call a line	*/
+    /* only used in child */
+    int nolog;			/* don't log output                     */
+    CONSFILE *fdlog;		/* the local log file                   */
+    int fdtty;			/* the port to talk to machine on       */
+    int activitylog;		/* log attach/detach/bump               */
+    short int fup;		/* we setup this line?                  */
+    short int fronly;		/* we can only read this console        */
+    short int iend;		/* like icursor in CONSCLIENT           */
+    short int inamelen;		/* strlen(server)                       */
+    struct client *pCLon;	/* clients on this console              */
+    struct client *pCLwr;	/* client that is writting on console   */
+    char acline[132 * 2 + 2];	/* max chars we will call a line        */
 } CONSENT;
 
 extern PARITY *FindParity();
@@ -97,8 +98,8 @@ extern void ConsInit();
 extern void ConsDown();
 
 struct hostcache {
-	char hostname[MAXSERVLEN];
-	struct hostcache *next;
+    char hostname[MAXSERVLEN];
+    struct hostcache *next;
 };
 
 extern int CheckHostCache();

@@ -1,0 +1,65 @@
+.\" $Id: conserver.passwd.man,v 1.2 2001-07-22 11:48:29-07 bryan Exp $
+.TH CONSERVER.PASSWD 5 "Local"
+.SH NAME
+conserver.passwd \- user access information for conserver(8)
+.SH SYNOPSIS
+.br
+\fIusername\fB:\fIpassword\fB:\fIconsoles\fR
+.SH DESCRIPTION
+The \fBconserver.passwd\fP file
+is the user authentication and authorization file for
+.BR conserver (8).
+Upon each incoming client connection,
+\fBconserver\fP opens and reads the \fBconserver.passwd\fP file,
+so edits to the file take effect immediately.
+It reads only until the first \fIusername\fP match.
+.PP
+Each line consists of three colon-separated fields,
+as follows:
+.TP
+.I username
+the login name of the authorized user,
+or the string ``\fB*any*\fP'' to match any user.
+This is compared against the name sent by the \fBconsole\fP client,
+based either on the user's identity or on the \fB\-l\fP option.
+Since \fBconserver\fP only uses the first \fIusername\fP match,
+an ``\fB*any*\fP'' entry will apply to any user
+without an entry earlier in the file.
+.TP
+.I password
+the encrypted password,
+or the string ``\fB*passwd*\fP''
+to indicate that \fBconserver\fP should look up the user's password
+in the system \fBpasswd\fP (or \fBshadow\fP) database.
+If this field is empty, password checking is bypassed for this user.
+.TP
+.I consoles
+a comma- and/or space-separated list of consoles
+to which the user is permitted to connect,
+or the string ``\fBany\fP'' to allow access to any console.
+These names must match the console names in the \fBconserver.cf\fP file.
+.SH EXAMPLE
+.TP 30
+\fBmary:r71mXjfALB5Ak:any\fP
+Mary may connect to any console if her password matches;
+it does not matter whether she has a login on the conserver host.
+.TP
+\fBfred:*passwd*:foo.example.com,bar.example.com\fP
+Fred may connect only to the listed consoles,
+and only with his regular login password on the conserver host.
+.TP
+\fBbozo:*:\fP
+Bozo is not allowed access to any consoles.
+.TP
+\fB*any*:*passwd*:any\fP
+Anyone not listed above may access any console
+if they have a regular login and know the password.
+.SH "SEE ALSO"
+.BR console (1),
+.BR conserver.cf (5),
+.BR conserver (8)
+.SH BUGS
+.PP
+There is currently no way provided by the conserver package
+to generate the encrypted password strings
+besides copying them from the system \fBpasswd\fP database.

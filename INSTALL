@@ -1,15 +1,41 @@
 				INSTALL
 				=======
 
+Upgrading?
+
+    Whenever you upgrade I suggest you upgrade both the client and
+    server.  Most times, however, you can get away without upgrading
+    the client (it's usually a fairly static piece of code).  I'll
+    document any dependencies here, but check the CHANGES file for any
+    new features added to the client if you're considering *not*
+    upgrading.
+
+    Version 7.1.0
+
+	- The client/server protocol has changed.  You *MUST* use a
+	  7.1.0 client with a 7.1.0 and above server.  A 7.1.0 client
+	  is *not* backward compatible with a pre-7.1.0 server.
+
+	- Some of the flags in the client (-d, -D, and -r) and server
+	  (-n) have been given new identities to make the client and
+	  server flags more uniform.
+
+	- The conserver.passwd file now uses the first username match
+	  to determine access rights - if you have multiple instances
+	  of a username in an existing password file, they must be
+	  combined into one to continue to work.
+
+
 Quickie Instructions
 
-	- Download conserver (http://www.conserver.com/) and unpack
+    - Download conserver (http://www.conserver.com/) and unpack
 
-	- Run './configure'
+    - Run './configure'
 
-	- If all is well, run 'make install'
+    - If all is well, run 'make install'
 
-	- Now set up config files, etc. (see below)
+    - Now set up config files, etc. (see below)
+
 
 Detailed Instructions
 
@@ -19,13 +45,14 @@ Detailed Instructions
       unique options:
 
 	--with-port=PORT        Specify port number [conserver]
+	--with-base=PORT        Base port for secondary channel [0]
 	--with-master=MASTER    Specify master server hostname [console]
-	--with-cffile=CFFILE    Specify config filename [conserver.cf] 
-	--with-pwdfile=PWDFILE  Specify password filename [conserver.passwd] 
+	--with-cffile=CFFILE    Specify config filename [conserver.cf]
+	--with-pwdfile=PWDFILE  Specify password filename [conserver.passwd]
+	--with-logfile=LOGFILE  Specify log filename [/var/log/conserver]
 	--with-pidfile=PIDFILE  Specify PID filepath [/var/run/conserver.pid]
-	--with-maxmemb=MAXMEMB  Specify maximum consoles per process [8]
+	--with-maxmemb=MAXMEMB  Specify maximum consoles per process [16]
 	--with-maxgrp=MAXGRP    Specify maximum number of processes [32]
-	--disable-8bit          Disable 8bit data path 
 	--with-timeout=TIMEOUT  Specify connect() timeout in seconds [10]
 
       Not surprisingly, some match the old conserver/cons.h items...here
@@ -85,5 +112,5 @@ Detailed Instructions
     - That's it!  Just start up the console server and enjoy!
 
 #
-#  $Id: INSTALL,v 1.11 2001-07-05 02:46:01-07 bryan Exp $
+#  $Id: INSTALL,v 1.17 2001-07-25 17:33:29-07 bryan Exp $
 #

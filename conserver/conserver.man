@@ -1,57 +1,139 @@
 .\" @(#)conserver.8 01/06/91 OSU CIS; Thomas A. Fine
-.\" $Id: conserver.man,v 1.11 2001-07-05 05:09:50-07 bryan Exp $
+.\" $Id: conserver.man,v 1.15 2001-07-26 10:23:52-07 bryan Exp $
 .TH CONSERVER 8 "Local"
 .SH NAME
 conserver \- console server daemon
 .SH SYNOPSIS
-.B conserver [\-\fBdDhinsvV\fP] [\-\fBa\fP \fItype\fP] [\-\fBM\fP \fIaddr\fP]
-.B [\-\fBp\fP \fIport\fP] [\-\fBC\fP \fIconfig\fP] [\-\fBP\fP \fIpasswd\fP]
-.B [\-\fBL\fP \fIlogfile\fP]
+\fBconserver\fP [\fB\-7dDhinuvV\fP] [\fB\-a\fP \fItype\fP]
+[\fB\-M\fP \fIaddr\fP] [\fB\-p\fP \fIport\fP] [\fB\-b\fP \fIport\fP]
+[\fB\-C\fP \fIconfig\fP] [\fB\-P\fP \fIpasswd\fP]
+[\fB\-L\fP \fIlogfile\fP]
 .SH DESCRIPTION
 .B Conserver
-is the daemon for the
-.IR console (1)
-program.
-It provides remote access to the server consoles,
-and logs all console data.
-Slave hosts which have no current connection might produce important
-error messages; these unloved errors are labeled with a machine name
-and output on stdout.
+is the daemon that manages
+remote access to system consoles by multiple users via the
+.BR console (1)
+client program
+and logs all console output.
+It can connect to consoles via local serial ports
+or terminal servers that allow network access,
+or to any external program.
 .PP
-When started, it forks a child for each group in /etc/conserver.cf and
-assigns each process a port number to listen on.  The \fIconsole\fP
-client program communicates with the master console server to find
-the host and port the child is listening on.
+When started,
+.B conserver
+reads its
+.BR conserver.cf (5)
+file for details of each console it should manage,
+including serial port or network parameters and logging options.
+(Also, in environments where multiple servers share a cf file,
+any server is able to refer clients to the particular server
+managing a requested console,
+so that the client need not have knowledge of the
+distribution of consoles among servers.)
+.B Conserver
+forks a child for each group of consoles it must manage
+and assigns each process a port number to listen on.
+(The maximum number of consoles managed by each child process,
+as well as the maximum number of children created, is set at compile time.)
+The
+.BR console (1)
+client program communicates with the master console server process to find
+the port (and host, in a multi-server configuration)
+on which the appropriate child is listening.
+The master conserver process forks a new process to handle each
+incoming client connection.
+.B Conserver
+restricts connections from clients based on the host access section of its
+.BR conserver.cf (5)
+and authenticates users against its
+.BR conserver.passwd (5)
+file.
 .PP
 .B Conserver
 completely controls any connection to a controlled host.
-All handling of escape sequenes is done by the server,
-except the suspend sequence which is
-sent as an out-of-band command to the client.
+All escape sequences given by the user to \fBconsole\fP
+are passed to the server without interpretation.
+The server recognizes and processes all escape sequences,
+except the suspend sequence, which is
+recognized by the server and
+sent as a TCP out-of-band command from the server to the client.
 .PP
 The \fBconserver\fP parent process will automatically respawn any child
-process that dies.  If the parent process receives a SIGTERM, it will
-propagate the signal to its children, shutting everything down.  The
-parent will also propagate the SIGHUP and SIGUSR1 signals.  A SIGHUP
-will cause all the console logfiles to be closed and
-then reopened (no reread of the configuration file is done).  A SIGUSR1
-will cause the server to try and connect to any consoles marked as
+process that dies.  The following signals are propagated by the parent
+process to its children.
+.TP
+SIGTERM
+close all connections and exit.
+.TP
+SIGHUP
+close and reopen all console logfiles
+and, if in daemon mode (\fB\-d\fP option),
+the error logfile (see the \fB\-L\fP option).
+(No reread of the configuration file is done.)
+.TP
+SIGUSR1
+try to connect to any consoles marked as
 down.  This can come in handy if you had a terminal server (or more)
 that wasn't accepting connections at startup and you want
-\fBconserver\fP to try and reconnect to all those downed ports.
+\fBconserver\fP to try to reconnect to all those downed ports.
+.PP
+Slave hosts which have no current
+.BR console (1)
+connection might produce important error messages.
+With the \fB\-u\fP option, these unloved errors are labeled with a machine name
+and output on stdout (or, in daemon mode, to the logfile).
+This allows a live operator or an automated log scanner
+to find otherwise unseen errors by watching in a single location.
+.PP
+\fBConserver\fP must be run as root if it is to bind to a port under 1024
+or if it must read a shadow passwd file for authentication (see
+.BR conserver.passwd (5)).
+Otherwise, it may be run by any user, with \fB\-p\fP used to specify
+a port above 1024.
 .SH OPTIONS
+.PP
+Options may be given as separate arguments (e.g., \fB\-n -d\fP)
+or clustered (e.g., \fB\-nd\fP).
+Options and their arguments may be separated by optional white space.
+Option arguments containing spaces or other characters special to the shell
+must be quoted.
 .TP
-.B \-a
-Set the default access type.
+.B \-7
+Strip the high bit off of all data received,
+whether from the \fBconsole\fP client or from the console device,
+before any processing occurs.
+.TP
+.BI \-a type
+Set the default access type for incoming connections from
+\fBconsole\fP clients:
+.RB ` r '
+for refused (the default),
+.RB ` a '
+for allowed, or
+.RB ` t '
+for trusted.
+This applies to hosts for which no matching entry is found in
+the access section of
+.BR conserver.cf (5).
+.TP
+.BI \-b port
+Set the base port for children to listen on.
+Each child starts looking for free ports at \fIport\fP
+and working upward, trying a maximum number of ports
+equal to twice the maximum number of groups.
+If no free ports are available in that range,
+\fBconserver\fP exits.
+By default, \fBconserver\fP lets the operating system choose
+a free port.
 .TP
 .BI \-C config
-This option points the server at a different configuration file.
-The default \fIconfig\fP is set at compile time using the
---with-cffile option.
+Read configuration information from the file \fIconfig\fP.
+The default \fIconfig\fP may be changed at compile time using the
+\fB--with-cffile\fP option.
 .TP
 .B \-d
 Become a daemon.  Disconnects from the controlling terminal and sends
-all output to the logfile specified with \fB\-L\fP.
+all output to the logfile (see \fB\-L\fP).
 .TP
 .B \-D
 Enable debugging output, sent to stderr.
@@ -60,41 +142,75 @@ Enable debugging output, sent to stderr.
 Output a brief help message.
 .TP
 .B \-i
-Initiate console connections on demand (and close them when not used)
+Initiate console connections on demand (and close them when not used).
 .TP
 .BI \-L logfile
-This option points the server at a different logfile path.  The default
-\fIlogfile\fP is set at compile time using the --with-logfile option.
+Log errors and informational messages to \fIlogfile\fP
+after startup in daemon mode (\fB\-d\fP).
+This option does not apply when not running in daemon mode.
+The default \fIlogfile\fP may be changed at compile time using the
+\fB--with-logfile\fP option.
 .TP
 .BI \-M addr
 Set the address to listen on.  This allows conserver to bind to a
-particular ip address (like `localhost') instead of all interfaces.
+particular IP address (like `127.0.0.1') instead of all interfaces.
 The default is to bind to all addresses.
 .TP
 .B \-n
-The \fIconserver\fP will \fBnot\fP output unloved console output to
-stdout.
+Obsolete (now a no-op); see \fB\-u\fP.
 .TP
 .BI \-p port
-Set the port to listen on.  The default \fIport\fP is set at compile time
-using the --with-port option.
+Set the TCP port for the master process to listen on.
+This may be either a port number or a service name.
+The default \fIport\fP, ``conserver'' (typically 782),
+may be changed at compile time using the \fB--with-port\fP option.
 .TP
 .BI \-P passwd
-This option points the server at a different password file.  The default
-\fIpasswd\fP is set at compile time using the --with-pwdfile option.
+Read the table of authorized user data from the file \fIpasswd\fP.
+The default \fIpasswd\fP may be changed at compile time using the
+\fB--with-pwdfile\fP option.
+.TP
+.B \-u
+Send unloved console output to \fBconserver\fP's stdout
+(which, in daemon mode, is redirected to the logfile).
+This applies to all consoles to which no user is attached,
+independent of whether logging of individual consoles is enabled
+via \fBconserver.cf\fP entries.
 .TP
 .B \-v
 Echo the configuration as it is being read (be verbose).
 .TP
 .B \-V
-Output the version of the console server (only) and exit.
+Output the version number and settings of the \fBconserver\fP
+program and then exit.
 .SH FILES
-.TS
-l l.
-/etc/conserver.cf	description of console terminal lines
-/etc/conserver.passwd	users allowed to access consoles
-\fIstdout\fP	unloved console errors
-.TE
+.PP
+The following default file locations may be overridden
+at compile time or by the command-line options described above.
+Run \fBconserver \-V\fP (with no other options) to see
+the defaults set at compile time.
+.PP
+.PD 0
+.TP 25
+.B /etc/conserver.cf
+description of console terminal lines and client host access levels;
+see
+.BR conserver.cf (5).
+.TP
+.B /etc/conserver.passwd
+users allowed to access consoles; see
+.BR conserver.passwd (5).
+.TP
+.B /var/run/conserver.pid
+the master conserver process ID
+.TP
+.B /var/log/conserver
+log of errors and informational messages
+.PD
+.PP
+Additionally, output from individual consoles may be logged
+to separate files specified in
+.BR conserver.cf (5).
 .SH AUTHORS
 Thomas A. Fine, Ohio State Computer Science
 .br
@@ -102,4 +218,6 @@ Kevin S Braunsdorf, Purdue University Computing Center
 .br
 Bryan Stansell, conserver.com
 .SH "SEE ALSO"
-console(1), conserver.cf(5)
+.BR console (1),
+.BR conserver.cf (5),
+.BR conserver.passwd (5)

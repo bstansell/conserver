@@ -1,6 +1,57 @@
 				CHANGES
 				=======
 
+version 7.1.0 (Jul 26, 2001):
+	- Hostname in access list that began with a digit was treated as
+	  an IP address - only strings using [0-9./] are considered CIDR
+	  notation and they must be of the form a.b.c.d[/n]
+	- Fixed SIGHUP always opening logfile(-L) - shouldn't without -d
+	- Fixed 'make install' problem under MacOS X and cygwin
+	- Client -l option totally broken in 7.0.3 - patch by Daniel E.
+	  Singer <des@cs.duke.edu>
+	- Client now accepts IP addresses from server and server now sends
+	  the IP of the socket instead of its hostname to the client,
+	  fixing part of the multi-interface problem
+	- Client no longer passes hostname to server along with username
+	- Client now turns off IEXTEN so stuff like ^V passes through
+	- Server now pauses one second when reopening a TCP-based console
+	  to give the terminal server a chance to clean up
+	- Master server process now fork()s when accepting clients
+	- timestamp-spec can be numeric only ('m' default)
+	- Ambiguous console name error now shows ambiguous list
+	- Console list in conserver.passwd can now have whitespace
+	- Access lists in conserver.cf can now use ',' as a separator
+	- Added special '*any*' username in conserver.passwd
+	- Username match (real or '*any*') now stops conserver.passwd file
+	  processing - allowing you to lock out users
+	- Added -u flag to server to enable "unloved" output - this is the
+	  opposite of the old -n flag, which now does nothing
+	- Added -7 flag to client and server for stripping the high bit
+	  of data on either side (--disable-8bit removed)
+	- Added -b to server to specify the base port number for the
+	  secondary communication channel - based on code from Enrik
+	  Berkhan <Enrik.Berkhan@planb.de>
+	- Changed -d and -D flags to -r and -R in client - now -D enables
+	  debugging mode in the client (and -d is unused)
+	- Changed -r to -G in client so -r could be used for the above
+	- Client now uses getpassphrase() (if available) for > 8 char
+	  passwords - pointed out by Gregory Bond <gnb@itga.com.au>
+	- Improved signal handling
+	- Improved process handling (POSIX waitpid() now necessary)
+	- Significant rework of STREAMS-based pseudo-tty code
+	- TCP connections ('!' config syntax) now have some Telnet protocol
+	  knowledge, removing the "noise" seen when conneting to a terminal
+	  server - reported by Todd Stansell <todd@stansell.org>
+	- Various code and message "pretty-printing" done
+	- Client and server both run in Windows (tested with Windows
+	  2000) under the cygwin environment thanks to a debug-fest with
+	  Emmett Hogan <hogan@gnac.com>
+	- Using autoconf version 2.50
+	- Man pages reworked and conserver.passwd page created by Dave
+	  Stuit <djs@gnac.com> - the pain he suffered documenting
+	  the program (and pointing out many of the bugs fixed above)
+	  should help endless others
+
 version 7.0.3 (Jul 5, 2001):
 	- "Off by 1" bug in 7.0.2 line-oriented timestamp code fixed (extra
 	  chars in logfile) reported by Matthew Cheek <cheek@mars-systems.com>
@@ -8,9 +59,10 @@ version 7.0.3 (Jul 5, 2001):
 	- 'attached', 'detached', and 'bumped' actions now written to
 	  console logs that have 'a' in timestamp-spec field
 	- Default timestamp specification with TIMESTAMP= in .cf file
-	- config file much more forgiving about whitespace in fields
+	- Config file much more forgiving about whitespace in fields
 	- gethostbyaddr() failures are no longer fatal
-	- Added -M for server to specify the address to listen on
+	- Added -M to server to specify the address to listen on
+	  based on code from Enrik Berkhan <Enrik.Berkhan@planb.de>
 	- Added -p option to client and server to specify the port to
 	  connect to and listen on (--with-port still sets the default)
 	- Added logfile output when going into daemon mode
@@ -154,5 +206,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.32 2001-07-05 08:09:30-07 bryan Exp $
+#  $Id: CHANGES,v 1.41 2001-07-26 16:42:26-07 bryan Exp $
 #

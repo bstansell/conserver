@@ -31,8 +31,6 @@ ALL = autologin
 
 all: $(ALL)
 
-.PHONY: clean distclean install
-
 autologin: $(AUTOLOGIN_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o autologin $(AUTOLOGIN_OBJS) $(LIBS)
 
@@ -49,3 +47,4 @@ install:
 	$(MKDIR) $(DESTDIR)$(bindir)
 	$(INSTALL_PROGRAM) autologin $(DESTDIR)$(bindir)
 
+.PHONY: clean distclean install

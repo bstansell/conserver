@@ -7,10 +7,8 @@ PATH=/usr/bin:/usr/local/bin
 
 case "$1" in
 	'start')
-		LF=/var/log/conserver.log
 		echo "Starting console server daemon"
-		[ -f $LF ] && mv $LF $LF.old
-		conserver -n -d > $LF 2>&1
+		conserver -d
 		;;
 
 	'stop')

@@ -9,6 +9,16 @@ Bryan Stansell
 
 ---------------------------------------------------------------------------
 
+- conserver.passwd parsing needs improvement
+    - shouldn't use strtok() (bryan::any == bryan:any)
+    - empty passwords not allowed
+
+- Telnet protocol should be improved
+    - Not even RFC 854 compliant
+    - Data sent to terminal server not encapsulated
+    - Option negotiation ignored - should we negotiate anything?
+    - Others?
+
 - reread of conserver.cf - totally difficult
     - non-dynamic memory allocation
     - no IPC for coordinated updates
@@ -49,14 +59,10 @@ Bryan Stansell
 
 - "not" or "except" in passwd file (!console).
 
-- master redirect for same host - big mess
-    - redirect for console goes to `hostname`
-    - should probably go to ip of connection
-    - addresses not allowed - has to be hostname (resolvable by client)
-    - can you say: gack!
-
 - multi-homed/multi-ip hosts not supported well
     - other names/ip addrs not detected as local, necessarily
+    - acls don't look at aliases properly
+    - the whole thing needs some serious help
 
 - cyclades ts1000/2000 port : "Moses, Joel" <jmoses@deloitte.com>
 
@@ -65,10 +71,6 @@ Bryan Stansell
     - kill --with-maxgrp
 
 - config file for client (list of masters, for example)
-
-- patches from Enrik Berkhan <Enrik.Berkhan@planb.de>
-    - bind address
-    - base port for children
 
 - strftime() idea for logfile names : Lars Kellogg-Stedman <lars@larsshack.org>
 
@@ -87,5 +89,5 @@ Bryan Stansell
     - bios support
 
 #
-#  $Id: TODO,v 1.7 2001-07-05 07:37:34-07 bryan Exp $
+#  $Id: TODO,v 1.11 2001-07-25 17:36:21-07 bryan Exp $
 #
