@@ -1,6 +1,15 @@
 				CHANGES
 				=======
 
+version 8.1.9 (Jul 14, 2004):
+	- fixed bug processing access lists when duplicates exist in the
+	  list - reported by Phil Dibowitz <phil@usc.edu>
+	- fixed bug where 'idletimeout' was not recognized in default
+	  blocks - reported by John Cagle <jcagle@gmail.com>
+	- added an 'autocomplete' config option to set the console name
+	  autocompletion behavior - suggested by John Stoffel
+	  <stoffel@lucent.com>
+
 version 8.1.8 (Jun 9, 2004):
 	- added 'initspinmax' and 'initspintimer' console options to
 	  help calm console initialization "spinning"
@@ -760,5 +769,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.189 2004/06/09 22:25:50 bryan Exp $
+#  $Id: CHANGES,v 1.192 2004/07/14 18:08:28 bryan Exp $
 #

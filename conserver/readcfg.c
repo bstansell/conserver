@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.178 2004/06/01 23:45:47 bryan Exp $
+ *  $Id: readcfg.c,v 5.180 2004/07/14 05:28:42 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -1782,8 +1782,8 @@ ProcessIdletimeout(c, id)
     /* if it wasn't a number or a qualifier wasn't at the end */
     if (*p != '\000') {
 	if (isMaster)
-	    Error("invalid idletime specification `%s' [%s:%d]", id, file,
-		  line);
+	    Error("invalid idletimeout specification `%s' [%s:%d]", id,
+		  file, line);
 	return;
     }
     c->idletimeout = (time_t)atoi(id) * (factor == 0 ? 1 : factor);
@@ -3843,10 +3843,11 @@ AccessProcessACL(trust, acl)
 		strcasecmp((*ppa)->pcwho, pa->pcwho) == 0) {
 		/* already exists, so skip it */
 		DestroyAccessList(pa);
-		return;
+		break;
 	    }
 	}
-	*ppa = pa;		/* add to end of list */
+	if (*ppa == (ACCESS *)0)
+	    *ppa = pa;		/* add to end of list */
     }
 }
 
@@ -3982,6 +3983,8 @@ ConfigEnd()
 	    }
 	    if (parserConfigTemp->defaultaccess != '\000')
 		pConfig->defaultaccess = parserConfigTemp->defaultaccess;
+	    if (parserConfigTemp->autocomplete != FLAGUNKNOWN)
+		pConfig->autocomplete = parserConfigTemp->autocomplete;
 	    if (parserConfigTemp->daemonmode != FLAGUNKNOWN)
 		pConfig->daemonmode = parserConfigTemp->daemonmode;
 	    if (parserConfigTemp->redirect != FLAGUNKNOWN)
@@ -4092,6 +4095,18 @@ ProcessYesNo(id, flag)
     else if (strcasecmp("no", id) == 0 || strcasecmp("false", id) == 0 ||
 	     strcasecmp("off", id) == 0)
 	*flag = FLAGFALSE;
+}
+
+void
+#if PROTOTYPES
+ConfigItemAutocomplete(char *id)
+#else
+ConfigItemAutocomplete(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConfigItemAutocomplete(%s) [%s:%d]", id, file, line));
+    ProcessYesNo(id, &(parserConfigTemp->autocomplete));
 }
 
 void
@@ -4384,7 +4399,7 @@ ITEM keyDefault[] = {
 /*  {"flow", DefaultItemFlow}, */
     {"host", DefaultItemHost},
     {"idlestring", DefaultItemIdlestring},
-    {"idletime", DefaultItemIdletimeout},
+    {"idletimeout", DefaultItemIdletimeout},
     {"include", DefaultItemInclude},
     {"initcmd", DefaultItemInitcmd},
     {"initspinmax", DefaultItemInitspinmax},
@@ -4451,6 +4466,7 @@ ITEM keyAccess[] = {
 };
 
 ITEM keyConfig[] = {
+    {"autocomplete", ConfigItemAutocomplete},
     {"defaultaccess", ConfigItemDefaultaccess},
     {"daemonmode", ConfigItemDaemonmode},
     {"initdelay", ConfigItemInitdelay},
@@ -4649,6 +4665,14 @@ ReReadCfg(fd)
 	    config->redirect = defConfig.redirect;
 	else if (pConfig->redirect != config->redirect)
 	    config->redirect = pConfig->redirect;
+	/* gets used on-the-fly */
+    }
+
+    if (optConf->autocomplete == FLAGUNKNOWN) {
+	if (pConfig->autocomplete == FLAGUNKNOWN)
+	    config->autocomplete = defConfig.autocomplete;
+	else if (pConfig->autocomplete != config->autocomplete)
+	    config->autocomplete = pConfig->autocomplete;
 	/* gets used on-the-fly */
     }
 

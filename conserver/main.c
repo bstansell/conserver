@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.185 2004/05/25 23:03:01 bryan Exp $
+ *  $Id: main.c,v 5.186 2004/07/14 05:28:42 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -59,7 +59,8 @@ CONFIG *optConf = (CONFIG *)0;
 CONFIG *config = (CONFIG *)0;
 char *interface = (char *)0;
 CONFIG defConfig =
-    { (STRING *)0, 'r', FLAGFALSE, LOGFILEPATH, PASSWDFILE, DEFPORT,
+    { (STRING *)0, FLAGTRUE, 'r', FLAGFALSE, LOGFILEPATH, PASSWDFILE,
+    DEFPORT,
     FLAGTRUE, FLAGTRUE, 0, DEFBASEPORT, (char *)0, 0
 #if HAVE_SETPROCTITLE
 	, FLAGFALSE
@@ -1456,6 +1457,13 @@ main(argc, argv)
 	config->redirect = pConfig->redirect;
     else
 	config->redirect = defConfig.redirect;
+
+    if (optConf->autocomplete != FLAGUNKNOWN)
+	config->autocomplete = optConf->autocomplete;
+    else if (pConfig->autocomplete != FLAGUNKNOWN)
+	config->autocomplete = pConfig->autocomplete;
+    else
+	config->autocomplete = defConfig.autocomplete;
 
     if (optConf->loghostnames != FLAGUNKNOWN)
 	config->loghostnames = optConf->loghostnames;

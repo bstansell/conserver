@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.127 2004/06/03 21:53:59 bryan Exp $
+ *  $Id: master.c,v 5.128 2004/07/14 05:28:42 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -292,7 +292,8 @@ CommandCall(pCL, args)
 	    pRCFound = pRC;
 	}
     }
-    if (found == 0) {		/* Then look for substring matches */
+    if (found == 0 && config->autocomplete == FLAGTRUE) {
+	/* Then look for substring matches */
 	NAMES *name = (NAMES *)0;
 	int foundOne = 0;
 	for (pGE = pGroups; pGE != (GRPENT *)0; pGE = pGE->pGEnext) {

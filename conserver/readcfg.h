@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.h,v 5.40 2004/05/25 23:03:01 bryan Exp $
+ *  $Id: readcfg.h,v 5.41 2004/07/14 05:28:42 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -10,6 +10,7 @@
 
 typedef struct config {
     STRING *name;
+    FLAG autocomplete;
     char defaultaccess;
     FLAG daemonmode;
     char *logfile;

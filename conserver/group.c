@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.304 2004/06/03 21:53:42 bryan Exp $
+ *  $Id: group.c,v 5.305 2004/07/14 05:28:42 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -2938,7 +2938,8 @@ DoClientRead(pGE, pCLServing)
 			    if (n != (NAMES *)0)
 				break;
 			}
-			if (pCEwant == (CONSENT *)0) {
+			if (pCEwant == (CONSENT *)0 &&
+			    config->autocomplete == FLAGTRUE) {
 			    NAMES *n = (NAMES *)0;
 			    int len = strlen(pcArgs);
 			    for (pCE = pGE->pCElist; pCE != (CONSENT *)0;

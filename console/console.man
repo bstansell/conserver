@@ -1,5 +1,5 @@
-.\" $Id: console.man,v 1.54 2004/05/28 00:02:16 bryan Exp $
-.TH CONSOLE 1 "2004/05/28" "conserver-8.1.8" "conserver"
+.\" $Id: console.man,v 1.55 2004/07/14 05:28:42 bryan Exp $
+.TH CONSOLE 1 "2004/07/14" "conserver-8.1.9" "conserver"
 .SH NAME
 console \- console server client program
 .SH SYNOPSIS
@@ -61,7 +61,8 @@ In the first form above,
 asks the user's password before
 granting interactive access to a console (on a non-trusted system),
 since such a session may provide single-user access.
-Only as much of the console name as is required to
+If the server's autocompletion feature is enabled,
+only as much of the console name as is required to
 identify it uniquely to the server is required.
 .PP
 For non-interactive options,
