@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.126 2004/05/06 02:09:07 bryan Exp $
+ *  $Id: master.c,v 5.127 2004/06/03 21:53:59 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -686,7 +686,9 @@ Master()
     static STRING *portPath = (STRING *)0;
 #else
     struct sockaddr_in master_port;
+# if HAVE_SETSOCKOPT
     int true = 1;
+# endif
 #endif
     FILE *fp;
     CONSCLIENT *pCLServing = (CONSCLIENT *)0;

@@ -1,5 +1,5 @@
-.\" $Id: conserver.cf.man,v 1.65 2004/05/27 23:39:06 bryan Exp $
-.TH CONSERVER.CF 5 "2004/05/27" "conserver-8.1.7" "conserver"
+.\" $Id: conserver.cf.man,v 1.67 2004/06/01 23:45:48 bryan Exp $
+.TH CONSERVER.CF 5 "2004/06/01" "conserver-8.1.8" "conserver"
 .SH NAME
 conserver.cf \- console configuration file for
 .BR conserver (8)
@@ -191,7 +191,7 @@ Define a break sequence where 0 <
 .I n
 < 10.
 Break sequences are accessed via the
-.RI ``^El n ''
+.RI ``^Ecl n ''
 client escape sequence.
 .RS
 .TP
@@ -588,6 +588,45 @@ The
 is passed as an argument to ``/bin/sh -ce''.
 If the null string (``\f3""\fP'') is used, the command is unset and
 nothing is invoked.
+.TP
+\f3initspinmax\fP \f2n\fP|\f3""\fP
+.br
+Set the maximum number of ``spins'' allowed for the console to
+.IR n ,
+where 0 <=
+.I n
+<= 254.
+A console is determined to be ``spinning'' if an attempt to initialize
+the console occurs in under
+.B initspintimer
+seconds from it's previous initialization and this quick
+initialization occurs
+.B initspinmax
+times in a row.
+If, at any point, the time between initializations is greater than
+.BR initspintimer ,
+the counter for reaching
+.B initspinmax
+resets to zero.
+When a console is determined to be ``spinning'' it is forced down.
+If the null string (``\f3""\fP'') is specified, the default of
+.B 5
+is used.
+.TP
+\f3initspintimer\fP \f2t\fP|\f3""\fP
+.br
+Set the number of seconds a console must be ``up'' to not be
+considered ``spinning'' to
+.IR t ,
+where 0 <=
+.I t
+<= 254.
+See
+.B initspinmax
+for a full description of console ``spinning.''
+If the null string (``\f3""\fP'') is specified, the default of
+.B 1
+is used.
 .TP
 \f3initsubst\fP \f2c\fP\f3=\fP\f2t\fP[\f2n\fP]\f2f\fP[\f3,\fP...]|\f3""\fP
 .br

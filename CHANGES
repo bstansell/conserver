@@ -1,6 +1,12 @@
 				CHANGES
 				=======
 
+version 8.1.8 (Jun 9, 2004):
+	- added 'initspinmax' and 'initspintimer' console options to
+	  help calm console initialization "spinning"
+	- fixed setsockopt() error on 64bit solaris - reported by Trond
+	  Hagen <trond@basefarm.no>
+
 version 8.1.7 (May 28, 2004):
 	- cleaned up the manpages a bit to make things clearer and more
 	  standard - reported by Dave Stuit <djs@tellme.com>
@@ -754,5 +760,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.186 2004/05/28 18:01:10 bryan Exp $
+#  $Id: CHANGES,v 1.189 2004/06/09 22:25:50 bryan Exp $
 #

@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.177 2004/05/27 23:40:36 bryan Exp $
+ *  $Id: readcfg.c,v 5.178 2004/06/01 23:45:47 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -641,6 +641,10 @@ ApplyDefault(d, c)
 	c->portinc = d->portinc;
     if (d->portbase != 0)
 	c->portbase = d->portbase;
+    if (d->spinmax != 0)
+	c->spinmax = d->spinmax;
+    if (d->spintimer != 0)
+	c->spintimer = d->spintimer;
     if (d->mark != 0)
 	c->mark = d->mark;
     if (d->nextMark != 0)
@@ -1614,6 +1618,102 @@ DefaultItemPortinc(id)
 {
     CONDDEBUG((1, "DefaultItemPortinc(%s) [%s:%d]", id, file, line));
     ProcessPortinc(parserDefaultTemp, id);
+}
+
+void
+#if PROTOTYPES
+ProcessInitspinmax(CONSENT *c, char *id)
+#else
+ProcessInitspinmax(c, id)
+    CONSENT *c;
+    char *id;
+#endif
+{
+    char *p;
+    int i;
+
+    if ((id == (char *)0) || (*id == '\000')) {
+	c->spinmax = 0;
+	return;
+    }
+    for (p = id; *p != '\000'; p++)
+	if (!isdigit((int)(*p)))
+	    break;
+    /* if it wasn't a number */
+    if (*p != '\000') {
+	if (isMaster)
+	    Error("invalid initspinmax number `%s' [%s:%d]", id, file,
+		  line);
+	return;
+    }
+    i = atoi(id);
+    if (i > 254) {
+	if (isMaster)
+	    Error("invalid initspinmax number `%s' [%s:%d]", id, file,
+		  line);
+	return;
+    }
+    c->spinmax = i + 1;
+}
+
+void
+#if PROTOTYPES
+DefaultItemInitspinmax(char *id)
+#else
+DefaultItemInitspinmax(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemInitspinmax(%s) [%s:%d]", id, file, line));
+    ProcessInitspinmax(parserDefaultTemp, id);
+}
+
+void
+#if PROTOTYPES
+ProcessInitspintimer(CONSENT *c, char *id)
+#else
+ProcessInitspintimer(c, id)
+    CONSENT *c;
+    char *id;
+#endif
+{
+    char *p;
+    int i;
+
+    if ((id == (char *)0) || (*id == '\000')) {
+	c->spintimer = 0;
+	return;
+    }
+    for (p = id; *p != '\000'; p++)
+	if (!isdigit((int)(*p)))
+	    break;
+    /* if it wasn't a number */
+    if (*p != '\000') {
+	if (isMaster)
+	    Error("invalid initspintimer number `%s' [%s:%d]", id, file,
+		  line);
+	return;
+    }
+    i = atoi(id);
+    if (i > 254) {
+	if (isMaster)
+	    Error("invalid initspintimer number `%s' [%s:%d]", id, file,
+		  line);
+	return;
+    }
+    c->spintimer = i + 1;
+}
+
+void
+#if PROTOTYPES
+DefaultItemInitspintimer(char *id)
+#else
+DefaultItemInitspintimer(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemInitspintimer(%s) [%s:%d]", id, file, line));
+    ProcessInitspintimer(parserDefaultTemp, id);
 }
 
 void
@@ -2598,6 +2698,8 @@ ConsoleAdd(c)
 	SwapStr(&pCEmatch->idlestring, &c->idlestring);
 	pCEmatch->portinc = c->portinc;
 	pCEmatch->portbase = c->portbase;
+	pCEmatch->spinmax = c->spinmax;
+	pCEmatch->spintimer = c->spintimer;
 	pCEmatch->activitylog = c->activitylog;
 	pCEmatch->breaklog = c->breaklog;
 	pCEmatch->raw = c->raw;
@@ -2680,6 +2782,18 @@ ConsoleDestroy()
 	/* default break number */
 	if (c->breakNum == 0)
 	    c->breakNum = 1;
+
+	/* initspin* values are +1, so adjust (since we don't
+	 * compare on a reread)
+	 */
+	if (c->spinmax == 0)
+	    c->spinmax = 5;
+	else
+	    c->spinmax--;
+	if (c->spintimer == 0)
+	    c->spintimer = 1;
+	else
+	    c->spintimer--;
 
 	/* portbase, portinc, and port values are +2, +1, +1, so a zero can
 	 * show that no value was given.  defaults: portbase=0, portinc=1
@@ -3232,6 +3346,30 @@ ConsoleItemPortinc(id)
 {
     CONDDEBUG((1, "ConsoleItemPortinc(%s) [%s:%d]", id, file, line));
     ProcessPortinc(parserConsoleTemp, id);
+}
+
+void
+#if PROTOTYPES
+ConsoleItemInitspinmax(char *id)
+#else
+ConsoleItemInitspinmax(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemInitspinmax(%s) [%s:%d]", id, file, line));
+    ProcessInitspinmax(parserConsoleTemp, id);
+}
+
+void
+#if PROTOTYPES
+ConsoleItemInitspintimer(char *id)
+#else
+ConsoleItemInitspintimer(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemInitspintimer(%s) [%s:%d]", id, file, line));
+    ProcessInitspintimer(parserConsoleTemp, id);
 }
 
 void
@@ -4098,7 +4236,7 @@ ConfigItemReinitcheck(id)
 	if (!isdigit((int)(*p)))
 	    break;
 
-    /* if it wasn't a number or the number was zero */
+    /* if it wasn't a number */
     if (*p != '\000') {
 	if (isMaster)
 	    Error("invalid reinitcheck value `%s' [%s:%d]", id, file,
@@ -4129,7 +4267,7 @@ ConfigItemInitdelay(id)
 	if (!isdigit((int)(*p)))
 	    break;
 
-    /* if it wasn't a number or the number was zero */
+    /* if it wasn't a number */
     if (*p != '\000') {
 	if (isMaster)
 	    Error("invalid initdelay value `%s' [%s:%d]", id, file, line);
@@ -4249,6 +4387,8 @@ ITEM keyDefault[] = {
     {"idletime", DefaultItemIdletimeout},
     {"include", DefaultItemInclude},
     {"initcmd", DefaultItemInitcmd},
+    {"initspinmax", DefaultItemInitspinmax},
+    {"initspintimer", DefaultItemInitspintimer},
     {"initsubst", DefaultItemInitsubst},
     {"logfile", DefaultItemLogfile},
     {"logfilemax", DefaultItemLogfilemax},
@@ -4281,6 +4421,8 @@ ITEM keyConsole[] = {
     {"idletimeout", ConsoleItemIdletimeout},
     {"include", ConsoleItemInclude},
     {"initcmd", ConsoleItemInitcmd},
+    {"initspinmax", ConsoleItemInitspinmax},
+    {"initspintimer", ConsoleItemInitspintimer},
     {"initsubst", ConsoleItemInitsubst},
     {"logfile", ConsoleItemLogfile},
     {"logfilemax", ConsoleItemLogfilemax},

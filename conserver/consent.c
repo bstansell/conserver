@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.138 2004/04/16 16:58:09 bryan Exp $
+ *  $Id: consent.c,v 5.140 2004/06/03 21:53:59 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -678,6 +678,40 @@ ConsInit(pCE)
     extern int FallBack PARAMS((char **, int *));
     int cofile = -1;
     int ret;
+#if HAVE_GETTIMEOFDAY
+    struct timeval tv;
+#else
+    time_t tv;
+#endif
+
+    if (pCE->spintimer > 0 && pCE->spinmax > 0) {
+#if HAVE_GETTIMEOFDAY
+	if (gettimeofday(&tv, (void *)0) == 0) {
+	    /* less than pCE->spintimer seconds gone by? */
+	    if ((tv.tv_sec <= pCE->lastInit.tv_sec + pCE->spintimer - 1)
+		|| (tv.tv_sec == pCE->lastInit.tv_sec + 1 &&
+		    tv.tv_usec <= pCE->lastInit.tv_usec)) {
+#else
+	if ((tv = time((time_t *)0)) != (time_t)-1) {
+	    /* less than pCE->spintimer seconds gone by? (approx) */
+	    if (tv <= pCE->lastInit + pCE->spintimer) {
+#endif
+		pCE->spincount++;
+		if (pCE->spincount >= pCE->spinmax) {
+		    pCE->spincount = 0;
+		    pCE->lastInit = tv;
+		    Error
+			("[%s] initialization rate exceeded: forcing down",
+			 pCE->server);
+		    ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+		    return;
+		}
+	    } else
+		pCE->spincount = 0;
+	    pCE->lastInit = tv;
+	} else
+	    pCE->spincount = 0;
+    }
 
     /* clean up old stuff
      */
@@ -734,7 +768,9 @@ ConsInit(pCE)
 	    {
 		struct sockaddr_in port;
 		struct hostent *hp;
-		size_t one = 1;
+#if HAVE_SETSOCKOPT
+		int one = 1;
+#endif
 
 		usleep(100000);	/* Not all terminal servers can keep up */
 
@@ -767,6 +803,7 @@ ConsInit(pCE)
 		    ConsDown(pCE, FLAGTRUE, FLAGTRUE);
 		    return;
 		}
+#if HAVE_SETSOCKOPT
 		if (setsockopt
 		    (cofile, SOL_SOCKET, SO_KEEPALIVE, (char *)&one,
 		     sizeof(one)) < 0) {
@@ -776,6 +813,7 @@ ConsInit(pCE)
 		    ConsDown(pCE, FLAGTRUE, FLAGTRUE);
 		    return;
 		}
+#endif
 
 		if (!SetFlags(cofile, O_NONBLOCK, 0)) {
 		    ConsDown(pCE, FLAGTRUE, FLAGTRUE);
@@ -897,6 +935,13 @@ ConsInit(pCE)
 	    Msg("[%s] console initializing", pCE->server);
 	pCE->downHard = FLAGFALSE;
     }
+#if HAVE_GETTIMEOFDAY
+    if (gettimeofday(&tv, (void *)0) == 0)
+	pCE->lastInit = tv;
+#else
+    if ((tv = time((time_t *)0)) != (time_t)-1)
+	pCE->lastInit = tv;
+#endif
 
     if (pCE->ioState == ISNORMAL)
 	StartInit(pCE);

@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.302 2004/05/27 23:40:35 bryan Exp $
+ *  $Id: group.c,v 5.304 2004/06/03 21:53:42 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -4346,6 +4346,13 @@ Kiddie(pGE, sfd)
 			}
 			pCEServing->ioState = ISNORMAL;
 			pCEServing->lastWrite = time((time_t *)0);
+#if HAVE_GETTIMEOFDAY
+			if (gettimeofday(&tv, (void *)0) == 0)
+			    pCEServing->lastInit = tv;
+#else
+			if ((tv = time((time_t *)0)) != (time_t)-1)
+			    pCEServing->lastInit = tv;
+#endif
 			/* waiting for a connect(), we watch the write bit,
 			 * so switch around and now watch for the read and
 			 * start gathering data
@@ -4627,7 +4634,9 @@ Spawn(pGE)
     static STRING *portPath = (STRING *)0;
 #else
     socklen_t so;
+# if HAVE_SETSOCKOPT
     int true = 1;
+# endif
     unsigned short portInc = 0;
     struct sockaddr_in lstn_port;
 #endif

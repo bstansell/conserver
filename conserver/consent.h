@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.57 2004/05/21 04:38:02 bryan Exp $
+ *  $Id: consent.h,v 5.58 2004/06/01 23:45:47 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -110,6 +110,8 @@ typedef struct consent {	/* console information                  */
     char *motd;			/* motd                                 */
     time_t idletimeout;		/* idle timeout                         */
     char *idlestring;		/* string to print when idle            */
+    unsigned short spinmax;	/* initialization spin maximum          */
+    unsigned short spintimer;	/* initialization spin timer            */
     /* timestamp stuff */
     int mark;			/* Mark (chime) interval                */
     long nextMark;		/* Next mark (chime) time               */
@@ -135,6 +137,12 @@ typedef struct consent {	/* console information                  */
     IOSTATE ioState;		/* state of the socket                  */
     time_t stateTimer;		/* timer for ioState states             */
     time_t lastWrite;		/* time of last data sent to console    */
+#if HAVE_GETTIMEOFDAY
+    struct timeval lastInit;	/* time of last initialization          */
+#else
+    time_t lastInit;		/* time of last initialization          */
+#endif
+    unsigned short spincount;	/* initialization spin counter          */
 
     /*** state information ***/
     char acline[132 * 2 + 2];	/* max chars we will call a line        */
