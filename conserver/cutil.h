@@ -1,5 +1,5 @@
 /*
- *  $Id: cutil.h,v 1.57 2003/11/28 00:47:29 bryan Exp $
+ *  $Id: cutil.h,v 1.60 2004/01/18 13:05:43 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -18,9 +18,10 @@
 
 /* communication constants
  */
+#define OB_IAC		0xff	/* quote char                   */
 #define OB_EXEC		'E'	/* exec a command on the client */
 #define OB_SUSP		'Z'	/* suspended by server          */
-#define OB_DROP		'.'	/* dropped by server            */
+#define OB_ABRT		'.'	/* abort                        */
 
 /* Struct to wrap information about a "file"...
  * This can be a socket, local file, whatever.  We do this so
@@ -68,6 +69,11 @@ typedef struct consFile {
     int fd;
     int fdout;			/* only used when a simplePipe */
     STRING *wbuf;
+    FLAG quoteiac;
+    FLAG sawiac;
+    FLAG sawiacsusp;
+    FLAG sawiacexec;
+    FLAG sawiacabrt;
 #if HAVE_OPENSSL
     /* SSL stuff */
     SSL *ssl;
@@ -75,6 +81,10 @@ typedef struct consFile {
     FLAG waitForRead;
 #endif
     /* Add crypto stuff to suit */
+#if DEBUG_CONSFILE_IO
+    int debugrfd;
+    int debugwfd;
+#endif
 } CONSFILE;
 
 extern int isMultiProc, fDebug, fVerbose, fErrorPrinted;
@@ -128,6 +138,10 @@ extern STRING *AllocString PARAMS((void));
 extern char *ReadLine PARAMS((FILE *, STRING *, int *));
 extern enum consFileType FileGetType PARAMS((CONSFILE *));
 extern void FileSetType PARAMS((CONSFILE *, enum consFileType));
+extern void FileSetQuoteIAC PARAMS((CONSFILE *, FLAG));
+extern FLAG FileSawQuoteSusp PARAMS((CONSFILE *));
+extern FLAG FileSawQuoteExec PARAMS((CONSFILE *));
+extern FLAG FileSawQuoteAbrt PARAMS((CONSFILE *));
 extern void Bye PARAMS((int));
 extern void DestroyDataStructures PARAMS((void));
 extern int IsMe PARAMS((char *));
@@ -137,6 +151,9 @@ extern int FileCanWrite PARAMS((CONSFILE *, fd_set *, fd_set *));
 extern int FileBufEmpty PARAMS((CONSFILE *));
 extern int SetFlags PARAMS((int, int, int));
 extern char *StrDup PARAMS((char *));
+extern int ParseIACBuf PARAMS((CONSFILE *, void *, int *));
+extern void *MemMove PARAMS((void *, void *, size_t));
+extern char *StringChar PARAMS((STRING *, int, char));
 #if HAVE_OPENSSL
 extern SSL *FileGetSSL PARAMS((CONSFILE *));
 extern void FileSetSSL PARAMS((CONSFILE *, SSL *));

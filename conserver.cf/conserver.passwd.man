@@ -1,5 +1,5 @@
-.\" $Id: conserver.passwd.man,v 1.9 2003/07/04 20:20:52 bryan Exp $
-.TH CONSERVER.PASSWD 5 "2003/07/04" "conserver-8.0.9" "conserver"
+.\" $Id: conserver.passwd.man,v 1.10 2004/01/08 16:12:33 bryan Exp $
+.TH CONSERVER.PASSWD 5 "2004/01/08" "conserver-8.1.0" "conserver"
 .SH NAME
 conserver.passwd \- user access information for
 .BR conserver (8)
@@ -59,7 +59,8 @@ in the system
 If PAM support has been enabled
 .RB ( --with-pam ),
 PAM lookups will be done instead of
-.BR passwd " (or " shadow ") lookups."
+.BR passwd " (or " shadow ") lookups"
+(you may need to edit /etc/pam.conf or create /etc/pam.d/conserver).
 If this field is empty, password checking is bypassed for this user.
 .SH EXAMPLE
 .TP 24

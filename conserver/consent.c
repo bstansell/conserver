@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.133 2003/12/10 18:33:47 bryan Exp $
+ *  $Id: consent.c,v 5.134 2003/12/20 06:11:53 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -691,7 +691,7 @@ ConsInit(pCE)
     TagLogfile(pCE, "Console up");
 
     switch (pCE->type) {
-	case UNKNOWN:		/* shut up gcc */
+	case UNKNOWNTYPE:	/* shut up gcc */
 	    break;
 	case EXEC:
 	    if ((cofile =
@@ -826,7 +826,7 @@ ConsInit(pCE)
     }
 
     switch (pCE->type) {
-	case UNKNOWN:		/* shut up gcc */
+	case UNKNOWNTYPE:	/* shut up gcc */
 	    break;
 	case EXEC:
 	    Verbose("[%s] pid %lu on %s", pCE->server, pCE->ipid,
@@ -857,9 +857,9 @@ ConsInit(pCE)
     if (pCE->ioState == ISNORMAL) {
 	pCE->lastWrite = tyme;
 	if (pCE->idletimeout != (time_t)0 &&
-	    (timers[T_IDLE] == (time_t)0 ||
-	     timers[T_IDLE] > pCE->lastWrite + pCE->idletimeout))
-	    timers[T_IDLE] = pCE->lastWrite + pCE->idletimeout;
+	    (timers[T_CIDLE] == (time_t)0 ||
+	     timers[T_CIDLE] > pCE->lastWrite + pCE->idletimeout))
+	    timers[T_CIDLE] = pCE->lastWrite + pCE->idletimeout;
     }
 
     /* If we have marks, adjust the next one so that it's in the future */

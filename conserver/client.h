@@ -1,5 +1,5 @@
 /*
- *  $Id: client.h,v 5.35 2003/11/28 15:55:34 bryan Exp $
+ *  $Id: client.h,v 5.36 2003/12/25 19:22:00 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -47,7 +47,8 @@ typedef enum clientState {
     S_PASSWD,			/* still needs a passwd to connect         */
     S_QUOTE,			/* send any character we can spell         */
     S_BCAST,			/* send a broadcast message to all clients */
-    S_CWAIT			/* wait for client                         */
+    S_CWAIT,			/* wait for client                         */
+    S_CEXEC			/* client execing a program                */
 } CLIENTSTATE;
 
 typedef struct client {		/* Connection Information:              */

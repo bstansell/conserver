@@ -1,5 +1,5 @@
 /*
- *  $Id: cutil.c,v 1.109 2003/12/02 16:21:43 bryan Exp $
+ *  $Id: cutil.c,v 1.113 2004/01/18 13:05:43 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -238,6 +238,35 @@ BuildStringN(str, n, msg)
     return msg->string;
 }
 
+void *
+#if PROTOTYPES
+MemMove(void *dest, void *src, size_t n)
+#else
+MemMove(void *dest, void *src, size_t n)
+    void *dest;
+    void *src;
+    size_t n;
+#endif
+{
+#if HAVE_MEMMOVE
+    return memmove(dest, src, n);
+#else
+    char *s = src;
+    char *d = dest;
+
+    if (s < d) {
+	/* Moving from low mem to hi mem; start at end.  */
+	for (s += n, d += n; n > 0; --n)
+	    *--d = *--s;
+    } else if (s != d) {
+	/* Moving from hi mem to low mem; start at beginning.  */
+	for (; n > 0; --n)
+	    *d++ = *s++;
+    }
+    return dest;
+#endif
+}
+
 char *
 #if PROTOTYPES
 ShiftString(STRING *msg, int n)
@@ -250,17 +279,8 @@ ShiftString(msg, n)
     if (msg == (STRING *)0 || n <= 0 || n > msg->used - 1)
 	return (char *)0;
 
-#if HAVE_MEMMOVE
-    memmove(msg->string, msg->string + n, msg->used - n);
-#else
-    {
-	char *s, *e;
-	int len;
-	for (s = msg->string, e = s + n, len = msg->used - n; len > 0;
-	     len--)
-	    *s++ = *e++;
-    }
-#endif
+    MemMove(msg->string, msg->string + n, msg->used - n);
+
     msg->used -= n;
     return msg->string;
 }
@@ -730,6 +750,27 @@ FileOpenFD(fd, type)
     cfp->ssl = (SSL *)0;
     cfp->waitForRead = cfp->waitForWrite = FLAGFALSE;
 #endif
+#if DEBUG_CONSFILE_IO
+    {
+	char buf[1024];
+	sprintf(buf, "CONSFILE-%s-%lu-%d.w", progname,
+		(unsigned long)thepid, fd);
+	if ((cfp->debugwfd =
+	     open(buf, O_WRONLY | O_CREAT | O_APPEND, 0644)) != -1) {
+	    sprintf(buf, "[---- STARTED - %s ----]\n",
+		    StrTime((time_t *)0));
+	    write(cfp->debugwfd, buf, strlen(buf));
+	}
+	sprintf(buf, "CONSFILE-%s-%lu-%d.r", progname,
+		(unsigned long)thepid, fd);
+	if ((cfp->debugrfd =
+	     open(buf, O_WRONLY | O_CREAT | O_APPEND, 0644)) != -1) {
+	    sprintf(buf, "[---- STARTED - %s ----]\n",
+		    StrTime((time_t *)0));
+	    write(cfp->debugrfd, buf, strlen(buf));
+	}
+    }
+#endif
 
     CONDDEBUG((2, "FileOpenFD(): encapsulated fd %d type %d", fd, type));
     return cfp;
@@ -759,6 +800,27 @@ FileOpenPipe(fd, fdout)
 #if HAVE_OPENSSL
     cfp->ssl = (SSL *)0;
     cfp->waitForRead = cfp->waitForWrite = FLAGFALSE;
+#endif
+#if DEBUG_CONSFILE_IO
+    {
+	char buf[1024];
+	sprintf(buf, "CONSFILE-%s-%lu-%d.w", progname,
+		(unsigned long)thepid, fdout);
+	if ((cfp->debugwfd =
+	     open(buf, O_WRONLY | O_CREAT | O_APPEND, 0644)) != -1) {
+	    sprintf(buf, "[---- STARTED - %s ----]\n",
+		    StrTime((time_t *)0));
+	    write(cfp->debugwfd, buf, strlen(buf));
+	}
+	sprintf(buf, "CONSFILE-%s-%lu-%d.r", progname,
+		(unsigned long)thepid, fd);
+	if ((cfp->debugrfd =
+	     open(buf, O_WRONLY | O_CREAT | O_APPEND, 0644)) != -1) {
+	    sprintf(buf, "[---- STARTED - %s ----]\n",
+		    StrTime((time_t *)0));
+	    write(cfp->debugrfd, buf, strlen(buf));
+	}
+    }
 #endif
 
     CONDDEBUG((2, "FileOpenPipe(): encapsulated pipe pair fd %d and fd %d",
@@ -798,6 +860,12 @@ FileUnopen(cfp)
     }
     CONDDEBUG((2, "FileUnopen(): unopened fd %d", cfp->fd));
     DestroyString(cfp->wbuf);
+#if DEBUG_CONSFILE_IO
+    if (cfp->debugwfd != -1)
+	close(cfp->debugwfd);
+    if (cfp->debugrfd != -1)
+	close(cfp->debugrfd);
+#endif
     free(cfp);
 
     return retval;
@@ -832,6 +900,27 @@ FileOpen(path, flag, mode)
 #if HAVE_OPENSSL
     cfp->ssl = (SSL *)0;
     cfp->waitForRead = cfp->waitForWrite = FLAGFALSE;
+#endif
+#if DEBUG_CONSFILE_IO
+    {
+	char buf[1024];
+	sprintf(buf, "CONSFILE-%s-%lu-%d.w", progname,
+		(unsigned long)thepid, fd);
+	if ((cfp->debugwfd =
+	     open(buf, O_WRONLY | O_CREAT | O_APPEND, 0644)) != -1) {
+	    sprintf(buf, "[---- STARTED - %s ----]\n",
+		    StrTime((time_t *)0));
+	    write(cfp->debugwfd, buf, strlen(buf));
+	}
+	sprintf(buf, "CONSFILE-%s-%lu-%d.r", progname,
+		(unsigned long)thepid, fd);
+	if ((cfp->debugrfd =
+	     open(buf, O_WRONLY | O_CREAT | O_APPEND, 0644)) != -1) {
+	    sprintf(buf, "[---- STARTED - %s ----]\n",
+		    StrTime((time_t *)0));
+	    write(cfp->debugrfd, buf, strlen(buf));
+	}
+    }
 #endif
 
     CONDDEBUG((2, "FileOpen(): opened `%s' as fd %d", path, fd));
@@ -928,6 +1017,12 @@ FileClose(pcfp)
 	CONDDEBUG((2, "FileClose(): closed fd %d", cfp->fd));
     }
     DestroyString(cfp->wbuf);
+#if DEBUG_CONSFILE_IO
+    if (cfp->debugwfd != -1)
+	close(cfp->debugwfd);
+    if (cfp->debugrfd != -1)
+	close(cfp->debugrfd);
+#endif
     free(cfp);
     *pcfp = (CONSFILE *)0;
 
@@ -969,6 +1064,10 @@ FileRead(cfp, buf, len)
 		    retval = -1;
 		    break;
 		}
+#if DEBUG_CONSFILE_IO
+		if (cfp->debugrfd != -1)
+		    write(cfp->debugrfd, buf, retval);
+#endif
 	    }
 	    break;
 #if HAVE_OPENSSL
@@ -1007,6 +1106,10 @@ FileRead(cfp, buf, len)
 		    cfp->ftype = simpleSocket;
 		    break;
 	    }
+#if DEBUG_CONSFILE_IO
+	    if (cfp->debugrfd != -1)
+		write(cfp->debugrfd, buf, retval);
+#endif
 	    break;
 #endif
 	default:
@@ -1080,9 +1183,23 @@ FileWrite(cfp, bufferonly, buf, len)
 		       tmpString->string, fdout));
 	}
     }
+
     /* save the data */
-    if (len > 0 && buf != (char *)0)
-	BuildStringN(buf, len, cfp->wbuf);
+    if (len > 0 && buf != (char *)0) {
+	if (cfp->quoteiac == FLAGTRUE) {
+	    int l, o;
+	    for (o = l = 0; l < len; l++) {
+		if (buf[l] == (char)OB_IAC) {
+		    BuildStringN(buf + o, l + 1 - o, cfp->wbuf);
+		    BuildStringChar((char)OB_IAC, cfp->wbuf);
+		    o = l + 1;
+		}
+	    }
+	    if (o < len)
+		BuildStringN(buf + o, len - o, cfp->wbuf);
+	} else
+	    BuildStringN(buf, len, cfp->wbuf);
+    }
 
     if (bufferonly == FLAGTRUE)
 	return 0;
@@ -1132,6 +1249,10 @@ FileWrite(cfp, bufferonly, buf, len)
 			  strerror(errno));
 		    break;
 		}
+#if DEBUG_CONSFILE_IO
+		if (cfp->debugwfd != -1)
+		    write(cfp->debugwfd, buf, retval);
+#endif
 		buf += retval;
 		len -= retval;
 		len_out += retval;
@@ -1176,6 +1297,10 @@ FileWrite(cfp, bufferonly, buf, len)
 		}
 		if (retval <= 0)
 		    break;
+#if DEBUG_CONSFILE_IO
+		if (cfp->debugwfd != -1)
+		    write(cfp->debugwfd, buf, retval);
+#endif
 		buf += retval;
 		len -= retval;
 		len_out += retval;
@@ -1757,6 +1882,58 @@ FileSetType(cfp, type)
     cfp->ftype = type;
 }
 
+/* Sets the file quoting method */
+void
+#if PROTOTYPES
+FileSetQuoteIAC(CONSFILE *cfp, FLAG flag)
+#else
+FileSetQuoteIAC(cfp, flag)
+    CONSFILE *cfp;
+    FLAG flag;
+#endif
+{
+    cfp->quoteiac = flag;
+}
+
+FLAG
+#if PROTOTYPES
+FileSawQuoteSusp(CONSFILE *cfp)
+#else
+FileSawQuoteSusp(cfp)
+    CONSFILE *cfp;
+#endif
+{
+    FLAG r = cfp->sawiacsusp;
+    cfp->sawiacsusp = FLAGFALSE;
+    return r;
+}
+
+FLAG
+#if PROTOTYPES
+FileSawQuoteExec(CONSFILE *cfp)
+#else
+FileSawQuoteExec(cfp)
+    CONSFILE *cfp;
+#endif
+{
+    FLAG r = cfp->sawiacexec;
+    cfp->sawiacexec = FLAGFALSE;
+    return r;
+}
+
+FLAG
+#if PROTOTYPES
+FileSawQuoteAbrt(CONSFILE *cfp)
+#else
+FileSawQuoteAbrt(cfp)
+    CONSFILE *cfp;
+#endif
+{
+    FLAG r = cfp->sawiacabrt;
+    cfp->sawiacabrt = FLAGFALSE;
+    return r;
+}
+
 #if HAVE_OPENSSL
 /* Get the SSL instance */
 SSL *
@@ -2087,4 +2264,107 @@ StrDup(msg)
     bcopy(msg, buf, len);
 #endif
     return buf;
+}
+
+char *
+#if PROTOTYPES
+StringChar(STRING *msg, int offset, char c)
+#else
+StringChar(msg, offset, c)
+    STRING *msg;
+    int offset;
+    char c;
+#endif
+{
+    int o;
+
+    if (msg == (STRING *)0 || msg->used <= 1 || offset < 0 ||
+	offset > msg->used)
+	return (char *)0;
+
+    for (o = offset; o != msg->used; o++) {
+	if (msg->string[o] == c)
+	    return &(msg->string[o]);
+    }
+    return (char *)0;
+}
+
+/* this takes a buffer, and returns the number of characters to use,
+ * which goes up to the first OB_IAC character sequence (that isn't
+ * OB_IAC/OB_IAC).  if it is an OB_IAC sequence, it sets the flag and
+ * returns zero.  if it's invalid args, we return -1.
+ * so <0 == no data, 0 == check flags, >0 number of chars to use
+ * this *WILL* modify the buffer (OB_IAC sequences get extracted/shrunk)
+ */
+int
+#if PROTOTYPES
+ParseIACBuf(CONSFILE *cfp, void *msg, int *len)
+#else
+ParseIACBuf(cfp, msg, len)
+    CONSFILE *cfp;
+    void *msg;
+    int *len;
+#endif
+{
+    int l = 0;
+    unsigned char *b = msg;
+
+    if (*len <= 0)
+	return -1;
+
+    if (cfp->quoteiac != FLAGTRUE)
+	return *len;
+
+    /* split OB_IAC/char pair OR OB_IAC at start */
+    if (cfp->sawiac == FLAGTRUE || b[0] == OB_IAC) {
+	int i = 1;
+
+	if (cfp->sawiac == FLAGTRUE) {
+	    i = 0;
+	    cfp->sawiac = FLAGFALSE;
+	}
+	if (i == *len) {	/* only thing is OB_IAC */
+	    cfp->sawiac = FLAGTRUE;
+	    return -1;
+	}
+
+	if (b[i] == OB_SUSP)
+	    cfp->sawiacsusp = FLAGTRUE;
+	else if (b[i] == OB_EXEC)
+	    cfp->sawiacexec = FLAGTRUE;
+	else if (b[i] == OB_ABRT)
+	    cfp->sawiacabrt = FLAGTRUE;
+	else {
+	    if (b[i] != OB_IAC)
+		Error
+		    ("ParseIACBuf(): fd %d: unrecognized quoted-OB_IAC char",
+		     cfp->fd, strerror(errno));
+	    l = 1;
+	}
+	*len = *len - i - 1 + l;
+	MemMove(b, b + i + 1 - l, *len);
+	if (l == 0)
+	    return 0;
+    }
+    for (; l < *len; l++) {
+	if (b[l] == OB_IAC) {
+	    if (l + 1 == *len)
+		return l;
+	    else if (b[l + 1] == OB_SUSP)
+		return l;
+	    else if (b[l + 1] == OB_EXEC)
+		return l;
+	    else if (b[l + 1] == OB_ABRT)
+		return l;
+	    else {
+		if (b[l + 1] != OB_IAC)
+		    Error
+			("ParseIACBuf(): fd %d: unrecognized quoted-OB_IAC char",
+			 cfp->fd, strerror(errno));
+		--(*len);
+		MemMove(b + l, b + l + 1, *len - l);
+	    }
+	}
+    }
+    return l;
 }

@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.172 2003/11/20 13:56:39 bryan Exp $
+ *  $Id: main.c,v 5.174 2003/12/21 16:23:02 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -883,13 +883,13 @@ DumpDataStructures()
 			       "DumpDataStructures():  server=%s, type=HOST",
 			       EMPTYSTR(pCE->server)));
 		    CONDDEBUG((1,
-			       "DumpDataStructures():  host=%s, port=%hu, telnetState=%d",
-			       EMPTYSTR(pCE->host), pCE->port,
+			       "DumpDataStructures():  host=%s, raw=%hu, port=%hu, telnetState=%d",
+			       EMPTYSTR(pCE->host), pCE->raw, pCE->port,
 			       pCE->telnetState));
 		    break;
-		case UNKNOWN:
+		case UNKNOWNTYPE:
 		    CONDDEBUG((1,
-			       "DumpDataStructures():  server=%s, type=UNKNOWN",
+			       "DumpDataStructures():  server=%s, type=UNKNOWNTYPE",
 			       EMPTYSTR(pCE->server)));
 		    break;
 	    }

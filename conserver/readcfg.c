@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.160 2003/12/01 02:15:18 bryan Exp $
+ *  $Id: readcfg.c,v 5.162 2003/12/21 16:23:02 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -653,7 +653,7 @@ ApplyDefault(d, c)
     CONSENT *c;
 #endif
 {
-    if (d->type != UNKNOWN)
+    if (d->type != UNKNOWNTYPE)
 	c->type = d->type;
     if (d->breakNum != 0)
 	c->breakNum = d->breakNum;
@@ -1686,6 +1686,41 @@ DefaultItemPortinc(id)
 
 void
 #if PROTOTYPES
+ProcessProtocol(CONSENT *c, char *id)
+#else
+ProcessProtocol(c, id)
+    CONSENT *c;
+    char *id;
+#endif
+{
+    c->raw = 0;
+    if ((id == (char *)0) || (*id == '\000'))
+	return;
+
+    if (strcmp(id, "telnet") == 0)
+	return;
+    if (strcmp(id, "raw") == 0) {
+	c->raw = 1;
+	return;
+    }
+    if (isMaster)
+	Error("invalid protocol name `%s' [%s:%d]", id, file, line);
+}
+
+void
+#if PROTOTYPES
+DefaultItemProtocol(char *id)
+#else
+DefaultItemProtocol(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemProtocol(%s) [%s:%d]", id, file, line));
+    ProcessProtocol(parserDefaultTemp, id);
+}
+
+void
+#if PROTOTYPES
 ProcessIdletimeout(CONSENT *c, char *id)
 #else
 ProcessIdletimeout(c, id)
@@ -1953,7 +1988,7 @@ ProcessType(c, id)
     char *id;
 #endif
 {
-    CONSTYPE t = UNKNOWN;
+    CONSTYPE t = UNKNOWNTYPE;
     if ((id == (char *)0) || (*id == '\000')) {
 	c->type = t;
 	return;
@@ -1964,7 +1999,7 @@ ProcessType(c, id)
 	t = EXEC;
     else if (strcasecmp("host", id) == 0)
 	t = HOST;
-    if (t == UNKNOWN) {
+    if (t == UNKNOWNTYPE) {
 	if (isMaster)
 	    Error("invalid console type `%s' [%s:%d]", id, file, line);
     } else
@@ -2119,7 +2154,7 @@ ConsoleEnd()
 		invalid = 1;
 	    }
 	    break;
-	case UNKNOWN:
+	case UNKNOWNTYPE:
 	    if (isMaster)
 		Error("[%s] console type unknown [%s:%d]",
 		      parserConsoleTemp->server, file, line);
@@ -2697,16 +2732,17 @@ ConsoleAdd(c)
 		    closeMatch = 0;
 		}
 		break;
-	    case UNKNOWN:
+	    case UNKNOWNTYPE:
 		break;
 	}
 
 	/* and now the rest (minus the "runtime" members - see below) */
 	pCEmatch->idletimeout = c->idletimeout;
 	if (pCEmatch->idletimeout != (time_t)0 &&
-	    (timers[T_IDLE] == (time_t)0 ||
-	     timers[T_IDLE] > pCEmatch->lastWrite + pCEmatch->idletimeout))
-	    timers[T_IDLE] = pCEmatch->lastWrite + pCEmatch->idletimeout;
+	    (timers[T_CIDLE] == (time_t)0 ||
+	     timers[T_CIDLE] >
+	     pCEmatch->lastWrite + pCEmatch->idletimeout))
+	    timers[T_CIDLE] = pCEmatch->lastWrite + pCEmatch->idletimeout;
 
 	pCEmatch->logfilemax = c->logfilemax;
 	if (pCEmatch->logfilemax != (off_t) 0 &&
@@ -3276,6 +3312,18 @@ ConsoleItemPortinc(id)
 {
     CONDDEBUG((1, "ConsoleItemPortinc(%s) [%s:%d]", id, file, line));
     ProcessPortinc(parserConsoleTemp, id);
+}
+
+void
+#if PROTOTYPES
+ConsoleItemProtocol(char *id)
+#else
+ConsoleItemProtocol(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemProtocol(%s) [%s:%d]", id, file, line));
+    ProcessProtocol(parserConsoleTemp, id);
 }
 
 void
@@ -4263,6 +4311,7 @@ ITEM keyDefault[] = {
     {"port", DefaultItemPort},
     {"portbase", DefaultItemPortbase},
     {"portinc", DefaultItemPortinc},
+    {"protocol", DefaultItemProtocol},
     {"ro", DefaultItemRo},
     {"rw", DefaultItemRw},
     {"timestamp", DefaultItemTimestamp},
@@ -4293,6 +4342,7 @@ ITEM keyConsole[] = {
     {"port", ConsoleItemPort},
     {"portbase", ConsoleItemPortbase},
     {"portinc", ConsoleItemPortinc},
+    {"protocol", ConsoleItemProtocol},
     {"ro", ConsoleItemRo},
     {"rw", ConsoleItemRw},
     {"timestamp", ConsoleItemTimestamp},

@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.123 2003/11/20 13:56:39 bryan Exp $
+ *  $Id: master.c,v 5.124 2003/12/25 19:22:00 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -433,7 +433,7 @@ DoNormalRead(pCLServing)
 {
     char *pcCmd;
     char *pcArgs;
-    int nr, i;
+    int nr, i, l;
     unsigned char acIn[BUFSIZ];
 
     /* read connection */
@@ -442,208 +442,221 @@ DoNormalRead(pCLServing)
 	return;
     }
 
-    for (i = 0; i < nr; ++i) {
-	if ('\n' != acIn[i]) {
-	    BuildStringChar(acIn[i], pCLServing->accmd);
+    while ((l = ParseIACBuf(pCLServing->fd, acIn, &nr)) >= 0) {
+	if (l == 0)		/* we ignore special OB_IAC stuff */
 	    continue;
-	}
-	if ((pCLServing->accmd->used > 1) &&
-	    ('\r' ==
-	     pCLServing->accmd->string[pCLServing->accmd->used - 2])) {
-	    pCLServing->accmd->string[pCLServing->accmd->used - 2] =
-		'\000';
-	    pCLServing->accmd->used--;
-	}
+	for (i = 0; i < l; ++i) {
+	    if ('\n' != acIn[i]) {
+		BuildStringChar(acIn[i], pCLServing->accmd);
+		continue;
+	    }
+	    if ((pCLServing->accmd->used > 1) &&
+		('\r' ==
+		 pCLServing->accmd->string[pCLServing->accmd->used - 2])) {
+		pCLServing->accmd->string[pCLServing->accmd->used - 2] =
+		    '\000';
+		pCLServing->accmd->used--;
+	    }
 
-	/* process password here...before we corrupt accmd */
-	if (pCLServing->iState == S_PASSWD) {
-	    if (CheckPasswd(pCLServing, pCLServing->accmd->string) !=
-		AUTH_SUCCESS) {
-		FileWrite(pCLServing->fd, FLAGFALSE,
-			  "invalid password\r\n", -1);
+	    /* process password here...before we corrupt accmd */
+	    if (pCLServing->iState == S_PASSWD) {
+		if (CheckPasswd(pCLServing, pCLServing->accmd->string) !=
+		    AUTH_SUCCESS) {
+		    FileWrite(pCLServing->fd, FLAGFALSE,
+			      "invalid password\r\n", -1);
+		    BuildString((char *)0, pCLServing->accmd);
+		    DropMasterClient(pCLServing, FLAGFALSE);
+		    return;
+		}
+		Verbose("<master> login %s", pCLServing->acid->string);
+		FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", 4);
+		pCLServing->iState = S_NORMAL;
 		BuildString((char *)0, pCLServing->accmd);
-		DropMasterClient(pCLServing, FLAGFALSE);
-		return;
+		continue;
 	    }
-	    Verbose("<master> login %s", pCLServing->acid->string);
-	    FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", 4);
-	    pCLServing->iState = S_NORMAL;
-	    BuildString((char *)0, pCLServing->accmd);
-	    continue;
-	}
 
-	if ((char *)0 != (pcArgs = strchr(pCLServing->accmd->string, ':'))) {
-	    *pcArgs++ = '\000';
-	} else if ((char *)0 !=
-		   (pcArgs = strchr(pCLServing->accmd->string, ' '))) {
-	    *pcArgs++ = '\000';
-	}
-	if (pcArgs != (char *)0)
-	    pcArgs = PruneSpace(pcArgs);
-	pcCmd = PruneSpace(pCLServing->accmd->string);
-	if (strcmp(pcCmd, "help") == 0) {
-	    static char *apcHelp1[] = {
-		"exit   disconnect\r\n",
-		"help   this help message\r\n",
-		"login  log in\r\n",
-#if HAVE_OPENSSL
-		"ssl    start ssl session\r\n",
-#endif
-		(char *)0
-	    };
-	    static char *apcHelp2[] = {
-		"call      provide port for given console\r\n",
-		"exit      disconnect\r\n",
-		"groups    provide ports for group leaders\r\n",
-		"help      this help message\r\n",
-		"master    provide a list of master servers\r\n",
-		"pid       provide pid of master process\r\n",
-		"quit*     terminate conserver (SIGTERM)\r\n",
-		"restart*  restart conserver (SIGHUP)\r\n",
-		"version   provide version info for server\r\n",
-		"* = requires admin privileges\r\n",
-		(char *)0
-	    };
-	    char **ppc;
-	    for (ppc =
-		 (pCLServing->iState == S_IDENT ? apcHelp1 : apcHelp2);
-		 (char *)0 != *ppc; ++ppc) {
-		FileWrite(pCLServing->fd, FLAGTRUE, *ppc, -1);
+	    if ((char *)0 !=
+		(pcArgs = strchr(pCLServing->accmd->string, ':'))) {
+		*pcArgs++ = '\000';
+	    } else if ((char *)0 !=
+		       (pcArgs = strchr(pCLServing->accmd->string, ' '))) {
+		*pcArgs++ = '\000';
 	    }
-	    FileWrite(pCLServing->fd, FLAGFALSE, (char *)0, 0);
-	} else if (strcmp(pcCmd, "exit") == 0) {
-	    FileWrite(pCLServing->fd, FLAGFALSE, "goodbye\r\n", -1);
-	    DropMasterClient(pCLServing, FLAGFALSE);
-	    return;
+	    if (pcArgs != (char *)0)
+		pcArgs = PruneSpace(pcArgs);
+	    pcCmd = PruneSpace(pCLServing->accmd->string);
+	    if (strcmp(pcCmd, "help") == 0) {
+		static char *apcHelp1[] = {
+		    "exit   disconnect\r\n",
+		    "help   this help message\r\n",
+		    "login  log in\r\n",
 #if HAVE_OPENSSL
-	} else if (pCLServing->iState == S_IDENT &&
-		   strcmp(pcCmd, "ssl") == 0) {
-	    FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", -1);
-	    if (!AttemptSSL(pCLServing)) {
+		    "ssl    start ssl session\r\n",
+#endif
+		    (char *)0
+		};
+		static char *apcHelp2[] = {
+		    "call      provide port for given console\r\n",
+		    "exit      disconnect\r\n",
+		    "groups    provide ports for group leaders\r\n",
+		    "help      this help message\r\n",
+		    "master    provide a list of master servers\r\n",
+		    "pid       provide pid of master process\r\n",
+		    "quit*     terminate conserver (SIGTERM)\r\n",
+		    "restart*  restart conserver (SIGHUP)\r\n",
+		    "version   provide version info for server\r\n",
+		    "* = requires admin privileges\r\n",
+		    (char *)0
+		};
+		char **ppc;
+		for (ppc =
+		     (pCLServing->iState == S_IDENT ? apcHelp1 : apcHelp2);
+		     (char *)0 != *ppc; ++ppc) {
+		    FileWrite(pCLServing->fd, FLAGTRUE, *ppc, -1);
+		}
+		FileWrite(pCLServing->fd, FLAGFALSE, (char *)0, 0);
+	    } else if (strcmp(pcCmd, "exit") == 0) {
+		FileWrite(pCLServing->fd, FLAGFALSE, "goodbye\r\n", -1);
 		DropMasterClient(pCLServing, FLAGFALSE);
 		return;
-	    }
-#endif
-	} else if (pCLServing->iState == S_IDENT &&
-		   strcmp(pcCmd, "login") == 0) {
 #if HAVE_OPENSSL
-	    if (config->sslrequired == FLAGTRUE &&
-		FileGetType(pCLServing->fd) != SSLSocket) {
-		FileWrite(pCLServing->fd, FLAGFALSE,
-			  "encryption required\r\n", -1);
-	    } else {
+	    } else if (pCLServing->iState == S_IDENT &&
+		       strcmp(pcCmd, "ssl") == 0) {
+		FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", -1);
+		if (!AttemptSSL(pCLServing)) {
+		    DropMasterClient(pCLServing, FLAGFALSE);
+		    return;
+		}
 #endif
-		if (pcArgs == (char *)0) {
+	    } else if (pCLServing->iState == S_IDENT &&
+		       strcmp(pcCmd, "login") == 0) {
+#if HAVE_OPENSSL
+		if (config->sslrequired == FLAGTRUE &&
+		    FileGetType(pCLServing->fd) != SSLSocket) {
 		    FileWrite(pCLServing->fd, FLAGFALSE,
-			      "login requires argument\r\n", -1);
+			      "encryption required\r\n", -1);
 		} else {
-		    BuildString((char *)0, pCLServing->username);
-		    BuildString((char *)0, pCLServing->acid);
-		    BuildString(pcArgs, pCLServing->username);
-		    BuildString(pcArgs, pCLServing->acid);
-		    BuildStringChar('@', pCLServing->acid);
-		    BuildString(pCLServing->peername->string,
-				pCLServing->acid);
-		    if (pCLServing->caccess == 't' ||
-			CheckPasswd(pCLServing, "") == AUTH_SUCCESS) {
-			pCLServing->iState = S_NORMAL;
-			Verbose("<master> login %s",
-				pCLServing->acid->string);
-			FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", 4);
-		    } else {
-			FilePrint(pCLServing->fd, FLAGFALSE,
-				  "passwd? %s\r\n", myHostname);
-			pCLServing->iState = S_PASSWD;
-		    }
-		}
-#if HAVE_OPENSSL
-	    }
 #endif
-	} else if (pCLServing->iState == S_NORMAL &&
-		   strcmp(pcCmd, "master") == 0) {
-	    int iSep = 1;
-
-	    if ((GRPENT *)0 != pGroups) {
-		struct sockaddr_in lcl;
-		socklen_t so = sizeof(lcl);
-		if (-1 ==
-		    getsockname(FileFDNum(pCLServing->fd),
-				(struct sockaddr *)&lcl, &so)) {
-		    FileWrite(pCLServing->fd, FLAGFALSE,
-			      "getsockname failed, try again later\r\n",
-			      -1);
-		    Error("Master(): getsockname(%u): %s",
-			  FileFDNum(pCLServing->fd), strerror(errno));
-		    Bye(EX_OSERR);
+		    if (pcArgs == (char *)0) {
+			FileWrite(pCLServing->fd, FLAGFALSE,
+				  "login requires argument\r\n", -1);
+		    } else {
+			BuildString((char *)0, pCLServing->username);
+			BuildString((char *)0, pCLServing->acid);
+			BuildString(pcArgs, pCLServing->username);
+			BuildString(pcArgs, pCLServing->acid);
+			BuildStringChar('@', pCLServing->acid);
+			BuildString(pCLServing->peername->string,
+				    pCLServing->acid);
+			if (pCLServing->caccess == 't' ||
+			    CheckPasswd(pCLServing, "") == AUTH_SUCCESS) {
+			    pCLServing->iState = S_NORMAL;
+			    Verbose("<master> login %s",
+				    pCLServing->acid->string);
+			    FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n",
+				      4);
+			} else {
+			    FilePrint(pCLServing->fd, FLAGFALSE,
+				      "passwd? %s\r\n", myHostname);
+			    pCLServing->iState = S_PASSWD;
+			}
+		    }
+#if HAVE_OPENSSL
 		}
-		FilePrint(pCLServing->fd, FLAGTRUE, "@%s",
-			  inet_ntoa(lcl.sin_addr));
-		iSep = 0;
-	    }
-	    if (config->redirect == FLAGTRUE) {
-		REMOTE *pRC;
-		for (pRC = pRCUniq; (REMOTE *)0 != pRC; pRC = pRC->pRCuniq) {
-		    FilePrint(pCLServing->fd, FLAGTRUE, ":@%s" + iSep,
-			      pRC->rhost);
+#endif
+	    } else if (pCLServing->iState == S_NORMAL &&
+		       strcmp(pcCmd, "master") == 0) {
+		int iSep = 1;
+
+		if ((GRPENT *)0 != pGroups) {
+		    struct sockaddr_in lcl;
+		    socklen_t so = sizeof(lcl);
+		    if (-1 ==
+			getsockname(FileFDNum(pCLServing->fd),
+				    (struct sockaddr *)&lcl, &so)) {
+			FileWrite(pCLServing->fd, FLAGFALSE,
+				  "getsockname failed, try again later\r\n",
+				  -1);
+			Error("Master(): getsockname(%u): %s",
+			      FileFDNum(pCLServing->fd), strerror(errno));
+			Bye(EX_OSERR);
+		    }
+		    FilePrint(pCLServing->fd, FLAGTRUE, "@%s",
+			      inet_ntoa(lcl.sin_addr));
 		    iSep = 0;
 		}
-	    }
-	    FileWrite(pCLServing->fd, FLAGFALSE, "\r\n", -1);
-	} else if (pCLServing->iState == S_NORMAL &&
-		   strcmp(pcCmd, "pid") == 0) {
-	    FilePrint(pCLServing->fd, FLAGFALSE, "%lu\r\n",
-		      (unsigned long)thepid);
-	} else if (pCLServing->iState == S_NORMAL &&
-		   strcmp(pcCmd, "version") == 0) {
-	    FilePrint(pCLServing->fd, FLAGFALSE, "version `%s'\r\n",
-		      THIS_VERSION);
-	} else if (pCLServing->iState == S_NORMAL &&
-		   strcmp(pcCmd, "quit") == 0) {
-	    if (ConsentUserOk(pADList, pCLServing->username->string) == 1) {
-		Verbose("quit command by %s", pCLServing->acid->string);
-		FileWrite(pCLServing->fd, FLAGFALSE,
-			  "ok -- terminated\r\n", -1);
-		DropMasterClient(pCLServing, FLAGFALSE);
-		kill(thepid, SIGTERM);
-		return;
-	    } else
-		FileWrite(pCLServing->fd, FLAGFALSE,
-			  "unauthorized command\r\n", -1);
-	} else if (pCLServing->iState == S_NORMAL &&
-		   strcmp(pcCmd, "restart") == 0) {
-	    if (ConsentUserOk(pADList, pCLServing->username->string) == 1) {
-		FileWrite(pCLServing->fd, FLAGFALSE,
-			  "ok -- restarting\r\n", -1);
-		Verbose("restart command by %s", pCLServing->acid->string);
-		kill(thepid, SIGHUP);
-	    } else
-		FileWrite(pCLServing->fd, FLAGFALSE,
-			  "unauthorized command\r\n", -1);
-	} else if (pCLServing->iState == S_NORMAL &&
-		   strcmp(pcCmd, "groups") == 0) {
-	    int iSep = 1;
-	    GRPENT *pGE;
+		if (config->redirect == FLAGTRUE) {
+		    REMOTE *pRC;
+		    for (pRC = pRCUniq; (REMOTE *)0 != pRC;
+			 pRC = pRC->pRCuniq) {
+			FilePrint(pCLServing->fd, FLAGTRUE, ":@%s" + iSep,
+				  pRC->rhost);
+			iSep = 0;
+		    }
+		}
+		FileWrite(pCLServing->fd, FLAGFALSE, "\r\n", -1);
+	    } else if (pCLServing->iState == S_NORMAL &&
+		       strcmp(pcCmd, "pid") == 0) {
+		FilePrint(pCLServing->fd, FLAGFALSE, "%lu\r\n",
+			  (unsigned long)thepid);
+	    } else if (pCLServing->iState == S_NORMAL &&
+		       strcmp(pcCmd, "version") == 0) {
+		FilePrint(pCLServing->fd, FLAGFALSE, "version `%s'\r\n",
+			  THIS_VERSION);
+	    } else if (pCLServing->iState == S_NORMAL &&
+		       strcmp(pcCmd, "quit") == 0) {
+		if (ConsentUserOk(pADList, pCLServing->username->string) ==
+		    1) {
+		    Verbose("quit command by %s",
+			    pCLServing->acid->string);
+		    FileWrite(pCLServing->fd, FLAGFALSE,
+			      "ok -- terminated\r\n", -1);
+		    DropMasterClient(pCLServing, FLAGFALSE);
+		    kill(thepid, SIGTERM);
+		    return;
+		} else
+		    FileWrite(pCLServing->fd, FLAGFALSE,
+			      "unauthorized command\r\n", -1);
+	    } else if (pCLServing->iState == S_NORMAL &&
+		       strcmp(pcCmd, "restart") == 0) {
+		if (ConsentUserOk(pADList, pCLServing->username->string) ==
+		    1) {
+		    FileWrite(pCLServing->fd, FLAGFALSE,
+			      "ok -- restarting\r\n", -1);
+		    Verbose("restart command by %s",
+			    pCLServing->acid->string);
+		    kill(thepid, SIGHUP);
+		} else
+		    FileWrite(pCLServing->fd, FLAGFALSE,
+			      "unauthorized command\r\n", -1);
+	    } else if (pCLServing->iState == S_NORMAL &&
+		       strcmp(pcCmd, "groups") == 0) {
+		int iSep = 1;
+		GRPENT *pGE;
 
-	    for (pGE = pGroups; pGE != (GRPENT *)0; pGE = pGE->pGEnext) {
-		if (0 == pGE->imembers)
-		    continue;
-		FilePrint(pCLServing->fd, FLAGTRUE, ":%hu" + iSep,
-			  pGE->port);
-		iSep = 0;
+		for (pGE = pGroups; pGE != (GRPENT *)0; pGE = pGE->pGEnext) {
+		    if (0 == pGE->imembers)
+			continue;
+		    FilePrint(pCLServing->fd, FLAGTRUE, ":%hu" + iSep,
+			      pGE->port);
+		    iSep = 0;
+		}
+		FileWrite(pCLServing->fd, FLAGFALSE, "\r\n", 2);
+	    } else if (pCLServing->iState == S_NORMAL &&
+		       strcmp(pcCmd, "call") == 0) {
+		if (pcArgs == (char *)0)
+		    FileWrite(pCLServing->fd, FLAGFALSE,
+			      "call requires argument\r\n", -1);
+		else
+		    CommandCall(pCLServing, pcArgs);
+	    } else {
+		FileWrite(pCLServing->fd, FLAGFALSE, "unknown command\r\n",
+			  -1);
 	    }
-	    FileWrite(pCLServing->fd, FLAGFALSE, "\r\n", 2);
-	} else if (pCLServing->iState == S_NORMAL &&
-		   strcmp(pcCmd, "call") == 0) {
-	    if (pcArgs == (char *)0)
-		FileWrite(pCLServing->fd, FLAGFALSE,
-			  "call requires argument\r\n", -1);
-	    else
-		CommandCall(pCLServing, pcArgs);
-	} else {
-	    FileWrite(pCLServing->fd, FLAGFALSE, "unknown command\r\n",
-		      -1);
+	    BuildString((char *)0, pCLServing->accmd);
 	}
-	BuildString((char *)0, pCLServing->accmd);
+	nr -= l;
+	MemMove(acIn, acIn + l, nr);
     }
 }
 
@@ -872,9 +885,10 @@ Master()
 	}
 
 	/* set to non-blocking and wrap in a File object */
-	if (SetFlags(cfd, O_NONBLOCK, 0))
+	if (SetFlags(cfd, O_NONBLOCK, 0)) {
 	    pCLmfree->fd = FileOpenFD(cfd, simpleSocket);
-	else
+	    FileSetQuoteIAC(pCLmfree->fd, FLAGTRUE);
+	} else
 	    pCLmfree->fd = (CONSFILE *)0;
 
 	if ((CONSFILE *)0 == pCLmfree->fd) {

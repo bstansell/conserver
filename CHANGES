@@ -1,6 +1,26 @@
 				CHANGES
 				=======
 
+version 8.1.0 (Jan 18, 2004):
+	- fixes for HP-UX compilation - patch by Petter Reinholdtsen
+	  <pere@hungry.com>
+	- fixes for compilation under various operating systems -
+	  patch by Albert Chin <conserver-users@mlists.thewrittenword.com>
+	- added a 'protocol' option for either 'telnet' or 'raw' socket
+	  communication - also reflected in -i output
+	- changed the client/server protocol to use 0xff as a command
+	  character for sending control commands - similiar to the
+	  telnet protocol - improves the ^Ec| interaction
+	- client -E option now disables ssl encryption attempts, useful
+	  for broken SSL environents - suggested by Graydon Dodson
+	  <grdodson@lexmark.com>
+	- bad error message connecting non-ssl client with ssl-required
+	  server - reported by Graydon Dodson <grdodson@lexmark.com>
+	- added note about pam configuration to conserver.passwd.man -
+	  suggested by Erik Sjolund <erik.sjolund@sbc.su.se>
+	- improved telnet protocol option handling such that connections
+	  to standard telnet ports should work properly
+
 version 8.0.9 (Dec 10, 2003):
 	- fixed major bug in connect() handling which causes most
 	  socket-based consoles to timeout after 10 seconds - reported
@@ -643,5 +663,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.141 2003/12/10 18:33:40 bryan Exp $
+#  $Id: CHANGES,v 1.148 2004/01/18 17:28:31 bryan Exp $
 #

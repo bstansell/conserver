@@ -1,5 +1,5 @@
 /*
- *  $Id: group.h,v 5.42 2003/11/28 23:36:02 bryan Exp $
+ *  $Id: group.h,v 5.43 2003/12/20 06:11:53 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -36,7 +36,7 @@
 
 /* timers used to have various things happen */
 #define T_STATE		0
-#define T_IDLE		1
+#define T_CIDLE		1
 #define T_MARK		2
 #define T_REINIT	3
 #define T_AUTOUP	4

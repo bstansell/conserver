@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.53 2003/11/28 23:36:02 bryan Exp $
+ *  $Id: consent.h,v 5.55 2003/12/21 16:23:02 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -52,7 +52,7 @@ typedef struct parity {		/* a parity bits table                  */
 } PARITY;
 
 typedef enum consType {
-    UNKNOWN = 0,
+    UNKNOWNTYPE = 0,
     DEVICE,
     EXEC,
     HOST
@@ -95,6 +95,7 @@ typedef struct consent {	/* console information                  */
     unsigned short port;	/* port number      socket = portbase + */
     unsigned short portbase;	/* port base             portinc * port */
     unsigned short portinc;	/* port increment                       */
+    unsigned short raw;		/* raw or telnet protocol?              */
     /* type == EXEC */
     char *exec;			/* exec command                         */
     char *execsubst;		/* exec substitution pattern            */

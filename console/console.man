@@ -1,5 +1,5 @@
-.\" $Id: console.man,v 1.41 2003/11/28 00:47:30 bryan Exp $
-.TH CONSOLE 1 "2003/11/28" "conserver-8.0.9" "conserver"
+.\" $Id: console.man,v 1.42 2003/12/25 19:22:02 bryan Exp $
+.TH CONSOLE 1 "2003/12/25" "conserver-8.1.0" "conserver"
 .SH NAME
 console \- console server client program
 .SH SYNOPSIS
@@ -324,7 +324,7 @@ file descriptor for the device.
 Commands will have values of the command, the command's pid, the
 pseudo-tty, and file descriptor for the pseudo-tty.
 Remote ports will have values of the remote hostname, remote port number,
-and file descriptor for the socket connection.
+``raw'' or ``telnet'' protocol, and file descriptor for the socket connection.
 .TP
 .I users-list
 The details of each user connected to the console.

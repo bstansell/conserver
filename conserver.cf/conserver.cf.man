@@ -1,5 +1,5 @@
-.\" $Id: conserver.cf.man,v 1.54 2003/12/10 18:33:56 bryan Exp $
-.TH CONSERVER.CF 5 "2003/12/10" "conserver-8.0.9" "conserver"
+.\" $Id: conserver.cf.man,v 1.55 2003/12/21 16:23:03 bryan Exp $
+.TH CONSERVER.CF 5 "2003/12/21" "conserver-8.1.0" "conserver"
 .SH NAME
 conserver.cf \- console configuration file for
 .BR conserver (8)
@@ -695,7 +695,7 @@ The conserver option
 .B \-7
 will set this flag for all consoles.
 Default is
-.BR !stiphigh .
+.BR !striphigh .
 .TP
 .B reinitoncc
 Automatically reinitialize (``bring up'') a downed console when a client
@@ -797,6 +797,21 @@ The default is one.
 See
 .B port
 for the details of the formula.
+.TP
+.B protocol
+.RB [ " telnet " | " raw " ]
+.br
+Set the protocol used to send and receive data from the console.
+If
+.B raw
+is used, all data is sent ``as is'', unprotected by any protocol specification.
+If
+.B telnet
+is used (which is the default), data is encapsulated in the telnet protocol.
+The
+.B striphigh
+console option still applies when data is read by the server, and if enabled,
+can impact the encapsulation process.
 .TP
 .B ro
 .RI "[ [\fB!\fP]" username ,...

@@ -3,7 +3,7 @@ srcdir = @srcdir@
 prefix = @prefix@
 mandir = @mandir@
 sysconfdir = @sysconfdir@
-exampledir = $(prefix)/share/examples/conserver
+exampledir = @datadir@/examples/conserver
 
 ### Installation programs and flags
 INSTALL = @INSTALL@

@@ -6,7 +6,7 @@ exec_prefix = @exec_prefix@
 sbindir = @sbindir@
 sysconfdir = @sysconfdir@
 mandir = @mandir@
-exampledir = $(prefix)/share/examples/conserver
+exampledir = @datadir@/examples/conserver
 
 ### Installation programs and flags
 INSTALL = @INSTALL@

@@ -348,3 +348,6 @@
 
 /* Define if <signal.h> does not define sig_atomic_t */
 #undef sig_atomic_t
+
+/* Define to `unsigned' if <sys/types.h> does not define. */
+#undef size_t

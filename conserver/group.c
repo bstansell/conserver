@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.280 2003/12/10 18:33:47 bryan Exp $
+ *  $Id: group.c,v 5.284 2004/01/18 16:33:25 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -1350,14 +1350,6 @@ ReapVirt(pGE)
     }
 }
 
-static char acStop[] = {	/* buffer for OOB stop command          */
-    OB_SUSP
-};
-
-static char acExec[] = {	/* buffer for OOB exec command          */
-    OB_EXEC
-};
-
 int
 #if PROTOTYPES
 CheckPasswd(CONSCLIENT *pCL, char *pw_string)
@@ -1482,8 +1474,14 @@ PutConsole(pCEServing, c, quote)
      * the wbufIAC variable...that way we don't have to do a string
      * search every time we flush this thing ('cause it should be
      * rather infrequent to have an IAC char).
+     *
+     * quote == 0, raw - processed by conserver
+     * quote == 1, console - processed by console
+     * quote == 2, telnet - processed by telnet protocol
+     * if console != telnet, 1 == 2
      */
-    if (quote && pCEServing->type == HOST && c == IAC) {
+    if (quote == 1 && pCEServing->type == HOST && !pCEServing->raw &&
+	c == IAC) {
 	BuildStringChar((char)c, pCEServing->wbuf);
 	if (pCEServing->wbufIAC == 0)
 	    pCEServing->wbufIAC = pCEServing->wbuf->used;
@@ -1853,7 +1851,7 @@ CommandExamine(pGE, pCLServing, pCEServing, tyme)
 		b = "Netwk";
 		p = ' ';
 		break;
-	    case UNKNOWN:	/* shut up gcc */
+	    case UNKNOWNTYPE:	/* shut up gcc */
 		break;
 	}
 	FilePrint(pCLServing->fd, FLAGFALSE,
@@ -2017,8 +2015,9 @@ CommandInfo(pGE, pCLServing, pCEServing, tyme)
 			  (unsigned long)pCE->ipid, pCE->execSlave);
 		break;
 	    case HOST:
-		FilePrint(pCLServing->fd, FLAGTRUE, "!:%s,%hu", pCE->host,
-			  pCE->port);
+		FilePrint(pCLServing->fd, FLAGTRUE, "!:%s,%hu,%s",
+			  pCE->host, pCE->port,
+			  (pCE->raw ? "raw" : "telnet"));
 		break;
 	    case DEVICE:
 		FilePrint(pCLServing->fd, FLAGTRUE, "/:%s,%s%c",
@@ -2026,7 +2025,7 @@ CommandInfo(pGE, pCLServing, pCEServing, tyme)
 			  (pCE->baud ? pCE->baud->acrate : ""),
 			  (pCE->parity ? pCE->parity->key[0] : ' '));
 		break;
-	    case UNKNOWN:	/* shut up gcc */
+	    case UNKNOWNTYPE:	/* shut up gcc */
 		break;
 	}
 	FilePrint(pCLServing->fd, FLAGTRUE, ",%d:",
@@ -2089,8 +2088,10 @@ CommandInfo(pGE, pCLServing, pCEServing, tyme)
 	    s = BuildTmpString(",ixany");
 	if (pCE->ixoff == FLAGTRUE)
 	    s = BuildTmpString(",ixoff");
+#if defined(CRTSCTS)
 	if (pCE->crtscts == FLAGTRUE)
 	    s = BuildTmpString(",crtscts");
+#endif
 	if (pCE->ondemand == FLAGTRUE)
 	    s = BuildTmpString(",ondemand");
 	if (pCE->reinitoncc == FLAGTRUE)
@@ -2216,6 +2217,36 @@ CommandWho(pGE, pCLServing, pCEServing, tyme)
     }
 }
 
+char *
+#if PROTOTYPES
+TelOpt(int o)
+#else
+TelOpt(o)
+    int o;
+#endif
+{
+    static char opt[128];
+    char *telopts[] = {
+	"BINARY", "ECHO", "RCP", "SUPPRESS GO AHEAD", "NAME",
+	"STATUS", "TIMING MARK", "RCTE", "NAOL", "NAOP",
+	"NAOCRD", "NAOHTS", "NAOHTD", "NAOFFD", "NAOVTS",
+	"NAOVTD", "NAOLFD", "EXTEND ASCII", "LOGOUT", "BYTE MACRO",
+	"DATA ENTRY TERMINAL", "SUPDUP", "SUPDUP OUTPUT",
+	"SEND LOCATION", "TERMINAL TYPE", "END OF RECORD",
+	"TACACS UID", "OUTPUT MARKING", "TTYLOC",
+	"3270 REGIME", "X.3 PAD", "NAWS", "TSPEED", "LFLOW",
+	"LINEMODE", "XDISPLOC", "OLD-ENVIRON", "AUTHENTICATION",
+	"ENCRYPT", "NEW-ENVIRON"
+    };
+
+    if (o < sizeof(telopts) / sizeof(char *))
+	return telopts[o];
+    else {
+	sprintf(opt, "%d", o);
+	return opt;
+    }
+}
+
 void
 #if PROTOTYPES
 DoConsoleRead(CONSENT *pCEServing)
@@ -2245,11 +2276,13 @@ DoConsoleRead(pCEServing)
     CONDDEBUG((1, "DoConsoleRead(): read %d bytes from fd %d", nr,
 	       cofile));
 
-    if (pCEServing->type == HOST) {
+    if (pCEServing->type == HOST && !pCEServing->raw) {
 	/* Do a little Telnet Protocol interpretation
 	 * state = 0: normal
 	 *       = 1: Saw a IAC char
-	 *       = 2: Saw a DONT/DO/WONT/WILL command
+	 *       = 2: Saw a DONT/WONT command
+	 *       = 3: Saw a WILL command
+	 *       = 4: Saw a DO command
 	 *       = 5: Saw a \r
 	 */
 	int new = 0, state;
@@ -2260,17 +2293,61 @@ DoConsoleRead(pCEServing)
 			   pCEServing->server));
 		state = 1;
 	    } else if (state == 1 && acInOrig[i] != IAC) {
-		CONDDEBUG((1, "DoConsoleRead(): [%s] got telnet cmd `%u'",
-			   pCEServing->server, acInOrig[i]));
-		if (acInOrig[i] == DONT || acInOrig[i] == DO ||
-		    acInOrig[i] == WILL || acInOrig[i] == WONT)
+		if (acInOrig[i] == WILL) {
+		    state = 3;
+		    CONDDEBUG((1,
+			       "DoConsoleRead(): [%s] got telnet cmd `WILL'",
+			       pCEServing->server));
+		} else if (acInOrig[i] == DO) {
+		    state = 4;
+		    CONDDEBUG((1,
+			       "DoConsoleRead(): [%s] got telnet cmd `DO'",
+			       pCEServing->server));
+		} else if (acInOrig[i] == DONT) {
 		    state = 2;
-		else
+		    CONDDEBUG((1,
+			       "DoConsoleRead(): [%s] got telnet cmd `DONT'",
+			       pCEServing->server));
+		} else if (acInOrig[i] == WONT) {
+		    state = 2;
+		    CONDDEBUG((1,
+			       "DoConsoleRead(): [%s] got telnet cmd `WONT'",
+			       pCEServing->server));
+		} else {
+		    CONDDEBUG((1,
+			       "DoConsoleRead(): [%s] got telnet cmd `%u'",
+			       pCEServing->server, acInOrig[i]));
 		    state = 0;
+		}
 	    } else if (state == 2) {
 		CONDDEBUG((1,
-			   "DoConsoleRead(): [%s] got telnet option `%u'",
-			   pCEServing->server, acInOrig[i]));
+			   "DoConsoleRead(): [%s] got telnet option `%s'",
+			   pCEServing->server, TelOpt(acInOrig[i])));
+		state = 0;
+	    } else if (state == 3) {
+		CONDDEBUG((1,
+			   "DoConsoleRead(): [%s] got telnet option `%s'",
+			   pCEServing->server, TelOpt(acInOrig[i])));
+		if (acInOrig[i] == TELOPT_ECHO ||
+		    acInOrig[i] == TELOPT_SGA) {
+		    PutConsole(pCEServing, IAC, 2);
+		    PutConsole(pCEServing, DO, 2);
+		    PutConsole(pCEServing, acInOrig[i], 2);
+		    CONDDEBUG((1,
+			       "DoConsoleRead(): [%s] sent telnet DO `%s'",
+			       pCEServing->server, TelOpt(acInOrig[i])));
+		}
+		state = 0;
+	    } else if (state == 4) {
+		CONDDEBUG((1,
+			   "DoConsoleRead(): [%s] got telnet option `%s'",
+			   pCEServing->server, TelOpt(acInOrig[i])));
+		PutConsole(pCEServing, IAC, 2);
+		PutConsole(pCEServing, WONT, 2);
+		PutConsole(pCEServing, acInOrig[i], 2);
+		CONDDEBUG((1,
+			   "DoConsoleRead(): [%s] sent telnet WONT `%s'",
+			   pCEServing->server, TelOpt(acInOrig[i])));
 		state = 0;
 	    } else {
 		if (state == 5) {
@@ -2360,9 +2437,8 @@ DoConsoleRead(pCEServing)
      */
     for (pCL = pCEServing->pCLon; (CONSCLIENT *)0 != pCL;
 	 pCL = pCL->pCLnext) {
-	if (pCL->fcon) {
+	if (pCL->fcon || pCL->iState == S_CEXEC)
 	    FileWrite(pCL->fd, FLAGFALSE, (char *)acIn, nr);
-	}
     }
 }
 
@@ -2411,7 +2487,7 @@ DoClientRead(pGE, pCLServing)
     struct termios sbuf;
     CONSENT *pCEServing = pCLServing->pCEto;
     CONSENT *pCE;
-    int nr, i;
+    int nr, i, l;
     unsigned char acIn[BUFSIZ], acInOrig[BUFSIZ];
     time_t tyme;
     static STRING *bcast = (STRING *)0;
@@ -2430,187 +2506,201 @@ DoClientRead(pGE, pCLServing)
 	DisconnectClient(pGE, pCLServing, (char *)0, FLAGFALSE);
 	return;
     }
+
     if (nr == 0)
 	return;
 
-    /* update last keystroke time
-     */
+    /* update last keystroke time */
     pCLServing->typetym = tyme = time((time_t *)0);
 
-    for (i = 0; i < nr; ++i) {
-	acInOrig[i] = acIn[i];
-	if (pCEServing->striphigh == FLAGTRUE) {
-	    acIn[i] &= 127;
+    while ((l = ParseIACBuf(pCLServing->fd, acIn, &nr)) >= 0) {
+	if (l == 0) {
+	    if (FileSawQuoteExec(pCLServing->fd) == FLAGTRUE) {
+		if (pCLServing->iState == S_CWAIT) {
+		    pCLServing->iState = S_CEXEC;
+		    if (pCEServing->pCLwr == pCLServing)
+			FileWrite(pCLServing->fd, FLAGFALSE, "[rw]\r\n",
+				  6);
+		    else
+			FileWrite(pCLServing->fd, FLAGFALSE, "[ro]\r\n",
+				  6);
+		}
+	    }
+	    if (FileSawQuoteAbrt(pCLServing->fd) == FLAGTRUE) {
+		if (pCLServing->iState == S_CWAIT ||
+		    pCLServing->iState == S_CEXEC) {
+		    pCLServing->fcon = 1;
+		    pCLServing->iState = S_NORMAL;
+		}
+	    }
+	    /* not used (yet?)
+	       if (FileSawQuoteSusp(pCLServing->fd) == FLAGTRUE) {
+	       }
+	     */
+	    continue;
 	}
-    }
 
-    for (i = 0; i < nr; ++i) {
-	if (pGE->pCEctl == pCEServing) {
-	    static char *pcArgs;
-	    static char *pcCmd;
-
-	    if ('\n' != acIn[i]) {
-		BuildStringChar(acIn[i], pCLServing->accmd);
-		continue;
+	for (i = 0; i < l; ++i) {
+	    acInOrig[i] = acIn[i];
+	    if (pCEServing->striphigh == FLAGTRUE) {
+		acIn[i] &= 127;
 	    }
-	    if ((pCLServing->accmd->used > 1) &&
-		('\r' ==
-		 pCLServing->accmd->string[pCLServing->accmd->used - 2])) {
-		pCLServing->accmd->string[pCLServing->accmd->used - 2] =
-		    '\000';
-		pCLServing->accmd->used--;
-	    }
+	}
 
-	    /* process password here...before we corrupt accmd */
-	    if (pCLServing->iState == S_PASSWD) {
-		if (CheckPasswd(pCLServing, pCLServing->accmd->string) !=
-		    AUTH_SUCCESS) {
-		    FileWrite(pCLServing->fd, FLAGFALSE,
-			      "invalid password\r\n", -1);
-		    BuildString((char *)0, pCLServing->accmd);
-		    DisconnectClient(pGE, pCLServing, (char *)0,
-				     FLAGFALSE);
-		    return;
+	for (i = 0; i < l; ++i) {
+	    if (pGE->pCEctl == pCEServing) {
+		static char *pcArgs;
+		static char *pcCmd;
+
+		if ('\n' != acIn[i]) {
+		    BuildStringChar(acIn[i], pCLServing->accmd);
+		    continue;
 		}
-		Verbose("<group> login %s", pCLServing->acid->string);
-		FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", -1);
-		pCLServing->iState = S_NORMAL;
-		BuildString((char *)0, pCLServing->accmd);
-		continue;
-	    }
-
-	    if ((pcArgs =
-		 strchr(pCLServing->accmd->string, ' ')) != (char *)0) {
-		*pcArgs++ = '\000';
-	    }
-	    if (pcArgs != (char *)0)
-		pcArgs = PruneSpace(pcArgs);
-	    pcCmd = PruneSpace(pCLServing->accmd->string);
-
-	    if (strcmp(pcCmd, "help") == 0) {
-		static char *apcHelp1[] = {
-		    "exit   disconnect\r\n",
-		    "help   this help message\r\n",
-		    "login  log in\r\n",
-#if HAVE_OPENSSL
-		    "ssl    start ssl session\r\n",
-#endif
-		    (char *)0
-		};
-		static char *apcHelp2[] = {
-		    "broadcast    send broadcast message\r\n",
-		    "call         connect to given console\r\n",
-		    "disconnect*  disconnect the given user(s)\r\n",
-		    "examine      examine port and baud rates\r\n",
-		    "exit         disconnect\r\n",
-		    "group        show users in this group\r\n",
-		    "help         this help message\r\n",
-		    "hosts        show host status and user\r\n",
-		    "info         show console information\r\n",
-		    "textmsg	  send a text message\r\n",
-		    "* = requires admin privileges\r\n",
-		    (char *)0
-		};
-		char **ppc;
-		for (ppc =
-		     (pCLServing->iState == S_IDENT ? apcHelp1 : apcHelp2);
-		     (char *)0 != *ppc; ++ppc) {
-		    FileWrite(pCLServing->fd, FLAGTRUE, *ppc, -1);
+		if ((pCLServing->accmd->used > 1) &&
+		    ('\r' ==
+		     pCLServing->accmd->string[pCLServing->accmd->used -
+					       2])) {
+		    pCLServing->accmd->string[pCLServing->accmd->used -
+					      2] = '\000';
+		    pCLServing->accmd->used--;
 		}
-		FileWrite(pCLServing->fd, FLAGFALSE, (char *)0, 0);
-	    } else if (strcmp(pcCmd, "exit") == 0) {
-		FileWrite(pCLServing->fd, FLAGFALSE, "goodbye\r\n", -1);
-		DisconnectClient(pGE, pCLServing, (char *)0, FLAGFALSE);
-		return;
-#if HAVE_OPENSSL
-	    } else if (pCLServing->iState == S_IDENT &&
-		       strcmp(pcCmd, "ssl") == 0) {
-		FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", -1);
-		if (!AttemptSSL(pCLServing)) {
-		    DisconnectClient(pGE, pCLServing, (char *)0,
-				     FLAGFALSE);
-		    return;
-		}
-#endif
-	    } else if (pCLServing->iState == S_IDENT &&
-		       strcmp(pcCmd, "login") == 0) {
-#if HAVE_OPENSSL
-		if (config->sslrequired == FLAGTRUE &&
-		    FileGetType(pCLServing->fd) != SSLSocket) {
-		    FileWrite(pCLServing->fd, FLAGFALSE,
-			      "encryption required\r\n", -1);
-		} else {
-#endif
-		    if (pcArgs == (char *)0) {
+
+		/* process password here...before we corrupt accmd */
+		if (pCLServing->iState == S_PASSWD) {
+		    if (CheckPasswd(pCLServing, pCLServing->accmd->string)
+			!= AUTH_SUCCESS) {
 			FileWrite(pCLServing->fd, FLAGFALSE,
-				  "login requires argument\r\n", -1);
-		    } else {
-			BuildString((char *)0, pCLServing->username);
-			BuildString((char *)0, pCLServing->acid);
-			BuildString(pcArgs, pCLServing->username);
-			BuildString(pcArgs, pCLServing->acid);
-			BuildStringChar('@', pCLServing->acid);
-			BuildString(pCLServing->peername->string,
-				    pCLServing->acid);
-			if (pCLServing->caccess == 't' ||
-			    CheckPasswd(pCLServing, "") == AUTH_SUCCESS) {
-			    pCLServing->iState = S_NORMAL;
-			    Verbose("<group> login %s",
-				    pCLServing->acid->string);
-			    FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n",
-				      -1);
-			} else {
-			    FilePrint(pCLServing->fd, FLAGFALSE,
-				      "passwd? %s\r\n", myHostname);
-			    pCLServing->iState = S_PASSWD;
-			}
+				  "invalid password\r\n", -1);
+			BuildString((char *)0, pCLServing->accmd);
+			DisconnectClient(pGE, pCLServing, (char *)0,
+					 FLAGFALSE);
+			return;
 		    }
-#if HAVE_OPENSSL
+		    Verbose("<group> login %s", pCLServing->acid->string);
+		    FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", -1);
+		    pCLServing->iState = S_NORMAL;
+		    BuildString((char *)0, pCLServing->accmd);
+		    continue;
 		}
+
+		if ((pcArgs =
+		     strchr(pCLServing->accmd->string,
+			    ' ')) != (char *)0) {
+		    *pcArgs++ = '\000';
+		}
+		if (pcArgs != (char *)0)
+		    pcArgs = PruneSpace(pcArgs);
+		pcCmd = PruneSpace(pCLServing->accmd->string);
+
+		if (strcmp(pcCmd, "help") == 0) {
+		    static char *apcHelp1[] = {
+			"exit   disconnect\r\n",
+			"help   this help message\r\n",
+			"login  log in\r\n",
+#if HAVE_OPENSSL
+			"ssl    start ssl session\r\n",
 #endif
-	    } else if (pCLServing->iState == S_NORMAL &&
-		       strcmp(pcCmd, "call") == 0) {
-		if (pcArgs == (char *)0)
-		    FileWrite(pCLServing->fd, FLAGFALSE,
-			      "call requires argument\r\n", -1);
-		else {
-		    CONSENT *pCEwant = (CONSENT *)0;
-		    /* try to move to the given console
-		     * we assume all the right checks for ambiguity
-		     * were already done by the master process, so
-		     * the first match should be what the user wants
-		     */
-		    for (pCE = pGE->pCElist; pCE != (CONSENT *)0;
-			 pCE = pCE->pCEnext) {
-			NAMES *n = (NAMES *)0;
-			if (strcasecmp(pcArgs, pCE->server)
-			    == 0) {
-			    pCEwant = pCE;
-			    break;
-			}
-			for (n = pCE->aliases; n != (NAMES *)0;
-			     n = n->next) {
-			    if (strcasecmp(pcArgs, n->name)
-				== 0) {
-				pCEwant = pCE;
-				break;
+			(char *)0
+		    };
+		    static char *apcHelp2[] = {
+			"broadcast    send broadcast message\r\n",
+			"call         connect to given console\r\n",
+			"disconnect*  disconnect the given user(s)\r\n",
+			"examine      examine port and baud rates\r\n",
+			"exit         disconnect\r\n",
+			"group        show users in this group\r\n",
+			"help         this help message\r\n",
+			"hosts        show host status and user\r\n",
+			"info         show console information\r\n",
+			"textmsg	  send a text message\r\n",
+			"* = requires admin privileges\r\n",
+			(char *)0
+		    };
+		    char **ppc;
+		    for (ppc =
+			 (pCLServing->iState ==
+			  S_IDENT ? apcHelp1 : apcHelp2);
+			 (char *)0 != *ppc; ++ppc) {
+			FileWrite(pCLServing->fd, FLAGTRUE, *ppc, -1);
+		    }
+		    FileWrite(pCLServing->fd, FLAGFALSE, (char *)0, 0);
+		} else if (strcmp(pcCmd, "exit") == 0) {
+		    FileWrite(pCLServing->fd, FLAGFALSE, "goodbye\r\n",
+			      -1);
+		    DisconnectClient(pGE, pCLServing, (char *)0,
+				     FLAGFALSE);
+		    return;
+#if HAVE_OPENSSL
+		} else if (pCLServing->iState == S_IDENT &&
+			   strcmp(pcCmd, "ssl") == 0) {
+		    FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", -1);
+		    if (!AttemptSSL(pCLServing)) {
+			DisconnectClient(pGE, pCLServing, (char *)0,
+					 FLAGFALSE);
+			return;
+		    }
+#endif
+		} else if (pCLServing->iState == S_IDENT &&
+			   strcmp(pcCmd, "login") == 0) {
+#if HAVE_OPENSSL
+		    if (config->sslrequired == FLAGTRUE &&
+			FileGetType(pCLServing->fd) != SSLSocket) {
+			FileWrite(pCLServing->fd, FLAGFALSE,
+				  "encryption required\r\n", -1);
+		    } else {
+#endif
+			if (pcArgs == (char *)0) {
+			    FileWrite(pCLServing->fd, FLAGFALSE,
+				      "login requires argument\r\n", -1);
+			} else {
+			    BuildString((char *)0, pCLServing->username);
+			    BuildString((char *)0, pCLServing->acid);
+			    BuildString(pcArgs, pCLServing->username);
+			    BuildString(pcArgs, pCLServing->acid);
+			    BuildStringChar('@', pCLServing->acid);
+			    BuildString(pCLServing->peername->string,
+					pCLServing->acid);
+			    if (pCLServing->caccess == 't' ||
+				CheckPasswd(pCLServing,
+					    "") == AUTH_SUCCESS) {
+				pCLServing->iState = S_NORMAL;
+				Verbose("<group> login %s",
+					pCLServing->acid->string);
+				FileWrite(pCLServing->fd, FLAGFALSE,
+					  "ok\r\n", -1);
+			    } else {
+				FilePrint(pCLServing->fd, FLAGFALSE,
+					  "passwd? %s\r\n", myHostname);
+				pCLServing->iState = S_PASSWD;
 			    }
 			}
-			if (n != (NAMES *)0)
-			    break;
+#if HAVE_OPENSSL
 		    }
-		    if (pCEwant == (CONSENT *)0) {
-			NAMES *n = (NAMES *)0;
-			int len = strlen(pcArgs);
+#endif
+		} else if (pCLServing->iState == S_NORMAL &&
+			   strcmp(pcCmd, "call") == 0) {
+		    if (pcArgs == (char *)0)
+			FileWrite(pCLServing->fd, FLAGFALSE,
+				  "call requires argument\r\n", -1);
+		    else {
+			CONSENT *pCEwant = (CONSENT *)0;
+			/* try to move to the given console
+			 * we assume all the right checks for ambiguity
+			 * were already done by the master process, so
+			 * the first match should be what the user wants
+			 */
 			for (pCE = pGE->pCElist; pCE != (CONSENT *)0;
 			     pCE = pCE->pCEnext) {
-			    if (strncasecmp(pcArgs, pCE->server, len) == 0) {
+			    NAMES *n = (NAMES *)0;
+			    if (strcasecmp(pcArgs, pCE->server)
+				== 0) {
 				pCEwant = pCE;
 				break;
 			    }
 			    for (n = pCE->aliases; n != (NAMES *)0;
 				 n = n->next) {
-				if (strncasecmp(pcArgs, n->name, len) == 0) {
+				if (strcasecmp(pcArgs, n->name)
+				    == 0) {
 				    pCEwant = pCE;
 				    break;
 				}
@@ -2618,215 +2708,229 @@ DoClientRead(pGE, pCLServing)
 			    if (n != (NAMES *)0)
 				break;
 			}
+			if (pCEwant == (CONSENT *)0) {
+			    NAMES *n = (NAMES *)0;
+			    int len = strlen(pcArgs);
+			    for (pCE = pGE->pCElist; pCE != (CONSENT *)0;
+				 pCE = pCE->pCEnext) {
+				if (strncasecmp(pcArgs, pCE->server, len)
+				    == 0) {
+				    pCEwant = pCE;
+				    break;
+				}
+				for (n = pCE->aliases; n != (NAMES *)0;
+				     n = n->next) {
+				    if (strncasecmp(pcArgs, n->name, len)
+					== 0) {
+					pCEwant = pCE;
+					break;
+				    }
+				}
+				if (n != (NAMES *)0)
+				    break;
+			    }
+			}
+
+			if (pCEwant == (CONSENT *)0) {
+			    FilePrint(pCLServing->fd, FLAGFALSE,
+				      "%s: no such console\r\n", pcArgs);
+			    DisconnectClient(pGE, pCLServing, (char *)0,
+					     FLAGFALSE);
+			    return;
+			}
+
+			pCLServing->fro =
+			    ClientAccess(pCEwant,
+					 pCLServing->username->string);
+			if (pCLServing->fro == -1) {
+			    FilePrint(pCLServing->fd, FLAGFALSE,
+				      "%s: permission denied\r\n", pcArgs);
+			    DisconnectClient(pGE, pCLServing, (char *)0,
+					     FLAGFALSE);
+			    return;
+			}
+
+			/* remove from current host */
+			if ((CONSCLIENT *)0 != pCLServing->pCLnext) {
+			    pCLServing->pCLnext->ppCLbnext =
+				pCLServing->ppCLbnext;
+			}
+			*(pCLServing->ppCLbnext) = pCLServing->pCLnext;
+			if (pCLServing->fwr) {
+			    pCLServing->fwr = 0;
+			    pCLServing->fwantwr = 0;
+			    TagLogfileAct(pCEServing, "%s detached",
+					  pCLServing->acid->string);
+			    pCEServing->pCLwr = (CONSCLIENT *)0;
+			    FindWrite(pCEServing);
+			}
+
+			/* inform operators of the change
+			 */
+			Verbose("<group> attach %s to %s",
+				pCLServing->acid->string, pCEwant->server);
+			Msg("[%s] login %s", pCEwant->server,
+			    pCLServing->acid->string);
+
+			/* set new host and link into new host list
+			 */
+			pCEServing = pCEwant;
+			pCLServing->pCEto = pCEServing;
+			pCLServing->pCLnext = pCEServing->pCLon;
+			pCLServing->ppCLbnext = &pCEServing->pCLon;
+			if ((CONSCLIENT *)0 != pCLServing->pCLnext) {
+			    pCLServing->pCLnext->ppCLbnext =
+				&pCLServing->pCLnext;
+			}
+			pCEServing->pCLon = pCLServing;
+
+			/* try to reopen line if specified at server startup
+			 */
+			if ((pCEServing->ondemand == FLAGTRUE ||
+			     pCEServing->reinitoncc == FLAGTRUE) &&
+			    !pCEServing->fup)
+			    ConsInit(pCEServing);
+
+			/* try for attach on new console
+			 */
+			if (pCEServing->fronly) {
+			    FileWrite(pCLServing->fd, FLAGFALSE,
+				      "[console is read-only]\r\n", -1);
+			} else if (pCEServing->initfile != (CONSFILE *)0 ||
+				   pCEServing->ioState == INCONNECT) {
+			    pCLServing->fwantwr = 1;
+			    FileWrite(pCLServing->fd, FLAGFALSE,
+				      "[read-only -- initializing]\r\n",
+				      -1);
+			} else
+			    if (!
+				(pCEServing->fup &&
+				 pCEServing->ioState == ISNORMAL)) {
+			    FileWrite(pCLServing->fd, FLAGFALSE,
+				      "[line to console is down]\r\n", -1);
+			} else if (((CONSCLIENT *)0 == pCEServing->pCLwr)
+				   && !pCLServing->fro) {
+			    pCEServing->pCLwr = pCLServing;
+			    pCLServing->fwr = 1;
+			    FileWrite(pCLServing->fd, FLAGFALSE,
+				      "[attached]\r\n", -1);
+			    /* this keeps the ops console neat */
+			    pCEServing->iend = 0;
+			    TagLogfileAct(pCEServing, "%s attached",
+					  pCLServing->acid->string);
+			} else {
+			    pCLServing->fwantwr = 1;
+			    FileWrite(pCLServing->fd, FLAGFALSE,
+				      "[spy]\r\n", -1);
+			}
+			pCLServing->fcon = 0;
+			pCLServing->iState = S_NORMAL;
 		    }
-
-		    if (pCEwant == (CONSENT *)0) {
-			FilePrint(pCLServing->fd, FLAGFALSE,
-				  "%s: no such console\r\n", pcArgs);
-			DisconnectClient(pGE, pCLServing, (char *)0,
-					 FLAGFALSE);
-			return;
-		    }
-
-		    pCLServing->fro =
-			ClientAccess(pCEwant,
-				     pCLServing->username->string);
-		    if (pCLServing->fro == -1) {
-			FilePrint(pCLServing->fd, FLAGFALSE,
-				  "%s: permission denied\r\n", pcArgs);
-			DisconnectClient(pGE, pCLServing, (char *)0,
-					 FLAGFALSE);
-			return;
-		    }
-
-		    /* remove from current host */
-		    if ((CONSCLIENT *)0 != pCLServing->pCLnext) {
-			pCLServing->pCLnext->ppCLbnext =
-			    pCLServing->ppCLbnext;
-		    }
-		    *(pCLServing->ppCLbnext) = pCLServing->pCLnext;
-		    if (pCLServing->fwr) {
-			pCLServing->fwr = 0;
-			pCLServing->fwantwr = 0;
-			TagLogfileAct(pCEServing, "%s detached",
-				      pCLServing->acid->string);
-			pCEServing->pCLwr = (CONSCLIENT *)0;
-			FindWrite(pCEServing);
-		    }
-
-		    /* inform operators of the change
-		     */
-		    Verbose("<group> attach %s to %s",
-			    pCLServing->acid->string, pCEwant->server);
-		    Msg("[%s] login %s", pCEwant->server,
-			pCLServing->acid->string);
-
-		    /* set new host and link into new host list
-		     */
-		    pCEServing = pCEwant;
-		    pCLServing->pCEto = pCEServing;
-		    pCLServing->pCLnext = pCEServing->pCLon;
-		    pCLServing->ppCLbnext = &pCEServing->pCLon;
-		    if ((CONSCLIENT *)0 != pCLServing->pCLnext) {
-			pCLServing->pCLnext->ppCLbnext =
-			    &pCLServing->pCLnext;
-		    }
-		    pCEServing->pCLon = pCLServing;
-
-		    /* try to reopen line if specified at server startup
-		     */
-		    if ((pCEServing->ondemand == FLAGTRUE ||
-			 pCEServing->reinitoncc == FLAGTRUE) &&
-			!pCEServing->fup)
-			ConsInit(pCEServing);
-
-		    /* try for attach on new console
-		     */
-		    if (pCEServing->fronly) {
+		} else if (pCLServing->iState == S_NORMAL &&
+			   strcmp(pcCmd, "info") == 0) {
+		    CommandInfo(pGE, pCLServing, pCEServing, tyme);
+		} else if (pCLServing->iState == S_NORMAL &&
+			   strcmp(pcCmd, "examine") == 0) {
+		    CommandExamine(pGE, pCLServing, pCEServing, tyme);
+		} else if (pCLServing->iState == S_NORMAL &&
+			   strcmp(pcCmd, "group") == 0) {
+		    CommandGroup(pGE, pCLServing, pCEServing, tyme);
+		} else if (pCLServing->iState == S_NORMAL &&
+			   strcmp(pcCmd, "hosts") == 0) {
+		    CommandHosts(pGE, pCLServing, pCEServing, tyme);
+		} else if (pCLServing->iState == S_NORMAL &&
+			   strcmp(pcCmd, "broadcast") == 0) {
+		    if (pcArgs == (char *)0) {
 			FileWrite(pCLServing->fd, FLAGFALSE,
-				  "[console is read-only]\r\n", -1);
-		    } else if (pCEServing->initfile != (CONSFILE *)0 ||
-			       pCEServing->ioState == INCONNECT) {
-			pCLServing->fwantwr = 1;
-			FileWrite(pCLServing->fd, FLAGFALSE,
-				  "[read-only -- initializing]\r\n", -1);
-		    } else
-			if (!
-			    (pCEServing->fup &&
-			     pCEServing->ioState == ISNORMAL)) {
-			FileWrite(pCLServing->fd, FLAGFALSE,
-				  "[line to console is down]\r\n", -1);
-		    } else if (((CONSCLIENT *)0 == pCEServing->pCLwr)
-			       && !pCLServing->fro) {
-			pCEServing->pCLwr = pCLServing;
-			pCLServing->fwr = 1;
-			FileWrite(pCLServing->fd, FLAGFALSE,
-				  "[attached]\r\n", -1);
-			/* this keeps the ops console neat */
-			pCEServing->iend = 0;
-			TagLogfileAct(pCEServing, "%s attached",
-				      pCLServing->acid->string);
+				  "broadcast requires argument\r\n", -1);
 		    } else {
-			pCLServing->fwantwr = 1;
-			FileWrite(pCLServing->fd, FLAGFALSE, "[spy]\r\n",
-				  -1);
-		    }
-		    pCLServing->fcon = 0;
-		    pCLServing->iState = S_NORMAL;
-		}
-	    } else if (pCLServing->iState == S_NORMAL &&
-		       strcmp(pcCmd, "info") == 0) {
-		CommandInfo(pGE, pCLServing, pCEServing, tyme);
-	    } else if (pCLServing->iState == S_NORMAL &&
-		       strcmp(pcCmd, "examine") == 0) {
-		CommandExamine(pGE, pCLServing, pCEServing, tyme);
-	    } else if (pCLServing->iState == S_NORMAL &&
-		       strcmp(pcCmd, "group") == 0) {
-		CommandGroup(pGE, pCLServing, pCEServing, tyme);
-	    } else if (pCLServing->iState == S_NORMAL &&
-		       strcmp(pcCmd, "hosts") == 0) {
-		CommandHosts(pGE, pCLServing, pCEServing, tyme);
-	    } else if (pCLServing->iState == S_NORMAL &&
-		       strcmp(pcCmd, "broadcast") == 0) {
-		if (pcArgs == (char *)0) {
-		    FileWrite(pCLServing->fd, FLAGFALSE,
-			      "broadcast requires argument\r\n", -1);
-		} else {
-		    BuildString((char *)0, bcast);
-		    BuildStringChar('[', bcast);
-		    BuildString(pCLServing->acid->string, bcast);
-		    BuildString(": ", bcast);
-		    BuildString(pcArgs, bcast);
-		    BuildString("]\r\n", bcast);
-		    SendAllClientsMsg(pGE, bcast->string);
-		    FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", -1);
-		}
-	    } else if (pCLServing->iState == S_NORMAL &&
-		       strcmp(pcCmd, "textmsg") == 0) {
-		char *pcMsg;
-		if (pcArgs == (char *)0) {
-		    FileWrite(pCLServing->fd, FLAGFALSE,
-			      "textmsg requires two arguments\r\n", -1);
-		} else {
-		    if ((pcMsg = strchr(pcArgs, ' ')) != (char *)0) {
-			*pcMsg++ = '\000';
-		    }
-		    if (pcMsg == (char *)0) {
-			FileWrite(pCLServing->fd, FLAGFALSE,
-				  "textmsg requires two arguments\r\n",
-				  -1);
-		    } else {
-			pcMsg = PruneSpace(pcMsg);
-
 			BuildString((char *)0, bcast);
 			BuildStringChar('[', bcast);
 			BuildString(pCLServing->acid->string, bcast);
 			BuildString(": ", bcast);
-			BuildString(pcMsg, bcast);
+			BuildString(pcArgs, bcast);
 			BuildString("]\r\n", bcast);
-
-			SendCertainClientsMsg(pGE, pcArgs, bcast->string);
+			SendAllClientsMsg(pGE, bcast->string);
 			FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", -1);
 		    }
-		}
-	    } else if (pCLServing->iState == S_NORMAL &&
-		       strcmp(pcCmd, "disconnect") == 0) {
-		if (pcArgs == (char *)0) {
-		    FileWrite(pCLServing->fd, FLAGFALSE,
-			      "disconnect requires argument\r\n", -1);
-		} else {
-		    if (ConsentUserOk
-			(pADList, pCLServing->username->string) == 1) {
-			int num;
-			Verbose("disconnect command (of `%s') by %s",
-				pcArgs, pCLServing->acid->string);
-			num =
-			    DisconnectCertainClients(pGE,
-						     pCLServing->acid->
-						     string, pcArgs);
-			/* client expects this string to be formatted
-			 * in this way only.
-			 */
-			FilePrint(pCLServing->fd, FLAGFALSE,
-				  "ok -- disconnected %d users\r\n", num);
-		    } else
+		} else if (pCLServing->iState == S_NORMAL &&
+			   strcmp(pcCmd, "textmsg") == 0) {
+		    char *pcMsg;
+		    if (pcArgs == (char *)0) {
 			FileWrite(pCLServing->fd, FLAGFALSE,
-				  "unauthorized command\r\n", -1);
+				  "textmsg requires two arguments\r\n",
+				  -1);
+		    } else {
+			if ((pcMsg = strchr(pcArgs, ' ')) != (char *)0) {
+			    *pcMsg++ = '\000';
+			}
+			if (pcMsg == (char *)0) {
+			    FileWrite(pCLServing->fd, FLAGFALSE,
+				      "textmsg requires two arguments\r\n",
+				      -1);
+			} else {
+			    pcMsg = PruneSpace(pcMsg);
+
+			    BuildString((char *)0, bcast);
+			    BuildStringChar('[', bcast);
+			    BuildString(pCLServing->acid->string, bcast);
+			    BuildString(": ", bcast);
+			    BuildString(pcMsg, bcast);
+			    BuildString("]\r\n", bcast);
+
+			    SendCertainClientsMsg(pGE, pcArgs,
+						  bcast->string);
+			    FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n",
+				      -1);
+			}
+		    }
+		} else if (pCLServing->iState == S_NORMAL &&
+			   strcmp(pcCmd, "disconnect") == 0) {
+		    if (pcArgs == (char *)0) {
+			FileWrite(pCLServing->fd, FLAGFALSE,
+				  "disconnect requires argument\r\n", -1);
+		    } else {
+			if (ConsentUserOk
+			    (pADList, pCLServing->username->string) == 1) {
+			    int num;
+			    Verbose("disconnect command (of `%s') by %s",
+				    pcArgs, pCLServing->acid->string);
+			    num =
+				DisconnectCertainClients(pGE,
+							 pCLServing->acid->
+							 string, pcArgs);
+			    /* client expects this string to be formatted
+			     * in this way only.
+			     */
+			    FilePrint(pCLServing->fd, FLAGFALSE,
+				      "ok -- disconnected %d users\r\n",
+				      num);
+			} else
+			    FileWrite(pCLServing->fd, FLAGFALSE,
+				      "unauthorized command\r\n", -1);
+		    }
+		} else {
+		    FileWrite(pCLServing->fd, FLAGFALSE,
+			      "unknown command\r\n", -1);
 		}
-	    } else {
-		FileWrite(pCLServing->fd, FLAGFALSE, "unknown command\r\n",
-			  -1);
-	    }
-	    BuildString((char *)0, pCLServing->accmd);
-	} else
-	    switch (pCLServing->iState) {
-		case S_IDENT:
-		case S_PASSWD:
-		    /* these are not used in this mode */
-		    break;
-		case S_BCAST:
-		    /* gather message */
-		    if ('\r' != acIn[i]) {
-			if (acIn[i] == '\a' ||
-			    (acIn[i] >= ' ' && acIn[i] <= '~')) {
-			    BuildStringChar(acIn[i], pCLServing->msg);
-			    if (pGE->pCEctl != pCEServing)
-				FileWrite(pCLServing->fd, FLAGFALSE,
-					  (char *)&acIn[i], 1);
-			} else if ((acIn[i] == '\b' || acIn[i] == 0x7f)
-				   && pCLServing->msg->used > 1) {
-			    if (pCLServing->msg->
-				string[pCLServing->msg->used - 2] != '\a'
-				&& pGE->pCEctl != pCEServing) {
-				FileWrite(pCLServing->fd, FLAGFALSE,
-					  "\b \b", 3);
-			    }
-			    pCLServing->msg->string[pCLServing->msg->used -
-						    2] = '\000';
-			    pCLServing->msg->used--;
-			} else if ((acIn[i] == 0x15) &&
-				   pCLServing->msg->used > 1) {
-			    while (pCLServing->msg->used > 1) {
+		BuildString((char *)0, pCLServing->accmd);
+	    } else
+		switch (pCLServing->iState) {
+		    case S_IDENT:
+		    case S_PASSWD:
+			/* these are not used in this mode */
+			break;
+		    case S_BCAST:
+			/* gather message */
+			if ('\r' != acIn[i]) {
+			    if (acIn[i] == '\a' ||
+				(acIn[i] >= ' ' && acIn[i] <= '~')) {
+				BuildStringChar(acIn[i], pCLServing->msg);
+				if (pGE->pCEctl != pCEServing)
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					      (char *)&acIn[i], 1);
+			    } else if ((acIn[i] == '\b' || acIn[i] == 0x7f)
+				       && pCLServing->msg->used > 1) {
 				if (pCLServing->msg->
 				    string[pCLServing->msg->used - 2] !=
 				    '\a' && pGE->pCEctl != pCEServing) {
@@ -2836,527 +2940,559 @@ DoClientRead(pGE, pCLServing)
 				pCLServing->msg->string[pCLServing->msg->
 							used - 2] = '\000';
 				pCLServing->msg->used--;
+			    } else if ((acIn[i] == 0x15) &&
+				       pCLServing->msg->used > 1) {
+				while (pCLServing->msg->used > 1) {
+				    if (pCLServing->msg->
+					string[pCLServing->msg->used -
+					       2] != '\a' &&
+					pGE->pCEctl != pCEServing) {
+					FileWrite(pCLServing->fd,
+						  FLAGFALSE, "\b \b", 3);
+				    }
+				    pCLServing->msg->string[pCLServing->
+							    msg->used -
+							    2] = '\000';
+				    pCLServing->msg->used--;
+				}
 			    }
-			}
-			continue;
-		    }
-		    FileWrite(pCLServing->fd, FLAGFALSE, "]\r\n", 3);
-		    BuildString((char *)0, bcast);
-		    BuildStringChar('[', bcast);
-		    BuildString(pCLServing->acid->string, bcast);
-		    BuildString(": ", bcast);
-		    BuildString(pCLServing->msg->string, bcast);
-		    BuildString("]\r\n", bcast);
-		    SendClientsMsg(pCEServing, bcast->string);
-
-		    BuildString((char *)0, pCLServing->msg);
-		    pCLServing->iState = S_NORMAL;
-		    continue;
-
-		case S_QUOTE:	/* send octal code              */
-		    /* must type in 3 octal digits */
-		    if (acIn[i] >= '0' && acIn[i] <= '7') {
-			BuildStringChar(acIn[i], pCLServing->accmd);
-			if (pCLServing->accmd->used < 4) {
-			    FileWrite(pCLServing->fd, FLAGFALSE,
-				      (char *)&acIn[i], 1);
 			    continue;
 			}
-			FileWrite(pCLServing->fd, FLAGTRUE,
-				  (char *)&acIn[i], 1);
-			FileWrite(pCLServing->fd, FLAGFALSE, "]", 1);
+			FileWrite(pCLServing->fd, FLAGFALSE, "]\r\n", 3);
+			BuildString((char *)0, bcast);
+			BuildStringChar('[', bcast);
+			BuildString(pCLServing->acid->string, bcast);
+			BuildString(": ", bcast);
+			BuildString(pCLServing->msg->string, bcast);
+			BuildString("]\r\n", bcast);
+			SendClientsMsg(pCEServing, bcast->string);
 
-			pCLServing->accmd->string[0] =
-			    (((pCLServing->accmd->string[0] - '0') * 8 +
-			      (pCLServing->accmd->string[1] - '0')) * 8) +
-			    (pCLServing->accmd->string[2] - '0');
-			PutConsole(pCEServing,
-				   pCLServing->accmd->string[0], 1);
-			BuildString((char *)0, pCLServing->accmd);
-		    } else {
-			FileWrite(pCLServing->fd, FLAGFALSE,
-				  " aborted]\r\n", -1);
-		    }
-		    pCLServing->iState = S_NORMAL;
-		    continue;
+			BuildString((char *)0, pCLServing->msg);
+			pCLServing->iState = S_NORMAL;
+			continue;
 
-		case S_SUSP:
-		    if (!
-			(pCEServing->fup &&
-			 pCEServing->ioState == ISNORMAL)) {
-			FileWrite(pCLServing->fd, FLAGFALSE,
-				  " -- line down]\r\n", -1);
-		    } else if (pCEServing->fronly) {
-			FileWrite(pCLServing->fd, FLAGFALSE,
-				  " -- read-only]\r\n", -1);
-		    } else if (((CONSCLIENT *)0 == pCEServing->pCLwr)
-			       && !pCLServing->fro) {
-			pCEServing->pCLwr = pCLServing;
-			pCLServing->fwr = 1;
-			if (pCEServing->nolog) {
-			    FileWrite(pCLServing->fd, FLAGFALSE,
-				      " -- attached (nologging)]\r\n", -1);
+		    case S_QUOTE:	/* send octal code              */
+			/* must type in 3 octal digits */
+			if (acIn[i] >= '0' && acIn[i] <= '7') {
+			    BuildStringChar(acIn[i], pCLServing->accmd);
+			    if (pCLServing->accmd->used < 4) {
+				FileWrite(pCLServing->fd, FLAGFALSE,
+					  (char *)&acIn[i], 1);
+				continue;
+			    }
+			    FileWrite(pCLServing->fd, FLAGTRUE,
+				      (char *)&acIn[i], 1);
+			    FileWrite(pCLServing->fd, FLAGFALSE, "]", 1);
+
+			    pCLServing->accmd->string[0] =
+				(((pCLServing->accmd->string[0] -
+				   '0') * 8 +
+				  (pCLServing->accmd->string[1] -
+				   '0')) * 8) +
+				(pCLServing->accmd->string[2] - '0');
+			    PutConsole(pCEServing,
+				       pCLServing->accmd->string[0], 1);
+			    BuildString((char *)0, pCLServing->accmd);
 			} else {
 			    FileWrite(pCLServing->fd, FLAGFALSE,
-				      " -- attached]\r\n", -1);
+				      " aborted]\r\n", -1);
 			}
-			TagLogfileAct(pCEServing, "%s attached",
-				      pCLServing->acid->string);
-		    } else {
-			FileWrite(pCLServing->fd, FLAGFALSE,
-				  " -- spy mode]\r\n", -1);
-		    }
-		    /* fall through */
-		case S_CWAIT:
-		    pCLServing->fcon = 1;
-		    pCLServing->iState = S_NORMAL;
-		    if (acInOrig[i] == OB_EXEC) {
-			if (pCEServing->pCLwr == pCLServing)
+			pCLServing->iState = S_NORMAL;
+			continue;
+
+		    case S_SUSP:
+			if (!
+			    (pCEServing->fup &&
+			     pCEServing->ioState == ISNORMAL)) {
 			    FileWrite(pCLServing->fd, FLAGFALSE,
-				      "[rw]\r\n", -1);
-			else
+				      " -- line down]\r\n", -1);
+			} else if (pCEServing->fronly) {
 			    FileWrite(pCLServing->fd, FLAGFALSE,
-				      "[ro]\r\n", -1);
-		    }
-		    continue;
-
-		case S_NORMAL:
-		    /* if it is an escape sequence shift states
-		     */
-		    if (acInOrig[i] == pCLServing->ic[0]) {
-			pCLServing->iState = S_ESC1;
-			continue;
-		    }
-		    /* if we can write, write to slave tty
-		     */
-		    if (pCLServing->fwr) {
-			PutConsole(pCEServing, acIn[i], 1);
-			continue;
-		    }
-		    /* if the client is stuck in spy mode
-		     * give them a clue as to how to get out
-		     * (LLL nice to put chars out as ^Ec, rather
-		     * than octal escapes, but....)
-		     */
-		    if ('\r' == acIn[i] || '\n' == acIn[i]) {
-			FilePrint(pCLServing->fd, FLAGFALSE,
-				  "[read-only -- use %s %s ? for help]\r\n",
-				  FmtCtl(pCLServing->ic[0], acA1),
-				  FmtCtl(pCLServing->ic[1], acA2));
-		    }
-		    continue;
-
-		case S_HALT1:	/* halt sequence? */
-		    pCLServing->iState = S_NORMAL;
-		    if (acIn[i] != '?' && (acIn[i] < '0' || acIn[i] > '9')) {
-			FileWrite(pCLServing->fd, FLAGFALSE,
-				  "aborted]\r\n", -1);
-			continue;
-		    }
-
-		    if (acIn[i] == '?') {
-			int i;
-			FileWrite(pCLServing->fd, FLAGFALSE, "list]\r\n",
-				  -1);
-			i = pCEServing->breakNum;
-			if (i == 0 || breakList[i - 1].seq->used <= 1)
-			    FileWrite(pCLServing->fd, FLAGTRUE,
-				      " 0 -   0ms, <undefined>\r\n", -1);
-			else {
-			    FmtCtlStr(breakList[i - 1].seq->string,
-				      breakList[i - 1].seq->used - 1,
-				      acA1);
-			    FilePrint(pCLServing->fd, FLAGTRUE,
-				      " 0 - %3dms, `%s'\r\n",
-				      breakList[i - 1].delay,
-				      acA1->string);
+				      " -- read-only]\r\n", -1);
+			} else if (((CONSCLIENT *)0 == pCEServing->pCLwr)
+				   && !pCLServing->fro) {
+			    pCEServing->pCLwr = pCLServing;
+			    pCLServing->fwr = 1;
+			    if (pCEServing->nolog) {
+				FileWrite(pCLServing->fd, FLAGFALSE,
+					  " -- attached (nologging)]\r\n",
+					  -1);
+			    } else {
+				FileWrite(pCLServing->fd, FLAGFALSE,
+					  " -- attached]\r\n", -1);
+			    }
+			    TagLogfileAct(pCEServing, "%s attached",
+					  pCLServing->acid->string);
+			} else {
+			    FileWrite(pCLServing->fd, FLAGFALSE,
+				      " -- spy mode]\r\n", -1);
 			}
-			for (i = 0; i < 9; i++) {
-			    if (breakList[i].seq->used > 1) {
-				FmtCtlStr(breakList[i].seq->string,
-					  breakList[i].seq->used - 1,
+			pCLServing->fcon = 1;
+			pCLServing->iState = S_NORMAL;
+			continue;
+
+		    case S_CWAIT:
+			continue;
+
+		    case S_NORMAL:
+			/* if it is an escape sequence shift states
+			 */
+			if (acInOrig[i] == pCLServing->ic[0]) {
+			    pCLServing->iState = S_ESC1;
+			    continue;
+			}
+			/* fall through */
+		    case S_CEXEC:
+			/* if we can write, write to slave tty
+			 */
+			if (pCLServing->fwr) {
+			    PutConsole(pCEServing, acIn[i], 1);
+			    continue;
+			}
+			/* if the client is stuck in spy mode
+			 * give them a clue as to how to get out
+			 * (LLL nice to put chars out as ^Ec, rather
+			 * than octal escapes, but....)
+			 */
+			if ('\r' == acIn[i] || '\n' == acIn[i]) {
+			    FilePrint(pCLServing->fd, FLAGFALSE,
+				      "[read-only -- use %s %s ? for help]\r\n",
+				      FmtCtl(pCLServing->ic[0], acA1),
+				      FmtCtl(pCLServing->ic[1], acA2));
+			}
+			continue;
+
+		    case S_HALT1:	/* halt sequence? */
+			pCLServing->iState = S_NORMAL;
+			if (acIn[i] != '?' &&
+			    (acIn[i] < '0' || acIn[i] > '9')) {
+			    FileWrite(pCLServing->fd, FLAGFALSE,
+				      "aborted]\r\n", -1);
+			    continue;
+			}
+
+			if (acIn[i] == '?') {
+			    int i;
+			    FileWrite(pCLServing->fd, FLAGFALSE,
+				      "list]\r\n", -1);
+			    i = pCEServing->breakNum;
+			    if (i == 0 || breakList[i - 1].seq->used <= 1)
+				FileWrite(pCLServing->fd, FLAGTRUE,
+					  " 0 -   0ms, <undefined>\r\n",
+					  -1);
+			    else {
+				FmtCtlStr(breakList[i - 1].seq->string,
+					  breakList[i - 1].seq->used - 1,
 					  acA1);
 				FilePrint(pCLServing->fd, FLAGTRUE,
-					  " %d - %3dms, `%s'\r\n", i + 1,
-					  breakList[i].delay,
+					  " 0 - %3dms, `%s'\r\n",
+					  breakList[i - 1].delay,
 					  acA1->string);
 			    }
+			    for (i = 0; i < 9; i++) {
+				if (breakList[i].seq->used > 1) {
+				    FmtCtlStr(breakList[i].seq->string,
+					      breakList[i].seq->used - 1,
+					      acA1);
+				    FilePrint(pCLServing->fd, FLAGTRUE,
+					      " %d - %3dms, `%s'\r\n",
+					      i + 1, breakList[i].delay,
+					      acA1->string);
+				}
+			    }
+			    FileWrite(pCLServing->fd, FLAGFALSE, (char *)0,
+				      0);
+			} else {
+			    if (pCLServing->fwr) {
+				int bt = acIn[i] - '0';
+				SendBreak(pCLServing, pCEServing, bt);
+			    } else
+				FileWrite(pCLServing->fd, FLAGFALSE,
+					  "attach to send break]\r\n", -1);
 			}
-			FileWrite(pCLServing->fd, FLAGFALSE, (char *)0, 0);
-		    } else {
-			if (pCLServing->fwr) {
-			    int bt = acIn[i] - '0';
-			    SendBreak(pCLServing, pCEServing, bt);
-			} else
-			    FileWrite(pCLServing->fd, FLAGFALSE,
-				      "attach to send break]\r\n", -1);
-		    }
-		    continue;
-
-		case S_CATTN:	/* redef escape sequence? */
-		    pCLServing->ic[0] = acInOrig[i];
-		    FmtCtl(acInOrig[i], acA1);
-		    FilePrint(pCLServing->fd, FLAGFALSE, "%s ",
-			      acA1->string);
-		    pCLServing->iState = S_CESC;
-		    continue;
-
-		case S_CESC:	/* escape sequent 2 */
-		    pCLServing->ic[1] = acInOrig[i];
-		    pCLServing->iState = S_NORMAL;
-		    FmtCtl(acInOrig[i], acA1);
-		    FilePrint(pCLServing->fd, FLAGFALSE, "%s  ok]\r\n",
-			      acA1->string);
-		    continue;
-
-		case S_ESC1:	/* first char in escape sequence */
-		    if (acInOrig[i] == pCLServing->ic[1]) {
-			if (pCLServing->fecho)
-			    FileWrite(pCLServing->fd, FLAGFALSE, "\r\n[",
-				      3);
-			else
-			    FileWrite(pCLServing->fd, FLAGFALSE, "[", 1);
-			pCLServing->iState = S_CMD;
 			continue;
-		    }
-		    /* ^E^Ec or ^_^_^[
-		     * pass (possibly stripped) first ^E (^_) and
-		     * stay in same state
-		     */
-		    if (acInOrig[i] == pCLServing->ic[0]) {
+
+		    case S_CATTN:	/* redef escape sequence? */
+			pCLServing->ic[0] = acInOrig[i];
+			FmtCtl(acInOrig[i], acA1);
+			FilePrint(pCLServing->fd, FLAGFALSE, "%s ",
+				  acA1->string);
+			pCLServing->iState = S_CESC;
+			continue;
+
+		    case S_CESC:	/* escape sequent 2 */
+			pCLServing->ic[1] = acInOrig[i];
+			pCLServing->iState = S_NORMAL;
+			FmtCtl(acInOrig[i], acA1);
+			FilePrint(pCLServing->fd, FLAGFALSE, "%s  ok]\r\n",
+				  acA1->string);
+			continue;
+
+		    case S_ESC1:	/* first char in escape sequence */
+			if (acInOrig[i] == pCLServing->ic[1]) {
+			    if (pCLServing->fecho)
+				FileWrite(pCLServing->fd, FLAGFALSE,
+					  "\r\n[", 3);
+			    else
+				FileWrite(pCLServing->fd, FLAGFALSE, "[",
+					  1);
+			    pCLServing->iState = S_CMD;
+			    continue;
+			}
+			/* ^E^Ec or ^_^_^[
+			 * pass (possibly stripped) first ^E (^_) and
+			 * stay in same state
+			 */
+			if (acInOrig[i] == pCLServing->ic[0]) {
+			    if (pCLServing->fwr) {
+				PutConsole(pCEServing, acIn[i], 1);
+			    }
+			    continue;
+			}
+			/* ^Ex or ^_x
+			 * pass both characters to slave tty (possibly stripped)
+			 */
+			pCLServing->iState = S_NORMAL;
 			if (pCLServing->fwr) {
+			    char c = pCLServing->ic[0];
+			    if (pCEServing->striphigh == FLAGTRUE)
+				c = c & 127;
+			    PutConsole(pCEServing, c, 1);
 			    PutConsole(pCEServing, acIn[i], 1);
 			}
 			continue;
-		    }
-		    /* ^Ex or ^_x
-		     * pass both characters to slave tty (possibly stripped)
-		     */
-		    pCLServing->iState = S_NORMAL;
-		    if (pCLServing->fwr) {
-			char c = pCLServing->ic[0];
-			if (pCEServing->striphigh == FLAGTRUE)
-			    c = c & 127;
-			PutConsole(pCEServing, c, 1);
-			PutConsole(pCEServing, acIn[i], 1);
-		    }
-		    continue;
 
-		case S_CMD:	/* have 1/2 of the escape sequence */
-		    pCLServing->iState = S_NORMAL;
-		    switch (acIn[i]) {
-			case ';':
-			    if (pCLServing->fcon == 1)
-				goto unknownchar;
-			    FileWrite(pCLServing->fd, FLAGFALSE,
-				      "connected]\r\n", -1);
-			    pCLServing->fcon = 1;
-			    break;
-			case '+':
-			case '-':
-			    if (0 != (pCLServing->fecho = '+' == acIn[i]))
+		    case S_CMD:	/* have 1/2 of the escape sequence */
+			pCLServing->iState = S_NORMAL;
+			switch (acIn[i]) {
+			    case ';':
+				if (pCLServing->fcon == 1)
+				    goto unknownchar;
 				FileWrite(pCLServing->fd, FLAGFALSE,
-					  "drop line]\r\n", -1);
-			    else
+					  "connected]\r\n", -1);
+				pCLServing->fcon = 1;
+				break;
+			    case '+':
+			    case '-':
+				if (0 !=
+				    (pCLServing->fecho = '+' == acIn[i]))
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					      "drop line]\r\n", -1);
+				else
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					      "no drop line]\r\n", -1);
+				break;
+
+			    case 'b':	/* broadcast message */
+			    case 'B':
 				FileWrite(pCLServing->fd, FLAGFALSE,
-					  "no drop line]\r\n", -1);
-			    break;
+					  "Enter message: ", -1);
+				pCLServing->iState = S_BCAST;
+				break;
 
-			case 'b':	/* broadcast message */
-			case 'B':
-			    FileWrite(pCLServing->fd, FLAGFALSE,
-				      "Enter message: ", -1);
-			    pCLServing->iState = S_BCAST;
-			    break;
-
-			case 'a':	/* attach */
-			case 'A':
-			    CommandAttach(pGE, pCLServing, pCEServing,
-					  tyme);
-			    break;
-
-			case 'c':
-			case 'C':
-			    CommandChangeFlow(pGE, pCLServing, pCEServing,
+			    case 'a':	/* attach */
+			    case 'A':
+				CommandAttach(pGE, pCLServing, pCEServing,
 					      tyme);
-			    break;
+				break;
 
-			case 'd':	/* down a console       */
-			case 'D':
-			    CommandDown(pGE, pCLServing, pCEServing, tyme);
-			    break;
+			    case 'c':
+			    case 'C':
+				CommandChangeFlow(pGE, pCLServing,
+						  pCEServing, tyme);
+				break;
 
-			case 'e':	/* redefine escape keys */
-			case 'E':
-			    pCLServing->iState = S_CATTN;
-			    FileWrite(pCLServing->fd, FLAGFALSE, "redef: ",
-				      -1);
-			    break;
+			    case 'd':	/* down a console       */
+			    case 'D':
+				CommandDown(pGE, pCLServing, pCEServing,
+					    tyme);
+				break;
 
-			case 'f':	/* force attach */
-			case 'F':
-			    CommandForce(pGE, pCLServing, pCEServing,
-					 tyme);
-			    break;
-
-			case 'g':	/* group info */
-			case 'G':
-			    FilePrint(pCLServing->fd, FLAGFALSE,
-				      "group %s]\r\n",
-				      pGE->pCEctl->server);
-			    CommandGroup(pGE, pCLServing, pCEServing,
-					 tyme);
-			    break;
-
-			case 'P':	/* DEC vt100 pf1 */
-			case 'h':	/* help                 */
-			case 'H':
-			case '?':
-			    HelpUser(pCLServing);
-			    break;
-
-			case 'i':
-			case 'I':
-			    FileWrite(pCLServing->fd, FLAGFALSE,
-				      "info]\r\n", -1);
-			    CommandInfo(pGE, pCLServing, pCEServing, tyme);
-			    break;
-
-			case 'L':
-			    CommandLogging(pGE, pCLServing, pCEServing,
-					   tyme);
-			    break;
-
-			case 'l':	/* halt character 1     */
-			    if (pCEServing->fronly) {
+			    case 'e':	/* redefine escape keys */
+			    case 'E':
+				pCLServing->iState = S_CATTN;
 				FileWrite(pCLServing->fd, FLAGFALSE,
-					  "can't halt read-only console]\r\n",
-					  -1);
-				continue;
-			    }
-			    pCLServing->iState = S_HALT1;
-			    FileWrite(pCLServing->fd, FLAGFALSE, "halt ",
-				      -1);
-			    break;
+					  "redef: ", -1);
+				break;
 
-			case 'm':	/* message of the day */
-			    if (pCEServing->motd == (char *)0)
-				FileWrite(pCLServing->fd, FLAGFALSE,
-					  "-- MOTD --]\r\n", -1);
-			    else
+			    case 'f':	/* force attach */
+			    case 'F':
+				CommandForce(pGE, pCLServing, pCEServing,
+					     tyme);
+				break;
+
+			    case 'g':	/* group info */
+			    case 'G':
 				FilePrint(pCLServing->fd, FLAGFALSE,
-					  "-- MOTD -- %s]\r\n",
-					  pCEServing->motd);
-			    break;
-
-			case 'o':	/* close and re-open line */
-			case 'O':
-			    CommandOpen(pGE, pCLServing, pCEServing, tyme);
-			    break;
-
-			case '\022':	/* ^R */
-			    FileWrite(pCLServing->fd, FLAGFALSE, "^R]\r\n",
-				      -1);
-			    Replay(pCEServing, pCLServing->fd, 1);
-			    break;
-
-			case 'R':	/* DEC vt100 pf3 */
-			case 'r':	/* replay 20 lines */
-			    FileWrite(pCLServing->fd, FLAGFALSE,
-				      "replay]\r\n", -1);
-			    Replay(pCEServing, pCLServing->fd, 20);
-			    break;
-
-			case 'p':	/* replay 60 lines */
-			    FileWrite(pCLServing->fd, FLAGFALSE,
-				      "long replay]\r\n", -1);
-			    Replay(pCEServing, pCLServing->fd, 60);
-			    break;
-
-			case 'S':	/* DEC vt100 pf4 */
-			case 's':	/* spy mode */
-			    pCLServing->fwantwr = 0;
-			    if (!pCLServing->fwr) {
-				FileWrite(pCLServing->fd, FLAGFALSE,
-					  "ok]\r\n", -1);
+					  "group %s]\r\n",
+					  pGE->pCEctl->server);
+				CommandGroup(pGE, pCLServing, pCEServing,
+					     tyme);
 				break;
-			    }
-			    pCLServing->fwr = 0;
-			    TagLogfileAct(pCEServing, "%s detached",
-					  pCLServing->acid->string);
-			    pCEServing->pCLwr = (CONSCLIENT *)0;
-			    FindWrite(pCEServing);
-			    FileWrite(pCLServing->fd, FLAGFALSE,
-				      "spying]\r\n", -1);
-			    break;
 
-			case 'u':	/* hosts on server this */
-			case 'U':
-			    FileWrite(pCLServing->fd, FLAGFALSE,
-				      "hosts]\r\n", -1);
-			    CommandHosts(pGE, pCLServing, pCEServing,
-					 tyme);
-			    break;
-
-			case 'v':	/* version */
-			case 'V':
-			    FilePrint(pCLServing->fd, FLAGFALSE,
-				      "version `%s']\r\n", THIS_VERSION);
-			    break;
-
-			case 'w':	/* who */
-			case 'W':
-			    FilePrint(pCLServing->fd, FLAGFALSE,
-				      "who %s]\r\n", pCEServing->server);
-			    CommandWho(pGE, pCLServing, pCEServing, tyme);
-			    break;
-
-			case 'x':
-			case 'X':
-			    FileWrite(pCLServing->fd, FLAGFALSE,
-				      "examine]\r\n", -1);
-			    CommandExamine(pGE, pCLServing, pCEServing,
-					   tyme);
-			    break;
-
-			case '|':	/* wait for client */
-			    if (!pCLServing->fwr) {
-				FileWrite(pCLServing->fd, FLAGFALSE,
-					  "attach to run local command]\r\n",
-					  -1);
-				continue;
-			    }
-			    FileSend(pCLServing->fd, acExec, 1, MSG_OOB);
-			    pCLServing->fcon = 0;
-			    pCLServing->iState = S_CWAIT;
-			    break;
-
-			case 'z':	/* suspend the client */
-			case 'Z':
-			case '\032':
-			    if (1 !=
-				FileSend(pCLServing->fd, acStop, 1,
-					 MSG_OOB)) {
+			    case 'P':	/* DEC vt100 pf1 */
+			    case 'h':	/* help                 */
+			    case 'H':
+			    case '?':
+				HelpUser(pCLServing);
 				break;
-			    }
-			    pCLServing->fcon = 0;
-			    pCLServing->iState = S_SUSP;
-			    if (pCEServing->pCLwr == pCLServing) {
-				pCLServing->fwr = 0;
+
+			    case 'i':
+			    case 'I':
+				FileWrite(pCLServing->fd, FLAGFALSE,
+					  "info]\r\n", -1);
+				CommandInfo(pGE, pCLServing, pCEServing,
+					    tyme);
+				break;
+
+			    case 'L':
+				CommandLogging(pGE, pCLServing, pCEServing,
+					       tyme);
+				break;
+
+			    case 'l':	/* halt character 1     */
+				if (pCEServing->fronly) {
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					      "can't halt read-only console]\r\n",
+					      -1);
+				    continue;
+				}
+				pCLServing->iState = S_HALT1;
+				FileWrite(pCLServing->fd, FLAGFALSE,
+					  "halt ", -1);
+				break;
+
+			    case 'm':	/* message of the day */
+				if (pCEServing->motd == (char *)0)
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					      "-- MOTD --]\r\n", -1);
+				else
+				    FilePrint(pCLServing->fd, FLAGFALSE,
+					      "-- MOTD -- %s]\r\n",
+					      pCEServing->motd);
+				break;
+
+			    case 'o':	/* close and re-open line */
+			    case 'O':
+				CommandOpen(pGE, pCLServing, pCEServing,
+					    tyme);
+				break;
+
+			    case '\022':	/* ^R */
+				FileWrite(pCLServing->fd, FLAGFALSE,
+					  "^R]\r\n", -1);
+				Replay(pCEServing, pCLServing->fd, 1);
+				break;
+
+			    case 'R':	/* DEC vt100 pf3 */
+			    case 'r':	/* replay 20 lines */
+				FileWrite(pCLServing->fd, FLAGFALSE,
+					  "replay]\r\n", -1);
+				Replay(pCEServing, pCLServing->fd, 20);
+				break;
+
+			    case 'p':	/* replay 60 lines */
+				FileWrite(pCLServing->fd, FLAGFALSE,
+					  "long replay]\r\n", -1);
+				Replay(pCEServing, pCLServing->fd, 60);
+				break;
+
+			    case 'S':	/* DEC vt100 pf4 */
+			    case 's':	/* spy mode */
 				pCLServing->fwantwr = 0;
-				pCEServing->pCLwr = (CONSCLIENT *)0;
+				if (!pCLServing->fwr) {
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					      "ok]\r\n", -1);
+				    break;
+				}
+				pCLServing->fwr = 0;
 				TagLogfileAct(pCEServing, "%s detached",
 					      pCLServing->acid->string);
-			    }
-			    break;
+				pCEServing->pCLwr = (CONSCLIENT *)0;
+				FindWrite(pCEServing);
+				FileWrite(pCLServing->fd, FLAGFALSE,
+					  "spying]\r\n", -1);
+				break;
 
-			case '\t':	/* toggle tab expand    */
-			    if (!pCLServing->fwr) {
+			    case 'u':	/* hosts on server this */
+			    case 'U':
 				FileWrite(pCLServing->fd, FLAGFALSE,
-					  "attach to toggle tabs]\r\n",
-					  -1);
-				continue;
-			    }
-			    if (pCEServing->type != DEVICE &&
-				pCEServing->type != EXEC) {
-				FileWrite(pCLServing->fd, FLAGFALSE,
-					  "ok]\r\n", -1);
-				continue;
-			    }
-			    if (-1 ==
-				tcgetattr(FileFDNum(pCEServing->cofile),
-					  &sbuf)) {
-				FileWrite(pCLServing->fd, FLAGFALSE,
-					  "failed]\r\n", -1);
-				continue;
-			    }
-#  if !defined(XTABS)		/* XXX hack */
-#   define XTABS   TAB3
-#  endif
-			    if (XTABS == (TABDLY & sbuf.c_oflag)) {
-				sbuf.c_oflag &= ~TABDLY;
-				sbuf.c_oflag |= TAB0;
-			    } else {
-				sbuf.c_oflag &= ~TABDLY;
-				sbuf.c_oflag |= XTABS;
-			    }
-			    if (-1 ==
-				tcsetattr(FileFDNum(pCEServing->cofile),
-					  TCSANOW, &sbuf)) {
-				FileWrite(pCLServing->fd, FLAGFALSE,
-					  "failed]\r\n", -1);
-				continue;
-			    }
-			    if (XTABS == (TABDLY & sbuf.c_oflag))
-				FileWrite(pCLServing->fd, FLAGFALSE,
-					  "tabs OFF]\r\n", -1);
-			    else
-				FileWrite(pCLServing->fd, FLAGFALSE,
-					  "tabs ON]\r\n", -1);
-			    break;
+					  "hosts]\r\n", -1);
+				CommandHosts(pGE, pCLServing, pCEServing,
+					     tyme);
+				break;
 
-			case 'Q':	/* DEC vt100 PF2 */
-			case '.':	/* disconnect */
-			case '\004':
-			case '\003':
-			    FileWrite(pCLServing->fd, FLAGFALSE,
-				      "disconnect]\r\n", -1);
-			    nr = 0;
-			    if (pCEServing->fup &&
-				pCEServing->type == DEVICE) {
+			    case 'v':	/* version */
+			    case 'V':
+				FilePrint(pCLServing->fd, FLAGFALSE,
+					  "version `%s']\r\n",
+					  THIS_VERSION);
+				break;
+
+			    case 'w':	/* who */
+			    case 'W':
+				FilePrint(pCLServing->fd, FLAGFALSE,
+					  "who %s]\r\n",
+					  pCEServing->server);
+				CommandWho(pGE, pCLServing, pCEServing,
+					   tyme);
+				break;
+
+			    case 'x':
+			    case 'X':
+				FileWrite(pCLServing->fd, FLAGFALSE,
+					  "examine]\r\n", -1);
+				CommandExamine(pGE, pCLServing, pCEServing,
+					       tyme);
+				break;
+
+			    case '|':	/* wait for client */
+				if (!pCLServing->fwr) {
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					      "attach to run local command]\r\n",
+					      -1);
+				    continue;
+				}
+				FileSetQuoteIAC(pCLServing->fd, FLAGFALSE);
+				FilePrint(pCLServing->fd, FLAGFALSE,
+					  "%c%c", OB_IAC, OB_EXEC);
+				FileSetQuoteIAC(pCLServing->fd, FLAGTRUE);
+				pCLServing->fcon = 0;
+				pCLServing->iState = S_CWAIT;
+				break;
+
+			    case 'z':	/* suspend the client */
+			    case 'Z':
+			    case '\032':
+				FileSetQuoteIAC(pCLServing->fd, FLAGFALSE);
+				FilePrint(pCLServing->fd, FLAGFALSE,
+					  "%c%c", OB_IAC, OB_SUSP);
+				FileSetQuoteIAC(pCLServing->fd, FLAGTRUE);
+				pCLServing->fcon = 0;
+				pCLServing->iState = S_SUSP;
+				if (pCEServing->pCLwr == pCLServing) {
+				    pCLServing->fwr = 0;
+				    pCLServing->fwantwr = 0;
+				    pCEServing->pCLwr = (CONSCLIENT *)0;
+				    TagLogfileAct(pCEServing,
+						  "%s detached",
+						  pCLServing->acid->
+						  string);
+				}
+				break;
+
+			    case '\t':	/* toggle tab expand    */
+				if (!pCLServing->fwr) {
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					      "attach to toggle tabs]\r\n",
+					      -1);
+				    continue;
+				}
+				if (pCEServing->type != DEVICE &&
+				    pCEServing->type != EXEC) {
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					      "ok]\r\n", -1);
+				    continue;
+				}
 				if (-1 ==
 				    tcgetattr(FileFDNum
 					      (pCEServing->cofile),
 					      &sbuf)) {
 				    FileWrite(pCLServing->fd, FLAGFALSE,
-					      "[failed]\r\n", -1);
+					      "failed]\r\n", -1);
 				    continue;
 				}
-				if (0 == (sbuf.c_iflag & IXOFF)) {
-				    sbuf.c_iflag |= IXOFF | IXON;
+#  if !defined(XTABS)		/* XXX hack */
+#   define XTABS   TAB3
+#  endif
+				if (XTABS == (TABDLY & sbuf.c_oflag)) {
+				    sbuf.c_oflag &= ~TABDLY;
+				    sbuf.c_oflag |= TAB0;
+				} else {
+				    sbuf.c_oflag &= ~TABDLY;
+				    sbuf.c_oflag |= XTABS;
+				}
+				if (-1 ==
 				    tcsetattr(FileFDNum
 					      (pCEServing->cofile),
-					      TCSANOW, &sbuf);
+					      TCSANOW, &sbuf)) {
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					      "failed]\r\n", -1);
+				    continue;
 				}
-			    }
-			    DisconnectClient(pGE, pCLServing, (char *)0,
-					     FLAGFALSE);
-			    continue;
+				if (XTABS == (TABDLY & sbuf.c_oflag))
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					      "tabs OFF]\r\n", -1);
+				else
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					      "tabs ON]\r\n", -1);
+				break;
 
-			case ' ':	/* abort escape sequence */
-			case '\n':
-			case '\r':
-			    FileWrite(pCLServing->fd, FLAGFALSE,
-				      "ignored]\r\n", -1);
-			    break;
-
-			case '\\':	/* quote mode (send ^Q,^S) */
-			    if (pCEServing->fronly) {
+			    case 'Q':	/* DEC vt100 PF2 */
+			    case '.':	/* disconnect */
+			    case '\004':
+			    case '\003':
 				FileWrite(pCLServing->fd, FLAGFALSE,
-					  "can't write to read-only console]\r\n",
-					  -1);
-				continue;
-			    }
-			    if (!pCLServing->fwr) {
-				FileWrite(pCLServing->fd, FLAGFALSE,
-					  "attach to send character]\r\n",
-					  -1);
-				continue;
-			    }
-			    BuildString((char *)0, pCLServing->accmd);
-			    pCLServing->iState = S_QUOTE;
-			    FileWrite(pCLServing->fd, FLAGFALSE,
-				      "quote \\", -1);
-			    break;
+					  "disconnect]\r\n", -1);
+				if (pCEServing->fup &&
+				    pCEServing->type == DEVICE) {
+				    if (-1 ==
+					tcgetattr(FileFDNum
+						  (pCEServing->cofile),
+						  &sbuf)) {
+					FileWrite(pCLServing->fd,
+						  FLAGFALSE,
+						  "[failed]\r\n", -1);
+					continue;
+				    }
+				    if (0 == (sbuf.c_iflag & IXOFF)) {
+					sbuf.c_iflag |= IXOFF | IXON;
+					tcsetattr(FileFDNum
+						  (pCEServing->cofile),
+						  TCSANOW, &sbuf);
+				    }
+				}
+				DisconnectClient(pGE, pCLServing,
+						 (char *)0, FLAGFALSE);
+				return;
 
-			default:	/* unknown sequence */
-			  unknownchar:
-			    FileWrite(pCLServing->fd, FLAGFALSE,
-				      "unknown -- use `?']\r\n", -1);
-			    break;
-		    }
-		    continue;
-	    }
+			    case ' ':	/* abort escape sequence */
+			    case '\n':
+			    case '\r':
+				FileWrite(pCLServing->fd, FLAGFALSE,
+					  "ignored]\r\n", -1);
+				break;
+
+			    case '\\':	/* quote mode (send ^Q,^S) */
+				if (pCEServing->fronly) {
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					      "can't write to read-only console]\r\n",
+					      -1);
+				    continue;
+				}
+				if (!pCLServing->fwr) {
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					      "attach to send character]\r\n",
+					      -1);
+				    continue;
+				}
+				BuildString((char *)0, pCLServing->accmd);
+				pCLServing->iState = S_QUOTE;
+				FileWrite(pCLServing->fd, FLAGFALSE,
+					  "quote \\", -1);
+				break;
+
+			    default:	/* unknown sequence */
+			      unknownchar:
+				FileWrite(pCLServing->fd, FLAGFALSE,
+					  "unknown -- use `?']\r\n", -1);
+				break;
+			}
+			continue;
+		}
+	}
+	nr -= l;
+	MemMove(acIn, acIn + l, nr);
     }
 }
 
@@ -3368,13 +3504,14 @@ FlushConsole(pCEServing)
     CONSENT *pCEServing;
 #endif
 {
+    static STRING *buf = (STRING *)0;
+    int offset = 0;
     /* we buffered console data in PutConsole() so that we can
      * send more than 1-byte payloads, if we get more than 1-byte
      * of data from a client connection.  here we flush that buffer,
      * possibly putting it into the write buffer (but we don't really
      * need to worry about that here.
      */
-    int justHadDelay = 0;
     if (pCEServing->wbuf->used <= 1) {
 	return;
     }
@@ -3384,226 +3521,202 @@ FlushConsole(pCEServing)
 	pCEServing->wbufIAC = 0;
 	return;
     }
-    while (!justHadDelay && pCEServing->wbuf->used > 1) {
-	if (pCEServing->wbufIAC == 0) {
-	    CONDDEBUG((1, "Kiddie(): flushing %d non-IAC bytes to fd %d",
-		       pCEServing->wbuf->used - 1,
-		       FileFDNum(pCEServing->cofile)));
-	    if (FileWrite
-		(pCEServing->cofile, FLAGFALSE, pCEServing->wbuf->string,
-		 pCEServing->wbuf->used - 1) < 0) {
-		Error("[%s] write failure", pCEServing->server);
-		ConsoleError(pCEServing);
-		break;
-	    }
-	    BuildString((char *)0, pCEServing->wbuf);
-	} else {
-	    unsigned char next;
 
+    if (buf == (STRING *)0)
+	buf = AllocString();
+    BuildString((char *)0, buf);
+
+    /* while wbuf
+     *    if wbufIAC == 1, yikes
+     *    else if wbufIAC == 0, buffer all data, move offset
+     *    else if wbufIAC > 2, buffer data, wbufIAC = 2, move offset
+     *    else if wbufIAC == 2, then
+     *       if heavy
+     *          write buffer
+     *          if flushed, do heavy, else break
+     *          break
+     *       else if light
+     *          buffer data
+     *       search for new wbufIAC
+     */
+    {
+	static STRING *s;
+	if (s == (STRING *)0)
+	    s = AllocString();
+	BuildString((char *)0, s);
+	FmtCtlStr(pCEServing->wbuf->string, pCEServing->wbuf->used, s);
+	CONDDEBUG((1, "Kiddie(): wbuf=%s", s->string));
+    }
+
+    while (pCEServing->wbuf->used > 1 &&
+	   offset < pCEServing->wbuf->used - 1) {
+	CONDDEBUG((1, "Kiddie(): wbuf->used=%d, offset=%d, wbufIAC=%d",
+		   pCEServing->wbuf->used, offset, pCEServing->wbufIAC));
+	if (pCEServing->wbufIAC >= pCEServing->wbuf->used) {
 	    /* this should never really happen...but in case it
 	     * does, just reset wbufIAC and try again.
 	     */
-	    if (pCEServing->wbuf->used < pCEServing->wbufIAC) {
-		CONDDEBUG((1,
-			   "Kiddie(): invalid wbufIAC setting for fd %d",
-			   FileFDNum(pCEServing->cofile)));
-	    } else {
-		if ((((next =
-		       (unsigned char)pCEServing->wbuf->string[pCEServing->
-							       wbufIAC -
-							       1]) >= '0'
-		      && next <= '9') || (next == BREAK &&
-					  pCEServing->type != HOST))) {
-		    CONDDEBUG((1, "Kiddie(): heavy IAC for fd %d",
-			       FileFDNum(pCEServing->cofile)));
-		    /* if we have data before the IAC, send it */
-		    if (pCEServing->wbufIAC > 2) {
-			CONDDEBUG((1,
-				   "Kiddie(): heavy IAC flushing %d leading bytes for fd %d",
-				   pCEServing->wbufIAC - 2,
-				   FileFDNum(pCEServing->cofile)));
-			if (FileWrite
-			    (pCEServing->cofile, FLAGFALSE,
-			     pCEServing->wbuf->string,
-			     pCEServing->wbufIAC - 2) < 0) {
-			    Error("[%s] write failure",
-				  pCEServing->server);
-			    ConsoleError(pCEServing);
-			    break;
-			}
-		    }
-		    /* if we didn't flush everything, bail and get
-		     * it the next time around (hopefully it'll have
-		     * cleared...or will soon.
-		     */
-		    if (!FileBufEmpty(pCEServing->cofile)) {
-			/* if we wrote something, shift it out */
-			if (pCEServing->wbufIAC > 2) {
-			    ShiftString(pCEServing->wbuf,
-					pCEServing->wbufIAC - 2);
-			    pCEServing->wbufIAC = 2;
-			}
-			CONDDEBUG((1,
-				   "Kiddie(): heavy IAC (wait for flush) for fd %d",
-				   FileFDNum(pCEServing->cofile)));
-			break;
-		    }
-
-		    /* Do the operation */
-		    if (next >= '0' && next <= '9') {
-			int delay = BREAKDELAYDEFAULT;
-			if (next != '0')
-			    delay = breakList[next - '1'].delay;
-			/* in theory this sets the break length to whatever
-			 * the "default" break sequence is for the console.
-			 * but, i think it would be better to just use the
-			 * global default (250ms right now) so that you
-			 * don't have to change things or get anything
-			 * unexpected.  remember, this is really just for
-			 * idle strings...
-			 else {
-			 if (pCEServing->breakNum != 0 &&
-			 breakList[pCEServbing->breakNum -
-			 1].seq->used <= 1)
-			 delay =
-			 breakList[pCEServbing->breakNum -
-			 1].delay;
-			 }
-			 */
-			CONDDEBUG((1,
-				   "Kiddie(): heavy IAC - doing usleep() for fd %d (break #%c - delay %dms)",
-				   FileFDNum(pCEServing->cofile), next,
-				   delay));
-			if (delay != 0)
-			    usleep(delay * 1000);
-		    } else if (next == BREAK) {
-			CONDDEBUG((1,
-				   "Kiddie(): heavy IAC - doing tcsendbreak() for fd %d",
-				   FileFDNum(pCEServing->cofile)));
-			if (tcsendbreak(FileFDNum(pCEServing->cofile), 0)
-			    == -1) {
-			    if (pCEServing->pCLwr != (CONSCLIENT *)0)
-				FileWrite(pCEServing->pCLwr->fd, FLAGFALSE,
-					  "[tcsendbreak() failed]\r\n",
-					  -1);
-			}
-		    }
-
-		    /* shift things off and trigger completion */
-		    ShiftString(pCEServing->wbuf, pCEServing->wbufIAC);
-		    justHadDelay = 1;
-		    /* we do this 'cause we just potentially paused for
-		     * a half-second doing a break...or even the
-		     * intentional usleep().  we could take out the
-		     * justHadDelay bits and continue with the stream,
-		     * but this allows us to process other consoles and
-		     * then come around and do more on this one.  you
-		     * see, someone could have a '\d\z\d\z\d\z' sequence
-		     * as a break string and we'd have about a 2 second
-		     * delay added up if we process it all at once.
-		     * we're just trying to be nice here.
-		     */
-		} else {
-		    char *iac;
-		    int offset = 0;
-		    static STRING *buf = (STRING *)0;
-
-		    if (buf == (STRING *)0)
-			buf = AllocString();
-		    BuildString((char *)0, buf);
-
-		    do {
-			CONDDEBUG((1, "Kiddie(): soft IAC for fd %d",
-				   FileFDNum(pCEServing->cofile)));
-			if (pCEServing->wbufIAC == 0) {
-			    /* if no more IAC chars, just throw the rest
-			     * into the buffer, clear things, and stop
-			     */
-			    CONDDEBUG((1,
-				       "Kiddie(): soft IAC buffering to EOS for fd %d",
-				       FileFDNum(pCEServing->cofile)));
-			    BuildString(pCEServing->wbuf->string + offset,
-					buf);
-			    offset = pCEServing->wbuf->used - 1;
-			    break;
-			}
-			/* buffer everything up to the IAC */
-			CONDDEBUG((1,
-				   "Kiddie(): soft IAC buffering to IAC for fd %d",
-				   FileFDNum(pCEServing->cofile)));
-			BuildStringN(pCEServing->wbuf->string + offset,
-				     pCEServing->wbufIAC - 2, buf);
-			/* process allowed sequences */
-			if (next == IAC) {
-			    CONDDEBUG((1,
-				       "Kiddie(): soft IAC processing IAC for fd %d",
-				       FileFDNum(pCEServing->cofile)));
-			    BuildStringChar((char)IAC, buf);
-			} else if (next == BREAK &&
-				   pCEServing->type == HOST) {
-			    CONDDEBUG((1,
-				       "Kiddie(): soft IAC processing HOST BREAK for fd %d",
-				       FileFDNum(pCEServing->cofile)));
-			    BuildStringChar((char)IAC, buf);
-			    BuildStringChar((char)BREAK, buf);
-			} else {
-			    CONDDEBUG((1,
-				       "Kiddie(): soft IAC unprocessable IAC for fd %d",
-				       FileFDNum(pCEServing->cofile)));
-			    /* move offset up to right before IAC */
-			    offset += pCEServing->wbufIAC - 2;
-			    break;
-			}
-			/* bring offset past char after IAC */
-			CONDDEBUG((1,
-				   "Kiddie(): soft IAC looking for new IAC for fd %d",
-				   FileFDNum(pCEServing->cofile)));
-			offset += pCEServing->wbufIAC;
-			iac =
-			    strchr(pCEServing->wbuf->string + offset, IAC);
-			if (iac == (char *)0)
-			    pCEServing->wbufIAC = 0;
-			else
-			    pCEServing->wbufIAC =
-				iac - (pCEServing->wbuf->string + offset) +
-				2;
-		    } while (offset < pCEServing->wbuf->used - 1);
-
-		    /* shift off the buffered data */
+	    CONDDEBUG((1, "Kiddie(): invalid wbufIAC setting for [%s]",
+		       pCEServing->server));
+	} else if (pCEServing->wbufIAC == 1) {
+	    Error("[%s] internal failure: wbufIAC==1", pCEServing->server);
+	    offset = pCEServing->wbuf->used - 1;	/* bail */
+	} else if (pCEServing->wbufIAC == 0) {
+	    CONDDEBUG((1,
+		       "Kiddie(): flushing final %d non-IAC bytes to [%s]",
+		       pCEServing->wbuf->used - 1 - offset,
+		       pCEServing->server));
+	    BuildStringN(pCEServing->wbuf->string + offset,
+			 pCEServing->wbuf->used - 1 - offset, buf);
+	    offset = pCEServing->wbuf->used - 1;
+	} else if (pCEServing->wbufIAC > 2) {
+	    CONDDEBUG((1, "Kiddie(): flushing %d non-IAC bytes to [%s]",
+		       pCEServing->wbufIAC - 2, pCEServing->server));
+	    BuildStringN(pCEServing->wbuf->string + offset,
+			 pCEServing->wbufIAC - 2, buf);
+	    offset += pCEServing->wbufIAC - 2;
+	    pCEServing->wbufIAC = 2;
+	    continue;
+	} else {		/* wbufIAC == 2 */
+	    unsigned char next =
+		(unsigned char)pCEServing->wbuf->string[offset + 1];
+	    if ((next >= '0' && next <= '9') ||
+		(next == BREAK && pCEServing->type != HOST)) {
+		CONDDEBUG((1, "Kiddie(): heavy IAC for [%s]",
+			   pCEServing->server));
+		offset += 2;
+		/* if we have buffered data, send it */
+		if (buf->used > 1) {
 		    CONDDEBUG((1,
-			       "Kiddie(): soft IAC shifting off %d chars for fd %d",
-			       offset, FileFDNum(pCEServing->cofile)));
-		    ShiftString(pCEServing->wbuf, offset);
-
-		    /* send the buffered data */
-		    CONDDEBUG((1,
-			       "Kiddie(): soft IAC writing %d chars to fd %d",
-			       buf->used - 1,
-			       FileFDNum(pCEServing->cofile)));
+			       "Kiddie(): heavy IAC flushing %d leading bytes for [%s]",
+			       buf->used - 1, pCEServing->server));
 		    if (FileWrite
 			(pCEServing->cofile, FLAGFALSE, buf->string,
 			 buf->used - 1) < 0) {
 			Error("[%s] write failure", pCEServing->server);
 			ConsoleError(pCEServing);
+			BuildString((char *)0, buf);
 			break;
 		    }
 		    BuildString((char *)0, buf);
 		}
+		/* if we didn't flush everything, bail and get
+		 * it the next time around (hopefully it'll have
+		 * cleared...or will soon.
+		 */
+		if (!FileBufEmpty(pCEServing->cofile)) {
+		    CONDDEBUG((1,
+			       "Kiddie(): heavy IAC (wait for flush) for [%s]",
+			       pCEServing->server));
+		    break;
+		}
+
+		/* Do the operation */
+		if (next >= '0' && next <= '9') {
+		    int delay = BREAKDELAYDEFAULT;
+		    if (next != '0')
+			delay = breakList[next - '1'].delay;
+		    /* in theory this sets the break length to whatever
+		     * the "default" break sequence is for the console.
+		     * but, i think it would be better to just use the
+		     * global default (250ms right now) so that you
+		     * don't have to change things or get anything
+		     * unexpected.  remember, this is really just for
+		     * idle strings...
+		     else {
+		     if (pCEServing->breakNum != 0 &&
+		     breakList[pCEServbing->breakNum -
+		     1].seq->used <= 1)
+		     delay =
+		     breakList[pCEServbing->breakNum -
+		     1].delay;
+		     }
+		     */
+		    CONDDEBUG((1,
+			       "Kiddie(): heavy IAC - doing usleep() for [%s] (break #%c - delay %dms)",
+			       pCEServing->server, next, delay));
+		    if (delay != 0)
+			usleep(delay * 1000);
+		} else if (next == BREAK) {
+		    CONDDEBUG((1,
+			       "Kiddie(): heavy IAC - doing tcsendbreak() for [%s]",
+			       pCEServing->server));
+		    if (tcsendbreak(FileFDNum(pCEServing->cofile), 0)
+			== -1) {
+			if (pCEServing->pCLwr != (CONSCLIENT *)0)
+			    FileWrite(pCEServing->pCLwr->fd, FLAGFALSE,
+				      "[tcsendbreak() failed]\r\n", -1);
+		    }
+		}
+		/* we do this 'cause we just potentially paused for
+		 * a half-second doing a break...or even the
+		 * intentional usleep().  we could take out the
+		 * justHadDelay bits and continue with the stream,
+		 * but this allows us to process other consoles and
+		 * then come around and do more on this one.  you
+		 * see, someone could have a '\d\z\d\z\d\z' sequence
+		 * as a break string and we'd have about a 2 second
+		 * delay added up if we process it all at once.
+		 * we're just trying to be nice here.
+		 */
+		break;
+	    } else {
+		CONDDEBUG((1, "Kiddie(): soft IAC for fd [%s]",
+			   pCEServing->server));
+		offset += 2;
+		if (next == IAC) {
+		    CONDDEBUG((1,
+			       "Kiddie(): soft IAC processing IAC for [%s]",
+			       pCEServing->server));
+		    BuildStringChar((char)IAC, buf);
+		} else if (next == BREAK && pCEServing->type == HOST) {
+		    CONDDEBUG((1,
+			       "Kiddie(): soft IAC processing HOST BREAK for [%s]",
+			       pCEServing->server));
+		    BuildStringChar((char)IAC, buf);
+		    BuildStringChar((char)BREAK, buf);
+		} else {
+		    CONDDEBUG((1,
+			       "Kiddie(): soft IAC unprocessable IAC for [%s]",
+			       pCEServing->server));
+		}
 	    }
-	    CONDDEBUG((1, "Kiddie(): hunting for new IAC for fd %d",
-		       FileFDNum(pCEServing->cofile)));
-	    /* hunt for a new IAC position */
-	    if (pCEServing->wbuf->used > 1) {
-		char *iac = strchr(pCEServing->wbuf->string, IAC);
-		if (iac == (char *)0)
-		    pCEServing->wbufIAC = 0;
-		else
-		    pCEServing->wbufIAC =
-			(iac - pCEServing->wbuf->string) + 2;
-	    } else
-		pCEServing->wbufIAC = 0;
 	}
+
+	/* hunt for a new IAC position */
+	if (offset < pCEServing->wbuf->used - 1) {
+	    char *iac = StringChar(pCEServing->wbuf, offset, (char)IAC);
+	    CONDDEBUG((1, "Kiddie(): hunting for new IAC for [%s]",
+		       pCEServing->server));
+	    if (iac == (char *)0)
+		pCEServing->wbufIAC = 0;
+	    else
+		pCEServing->wbufIAC =
+		    (iac - pCEServing->wbuf->string - offset) + 2;
+	} else
+	    pCEServing->wbufIAC = 0;
     }
+
+    if (buf->used > 1) {
+	CONDDEBUG((1, "Kiddie(): flushing buffer of %d bytes for [%s]",
+		   buf->used - 1, pCEServing->server));
+	if (FileWrite
+	    (pCEServing->cofile, FLAGFALSE, buf->string,
+	     buf->used - 1) < 0) {
+	    Error("[%s] write failure", pCEServing->server);
+	    ConsoleError(pCEServing);
+	    return;
+	}
+	BuildString((char *)0, buf);
+    }
+
+    /* nuke the data alread sent */
+    if (offset >= pCEServing->wbuf->used - 1) {
+	BuildString((char *)0, pCEServing->wbuf);
+    } else if (offset > 0) {
+	ShiftString(pCEServing->wbuf, offset);
+    }
+
     if (pCEServing->wbuf->used > 1) {
 	CONDDEBUG((1,
 		   "Kiddie(): watching writability for fd %d 'cause we have buffered data",
@@ -3619,9 +3732,10 @@ FlushConsole(pCEServing)
     }
     pCEServing->lastWrite = time((time_t *)0);
     if (pCEServing->idletimeout != (time_t)0 &&
-	(timers[T_IDLE] == (time_t)0 ||
-	 timers[T_IDLE] > pCEServing->lastWrite + pCEServing->idletimeout))
-	timers[T_IDLE] = pCEServing->lastWrite + pCEServing->idletimeout;
+	(timers[T_CIDLE] == (time_t)0 ||
+	 timers[T_CIDLE] >
+	 pCEServing->lastWrite + pCEServing->idletimeout))
+	timers[T_CIDLE] = pCEServing->lastWrite + pCEServing->idletimeout;
 }
 
 
@@ -3832,8 +3946,8 @@ Kiddie(pGE, sfd)
 	}
 
 	/* process any idle timeouts */
-	if (timers[T_IDLE] != (time_t)0 && tyme >= timers[T_IDLE]) {
-	    timers[T_IDLE] = (time_t)0;
+	if (timers[T_CIDLE] != (time_t)0 && tyme >= timers[T_CIDLE]) {
+	    timers[T_CIDLE] = (time_t)0;
 	    for (pCEServing = pGE->pCElist; pCEServing != (CONSENT *)0;
 		 pCEServing = pCEServing->pCEnext) {
 		/* if we aren't in a normal state, skip it */
@@ -3847,9 +3961,9 @@ Kiddie(pGE, sfd)
 		    time_t chime =
 			pCEServing->lastWrite + pCEServing->idletimeout;
 		    if (tyme < chime) {
-			if (timers[T_IDLE] == (time_t)0 ||
-			    timers[T_IDLE] > chime)
-			    timers[T_IDLE] = chime;
+			if (timers[T_CIDLE] == (time_t)0 ||
+			    timers[T_CIDLE] > chime)
+			    timers[T_CIDLE] = chime;
 			continue;
 		    }
 		    ExpandString(pCEServing->idlestring, pCEServing, 0);
@@ -3863,9 +3977,9 @@ Kiddie(pGE, sfd)
 		     */
 		    pCEServing->lastWrite = tyme;
 		    chime = tyme + pCEServing->idletimeout;
-		    if (timers[T_IDLE] == (time_t)0 ||
-			timers[T_IDLE] > chime)
-			timers[T_IDLE] = chime;
+		    if (timers[T_CIDLE] == (time_t)0 ||
+			timers[T_CIDLE] > chime)
+			timers[T_CIDLE] = chime;
 		}
 	    }
 	}
@@ -3980,11 +4094,11 @@ Kiddie(pGE, sfd)
 			FD_SET(cofile, &rinit);
 			FD_CLR(cofile, &winit);
 			if (pCEServing->idletimeout != (time_t)0 &&
-			    (timers[T_IDLE] == (time_t)0 ||
-			     timers[T_IDLE] >
+			    (timers[T_CIDLE] == (time_t)0 ||
+			     timers[T_CIDLE] >
 			     pCEServing->lastWrite +
 			     pCEServing->idletimeout))
-			    timers[T_IDLE] =
+			    timers[T_CIDLE] =
 				pCEServing->lastWrite +
 				pCEServing->idletimeout;
 			StartInit(pCEServing);
@@ -4140,9 +4254,10 @@ Kiddie(pGE, sfd)
 	    continue;
 	}
 
-	if (SetFlags(sfd, O_NONBLOCK, 0))
+	if (SetFlags(sfd, O_NONBLOCK, 0)) {
 	    pGE->pCLfree->fd = FileOpenFD(fd, simpleSocket);
-	else
+	    FileSetQuoteIAC(pGE->pCLfree->fd, FLAGTRUE);
+	} else
 	    pGE->pCLfree->fd = (CONSFILE *)0;
 
 	if ((CONSFILE *)0 == pGE->pCLfree->fd) {

@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.152 2003/11/28 00:47:30 bryan Exp $
+ *  $Id: console.c,v 5.155 2004/01/08 16:12:46 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -193,7 +193,7 @@ Usage(wantfull)
 	"D       enable debug output, sent to stderr",
 	"e esc   set the initial escape characters",
 #if HAVE_OPENSSL
-	"E       don't require encrypted connections",
+	"E       don't attempt encrypted connections",
 #else
 	"E       ignored - encryption not compiled into code",
 #endif
@@ -573,6 +573,7 @@ ReadReply(fd)
 	BuildString((char *)0, result);
 
     while (1) {
+	int l;
 	switch (nr = FileRead(fd, buf, sizeof(buf))) {
 	    case 0:
 		/* fall through */
@@ -583,6 +584,13 @@ ReadReply(fd)
 		Error("lost connection");
 		Bye(EX_UNAVAILABLE);
 	    default:
+		while ((l = ParseIACBuf(fd, buf, &nr)) >= 0) {
+		    if (l == 0)
+			continue;
+		    BuildStringN(buf, l, result);
+		    nr -= l;
+		    MemMove(buf, buf + l, nr);
+		}
 		BuildStringN(buf, nr, result);
 		if (toEOF)	/* if toEOF, read until EOF */
 		    continue;
@@ -602,119 +610,6 @@ ReadReply(fd)
 	CONDDEBUG((1, "ReadReply: `%s'", tmpString->string));
     }
     return result->string;
-}
-
-static int SawUrg = 0;
-
-/* when the conserver program gets the suspend sequence it will send us
- * an out of band command to suspend ourself.  We just tell the reader
- * routine we saw one
- */
-RETSIGTYPE
-#if PROTOTYPES
-OOB(int sig)
-#else
-OOB(sig)
-    int sig;
-#endif
-{
-    ++SawUrg;
-#if !HAVE_SIGACTION
-#if defined(SIGURG)
-    SimpleSignal(SIGURG, OOB);
-#endif
-#endif
-}
-
-void
-#if PROTOTYPES
-ProcessUrgentData(CONSFILE *pcf)
-#else
-ProcessUrgentData(pcf)
-    CONSFILE *pcf;
-#endif
-{
-    static char acCmd;
-    int s;
-
-    SawUrg = 0;
-    s = FileFDNum(pcf);
-
-    /* get the pending urgent message
-     */
-    while (recv(s, &acCmd, 1, MSG_OOB) < 0) {
-	switch (errno) {
-	    case EWOULDBLOCK:
-		/* clear any pending input to make room */
-		read(s, &acCmd, 1);
-		FileWrite(cfstdout, FLAGFALSE, ".", 1);
-		continue;
-	    case EINVAL:
-	    default:
-		Error("recv(%d): %s\r", s, strerror(errno));
-		sleep(1);
-		continue;
-	}
-    }
-    switch (acCmd) {
-	case OB_EXEC:
-	    FileWrite(cfstdout, FLAGFALSE, "exec: ", 6);
-	    BuildString((char *)0, execCmd);
-	    for (;;) {
-		char c;
-		if (read(0, &c, 1) == 0)
-		    break;
-		if (c == '\n' || c == '\r') {
-		    FileWrite(cfstdout, FLAGFALSE, "]\r\n", 3);
-		    if (execCmd->used <= 1) {
-			char s = OB_DROP;
-			FileWrite(pcf, FLAGFALSE, &s, 1);
-		    }
-		    break;
-		}
-		if (c == '\a' || (c >= ' ' && c <= '~')) {
-		    BuildStringChar(c, execCmd);
-		    FileWrite(cfstdout, FLAGFALSE, &c, 1);
-		} else if ((c == '\b' || c == 0x7f) && execCmd->used > 1) {
-		    if (execCmd->string[execCmd->used - 2] != '\a') {
-			FileWrite(cfstdout, FLAGFALSE, "\b \b", 3);
-		    }
-		    execCmd->string[execCmd->used - 2] = '\000';
-		    execCmd->used--;
-		} else if ((c == 0x15) && execCmd->used > 1) {
-		    while (execCmd->used > 1) {
-			if (execCmd->string[execCmd->used - 2] != '\a') {
-			    FileWrite(cfstdout, FLAGFALSE, "\b \b", 3);
-			}
-			execCmd->string[execCmd->used - 2] = '\000';
-			execCmd->used--;
-		    }
-		}
-	    }
-	    break;
-	case OB_SUSP:
-#if defined(SIGSTOP)
-	    FileWrite(cfstdout, FLAGFALSE, "stop]", 5);
-	    C2Cooked();
-	    kill(getpid(), SIGSTOP);
-	    C2Raw();
-	    FileWrite(cfstdout, FLAGFALSE,
-		      "[press any character to continue", 32);
-#else
-	    FileWrite(cfstdout, FLAGFALSE,
-		      "stop not supported -- press any character to continue",
-		      53);
-#endif
-	    break;
-	case OB_DROP:
-	    FileWrite(cfstdout, FLAGFALSE, "dropped by server]\r\n", 20);
-	    C2Cooked();
-	    Bye(EX_UNAVAILABLE);
-	 /*NOTREACHED*/ default:
-	    Error("unknown out of band command `%c\'\r", acCmd);
-	    fflush(stderr);
-	    break;
-    }
 }
 
 static void
@@ -846,9 +741,6 @@ ExecCmd()
 
     /* put the signals back that we ignore (trapped auto-reset to default)
      */
-#if defined(SIGURG)
-    SimpleSignal(SIGURG, SIG_DFL);
-#endif
     SimpleSignal(SIGPIPE, SIG_DFL);
     SimpleSignal(SIGCHLD, SIG_DFL);
 
@@ -867,10 +759,10 @@ ExecCmd()
     iNewGrp = setsid();
     if (-1 == iNewGrp) {
 	Error("ExecCmd(): setsid(): %s", strerror(errno));
-	iNewGrp = getpid();
+	iNewGrp = thepid;
     }
 # else
-    iNewGrp = getpid();
+    iNewGrp = thepid;
 # endif
 
     if (dup(pout[0]) != 0 || dup(pin[1]) != 1) {
@@ -890,6 +782,84 @@ ExecCmd()
     return;
 }
 
+void
+#if PROTOTYPES
+DoExec(CONSFILE *pcf)
+#else
+DoExec(pcf)
+    CONSFILE *pcf;
+#endif
+{
+    FileWrite(cfstdout, FLAGFALSE, "exec: ", 6);
+    BuildString((char *)0, execCmd);
+    for (;;) {
+	char c;
+	if (read(0, &c, 1) == 0)
+	    break;
+	if (c == '\n' || c == '\r') {
+	    FileWrite(cfstdout, FLAGFALSE, "]\r\n", 3);
+	    break;
+	}
+	if (c == '\a' || (c >= ' ' && c <= '~')) {
+	    BuildStringChar(c, execCmd);
+	    FileWrite(cfstdout, FLAGFALSE, &c, 1);
+	} else if ((c == '\b' || c == 0x7f) && execCmd->used > 1) {
+	    if (execCmd->string[execCmd->used - 2] != '\a') {
+		FileWrite(cfstdout, FLAGFALSE, "\b \b", 3);
+	    }
+	    execCmd->string[execCmd->used - 2] = '\000';
+	    execCmd->used--;
+	} else if ((c == 0x15) && execCmd->used > 1) {
+	    while (execCmd->used > 1) {
+		if (execCmd->string[execCmd->used - 2] != '\a') {
+		    FileWrite(cfstdout, FLAGFALSE, "\b \b", 3);
+		}
+		execCmd->string[execCmd->used - 2] = '\000';
+		execCmd->used--;
+	    }
+	}
+    }
+    if (execCmd != (STRING *)0 && execCmd->used > 1) {
+	ExecCmd();
+	BuildString((char *)0, execCmd);
+	if (execCmdFile == (CONSFILE *)0) {	/* exec failed */
+	    /* say forget it */
+	    FileSetQuoteIAC(pcf, FLAGFALSE);
+	    FilePrint(pcf, FLAGFALSE, "%c%c", OB_IAC, OB_ABRT);
+	    FileSetQuoteIAC(pcf, FLAGTRUE);
+	} else {
+	    char *r;
+	    /* go back to blocking mode */
+	    SetFlags(FileFDNum(pcf), 0, O_NONBLOCK);
+	    /* say we're ready */
+	    FileSetQuoteIAC(pcf, FLAGFALSE);
+	    FilePrint(pcf, FLAGFALSE, "%c%c", OB_IAC, OB_EXEC);
+	    FileSetQuoteIAC(pcf, FLAGTRUE);
+	    r = ReadReply(pcf, 0);
+	    /* now back to non-blocking, now that we've got reply */
+	    SetFlags(FileFDNum(pcf), O_NONBLOCK, 0);
+	    /* if we aren't still r/w, abort */
+	    if (strncmp(r, "[rw]", 4) != 0) {
+		FileWrite(cfstdout, FLAGFALSE,
+			  "[no longer read-write - aborting command]\r\n",
+			  -1);
+		FD_CLR(FileFDNum(execCmdFile), &rinit);
+		FD_CLR(FileFDOutNum(execCmdFile), &winit);
+		FileClose(&execCmdFile);
+		FileSetQuoteIAC(pcf, FLAGFALSE);
+		FilePrint(pcf, FLAGFALSE, "%c%c", OB_IAC, OB_ABRT);
+		FileSetQuoteIAC(pcf, FLAGTRUE);
+		kill(execCmdPid, SIGHUP);
+	    }
+	}
+    } else {
+	/* say forget it */
+	FileSetQuoteIAC(pcf, FLAGFALSE);
+	FilePrint(pcf, FLAGFALSE, "%c%c", OB_IAC, OB_ABRT);
+	FileSetQuoteIAC(pcf, FLAGTRUE);
+    }
+}
+
 /* interact with a group server					(ksb)
  */
 static int
@@ -906,7 +876,7 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
     int fIn = '-';
     fd_set rmask, wmask;
     int i;
-    int justProcessedUrg = 0;
+    int justSuspended = 0;
     char *r = (char *)0;
     static char acMesg[8192];
 
@@ -915,9 +885,9 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
     }
 #if !defined(__CYGWIN__)
 # if defined(F_SETOWN)
-    if (fcntl(FileFDNum(pcf), F_SETOWN, getpid()) == -1) {
-	Error("fcntl(F_SETOWN,%d): %d: %s", getpid(), FileFDNum(pcf),
-	      strerror(errno));
+    if (fcntl(FileFDNum(pcf), F_SETOWN, thepid) == -1) {
+	Error("fcntl(F_SETOWN,%lu): %d: %s", (unsigned long)thepid,
+	      FileFDNum(pcf), strerror(errno));
     }
 # else
 #  if defined(SIOCSPGRP)
@@ -925,7 +895,7 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 	int iTemp;
 	/* on the HP-UX systems if different
 	 */
-	iTemp = -getpid();
+	iTemp = -thepid;
 	if (ioctl(FileFDNum(pcf), SIOCSPGRP, &iTemp) == -1) {
 	    Error("ioctl(%d,SIOCSPGRP): %s", FileFDNum(pcf),
 		  strerror(errno));
@@ -933,9 +903,6 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
     }
 #  endif
 # endif
-#endif
-#if defined(SIGURG)
-    SimpleSignal(SIGURG, OOB);
 #endif
     SimpleSignal(SIGCHLD, FlagReapVirt);
 
@@ -1048,38 +1015,7 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
     if (maxfd < FileFDNum(pcf) + 1)
 	maxfd = FileFDNum(pcf) + 1;
     for (;;) {
-	justProcessedUrg = 0;
-	if (SawUrg) {
-	    ProcessUrgentData(pcf);
-	    justProcessedUrg = 1;
-	}
-	if (execCmd != (STRING *)0 && execCmd->used > 1) {
-	    char *r;
-	    char s = OB_EXEC;
-	    ExecCmd();
-	    BuildString((char *)0, execCmd);
-	    if (execCmdFile == (CONSFILE *)0) {	/* exec failed */
-		s = OB_DROP;
-		FileWrite(pcf, FLAGFALSE, &s, 1);	/* say forget it */
-	    } else {
-		/* go back to blocking mode */
-		SetFlags(FileFDNum(pcf), 0, O_NONBLOCK);
-		FileWrite(pcf, FLAGFALSE, &s, 1);	/* say we're ready */
-		r = ReadReply(pcf, 0);
-		/* now back to non-blocking now that we've got reply */
-		SetFlags(FileFDNum(pcf), O_NONBLOCK, 0);
-		/* if we aren't still r/w, abort */
-		if (strncmp(r, "[rw]", 4) != 0) {
-		    FileWrite(cfstdout, FLAGFALSE,
-			      "[no longer read-write - aborting command]\r\n",
-			      -1);
-		    FD_CLR(FileFDNum(execCmdFile), &rinit);
-		    FD_CLR(FileFDOutNum(execCmdFile), &winit);
-		    FileClose(&execCmdFile);
-		    kill(execCmdPid, SIGHUP);
-		}
-	    }
-	}
+	justSuspended = 0;
 	if (fSawReapVirt) {
 	    fSawReapVirt = 0;
 	    ReapVirt();
@@ -1106,6 +1042,9 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 		    FD_CLR(FileFDNum(execCmdFile), &rinit);
 		    FD_CLR(FileFDOutNum(execCmdFile), &winit);
 		    FileClose(&execCmdFile);
+		    FileSetQuoteIAC(pcf, FLAGFALSE);
+		    FilePrint(pcf, FLAGFALSE, "%c%c", OB_IAC, OB_ABRT);
+		    FileSetQuoteIAC(pcf, FLAGTRUE);
 		} else {
 		    if (fStrip) {
 			for (i = 0; i < nc; ++i)
@@ -1126,21 +1065,46 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 
 	/* anything from socket? */
 	if (FileCanRead(pcf, &rmask, &wmask)) {
+	    int l;
 	    if ((nc = FileRead(pcf, acMesg, sizeof(acMesg))) < 0) {
 		/* if we got an error/eof after returning from suspend */
-		if (justProcessedUrg) {
+		if (justSuspended) {
 		    fprintf(stderr, "\n");
 		    Error("lost connection");
 		}
 		break;
 	    }
-	    if (fStrip) {
-		for (i = 0; i < nc; ++i)
-		    acMesg[i] &= 127;
-	    }
-	    FileWrite(cfstdout, FLAGFALSE, acMesg, nc);
-	    if (execCmdFile != (CONSFILE *)0) {
-		FileWrite(execCmdFile, FLAGFALSE, acMesg, nc);
+	    while ((l = ParseIACBuf(pcf, acMesg, &nc)) >= 0) {
+		if (l == 0) {
+		    if (FileSawQuoteExec(pcf) == FLAGTRUE)
+			DoExec(pcf);
+		    if (FileSawQuoteSusp(pcf) == FLAGTRUE) {
+			justSuspended = 1;
+#if defined(SIGSTOP)
+			FileWrite(cfstdout, FLAGFALSE, "stop]", 5);
+			C2Cooked();
+			kill(thepid, SIGSTOP);
+			C2Raw();
+			FileWrite(cfstdout, FLAGFALSE,
+				  "[press any character to continue", 32);
+#else
+			FileWrite(cfstdout, FLAGFALSE,
+				  "stop not supported -- press any character to continue",
+				  53);
+#endif
+		    }
+		    continue;
+		}
+		if (fStrip) {
+		    for (i = 0; i < l; ++i)
+			acMesg[i] &= 127;
+		}
+		FileWrite(cfstdout, FLAGFALSE, acMesg, l);
+		if (execCmdFile != (CONSFILE *)0) {
+		    FileWrite(execCmdFile, FLAGFALSE, acMesg, l);
+		}
+		nc -= l;
+		MemMove(acMesg, acMesg + l, nc);
 	    }
 	} else if (!FileBufEmpty(pcf) && FileCanWrite(pcf, &rmask, &wmask)) {
 	    CONDDEBUG((1, "CallUp(): flushing fd %d", FileFDNum(pcf)));
@@ -1255,6 +1219,8 @@ DoCmds(master, ports, cmdi)
 	if ((pcf = GetPort(server, port)) == (CONSFILE *)0)
 	    continue;
 
+	FileSetQuoteIAC(pcf, FLAGTRUE);
+
 	t = ReadReply(pcf, 0);
 	if (strcmp(t, "ok\r\n") != 0) {
 	    FileClose(&pcf);
@@ -1262,15 +1228,17 @@ DoCmds(master, ports, cmdi)
 	    continue;
 	}
 #if HAVE_OPENSSL
-	FileWrite(pcf, FLAGFALSE, "ssl\r\n", 5);
-	t = ReadReply(pcf, 0);
-	if (strcmp(t, "ok\r\n") == 0) {
-	    AttemptSSL(pcf);
-	}
-	if (fReqEncryption && FileGetType(pcf) != SSLSocket) {
-	    Error("Encryption not supported by server `%s'", server);
-	    FileClose(&pcf);
-	    continue;
+	if (fReqEncryption) {
+	    FileWrite(pcf, FLAGFALSE, "ssl\r\n", 5);
+	    t = ReadReply(pcf, 0);
+	    if (strcmp(t, "ok\r\n") == 0) {
+		AttemptSSL(pcf);
+	    }
+	    if (FileGetType(pcf) != SSLSocket) {
+		Error("Encryption not supported by server `%s'", server);
+		FileClose(&pcf);
+		continue;
+	    }
 	}
 #endif
 
@@ -1320,6 +1288,10 @@ DoCmds(master, ports, cmdi)
 		continue;
 	    } else
 		count = 0;
+	} else if (strcmp(t, "ok\r\n") != 0) {
+	    FileClose(&pcf);
+	    FilePrint(cfstdout, FLAGFALSE, "%s: %s", server, t);
+	    continue;
 	}
 
 	/* now that we're logged in, we can do something */
@@ -1456,6 +1428,8 @@ main(argc, argv)
     int retval;
 
     isMultiProc = 0;		/* make sure stuff DOESN'T have the pid */
+
+    thepid = getpid();
 
     if (textMsg == (STRING *)0)
 	textMsg = AllocString();
