@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.55 1999-05-14 10:16:48-07 bryan Exp $
+ *  $Id: group.c,v 5.56 1999-08-24 14:39:12-07 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -127,6 +127,8 @@ extern int FallBack();
 extern char *crypt(), *calloc();
 extern time_t time();
 
+/* flags that a signal has occurred */
+static SIGFLAG fSawReOpen, fSawReUp, fSawMark, fSawGoAway;
 
 /* Is this passwd a match for this user's passwd? 		(gregf/ksb)
  * look up passwd in shadow file if we have to, if we are
@@ -159,10 +161,19 @@ char *pcEPass, *pcWord;
 /* on an HUP close and re-open log files so lop can trim them		(ksb)
  * lucky for us: log file fd's can change async from the group driver!
  */
-static GRPENT *pGEHup;
 static SIGRETS
-ReOpen(arg)
-	int arg;
+FlagReOpen(sig)
+	int sig;
+{
+	fSawReOpen = 1;
+#if !USE_SIGACTION
+	(void)signal(SIGHUP, FlagReOpen);
+#endif
+}
+
+static GRPENT *pGEHup;
+static void
+ReOpen()
 {
 	register int i;
 	register CONSENT *pCE;
@@ -183,10 +194,19 @@ ReOpen(arg)
 	}
 }
 
-static fd_set *rinitUsr1;
 static SIGRETS
-ReUp(arg)
-	int arg;
+FlagReUp(sig)
+	int sig;
+{
+	fSawReUp = 1;
+#if !USE_SIGACTION
+	(void)signal(SIGUSR1, FlagReUp);
+#endif
+}
+
+static fd_set *rinitUsr1;
+static void
+ReUp()
 {
 	register int i;
 	register CONSENT *pCE;
@@ -201,12 +221,20 @@ ReUp(arg)
 		}
 		ConsInit(pCE, rinitUsr1);
 	}
-	(void)signal(SIGUSR1, ReUp);
 }
 
 static SIGRETS
-Mark(arg)
-    int arg;
+FlagMark(sig)
+    int sig;
+{
+	fSawMark = 1;
+#if !USE_SIGACTION
+	signal(SIGALRM, FlagMark);
+#endif
+}
+
+static void
+Mark()
 {
     long tyme;
     char acOut[BUFSIZ];
@@ -233,7 +261,6 @@ Mark(arg)
 		pCE->nextMark = tyme + pCE->mark;
 	    }
     }
-    signal(SIGALRM, Mark);
     alarm(ALARMTIME);
 }
 
@@ -263,8 +290,14 @@ GRPENT *pGE;
 }
 
 static SIGRETS
-GoAway(sig)
+FlagGoAway(sig)
 int sig;
+{
+    fSawGoAway = 1;
+}
+
+static void
+GoAway()
 {
 	SendShutdownMsg(pGEHup);
 
@@ -276,9 +309,8 @@ int sig;
 #if DO_VIRTUAL
 /* on a TERM we have to cleanup utmp entries (ask ptyd to do it)	(ksb)
  */
-static SIGRETS
-DeUtmp(sig)
-int sig;
+static void
+DeUtmp()
 {
 	register int i;
 	register CONSENT *pCE;
@@ -325,7 +357,7 @@ int sig;
 		if (0 == pid) {
 			break;
 		}
-		/* stopped child is just continuted
+		/* stopped child is just continued
 		 */
 		if (WIFSTOPPED(UWbuf) && 0 == kill(pid, SIGCONT)) {
 			continue;
@@ -543,20 +575,18 @@ int sfd;
 #endif
 #endif
 
-
-	/* turn off signals that master() might turned on
+	/* turn off signals that master() might have turned on
 	 * (only matters if respawned)
 	 */
 	(void)signal(SIGURG, SIG_DFL);
+	Set_signal(SIGTERM, FlagGoAway);
 #if DO_VIRTUAL
-	(void)signal(SIGTERM, DeUtmp);
-	(void)signal(SIGCHLD, ReapVirt);
+	Set_signal(SIGCHLD, ReapVirt);
 #else
-	(void)signal(SIGTERM, GoAway);
 	(void)signal(SIGCHLD, SIG_DFL);
 #endif
 
-	/* setup our local data structures and fields, and contol line
+	/* setup our local data structures and fields, and control line
 	 */
 	pCE = pGE->pCElist;
 	for (iConsole = 0; iConsole < pGE->imembers; ++iConsole) {
@@ -628,20 +658,41 @@ int sfd;
 	/* on a SIGHUP we should close and reopen our log files
 	 */ 
 	pGEHup = pGE;
-	(void)signal(SIGHUP, ReOpen);
+	Set_signal(SIGHUP, FlagReOpen);
 
 	/* on a SIGUSR1 we try to bring up all downed consoles */ 
 	rinitUsr1 = &rinit;
-	(void)signal(SIGUSR1, ReUp);
+	Set_signal(SIGUSR1, FlagReUp);
 
 	/* on a SIGALRM we should mark log files */
-	(void)signal(SIGALRM, Mark);
+	Set_signal(SIGALRM, FlagMark);
 	alarm(ALARMTIME);
 
 	/* the MAIN loop a group server
 	 */
 	pGE->pCLall = (CLIENT *)0;
 	while (1) {
+		/* check signal flags */
+		if (fSawGoAway) {
+#if DO_VIRTUAL
+		    DeUtmp();
+#else
+		    GoAway();
+#endif
+		}
+		if (fSawReOpen) {
+		    fSawReOpen = 0;
+		    ReOpen();
+		}
+		if (fSawReUp) {
+		    fSawReUp = 0;
+		    ReUp();
+		}
+		if (fSawMark) {
+		    fSawMark = 0;
+		    Mark();
+		}
+
 		rmask = rinit;
 
 		if (-1 == select(maxfd, &rmask, (fd_set *)0, (fd_set *)0, (struct timeval *)0)) {
@@ -659,7 +710,7 @@ int sfd;
 				continue;
 			}
 			/* read terminal line */
-			if ((nr = read(pCEServing->fdtty, acIn, sizeof(acIn))) < 0) {
+			if ((nr = read(pCEServing->fdtty, acIn, sizeof(acIn))) <= 0) {
 				/* carrier lost */
 				fprintf(stderr, "%s: lost carrier on %s (%s)!\n", progname, pCEServing->server, pCEServing->dfile);
 #if DO_VIRTUAL
@@ -1751,3 +1802,16 @@ GRPENT *pGE;
 	/*NOTREACHED*/
 }
 
+#if USE_SIGACTION
+void Set_signal(sig, disp)
+    int sig;
+    SIGRETS (*disp)(int);
+{
+	struct sigaction sa;
+
+	sa.sa_handler = disp;
+	sa.sa_flags = 0;
+	sigemptyset(&sa.sa_mask);
+	sigaction(sig, &sa, NULL);
+}
+#endif

@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.24 1999-01-26 20:35:17-08 bryan Exp $
+ *  $Id: readcfg.c,v 5.26 1999-08-24 14:37:55-07 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -317,7 +317,7 @@ register FILE *fp;
 		auto int iLen;
 
 		++iLine;
-		for (pcRem = acIn+strlen(acIn); pcRem >= acIn; --pcRem) {
+		for (pcRem = acIn+strlen(acIn)-1; pcRem >= acIn; --pcRem) {
 			if (!isspace(*pcRem))
 				break;
 			*pcRem = '\000';
@@ -355,7 +355,7 @@ register FILE *fp;
 			exit(3);
 		}
 		while ('\000' != *(pcMach = pcNext)) {
-			while (!isspace(*pcNext)) {
+			while ('\000' != *pcNext && !isspace(*pcNext)) {
 				++pcNext;
 			}
 			while ('\000' != *pcNext && isspace(*pcNext)) {

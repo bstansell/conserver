@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.26 1999-02-02 11:36:26-08 bryan Exp $
+ *  $Id: console.c,v 5.27 1999-08-23 17:32:35-07 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -77,7 +77,7 @@ extern char *sys_errlist[];
 #endif
 
 static char rcsid[] =
-	"$Id: console.c,v 5.26 1999-02-02 11:36:26-08 bryan Exp $";
+	"$Id: console.c,v 5.27 1999-08-23 17:32:35-07 bryan Exp $";
 static char *progname =
 	rcsid;
 int fVerbose = 0, fReplay = 0, fRaw = 0;
@@ -153,7 +153,7 @@ FILE *fp;
 }
 
 static char *apcLong[] = {
-	"a(A)	attach politelty (and replay last 20 lines)",
+	"a(A)	attach politely (and replay last 20 lines)",
 	"b	broadcast message",
 	"d(D)	display (local) daemon version",
 	"e esc	set the initial escape characters",
@@ -936,7 +936,7 @@ char *pcMaster, *pcMach, *pcCmd, *pcWho;
 #define BUF_MIN		80
 #define BUF_CHUNK	(2*132)
 
-/* Cmd is implemented seperately from above because of the need buffer	(ksb)
+/* Cmd is implemented separately from above because of the need buffer	(ksb)
  * the ports' output.  It's about the same as what's above otherwise.
  * We trick lint because we have to be call compatible (prototype'd)
  * the same as all the other Gather functions.

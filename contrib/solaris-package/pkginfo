@@ -1,0 +1,9 @@
+PKG="conserver"
+NAME="Console server and client"
+CATEGORY="system"
+VERSION="GNAC-6.12"
+DESC="Console server and client"
+CLASSES=none
+ARCH=sparc
+VENDOR="GNAC"
+BASEDIR=/opt

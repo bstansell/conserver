@@ -1,5 +1,5 @@
 /*
- *  $Id: access.c,v 5.12 1999-01-26 20:35:17-08 bryan Exp $
+ *  $Id: access.c,v 5.13 1999-08-24 14:39:26-07 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -81,6 +81,67 @@ OutOfMem()
 	exit(45);
 }
 
+/* Compare an Internet address (IPv4 expected), with an address pattern
+ * passed as a character string representing an address in the Internet
+ * standard `.' notation, optionally followed by a slash and an integer
+ * specifying the number of bits in the network portion of the address
+ * (the netmask size). If not specified explicitly, the netmask size used
+ * is that implied by the address class. If either the netmask is specified
+ * explicitly, or the local network address part of the pattern is zero,
+ * then only the network number parts of the addresses are compared;
+ * otherwise the entire addresses are compared.
+ *
+ * Returns 0 if the addresses match, else returns 1.
+ */
+int
+AddrCmp(hp, pattern)
+struct hostent *hp;
+char *pattern;
+{
+    unsigned long int hostaddr, pattern_addr, netmask;
+    char buf[200], *p, *slash_posn;
+
+    if (hp->h_addrtype != AF_INET || hp->h_length != 4)
+	return 1;	/* unsupported address type */
+
+    slash_posn = strchr(pattern, '/');
+    if (slash_posn != NULL) {
+	if (strlen(pattern) >= sizeof(buf))
+	    return 1;	/* too long to handle */
+	strncpy(buf, pattern, sizeof(buf));
+	buf[slash_posn-pattern] = '\0';	/* isolate the address */
+	p = buf;
+    }
+    else
+	p = pattern;
+
+    pattern_addr = inet_addr(p);
+    if (pattern_addr == -1)
+	return 1;	/* malformed address */
+
+    if (slash_posn) {
+	/* convert explicit netmask */
+	int mask_bits = atoi(slash_posn+1);
+	for (netmask = 0; mask_bits > 0; --mask_bits)
+	    netmask = 0x80000000 | (netmask >> 1);
+    } else {
+	/* netmask implied by address class */
+	unsigned long int ia = ntohl(pattern_addr);
+	if (IN_CLASSA(ia))
+	    netmask = IN_CLASSA_NET;
+	else if (IN_CLASSB(ia))
+	    netmask = IN_CLASSB_NET;
+	else if (IN_CLASSC(ia))
+	    netmask = IN_CLASSC_NET;
+	else
+	    return 1;	/* unsupported address class */
+    }
+    netmask = htonl(netmask);
+    if (~netmask & pattern_addr)
+	netmask = 0xffffffff;		/* compare entire addresses */
+    hostaddr = *(unsigned long int*)hp->h_addr;
+    return (hostaddr & netmask) != (pattern_addr & netmask);
+}
 
 /* return the access type for a given host entry			(ksb)
  */
@@ -89,21 +150,33 @@ AccType(hp)
 struct hostent *hp;
 {
 	register int i;
+#if ORIGINAL_CODE
 	register unsigned char *puc;
+#endif
 	register char *pcName;
+#if ORIGINAL_CODE
 	auto char acAddr[4*3+2];
+#endif
 	register int len;
 
+#if ORIGINAL_CODE
 	puc = (unsigned char *)hp->h_addr;
 	sprintf(acAddr, "%d.%d.%d.%d", puc[0], puc[1], puc[2], puc[3]);
+#endif
 	for (i = 0; i < iAccess; ++i) {
 		if (isdigit(pACList[i].pcwho[0])) {
+#if ORIGINAL_CODE
 			/* we could allow 128.210.7 to match all on that subnet
 			 * here...
 			 */
 			if (0 == strcmp(acAddr, pACList[i].pcwho)) {
 				return pACList[i].ctrust;
 			}
+#else
+			if (0 == AddrCmp(hp, pACList[i].pcwho)) {
+				return pACList[i].ctrust;
+			}
+#endif
 			continue;
 		}
 		pcName = hp->h_name;

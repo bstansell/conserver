@@ -1,6 +1,18 @@
 				CHANGES
 				=======
 
+version 6.12:
+	- Blank line bug after '%%' in .cf file (found by Miss
+	  Himali Patel <cpate03@dcs.bbk.ac.uk>)
+     Special thanks to Michael Sullivan <mike@trdlnk.com> for
+     the following improvements and fixes...
+	- Read result bug in group.c caused lock up
+	- Signal handling fixes and cleanup
+	- Several minor spelling errors in strings and comments
+	- Solaris package creation scripts
+	- Extended syntax of the access restrictions to understand
+	  network numbers with optional netmasks
+
 version 6.11:
 	- Added broadcast capability in client (-b option)
 	- Protected certain escape sequences from end-user use
@@ -39,5 +51,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.7 1999-05-14 10:18:20-07 bryan Exp $
+#  $Id: CHANGES,v 1.8 1999-08-24 14:37:09-07 bryan Exp $
 #

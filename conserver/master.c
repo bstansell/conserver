@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.23 1999-01-26 20:35:17-08 bryan Exp $
+ *  $Id: master.c,v 5.24 1999-08-24 14:38:26-07 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -67,13 +67,24 @@
 extern char *crypt();
 extern time_t time();
 
+static SIGFLAG fSawQuit, fSawHUP, fSawUSR1, fSawCHLD;
+
+
+static SIGRETS
+FlagSawCHLD(sig)
+	int sig;
+{
+	fSawCHLD = 1;
+#if !USE_SIGACTION
+	(void)signal(SIGCHLD, FlagSawCHLD);
+#endif
+}
 
 /* check all the kids and respawn as needed.				(fine)
  * Called when master process receives SIGCHLD
  */
-static SIGRETS
-FixKids(arg)
-	int arg;
+static void
+FixKids()
 {
 	register int i, pid;
 	auto long tyme;
@@ -108,8 +119,6 @@ FixKids(arg)
 	}
 }
 
-static int fSawQuit;
-
 /* kill all the kids and exit.
  * Called when master process receives SIGTERM
  */
@@ -117,12 +126,32 @@ static SIGRETS
 QuitIt(arg)
 	int arg;
 {
-	++fSawQuit;
+	fSawQuit = 1;
+}
+
+static SIGRETS
+FlagSawHUP(arg)
+	int arg;
+{
+	fSawHUP = 1;
+#if !USE_SIGACTION
+	(void)signal(SIGHUP, FlagSawHUP);
+#endif
+}
+
+static SIGRETS
+FlagSawUSR1(arg)
+	int arg;
+{
+	fSawUSR1 = 1;
+#if !USE_SIGACTION
+	(void)signal(SIGUSR1, FlagSawUSR1);
+#endif
 }
 
 /* Signal all the kids...
  */
-static SIGRETS
+void
 SignalKids(arg)
 	int arg;
 {
@@ -134,7 +163,6 @@ SignalKids(arg)
 		    fprintf(stderr, "%s: kill: %s\n", progname, strerror(errno));
 		}
 	}
-	(void)signal(SIGUSR1, SignalKids);
 }
 
 
@@ -158,10 +186,10 @@ REMOTE
 	int true = 1;
 
 	/* set up signal handler */
-	(void)signal(SIGCHLD, FixKids);
-	(void)signal(SIGTERM, QuitIt);
-	(void)signal(SIGUSR1, SignalKids);
-	(void)signal(SIGHUP, SignalKids);
+	Set_signal(SIGCHLD, FlagSawCHLD);
+	Set_signal(SIGTERM, QuitIt);
+	Set_signal(SIGUSR1, FlagSawUSR1);
+	Set_signal(SIGHUP, FlagSawHUP);
 
 	/* set up port for master to listen on
 	 */
@@ -210,6 +238,19 @@ REMOTE
 	FD_ZERO(&rmaster);
 	FD_SET(msfd, &rmaster);
 	for (fSawQuit = 0; !fSawQuit; /* can't close here :-( */) {
+	        if (fSawCHLD) {
+		    fSawCHLD = 0;
+		    FixKids();
+		}
+		if (fSawHUP) {
+		    fSawHUP = 0;
+		    SignalKids(SIGHUP);
+		}
+		if (fSawUSR1) {
+		    fSawUSR1 = 0;
+		    SignalKids(SIGUSR1);
+		}
+
 		rmask = rmaster;
 
 		if (-1 == select(msfd+1, &rmask, (fd_set *)0, (fd_set *)0, (struct timeval *)0)) {
@@ -469,7 +510,7 @@ REMOTE
 			}
 			break;
 		default:
-			sprintf(acOut, "ambigous server abbreviation, %s\r\n", pcArgs);
+			sprintf(acOut, "ambiguous server abbreviation, %s\r\n", pcArgs);
 			break;
 		}
 		(void)write(cfd, acOut, strlen(acOut));

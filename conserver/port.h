@@ -1,5 +1,5 @@
 /*
- *  $Id: port.h,v 1.7 1999-05-14 10:17:14-07 bryan Exp $
+ *  $Id: port.h,v 1.8 1999-08-24 14:37:29-07 bryan Exp $
  *
  *  Copyright GNAC, Inc., 1998
  *
@@ -283,6 +283,23 @@ typedef long fd_set;
 #define SIGRETS	void
 #else
 #define SIGRETS	int
+#endif
+
+/* which type to use for global flags set by signal handlers */
+#if defined(SUN5)
+#define SIGFLAG volatile sig_atomic_t
+#else
+#define SIGFLAG int
+#endif
+
+#if !defined(USE_SIGACTION)
+#define USE_SIGACTION (defined(SUN4)||defined(SUN5)||defined(LINUX2))
+#endif
+
+#if USE_SIGACTION
+extern void Set_signal(int isg, SIGRETS (*disp)(int));
+#else
+#define Set_signal(sig, disp) (void)signal((sig), (disp))
 #endif
 
 /* do we have a (working) setsockopt call

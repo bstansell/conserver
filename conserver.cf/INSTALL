@@ -9,11 +9,11 @@ contains three fields seperated by colons: <username>:<passwd>:<hosts>.
 The <passwd> field should either be an encrypted password or the special
 string '*passwd*', which will cause the console server to do a getpwnam()
 call.  The <hosts> field can be a comma seperated list of console names
-(from conserver.cf) or the special string 'all'.  Access for the user
-is only granted to the hosts listed here (or all if 'all' is used).
+(from conserver.cf) or the special string 'any'.  Access for the user
+is only granted to the hosts listed here (or all if 'any' is used).
 
 That's about it.  Good luck.
 
 #
-#  $Id: INSTALL,v 1.1 1999-01-25 15:36:52-08 bryan Exp $
+#  $Id: INSTALL,v 1.2 1999-08-24 13:45:00-07 bryan Exp $
 #

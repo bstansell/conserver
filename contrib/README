@@ -1,0 +1,14 @@
+Various contributions by folks....
+
+    solaris-package
+	Author:   Michael Sullivan <mike@trdlnk.com>
+	Synopsis: Creates a solaris package
+
+I can't verify that these scripts will work for everyone.  Hopefully they
+will be helpful.
+
+Bryan Stansell
+
+#
+#  $Id: README,v 1.1 1999-08-24 14:24:41-07 bryan Exp $
+#
