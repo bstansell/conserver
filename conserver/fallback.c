@@ -1,5 +1,5 @@
 /*
- *  $Id: fallback.c,v 5.44 2002-02-12 20:28:14-08 bryan Exp $
+ *  $Id: fallback.c,v 5.45 2002-06-05 11:12:24-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -32,6 +32,40 @@
 #include <compat.h>
 #include <port.h>
 #include <util.h>
+
+#if defined(_AIX)
+/*
+ * get a pty for the user (emulate the neato sequent call)		(mm)
+ */
+static int
+#if USE_ANSI_PROTO
+getpseudotty(STRING * slave, STRING * master)
+#else
+getpseudotty(slave, master)
+    STRING *slave;
+    STRING *master;
+#endif
+{
+    int fd;
+    char *pcName;
+
+    if (0 > (fd = open("/dev/ptc", O_RDWR | O_NDELAY, 0))) {
+	return -1;
+    }
+    if ((char *)0 == (pcName = ttyname(fd))) {
+	return -1;
+    }
+    buildMyString((char *)0, slave);
+    buildMyString(pcName, slave);
+
+    buildMyString((char *)0, master);
+    buildMyString(pcName, master);
+    master->string[7] = 'c';
+
+    return fd;
+}
+
+#else
 
 #if defined(HAVE_PTSNAME) && defined(HAVE_GRANTPT) && defined(HAVE_UNLOCKPT)
 #if defined(linux)
@@ -111,38 +145,6 @@ static char charone[] = "prstuvwxyzPQRSTUVWq";
 static char chartwo[] =
     "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-# if defined(_AIX)
-/*
- * get a pty for the user (emulate the neato sequent call)		(mm)
- */
-static int
-#if USE_ANSI_PROTO
-getpseudotty(STRING * slave, STRING * master)
-#else
-getpseudotty(slave, master)
-    STRING *slave;
-    STRING *master;
-#endif
-{
-    int fd;
-    char *pcName;
-
-    if (0 > (fd = open("/dev/ptc", O_RDWR | O_NDELAY, 0))) {
-	return -1;
-    }
-    if ((char *)0 == (pcName = ttyname(fd))) {
-	return -1;
-    }
-    buildMyString((char *)0, slave);
-    buildMyString(pcName, slave);
-
-    buildMyString((char *)0, master);
-    buildMyString(pcName, master);
-    master->string[7] = 'c';
-
-    return fd;
-}
-# else
 /*
  * get a pty for the user (emulate the neato sequent call)		(ksb)
  */
@@ -206,8 +208,8 @@ getpseudotty(slave, master)
     buildMyString(acSlave, slave);
     return fd;
 }
-# endif	/* _AIX */
 #endif
+#endif /* _AIX */
 
 /*
  * get a Joe pty bacause the daemon is not with us, sadly.		(ksb)

@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.73 2002-02-25 14:00:38-08 bryan Exp $
+ *  $Id: master.c,v 5.76 2002-06-05 15:05:00-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -260,8 +260,18 @@ Master()
     char *ambiguous = (char *)0;
     GRPENT *pGE;
     CONSENT *pCE;
+    FILE *fp;
+
 
     /* set up signal handler */
+    simpleSignal(SIGPIPE, SIG_IGN);
+    simpleSignal(SIGQUIT, SIG_IGN);
+#if defined(SIGTTOU)
+    simpleSignal(SIGTTOU, SIG_IGN);
+#endif
+#if defined(SIGTTIN)
+    simpleSignal(SIGTTIN, SIG_IGN);
+#endif
 #if defined(SIGPOLL)
     simpleSignal(SIGPOLL, SIG_IGN);
 #endif
@@ -269,8 +279,7 @@ Master()
     simpleSignal(SIGTERM, FlagQuitIt);
     simpleSignal(SIGUSR1, FlagSawUSR1);
     simpleSignal(SIGHUP, FlagSawHUP);
-    if (!fDaemon)
-	simpleSignal(SIGINT, FlagSawINT);
+    simpleSignal(SIGINT, FlagSawINT);
 
     /* set up port for master to listen on
      */
@@ -305,8 +314,17 @@ Master()
 	return;
     }
 
+    fp = fopen(PIDFILE, "w");
+    if (fp) {
+	fprintf(fp, "%d\n", (int)getpid());
+	fclose(fp);
+    } else {
+	Error("can't write pid to %s", PIDFILE);
+    }
+
     FD_ZERO(&rmaster);
     FD_SET(msfd, &rmaster);
+
     for (fSawQuit = 0; !fSawQuit; /* can't close here :-( */ ) {
 	if (fSawCHLD) {
 	    fSawCHLD = 0;
@@ -634,4 +652,6 @@ Master()
 	fileClose(&csocket);
 	exit(EX_OK);
     }
+
+    (void)unlink(PIDFILE);
 }

@@ -10,6 +10,10 @@ Bryan Stansell
 
 ---------------------------------------------------------------------------
 
+- checks for EPIPE during write() should really be done, but, for the
+  most part, consoles and clients will come around and we'll see
+  problems on the read().
+
 - Singular logging so that swatch/logsurfer can watch for errors across
   the board - unloved output comes close
 
@@ -98,6 +102,17 @@ Bryan Stansell
 - support 2 stop bits (as well as other stty-type options in console
   definitions) : Kelly Setzer <setzer@placemark.com>
 
+- ability to configure strings to be sent to a console whenever it is
+  (re)opened (eg. a termserver login) : Greg A. Woods
+  <woods@planix.com>
+
+- ability to configure strings to be sent to a console periodically :
+  Greg A. Woods <woods@planix.com>
+
+- show attach/detach events to/of spy console clients : Greg A. Woods
+  <woods@planix.com>
+
+
 #
-#  $Id: TODO,v 1.22 2002-03-11 18:11:48-08 bryan Exp $
+#  $Id: TODO,v 1.24 2002-06-05 12:00:35-07 bryan Exp $
 #

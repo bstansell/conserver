@@ -1,4 +1,4 @@
-.\" $Id: conserver.cf.man,v 1.24 2002-03-25 17:14:34-08 bryan Exp $
+.\" $Id: conserver.cf.man,v 1.25 2002-06-05 11:14:35-07 bryan Exp $
 .\" @(#)constab.5 01/06/91 OSU CIS; Thomas A. Fine
 .TH CONSERVER.CF 5 "Local"
 .SH NAME
@@ -46,8 +46,8 @@ This is typically the name of the host whose console is being monitored.
 the full path name of the device for this line.
 The \fIbaud\fP rate is the speed and parity for this console.
 Speed may be given as an integer,
-parity only requires the first letter of any of: even, odd, mark, space.
-For no parity, use the character `p'.
+parity only requires the first letter of any of: even, odd, mark, space, none.
+For historical reasons, `p' can also be used for no parity.
 .TP
 .BI ! termserver
 the hostname of the terminal server to connect to.

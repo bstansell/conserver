@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.176 2002-03-25 17:46:04-08 bryan Exp $
+ *  $Id: group.c,v 5.178 2002-06-05 15:05:00-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -485,7 +485,11 @@ Mark(pGE)
 	if ((pCE->nextMark > 0) && (tyme >= pCE->nextMark)) {
 	    Debug(1, "[-- MARK --] stamp added to %s", pCE->lfile.string);
 	    (void)fileWrite(pCE->fdlog, acOut, -1);
-	    pCE->nextMark += pCE->mark;
+	    /* Add as many pCE->mark values as necessary so that we move
+	     * beyond the current time.
+	     */
+	    pCE->nextMark +=
+		(((tyme - pCE->nextMark) / pCE->mark) + 1) * pCE->mark;
 	}
     }
     if ((i = (ALARMTIME - (tyme % 60))) <= 0) {
@@ -1279,11 +1283,20 @@ Kiddie(pGE, sfd)
     /* turn off signals that master() might have turned on
      * (only matters if respawned)
      */
-    simpleSignal(SIGURG, SIG_DFL);
+    simpleSignal(SIGQUIT, SIG_IGN);
+    simpleSignal(SIGPIPE, SIG_IGN);
+#if defined(SIGTTOU)
+    simpleSignal(SIGTTOU, SIG_IGN);
+#endif
+#if defined(SIGTTIN)
+    simpleSignal(SIGTTIN, SIG_IGN);
+#endif
+#if defined(SIGPOLL)
+    simpleSignal(SIGPOLL, SIG_IGN);
+#endif
     simpleSignal(SIGTERM, FlagGoAway);
     simpleSignal(SIGCHLD, FlagReapVirt);
-    if (!fDaemon)
-	simpleSignal(SIGINT, FlagGoAwayAlso);
+    simpleSignal(SIGINT, FlagGoAwayAlso);
 
     sprintf(acOut, "ctl_%d", pGE->port);
     buildMyString(acOut, &pGE->pCEctl->server);

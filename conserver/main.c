@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.90 2002-03-25 17:08:35-08 bryan Exp $
+ *  $Id: main.c,v 5.94 2002-06-05 15:05:00-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -115,7 +115,6 @@ daemonize()
 #endif
 {
     int res;
-    FILE *fp;
 #if !HAVE_SETSID
     int td;
 #endif
@@ -124,6 +123,9 @@ daemonize()
     simpleSignal(SIGINT, SIG_IGN);
 #if defined(SIGTTOU)
     simpleSignal(SIGTTOU, SIG_IGN);
+#endif
+#if defined(SIGTTIN)
+    simpleSignal(SIGTTIN, SIG_IGN);
 #endif
 #if defined(SIGTSTP)
     simpleSignal(SIGTSTP, SIG_IGN);
@@ -161,14 +163,6 @@ daemonize()
 	close(td);
     }
 #endif
-
-    fp = fopen(PIDFILE, "w");
-    if (fp) {
-	fprintf(fp, "%d\n", (int)getpid());
-	fclose(fp);
-    } else {
-	Error("can't write pid to %s", PIDFILE);
-    }
 }
 
 

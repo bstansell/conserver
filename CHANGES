@@ -1,6 +1,20 @@
 				CHANGES
 				=======
 
+version 7.2.2 (Jun 05, 2002):
+	- added 'n' as token for no-parity - patch by Greg A. Woods
+	  <woods@weird.com>
+	- extra timestamps occur when consoles come back up after being
+	  down longer than their timestamp period - reported by Dave
+	  Stuit <djs@gnac.com>
+	- AIX 5.1 psuedo-terminal support broken - patch by William P
+	  LePera <lepera@us.ibm.com>
+	- PID file overwritten and not unlinked on exit - reported by
+	  William P LePera <lepera@us.ibm.com>
+	- signals cleaned up in master, child, and sub-proc sections
+	- SIGPIPE now ignored - reported by Greg A. Woods
+	  <woods@weird.com>
+
 version 7.2.1 (Mar 25, 2002):
 	- bug regarding timestamp/break reading - patch by Benn Oshrin
 	  <benno@columbia.edu>
@@ -307,5 +321,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.58 2002-03-25 17:38:41-08 bryan Exp $
+#  $Id: CHANGES,v 1.60 2002-06-05 15:05:13-07 bryan Exp $
 #

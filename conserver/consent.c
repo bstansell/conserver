@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.86 2002-03-25 17:26:28-08 bryan Exp $
+ *  $Id: consent.c,v 5.88 2002-06-05 15:05:00-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -124,6 +124,8 @@ PARITY parity[] = {
     ,				/* even                 */
     {'m', PARENB | CS7 | PARODD | PAREXT, 0}
     ,				/* mark                 */
+    {'n', CS8, 0}
+    ,				/* pass 8 bits, no parity */
     {'o', PARENB | CS7 | PARODD, 0}
     ,				/* odd                  */
     {'p', CS8, 0}
@@ -138,6 +140,8 @@ PARITY parity[] = {
     {'o', ODDP, EVENP}
     ,				/* odd                                  */
 # if defined(PASS8)
+    {'n', PASS8, EVENP | ODDP}
+    ,				/* pass 8 bits, no parity               */
     {'p', PASS8, EVENP | ODDP}
     ,				/* pass 8 bits, no parity               */
 # endif
@@ -400,16 +404,28 @@ VirtDev(pCE)
 	    return 0;
     }
 
-    /* put the signals back that we trap
+    /* put the signals back that we ignore (trapped auto-reset to default)
      */
-    simpleSignal(SIGINT, SIG_DFL);
     simpleSignal(SIGQUIT, SIG_DFL);
+    simpleSignal(SIGINT, SIG_DFL);
+    simpleSignal(SIGPIPE, SIG_DFL);
+#if defined(SIGTTOU)
+    simpleSignal(SIGTTOU, SIG_DFL);
+#endif
+#if defined(SIGTTIN)
+    simpleSignal(SIGTTIN, SIG_DFL);
+#endif
+#if defined(SIGTSTP)
     simpleSignal(SIGTSTP, SIG_DFL);
+#endif
+#if defined(SIGPOLL)
+    simpleSignal(SIGPOLL, SIG_DFL);
+#endif
 
     /* setup new process with clean filew descriptors
      */
     i = cmaxfiles();
-    for ( /* i above */ ; i-- > 2;) {
+    for ( /* i above */ ; --i > 2;) {
 	close(i);
     }
     /* leave 2 until we *have to close it*
@@ -431,14 +447,18 @@ VirtDev(pCE)
 	Error("%s: fd sync error", pCE->server.string);
 	exit(EX_UNAVAILABLE);
     }
-# if HAVE_STROPTS_H
+# if HAVE_STROPTS_H  && !defined(_AIX)
     /* SYSVr4 semantics for opening stream ptys                     (gregf)
      * under PTX (others?) we have to push the compatibility
      * streams modules `ptem', `ld', and `ttcompat'
      */
+    Debug(1, "Pushing ptemp onto pseudo-terminal");
     (void)ioctl(0, I_PUSH, "ptem");
+    Debug(1, "Pushing ldterm onto pseudo-terminal");
     (void)ioctl(0, I_PUSH, "ldterm");
+    Debug(1, "Pushing ttcompat onto pseudo-terminal");
     (void)ioctl(0, I_PUSH, "ttcompat");
+    Debug(1, "Done pushing modules onto pseudo-terminal");
 # endif
 
 # if HAVE_TERMIOS_H
@@ -680,6 +700,7 @@ ConsInit(pCE, pfdSet, useHostCache)
     int useHostCache;
 #endif
 {
+    time_t tyme;
 #if USE_ANSI_PROTO
     extern int FallBack(STRING *, STRING *);
 #else
@@ -857,5 +878,17 @@ ConsInit(pCE, pfdSet, useHostCache)
 	pCE->fup = 1;
     } else {
 	TtyDev(pCE);
+    }
+
+    /* If we have marks, adjust the next one so that it's in the future */
+    if (pCE->nextMark > 0) {
+	tyme = time((time_t *) 0);
+	if (tyme >= pCE->nextMark) {
+	    /* Add as many pCE->mark values as necessary so that we move
+	     * beyond the current time.
+	     */
+	    pCE->nextMark +=
+		(((tyme - pCE->nextMark) / pCE->mark) + 1) * pCE->mark;
+	}
     }
 }
