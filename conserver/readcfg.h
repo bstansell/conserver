@@ -1,7 +1,7 @@
 /*
- *  $Id: readcfg.h,v 5.13 2001-07-30 01:57:27-07 bryan Exp $
+ *  $Id: readcfg.h,v 5.16 2002-01-21 02:48:33-08 bryan Exp $
  *
- *  Copyright conserver.com, 2000-2001
+ *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
@@ -47,6 +47,7 @@ extern int
   iAccess;			/* how many access restrictions we have */
 extern int
   iLocal;			/* how many local consoles we have      */
+extern STRING *breakList;	/* list of break sequences */
 
 extern void ReadCfg();
 extern char *pruneSpace();

@@ -1,7 +1,7 @@
 /*
- *  $Id: group.c,v 5.140 2001-10-16 21:29:01-07 bryan Exp $
+ *  $Id: group.c,v 5.151 2002-01-21 02:48:33-08 bryan Exp $
  *
- *  Copyright conserver.com, 2000-2001
+ *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
@@ -189,7 +189,7 @@ FlagReUp(sig)
 }
 
 static void
-ReUp(pGE, prinit)
+ReUp(pGE, automatic, prinit)
     GRPENT *pGE;
     fd_set *prinit;
 {
@@ -201,11 +201,11 @@ ReUp(pGE, prinit)
     }
 
     for (i = 0, pCE = pGE->pCElist; i < pGE->imembers; ++i, ++pCE) {
-	if (pCE->fup) {
+	if (pCE->fup || fNoinit || (automatic == 1 && !pCE->autoReUp))
 	    continue;
-	}
-	if (fNoinit)
-	    continue;
+	if (automatic)
+	    Info("%s: automatic reinitialization [%s]", pCE->server,
+		 strtime(NULL));
 	ConsInit(pCE, prinit, 1);
     }
 }
@@ -265,10 +265,13 @@ Mark(pGE, prinit)
 	if ((pCE->nextMark > 0) && (tyme >= pCE->nextMark)) {
 	    Debug("[-- MARK --] stamp added to %s", pCE->lfile);
 	    (void)fileWrite(pCE->fdlog, acOut, -1);
-	    pCE->nextMark = tyme + pCE->mark;
+	    pCE->nextMark += pCE->mark;
 	}
     }
-    alarm(ALARMTIME);
+    if ((i = (ALARMTIME - (tyme % 60))) <= 0) {
+	i = 1;
+    }
+    alarm(i);
 }
 
 void
@@ -438,7 +441,14 @@ ReapVirt(pGE, prinit)
 		pCE->pCLwr = (CONSCLIENT *) 0;
 	    }
 
-	    ConsDown(pCE, prinit);
+	    /* Try an initial reconnect */
+	    Info("%s: automatic reinitialization [%s]", pCE->server,
+		 strtime(NULL));
+	    ConsInit(pCE, prinit, 0);
+
+	    /* If we didn't succeed, try again later */
+	    if (!pCE->fup)
+		pCE->autoReUp = 1;
 	}
     }
 }
@@ -469,6 +479,7 @@ CheckPasswd(pCLServing, pw_string)
 	Info("Cannot open passwd file %s: %s", pcPasswd, strerror(errno));
 
 	if ((struct passwd *)0 == (pwd = getpwuid(0))) {
+	    (void)endpwent();
 	    fileWrite(pCLServing->fd, "no root passwd?\r\n", -1);
 	    return 0;
 	}
@@ -476,6 +487,7 @@ CheckPasswd(pCLServing, pw_string)
 	    if (fVerbose)
 		Info("User %s logging into server %s via root passwd",
 		     pCLServing->acid, pCLServing->pCEwant->server);
+	    (void)endpwent();
 	    return 1;
 	}
     } else {
@@ -547,6 +559,7 @@ CheckPasswd(pCLServing, pw_string)
 				 pCLServing->pCEwant->server);
 			}
 			fclose(fp);
+			(void)endpwent();
 			return 1;
 		    } else {
 			char *p;
@@ -561,6 +574,7 @@ CheckPasswd(pCLServing, pw_string)
 					 pCLServing->pCEwant->server);
 				}
 				fclose(fp);
+				(void)endpwent();
 				return 1;
 			    }
 			    if (domainHack) {
@@ -580,6 +594,7 @@ CheckPasswd(pCLServing, pw_string)
 	    break;
 	}
 	fclose(fp);
+	(void)endpwent();
     }
 
     return 0;
@@ -605,6 +620,310 @@ IdleTyme(tyme)
 
     return timestr;
 }
+
+void
+sendRealBreak(pCLServing, pCEServing)
+    CONSCLIENT *pCLServing;
+    CONSENT *pCEServing;
+{
+    Debug("Sending a break to %s", pCEServing->server);
+    if (pCEServing->isNetworkConsole) {
+	char haltseq[2];
+
+	haltseq[0] = IAC;
+	haltseq[1] = BREAK;
+	write(pCEServing->fdtty, haltseq, 2);
+    } else {
+#if HAVE_TERMIO_H
+	if (-1 == ioctl(pCEServing->fdtty, TCSBRK, (char *)0)) {
+	    fileWrite(pCLServing->fd, "failed]\r\n", -1);
+	    return;
+	}
+#else
+# if HAVE_TCSENDBREAK
+	if (-1 == tcsendbreak(pCEServing->fdtty, 0)) {
+	    fileWrite(pCLServing->fd, "failed]\r\n", -1);
+	    return;
+	}
+# else
+#  if HAVE_TERMIOS_H
+	if (-1 == ioctl(pCEServing->fdtty, TIOCSBRK, (char *)0)) {
+	    fileWrite(pCLServing->fd, "failed]\r\n", -1);
+	    return;
+	}
+	fileWrite(pCLServing->fd, "- ", -1);
+	sleep(1);
+	if (-1 == ioctl(pCEServing->fdtty, TIOCCBRK, (char *)0)) {
+	    fileWrite(pCLServing->fd, "failed]\r\n", -1);
+	    return;
+	}
+#  endif
+# endif
+#endif
+    }
+}
+
+void
+prettyPrintBreak(fd, str)
+    CONSFILE *fd;
+    STRING *str;
+{
+    static STRING output = { (char *)0, 0, 0 };
+    unsigned char c;
+    char *p;
+
+    if (str->used == 0)
+	return;
+
+    buildMyString((char *)0, &output);
+    for (p = str->string; *p != '\000'; p++) {
+	c = *p & 0xff;
+	if (c > 127) {
+	    char oct[5];
+	    oct[4] = '\000';
+	    oct[3] = c % 8;
+	    c /= 8;
+	    oct[2] = c % 8;
+	    c /= 8;
+	    oct[1] = c % 8;
+	    oct[0] = '\\';
+	    buildMyString(oct, &output);
+	} else if (c < ' ' || c == '\177') {
+	    buildMyStringChar('^', &output);
+	    buildMyStringChar(c ^ 0100, &output);
+	} else {
+	    buildMyStringChar(c, &output);
+	}
+    }
+
+    if (output.used != 0)
+	(void)fileWrite(fd, output.string, -1);
+}
+
+void
+doBreakWork(pCLServing, pCEServing, bt, cleanup)
+    CONSCLIENT *pCLServing;
+    CONSENT *pCEServing;
+    short int bt;
+    short int cleanup;
+{
+    char *p, s;
+    short int backslash;
+    short int cntrl;
+    char oct[3];
+    short int octs = -1;
+    STRING cleaned = { (char *)0, 0, 0 };
+
+    if (cleanup && (bt < 1 || bt > 9))
+	return;
+    if (bt < 0 || bt > 9) {
+	(void)fileWrite(pCLServing->fd, "aborted]\r\n", -1);
+	return;
+    }
+    if (bt == 0)
+	bt = pCEServing->breakType;
+    if (bt == 0 || breakList[bt - 1].used == 0) {
+	if (!cleanup)
+	    (void)fileWrite(pCLServing->fd, "undefined]\r\n", -1);
+	return;
+    }
+
+    p = breakList[bt - 1].string;
+    backslash = 0;
+    cntrl = 0;
+    while ((s = (*p++)) != '\000') {
+	if (octs != -1) {
+	    if (s >= '0' && s <= '7') {
+		if (++octs < 3) {
+		    oct[octs] = s;
+		}
+		continue;
+	    } else {
+		int i;
+		if (octs > 2) {
+		    Error("octal number too large in BREAK%d sequence",
+			  bt);
+		} else {
+		    if (cleanup) {
+			buildMyStringChar('\\', &cleaned);
+			for (i = 0; i <= 1 - octs; i++)
+			    buildMyStringChar('0', &cleaned);
+			for (i = 0; i <= octs; i++)
+			    buildMyStringChar(oct[i], &cleaned);
+		    } else {
+			char c = '\000';
+			c = oct[0] - '0';
+			for (i = 1; i <= octs; i++)
+			    c = c * 8 + (oct[i] - '0');
+			(void)write(pCEServing->fdtty, &c, 1);
+		    }
+		}
+		octs = -1;
+	    }
+	}
+	if (s == '\\' && !cntrl) {
+	    if (backslash) {
+		if (cleanup)
+		    buildMyString("\\\\", &cleaned);
+		else
+		    (void)write(pCEServing->fdtty, &s, 1);
+		backslash = 0;
+	    } else
+		backslash = 1;
+	    continue;
+	}
+	if (backslash) {
+	    char o = s;
+	    if (s == 'a')
+		s = '\a';
+	    else if (s == 'b')
+		s = '\b';
+	    else if (s == 'f')
+		s = '\f';
+	    else if (s == 'n')
+		s = '\n';
+	    else if (s == 'r')
+		s = '\r';
+	    else if (s == 't')
+		s = '\t';
+	    else if (s == 'v')
+		s = '\v';
+	    else if (s == '^')
+		s = '^';
+	    else if (s == 'z') {
+		if (cleanup)
+		    buildMyString("\\z", &cleaned);
+		else
+		    (void)sendRealBreak(pCLServing, pCEServing);
+		s = '\000';
+	    } else if (s >= '0' && s <= '7') {
+		if (++octs < 3) {
+		    oct[octs] = s;
+		}
+		s = '\000';
+	    } else {
+		if (octs < 0) {
+		    if (cleanup)
+			buildMyStringChar(o, &cleaned);
+		    else
+			(void)write(pCEServing->fdtty, &s, 1);
+		    s = '\000';
+		} else if (octs > 2) {
+		    Error("octal number too large in BREAK%d sequence",
+			  bt);
+		    octs = -1;
+		} else {
+		    int i;
+		    if (cleanup) {
+			buildMyStringChar('\\', &cleaned);
+			for (i = 0; i <= octs; i++)
+			    buildMyStringChar(oct[i], &cleaned);
+		    } else {
+			char c = '\000';
+			c = oct[0] - '0';
+			for (i = 1; i <= octs; i++)
+			    c = c * 8 + (oct[i] - '0');
+			(void)write(pCEServing->fdtty, &c, 1);
+		    }
+		    octs = -1;
+		}
+	    }
+	    if (s != '\000') {
+		if (cleanup) {
+		    buildMyStringChar('\\', &cleaned);
+		    buildMyStringChar(o, &cleaned);
+		} else
+		    (void)write(pCEServing->fdtty, &s, 1);
+	    }
+	    backslash = 0;
+	    continue;
+	}
+	if (s == '^') {
+	    if (cntrl) {
+		if (cleanup)
+		    buildMyString("^^", &cleaned);
+		else {
+		    s = s & 0x1f;
+		    (void)write(pCEServing->fdtty, &s, 1);
+		}
+		cntrl = 0;
+	    } else
+		cntrl = 1;
+	    continue;
+	}
+	if (cntrl) {
+	    if (s == '?') {
+		if (cleanup)
+		    buildMyString("^?", &cleaned);
+		else {
+		    s = 0x7f;	/* delete */
+		    (void)write(pCEServing->fdtty, &s, 1);
+		}
+		continue;
+	    }
+	    if (cleanup) {
+		buildMyStringChar('^', &cleaned);
+		buildMyStringChar(s, &cleaned);
+	    } else {
+		s = s & 0x1f;
+		(void)write(pCEServing->fdtty, &s, 1);
+	    }
+	    cntrl = 0;
+	    continue;
+	}
+	if (cleanup)
+	    buildMyStringChar(s, &cleaned);
+	else
+	    (void)write(pCEServing->fdtty, &s, 1);
+    }
+
+    if (octs > 2) {
+	Error("octal number too large in BREAK%d sequence", bt);
+    } else if (octs != -1) {
+	int i;
+	if (cleanup) {
+	    buildMyStringChar('\\', &cleaned);
+	    for (i = 0; i <= 1 - octs; i++)
+		buildMyStringChar('0', &cleaned);
+	    for (i = 0; i <= octs; i++)
+		buildMyStringChar(oct[i], &cleaned);
+	} else {
+	    char c = '\000';
+	    c = oct[0] - '0';
+	    for (i = 1; i <= octs; i++)
+		c = c * 8 + (oct[i] - '0');
+	    (void)write(pCEServing->fdtty, &c, 1);
+	}
+    }
+
+    if (backslash)
+	Error("trailing backslash ignored in BREAK%d sequence", bt);
+    if (cntrl)
+	Error("trailing circumflex ignored in BREAK%d sequence", bt);
+
+    if (cleanup) {
+	free(breakList[bt - 1].string);
+	breakList[bt - 1] = cleaned;
+    } else
+	fileWrite(pCLServing->fd, "sent]\r\n", -1);
+}
+
+void
+sendBreak(pCLServing, pCEServing, bt)
+    CONSCLIENT *pCLServing;
+    CONSENT *pCEServing;
+    short int bt;
+{
+    doBreakWork(pCLServing, pCEServing, bt, 0);
+}
+
+void
+cleanupBreak(bt)
+    short int bt;
+{
+    doBreakWork((CONSCLIENT *) 0, (CONSENT *) 0, bt, 1);
+}
+
 
 /* routine used by the child processes.				   (ksb/fine)
  * Most of it is escape sequence parsing.
@@ -647,7 +966,8 @@ Kiddie(pGE, sfd)
     int iConsole;
     int i, nr;
     struct hostent *hpPeer;
-    long tyme;
+    time_t tyme;
+    time_t lastup = time(NULL);	/* last time we tried to up all downed  */
     int fd;
     CONSENT CECtl;		/* our control `console'        */
     char cType;
@@ -681,6 +1001,7 @@ Kiddie(pGE, sfd)
 	pCE[iConsole].pCLon = pCE[iConsole].pCLwr = (CONSCLIENT *) 0;
 	pCE[iConsole].fdlog = (CONSFILE *) 0;
 	pCE[iConsole].fdtty = -1;
+	pCE[iConsole].autoReUp = 0;
     }
     sprintf(CECtl.server, "ctl_%d", pGE->port);
     CECtl.inamelen = strlen(CECtl.server);	/* bogus, of course     */
@@ -732,7 +1053,7 @@ Kiddie(pGE, sfd)
 
     /* on a SIGALRM we should mark log files */
     simpleSignal(SIGALRM, FlagMark);
-    alarm(ALARMTIME);
+    fSawMark = 1;		/* start during first pass */
 
     /* the MAIN loop a group server
      */
@@ -754,11 +1075,25 @@ Kiddie(pGE, sfd)
 	}
 	if (fSawReUp) {
 	    fSawReUp = 0;
-	    ReUp(pGE, &rinit);
+	    ReUp(pGE, 0, &rinit);
+
+	    if (fReopenall > 0) {
+		lastup = time(NULL);
+	    }
 	}
 	if (fSawMark) {
 	    fSawMark = 0;
 	    Mark(pGE, &rinit);
+	    ReUp(pGE, 1, &rinit);
+	}
+
+	/* Is it time to reup everything? */
+	if ((fReopenall > 0) &&
+	    ((time(NULL) - lastup) > (fReopenall * 60))) {
+	    /* Note the new lastup time only after we finish.
+	     */
+	    ReUp(pGE, 2, &rinit);
+	    lastup = time(NULL);
 	}
 
 	rmask = rinit;
@@ -796,8 +1131,14 @@ Kiddie(pGE, sfd)
 		    pCEServing->pCLwr = (CONSCLIENT *) 0;
 		}
 
-		/*ConsInit(pCEServing, &rinit, 0); */
-		ConsDown(pCEServing, &rinit);
+		/* Try an initial reconnect */
+		Info("%s: automatic reinitialization [%s]",
+		     pCEServing->server, strtime(NULL));
+		ConsInit(pCEServing, &rinit, 0);
+
+		/* If we didn't succeed, try again later */
+		if (!pCEServing->fup)
+		    pCEServing->autoReUp = 1;
 
 		continue;
 	    }
@@ -944,7 +1285,7 @@ Kiddie(pGE, sfd)
 		    if (pCEServing->nolog) {
 			pCEServing->nolog = 0;
 			sprintf(acOut,
-				"[Console logging restored (logout)]\r\n");
+				"[-- Console logging restored (logout) --]\r\n");
 			(void)fileWrite(pCEServing->fdlog, acOut, -1);
 		    }
 		    pCEServing->pCLwr = FindWrite(pCEServing->pCLon);
@@ -1062,7 +1403,7 @@ Kiddie(pGE, sfd)
 		    case S_HOST:
 			/* append char to buffer, check for \n
 			 * continue if incomplete
-			 * else swtich to new host
+			 * else switch to new host
 			 */
 			if (pCLServing->icursor ==
 			    sizeof(pCLServing->accmd)) {
@@ -1199,7 +1540,9 @@ Kiddie(pGE, sfd)
 			}
 			pCEServing->pCLon = pCLServing;
 
-			if (fNoinit && !pCEServing->fup)
+			/* try to reopen line if specified at server startup
+			 */
+			if ((fNoinit || fReopen) && !pCEServing->fup)
 			    ConsInit(pCEServing, &rinit, 0);
 
 			/* try for attach on new console
@@ -1304,73 +1647,42 @@ Kiddie(pGE, sfd)
 
 		    case S_HALT1:	/* halt sequence? */
 			pCLServing->iState = S_NORMAL;
-			if (acIn[i] != '1' && acIn[i] != '2') {
+			if (acIn[i] != '?' &&
+			    (acIn[i] < '0' || acIn[i] > '9')) {
 			    fileWrite(pCLServing->fd, "aborted]\r\n", -1);
 			    continue;
 			}
 
-			/* send a break
-			 */
-			if (acIn[i] == '1') {
-			    Debug("Sending a break to %s",
-				  pCEServing->server);
-			    if (pCEServing->isNetworkConsole) {
-				char haltseq[2];
-
-				haltseq[0] = IAC;
-				haltseq[1] = BREAK;
-				write(pCEServing->fdtty, haltseq, 2);
-			    } else {
-#if HAVE_TERMIO_H
-				if (-1 ==
-				    ioctl(pCEServing->fdtty, TCSBRK,
-					  (char *)0)) {
-				    fileWrite(pCLServing->fd,
-					      "failed]\r\n", -1);
-				    continue;
+			if (acIn[i] == '?') {
+			    int i;
+			    fileWrite(pCLServing->fd, "list]\r\n", -1);
+			    i = pCEServing->breakType;
+			    if (i == 0 || breakList[i - 1].used == 0)
+				(void)fileWrite(pCLServing->fd,
+						" 0  <undefined>\r\n", -1);
+			    else {
+				(void)fileWrite(pCLServing->fd, " 0  `",
+						-1);
+				prettyPrintBreak(pCLServing->fd,
+						 &breakList[i - 1].string);
+				(void)fileWrite(pCLServing->fd, "'\r\n",
+						-1);
+			    }
+			    for (i = 0; i < 9; i++) {
+				if (breakList[i].used) {
+				    sprintf(acOut, " %d  `", i + 1);
+				    (void)fileWrite(pCLServing->fd, acOut,
+						    -1);
+				    prettyPrintBreak(pCLServing->fd,
+						     &breakList[i].string);
+				    (void)fileWrite(pCLServing->fd,
+						    "'\r\n", -1);
 				}
-#else
-# if HAVE_TCSENDBREAK
-				if (-1 ==
-				    tcsendbreak(pCEServing->fdtty, 0)) {
-				    fileWrite(pCLServing->fd,
-					      "failed]\r\n", -1);
-				    continue;
-				}
-# else
-#  if HAVE_TERMIOS_H
-				if (-1 ==
-				    ioctl(pCEServing->fdtty, TIOCSBRK,
-					  (char *)0)) {
-				    fileWrite(pCLServing->fd,
-					      "failed]\r\n", -1);
-				    continue;
-				}
-				fileWrite(pCLServing->fd, "- ", -1);
-				sleep(1);
-				if (-1 ==
-				    ioctl(pCEServing->fdtty, TIOCCBRK,
-					  (char *)0)) {
-				    fileWrite(pCLServing->fd,
-					      "failed]\r\n", -1);
-				    continue;
-				}
-#  endif
-# endif
-#endif
 			    }
 			} else {
-			    char haltseq[3];
-
-			    Debug("Sending an alt-break to %s",
-				  pCEServing->server);
-			    /* The default Solaris 8 `alternate' break... */
-			    haltseq[0] = 0x0D;	/* CR     */
-			    haltseq[1] = 0x7E;	/* Tilde  */
-			    haltseq[2] = 0x02;	/* Ctrl-B */
-			    write(pCEServing->fdtty, haltseq, 3);
+			    int bt = acIn[i] - '0';
+			    (void)sendBreak(pCLServing, pCEServing, bt);
 			}
-			fileWrite(pCLServing->fd, "sent]\r\n", -1);
 			continue;
 
 		    case S_CATTN:	/* redef escape sequence? */
@@ -1699,7 +2011,7 @@ Kiddie(pGE, sfd)
 					fileWrite(pCLServing->fd,
 						  "logging off]\r\n", -1);
 					sprintf(acOut,
-						"[Console logging disabled by %s]\r\n",
+						"[-- Console logging disabled by %s --]\r\n",
 						pCLServing->acid);
 					(void)fileWrite(pCEServing->fdlog,
 							acOut, -1);
@@ -1707,7 +2019,7 @@ Kiddie(pGE, sfd)
 					fileWrite(pCLServing->fd,
 						  "logging on]\r\n", -1);
 					sprintf(acOut,
-						"[Console logging restored by %s]\r\n",
+						"[-- Console logging restored by %s --]\r\n",
 						pCLServing->acid);
 					(void)fileWrite(pCEServing->fdlog,
 							acOut, -1);

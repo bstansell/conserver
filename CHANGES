@@ -1,6 +1,24 @@
 				CHANGES
 				=======
 
+version 7.1.4 (Jan 21, 2002):
+	- console -[PqQ] didn't work - patch by Han Pilmeyer
+	  <han@zk3.dec.com>
+	- maxfiles() didn't check FD_SETSIZE - patch by Justin Grudzien
+	  <grudzien@31337.com>
+	- New -o and -O server flags for automatically reconnecting
+	  downed consoles - patch by Benn Oshrin <benno@columbia.edu>
+	- Automatic reconnection of consoles on read failures, retried
+	  every minute
+	- Up to nine break sequences can be defined in the
+	  configuration file and assigned to consoles individually,
+	  accessed via new ^ecl[?0-9] escape sequences
+	- console logs are marked with "up" and "down" timestamps
+    The following based on code by John R. Jackson <jrj@cc.purdue.edu>
+	- sequential timestamps merged into one range during playback
+	- timestamps done on "nice" boundaries (hour, minute, etc.)
+	- lots of code cleanup, optimizations, etc.
+
 version 7.1.3 (Oct 16, 2001):
 	- NetBSD 1.5 termios bug/compatibility - patch by Andreas Wrede
 	  <aew.conserver@planix.com>
@@ -23,7 +41,7 @@ version 7.1.2 (Oct 15, 2001):
 	- Widened username field of 'console -w' output
 	- Added server hostname to password entry prompt
 	- AC_CHECK_LIB replaced with AC_SEARCH_LIBS in configure.in so
-	  that irrelavent (and sometimes incompatible) libraries aren't
+	  that irrelevant (and sometimes incompatible) libraries aren't
 	  linked in
 
 version 7.1.1 (Aug 4, 2001):
@@ -81,7 +99,7 @@ version 7.1.0 (Jul 26, 2001):
 	- Improved process handling (POSIX waitpid() now necessary)
 	- Significant rework of STREAMS-based pseudo-tty code
 	- TCP connections ('!' config syntax) now have some Telnet protocol
-	  knowledge, removing the "noise" seen when conneting to a terminal
+	  knowledge, removing the "noise" seen when connecting to a terminal
 	  server - reported by Todd Stansell <todd@stansell.org>
 	- Various code and message "pretty-printing" done
 	- Client and server both run in Windows (tested with Windows
@@ -247,5 +265,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.50 2001-10-16 21:32:33-07 bryan Exp $
+#  $Id: CHANGES,v 1.52 2002-01-21 02:49:42-08 bryan Exp $
 #

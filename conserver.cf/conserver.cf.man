@@ -1,4 +1,4 @@
-.\" $Id: conserver.cf.man,v 1.17 2001-08-04 20:54:25-07 bryan Exp $
+.\" $Id: conserver.cf.man,v 1.23 2002-01-20 21:14:43-08 bryan Exp $
 .\" @(#)constab.5 01/06/91 OSU CIS; Thomas A. Fine
 .TH CONSERVER.CF 5 "Local"
 .SH NAME
@@ -9,11 +9,13 @@ conserver.cf \- console configuration file for conserver(8)
 .br
 .BI \s-1TIMESTAMP\s0= timestamp-spec
 .br
-\fIname\fP:\fIdevice\fP[@\fIconserver\fP]:\fIbaud\fP:\fIlogfile\fP:\fItimestamp-spec\fP
+.BI \s-1BREAK\s0\fIn\fP= break-spec
 .br
-\fIname\fP:!\fItermserver\fP[@\fIconserver\fP]:\fIport\fP:\fIlogfile\fP:\fItimestamp-spec\fP
+\fIname\fP:\fIdevice\fP[@\fIconserver\fP]:\fIbaud\fP:\fIlogfile\fP:\fItimestamp-spec\fP:\fIbreak\fP
 .br
-\fIname\fP:|\fIcommand\fP[@\fIconserver\fP]::\fIlogfile\fP:\fItimestamp-spec\fP
+\fIname\fP:!\fItermserver\fP[@\fIconserver\fP]:\fIport\fP:\fIlogfile\fP:\fItimestamp-spec\fP:\fIbreak\fP
+.br
+\fIname\fP:|\fIcommand\fP[@\fIconserver\fP]::\fIlogfile\fP:\fItimestamp-spec\fP:\fIbreak\fP
 .br
 \fB%%\fP
 .br
@@ -83,7 +85,7 @@ timestamps applied to the console log file and
 whether to log read/write connection actions.
 The format of the specification is
 [\fImark-interval\fP[\fBm\fP|\fBh\fP|\fBd\fP|\fBl\fP]][\fBa\fP].
-The timestamps look like `[-- MARK -- Mon Jan 25 14:46:56 PST 1999]'.
+The timestamps look like `[-- MARK -- Mon Jan 25 14:46:56 1999]'.
 The `\fBm\fP', `\fBh\fP', and `\fBd\fP' tags specify
 `minutes' (the default), `hours', and `days'.  The `\fBl\fP' tag
 specifies `lines' and will cause timestamps of the form
@@ -104,6 +106,54 @@ All consoles below the \fB\s-1TIMESTAMP=\s0\fP line will use that
 and until superseded by another \fB\s-1TIMESTAMP=\s0\fP line.
 To turn off marks for a specific
 console, use a \fImark-interval\fP of zero.
+.TP
+.I break
+specifies which break sequence to use.  The default value is `1'.
+Values of `0' thru `9' are valid.  A value of `0' will unset the
+default break sequence, which will cause the \fB^Ecl0\fP sequence to do
+nothing.
+.PP
+The \fIbreak-spec\fP sequences are defined using
+the \fB\s-1BREAK\s0\fIn\fB=\fR
+syntax where \fIn\fP is a number from 1 to 9.
+There are three builtin defaults: ``\s-1BREAK1\s0=\\z'',
+``\s-1BREAK2\s0=\\r~^b'',
+and ``\s-1BREAK3\s0=#.reset -x\\r''.  The values of
+the \fB\s-1BREAK\s0\fIn\fR
+sequences are simple characters strings with the exception of `\\' and
+`^':
+.sp
+.PD 0
+.IP \\\\a
+alert
+.IP \\\\b
+backspace
+.IP \\\\f
+form-feed
+.IP \\\\n
+newline
+.IP \\\\r
+carriage-return
+.IP \\\\t
+tab
+.IP \\\\v
+vertical-tab
+.IP \\\\z
+serial break
+.IP \\\\\\\\
+backslash
+.IP \\\\^
+circumflex
+.IP \\\\\fIooo\fP
+octal representation of a character (where \fIooo\fP is one to three
+octal digits)
+.IP \\\\\fIc\fP
+character \fIc\fP
+.IP ^?
+delete
+.IP ^\fIc\fP
+control character (\fIc\fP is `and'ed with 0x1f)
+.PD
 .PP
 This section is terminated with a `\fB%%\fP' token on a line by itself.
 .PP
@@ -132,12 +182,16 @@ For example, `\fB192.168.1.0\fP' will allow the class C space of 192.168.1.0,
 but `\fB192.168.1.0/25\fP' will allow
 only the lower half of that same address space (192.168.1.0 thru 192.168.1.127).
 .SH EXAMPLE
-# name:path:baud:/usr/adm/logfile:mark
+# name:path:baud:logfile:mark:break
 .nf
 LOGDIR=/tmp
+# overriding the builtin BREAK3 sequence
+BREAK3=#.reset\\r
+# adding another break sequence
+BREAK8=+++
 #
-# This logs to /tmp/treelog...
-tree:/dev/ttyj0:9600e:&log:
+# This logs to /tmp/treelog...using BREAK8
+tree:/dev/ttyj0:9600e:&log::8
 #
 # This logs to /tmp/fishlog...
 fish:/dev/ttyj1:4800e:fishlog:
@@ -145,19 +199,21 @@ fish:/dev/ttyj1:4800e:fishlog:
 # Now we're defaulting to /var/tmp for logfiles...
 LOGDIR=/var/tmp
 #
-# So, this is /var/tmp/birdlog
-bird:/dev/ttyj2:4800m:&log:
+# So, this is /var/tmp/birdlog with 1-hour timestamps
+bird:/dev/ttyj2:4800m:&log:1h
 #
-# And this is /var/tmp/solarlog...
-solar:|telnet solar::solarlog:
+# And this is /var/tmp/solarlog, using BREAK4, no timestamps
+solar:|telnet solar::solarlog::4
 #
 # Now things are all in /var/consoles/<console name>
 LOGDIR=/var/consoles
 shell:|::&:
 #
-# These open connections to ports 2003 and 2004 of ts1...
-tribe:!ts1:2003:&:
-reptile:!ts1:2004:&:
+# These open connections to ports 2003 and 2004 of ts1
+# using BREAK2 and BREAK3
+tribe:!ts1:2003:&::2
+# This one also has 10-minute timestamps and activity logging
+reptile:!ts1:2004:&:10ma:3
 #
 # This opens /dev/ttyh0 if running on extra.cc.purdue.edu;
 # otherwise, clients are redirected to that host.

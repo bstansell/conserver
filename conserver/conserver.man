@@ -1,13 +1,13 @@
 .\" @(#)conserver.8 01/06/91 OSU CIS; Thomas A. Fine
-.\" $Id: conserver.man,v 1.15 2001-07-26 10:23:52-07 bryan Exp $
+.\" $Id: conserver.man,v 1.19 2002-01-20 20:02:49-08 bryan Exp $
 .TH CONSERVER 8 "Local"
 .SH NAME
 conserver \- console server daemon
 .SH SYNOPSIS
-\fBconserver\fP [\fB\-7dDhinuvV\fP] [\fB\-a\fP \fItype\fP]
+\fBconserver\fP [\fB\-7dDhinouvV\fP] [\fB\-a\fP \fItype\fP]
 [\fB\-M\fP \fIaddr\fP] [\fB\-p\fP \fIport\fP] [\fB\-b\fP \fIport\fP]
 [\fB\-C\fP \fIconfig\fP] [\fB\-P\fP \fIpasswd\fP]
-[\fB\-L\fP \fIlogfile\fP]
+[\fB\-L\fP \fIlogfile\fP] [\fB\-O\fP \fImin\fP]
 .SH DESCRIPTION
 .B Conserver
 is the daemon that manages
@@ -159,6 +159,15 @@ The default is to bind to all addresses.
 .B \-n
 Obsolete (now a no-op); see \fB\-u\fP.
 .TP
+.B \-o
+Normally, a client connecting to a ``downed'' console does just that.
+Using this flag, the server will automatically attempt to open
+(``bring up'') the console when the client connects.
+.TP
+.BI \-O min
+Enable periodic attempts (every \fImin\fP minutes) to open (``bring up'')
+all downed consoles (similar to sending a SIGUSR1).
+.TP
 .BI \-p port
 Set the TCP port for the master process to listen on.
 This may be either a port number or a service name.
@@ -211,6 +220,10 @@ log of errors and informational messages
 Additionally, output from individual consoles may be logged
 to separate files specified in
 .BR conserver.cf (5).
+.SH BUGS
+All client/server traffic (including root and user passwords) is
+passed ``in the clear''.  Extreme care should be taken to insure no one
+is ``snooping'' this private data.  One day the traffic will be encrypted.
 .SH AUTHORS
 Thomas A. Fine, Ohio State Computer Science
 .br

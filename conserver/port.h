@@ -1,7 +1,7 @@
 /*
- *  $Id: port.h,v 1.28 2001-07-17 14:14:36-07 bryan Exp $
+ *  $Id: port.h,v 1.31 2002-01-21 02:48:33-08 bryan Exp $
  *
- *  Copyright conserver.com, 2000-2001
+ *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
@@ -44,6 +44,18 @@
 # define USLEEP_FOR_SLOW_PORTS 100000
 #endif
 
+/* If, when processing a logfile for replaying the last N lines,
+ * we end up seeing more than MAXREPLAYLINELEN characters in a line,
+ * abort processing and display the data.  Why?  There could be some
+ * very large logfiles and very long lines and we'd chew up lots of
+ * memory and send a LOT of data down to the client - all potentially
+ * bad.  If there's a line over this in size, would you really want to
+ * see the whole thing (and possibly others)?
+ */
+#if !defined(MAXREPLAYLINELEN)
+# define MAXREPLAYLINELEN 10000
+#endif
+
 /* the default escape sequence used to give meta commands
  */
 #if !defined(DEFATTN)
@@ -51,12 +63,6 @@
 #endif
 #if !defined(DEFESC)
 # define DEFESC		'c'
-#endif
-
-/* the max number of characters conserver will replay for you (the r command)
- */
-#if !defined(MAXREPLAY)
-# define MAXREPLAY	(80*25)
 #endif
 
 /* communication constants

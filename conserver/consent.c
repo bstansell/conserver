@@ -1,7 +1,7 @@
 /*
- *  $Id: consent.c,v 5.71 2001-10-16 12:02:30-07 bryan Exp $
+ *  $Id: consent.c,v 5.74 2002-01-21 02:48:33-08 bryan Exp $
  *
- *  Copyright conserver.com, 2000-2001
+ *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
@@ -59,6 +59,7 @@
 
 #include <consent.h>
 #include <client.h>
+#include <group.h>
 #include <main.h>
 
 
@@ -551,6 +552,8 @@ ConsDown(pCE, pfdSet)
     CONSENT *pCE;
     fd_set *pfdSet;
 {
+    static char acOut[BUFSIZ];
+
     if (-1 != pCE->ipid) {
 	Debug("Sending pid %d signal %d", pCE->ipid, SIGHUP);
 	kill(pCE->ipid, SIGHUP);
@@ -564,13 +567,17 @@ ConsDown(pCE, pfdSet)
     }
     if ((CONSFILE *) 0 != pCE->fdlog) {
 	if (pCE->nolog) {
-	    fileWrite(pCE->fdlog, "[Console logging restored]\r\n", -1);
+	    fileWrite(pCE->fdlog, "[-- Console logging restored --]\r\n",
+		      -1);
 	}
+	sprintf(acOut, "[-- Console down -- %s]\r\n", strtime(NULL));
+	fileWrite(pCE->fdlog, acOut, -1);
 	(void)fileClose(pCE->fdlog);
 	pCE->fdlog = (CONSFILE *) 0;
     }
     pCE->fup = 0;
     pCE->nolog = 0;
+    pCE->autoReUp = 0;
 }
 
 int
@@ -627,6 +634,7 @@ ConsInit(pCE, pfdSet, useHostCache)
     int useHostCache;
 {
     extern int FallBack();
+    static char acOut[BUFSIZ];
 
     if (!useHostCache)
 	ClearHostCache();
@@ -642,6 +650,7 @@ ConsInit(pCE, pfdSet, useHostCache)
 	}
     }
 
+    pCE->autoReUp = 0;
     pCE->fronly = 0;
     pCE->nolog = 0;
     (void)strcpy(pCE->acline, pCE->server);
@@ -659,6 +668,8 @@ ConsInit(pCE, pfdSet, useHostCache)
 	Error("open: %s: %s", pCE->lfile, strerror(errno));
 	return;
     }
+    sprintf(acOut, "[-- Console up -- %s]\r\n", strtime(NULL));
+    fileWrite(pCE->fdlog, acOut, -1);
 
     if (0 != pCE->fvirtual) {
 	if (-1 == (pCE->fdtty = FallBack(pCE->acslave, pCE->dfile))) {

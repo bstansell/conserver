@@ -1,7 +1,7 @@
 /*
- *  $Id: console.c,v 5.71 2001-10-10 11:30:17-07 bryan Exp $
+ *  $Id: console.c,v 5.73 2002-01-21 02:48:33-08 bryan Exp $
  *
- *  Copyright conserver.com, 2000-2001
+ *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
@@ -769,7 +769,7 @@ CallUp(s, pcMaster, pcMach, pcHow, pcUser)
 	chAttn = DEFATTN;
 	chEsc = DEFESC;
     } else {
-	/* tell the conserver to change escape sequences, assmue OK
+	/* tell the conserver to change escape sequences, assume OK
 	 * (we'll find out soon enough)
 	 */
 	(void)sprintf(acMesg, "%c%ce%c%c", DEFATTN, DEFESC, chAttn, chEsc);

@@ -1,4 +1,4 @@
-		
+
 				Conserver FAQ
 				=============
 
@@ -14,6 +14,7 @@ directed to faq@conserver.com.  The FAQ answers the following questions:
     6) What does "console: gethostbyname: console: host lookup error"
        mean (or something close to that)?
     7) How do I set up a serial port for no parity?
+   99) Ok, things just don't seem to work.  Help?!?
 
 
  1) What is conserver?
@@ -78,6 +79,45 @@ directed to faq@conserver.com.  The FAQ answers the following questions:
     but the answer is to use a 'p' after the baud rate.  So, '9600p'
     is 9600 baud, no parity.
 
+99) Ok, things just don't seem to work.  Help?!?
+
+    Yes, this is a pretty vague question, but here are a few tips that
+    might help.
+
+    - Is your low-level serial connection correct?  Incorrect cables,
+      adapters, wiring, etc. could be the issue.  Using a signal tracer
+      or attaching other equipment that's known to work (like a laptop)
+      might be enlightening.  Check out
+      http://www.conserver.com/consoles/msock.html for basic serial
+      information (or http://www.conserver.com/consoles/ for even more
+      info).
+
+    - Can you talk to the serial port with different software?  Try
+      using tip or minicom or another application to make sure you can
+      interact with the port.  If you're not seeing the right info
+      here, there may be a baud rate issue, a lack of a getty (or
+      equivalent) running on the host or...*shrug*.  But, if you've
+      determined that you already have a valid low-level signal
+      connection, you shouldn't have to worry about that level of
+      problem.
+
+    - So, you're getting the proper interaction from other
+      applications, but not conserver?  Are the port name and baud rate
+      correct in the conserver.cf file?  When you start conserver
+      (adding -v doesn't hurt), are there any warnings/errors?  Is the
+      port in the "up" state when you use "console -u"?  If not, what
+      happens when you connect and then do a "^eco" escape sequence to
+      bring it up?  What does the conserver process say when you do
+      this?  These are the types of things I look at first.  If that
+      doesn't help you determine the problem, others will want to see
+      this info (and possibly the same steps with both the client and
+      server using the -D option) to be able to help.  Posting your
+      questions to the users mailing list is probably your next step.
+
+    - Have you tried a search on the conserver site (it searches
+      mailing list traffic as well) to see if someone else has gone
+      through the same problem?
+
 #
-#  $Id: FAQ,v 1.3 2001-04-04 16:58:49-07 bryan Exp $
+#  $Id: FAQ,v 1.5 2002-01-20 19:06:42-08 bryan Exp $
 #

@@ -1,7 +1,7 @@
 /*
- *  $Id: fallback.c,v 5.39 2001-07-26 00:58:55-07 bryan Exp $
+ *  $Id: fallback.c,v 5.40 2002-01-21 02:48:33-08 bryan Exp $
  *
- *  Copyright conserver.com, 2000-2001
+ *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *

@@ -1,7 +1,7 @@
 /*
- *  $Id: group.h,v 5.18 2001-07-30 01:57:42-07 bryan Exp $
+ *  $Id: group.h,v 5.20 2002-01-21 02:48:33-08 bryan Exp $
  *
- *  Copyright conserver.com, 2000-2001
+ *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
@@ -49,3 +49,4 @@ extern void Spawn();
 extern int CheckPass();
 extern const char *strtime();
 extern void tagLogfile();
+extern void cleanupBreak();

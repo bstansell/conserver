@@ -1,7 +1,7 @@
 /*
- *  $Id: main.h,v 5.27 2001-07-11 12:52:57-07 bryan Exp $
+ *  $Id: main.h,v 5.29 2002-01-21 02:48:33-08 bryan Exp $
  *
- *  Copyright conserver.com, 2000-2001
+ *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
@@ -38,7 +38,7 @@
  */
 extern char rcsid[];
 extern int fAll, fVerbose, fSoftcar, fNoinit, fInteractive, fStrip,
-    fDaemon;
+    fDaemon, fReopen, fReopenall;
 extern char chDefAcc;
 extern unsigned long bindAddr;
 extern unsigned int bindPort, bindBasePort;

@@ -1,7 +1,7 @@
 /*
- *  $Id: client.c,v 5.34 2001-10-15 17:24:16-07 bryan Exp $
+ *  $Id: client.c,v 5.40 2002-01-21 02:48:33-08 bryan Exp $
  *
- *  Copyright conserver.com, 2000-2001
+ *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
@@ -136,11 +136,27 @@ Replay(fdLog, fdOut, iBack)
     CONSFILE *fdOut;
     int iBack;
 {
-    int tot, nCr;
-    char *pc;
-    off_t where;
-    char bf[MAXREPLAY + 2];
+
+    off_t file_pos;
+    off_t buf_pos;
+    char *buf;
+    char *bp;
+    char *s;
+    int r;
+    int ch;
     struct stat stLog;
+    struct lines {
+	int is_mark;
+	STRING line;
+	STRING mark_end;
+    } *lines;
+    int n_lines;
+    int ln;
+    int i;
+    int j;
+    int u;
+    int is_mark;
+    char dummy[4];
 
     if ((CONSFILE *) 0 == fdLog) {
 	fileWrite(fdOut, "[no log file on this console]\r\n", -1);
@@ -152,40 +168,219 @@ Replay(fdLog, fdOut, iBack)
     if (0 != fileStat(fdLog, &stLog)) {
 	return;
     }
+    file_pos = stLog.st_size - 1;
+    buf_pos = file_pos + 1;
 
-    if (MAXREPLAY > stLog.st_size) {
-	where = 0L;
-    } else {
-	where = stLog.st_size - MAXREPLAY;
-    }
-
-#if defined(SEEK_SET)
-    /* PTX and maybe other Posix systems
+    /* get space for the line information and initialize it
+     *
+     * we allocate room for one more line than requested to be able to
+     * do the mark ranges
      */
-    if (fileSeek(fdLog, where, SEEK_SET) < 0) {
-	return;
+    if ((char *)0 == (buf = malloc(BUFSIZ))) {
+	OutOfMem();
     }
+    n_lines = iBack + 1;
+    lines = (struct lines *)calloc(n_lines, sizeof(*lines));
+    if ((struct lines *)0 == lines) {
+	OutOfMem();
+    }
+    ln = -1;
+
+    /* loop as long as there is data in the file or we have not found
+     * the requested number of lines
+     */
+    while (file_pos >= 0) {
+	if (file_pos < buf_pos) {
+
+	    /* read one buffer worth of data a buffer boundary
+	     *
+	     * the first read will probably not get a full buffer but
+	     * the rest (as we work our way back in the file) should be
+	     */
+	    buf_pos = (file_pos / BUFSIZ) * BUFSIZ;
+#if defined(SEEK_SET)
+	    /* PTX and maybe other Posix systems
+	     */
+	    if (fileSeek(fdLog, buf_pos, SEEK_SET) < 0) {
+		goto common_exit;
+	    }
 #else
-    if (fileSeek(fdLog, where, L_SET) < 0) {
-	return;
-    }
+	    if (fileSeek(fdLog, buf_pos, L_SET) < 0) {
+		goto common_exit;
+	    }
 #endif
+	    if ((r = fileRead(fdLog, buf, BUFSIZ)) <= 0) {
+		goto common_exit;
+	    }
+	    bp = buf + r;
+	}
 
-    if ((tot = fileRead(fdLog, bf, MAXREPLAY)) <= 0) {
-	return;
-    }
-    bf[tot] = '@';
+	/* process the next character
+	 */
+	--file_pos;
+	if ((ch = *--bp) == '\n') {
+	    if (ln >= 0) {
 
-    pc = &bf[tot];
-    nCr = 0;
-    while (--pc != bf) {
-	if ('\n' == *pc && iBack == nCr++) {
-	    ++pc;		/* get rid of a blank line */
+		/* reverse the text to put it in forward order
+		 */
+		u = lines[ln].line.used - 1;
+		for (i = 0; i < u / 2; i++) {
+		    int temp;
+
+		    temp = lines[ln].line.string[i];
+		    lines[ln].line.string[i]
+			= lines[ln].line.string[u - i - 1];
+		    lines[ln].line.string[u - i - 1] = temp;
+		}
+
+		/* see if this line is a MARK
+		 */
+		if (lines[ln].line.used > 0 &&
+		    lines[ln].line.string[0] == '[') {
+		    i = sscanf(lines[ln].line.string + 1,
+			       "-- MARK -- %3c %3c %d %d:%d:%d %d]\r\n",
+			       dummy, dummy, &j, &j, &j, &j, &j);
+		    is_mark = (i == 7);
+		} else {
+		    is_mark = 0;
+		}
+
+		/* process this line
+		 */
+		if (is_mark && ln > 0 && lines[ln - 1].is_mark) {
+		    /* this is a mark and the previous line is also
+		     * a mark, so make (or continue) that range
+		     */
+		    if (0 == lines[ln - 1].mark_end.allocated) {
+			/* this is a new range - shuffle pointers
+			 *
+			 * remember that we are moving backward
+			 */
+			lines[ln - 1].mark_end = lines[ln - 1].line;
+			lines[ln - 1].line.string = (char *)0;
+			lines[ln - 1].line.used = 0;
+			lines[ln - 1].line.allocated = 0;
+		    }
+		    /* if unallocated, cheat and shuffle pointers */
+		    if (0 == lines[ln - 1].line.allocated) {
+			lines[ln - 1].line = lines[ln].line;
+			lines[ln].line.string = (char *)0;
+			lines[ln].line.used = 0;
+			lines[ln].line.allocated = 0;
+		    } else {
+			buildMyString((char *)0, &lines[ln - 1].line);
+			buildMyString(lines[ln].line.string,
+				      &lines[ln - 1].line);
+			buildMyString((char *)0, &lines[ln].line);
+		    }
+		    ln--;
+		}
+		lines[ln].is_mark = is_mark;
+	    }
+
+	    /* advance to the next line and break if we have enough
+	     */
+	    ln++;
+	    if (ln >= n_lines - 1) {
+		break;
+	    }
+	}
+
+	/* if we have a character but no lines yet, the last text in the
+	 * file does not end with a newline, so start the first line anyway
+	 */
+	if (ln < 0) {
+	    ln = 0;
+	}
+	(void)buildMyStringChar(ch, &lines[ln].line);
+
+	/* if we've processed "a lot" of data for a line, then bail
+	 * why?  there must be some very long non-newline terminated
+	 * strings and if we just keep going back, we could spew lots
+	 * of data and chew up lots of memory
+	 */
+	if (lines[ln].line.used > MAXREPLAYLINELEN) {
 	    break;
 	}
     }
+    free(buf);
+    buf = (char *)0;
 
-    (void)fileWrite(fdOut, pc, tot - (pc - bf));
+    /* if we got back to beginning of file but saw some data, include it
+     */
+    if (ln >= 0 && lines[ln].line.used > 0) {
+
+	/* reverse the text to put it in forward order
+	 */
+	u = lines[ln].line.used - 1;
+	for (i = 0; i < u / 2; i++) {
+	    int temp;
+
+	    temp = lines[ln].line.string[i];
+	    lines[ln].line.string[i]
+		= lines[ln].line.string[u - i - 1];
+	    lines[ln].line.string[u - i - 1] = temp;
+	}
+	ln++;
+    }
+
+    /* copy the lines into the buffer and put them in order
+     */
+    for (i = ln - 1; i >= 0; i--) {
+	if (lines[i].is_mark && 0 != lines[i].mark_end.used) {
+	    int mark_len;
+
+	    /* output the start of the range, stopping at the ']'
+	     */
+	    s = strrchr(lines[i].line.string, ']');
+	    if ((char *)0 != s) {
+		*s = '\000';
+	    }
+	    (void)fileWrite(fdOut, lines[i].line.string, -1);
+	    (void)fileWrite(fdOut, " .. ", -1);
+
+	    /* build the end string by removing the leading "[-- MARK -- "
+	     * and replacing "]\r\n" on the end with " -- MARK --]\r\n"
+	     */
+	    mark_len = sizeof("[-- MARK -- ") - 1;
+
+	    s = strrchr(lines[i].mark_end.string + mark_len, ']');
+	    if ((char *)0 != s) {
+		*s = '\000';
+	    }
+	    (void)fileWrite(fdOut, lines[i].mark_end.string + mark_len,
+			    -1);
+	    (void)fileWrite(fdOut, " -- MARK --]\r\n", -1);
+	    u = lines[i].mark_end.used;
+	    s = lines[i].mark_end.string;
+	} else
+	    (void)fileWrite(fdOut, lines[i].line.string, -1);
+    }
+
+  common_exit:
+
+    if ((struct lines *)0 != lines) {
+	for (i = 0; i < n_lines; i++) {
+	    if ((char *)0 != lines[i].mark_end.string) {
+		free(lines[i].mark_end.string);
+		lines[i].mark_end.string = (char *)0;
+		lines[i].mark_end.used = 0;
+		lines[i].mark_end.allocated = 0;
+	    }
+	    if ((char *)0 != lines[i].line.string) {
+		free(lines[i].line.string);
+		lines[i].line.string = (char *)0;
+		lines[i].line.used = 0;
+		lines[i].line.allocated = 0;
+	    }
+	}
+	free(lines);
+	lines = (struct lines *)0;
+    }
+    if ((char *)0 != buf) {
+	free(buf);
+	buf = (char *)0;
+    }
 }
 
 
@@ -212,8 +407,9 @@ static HELP aHLTable[] = {
     {WHEN_ALWAYS, "f    force attach read/write"},
     {WHEN_ALWAYS, "g    group info"},
     {WHEN_ATTACH, "L    toggle logging on/off"},
-    {WHEN_ATTACH, "l1   send break (halt host!)"},
-    {WHEN_ATTACH, "l2   send alt. break (halt host!)"},
+    {WHEN_ATTACH, "l?   break sequence list"},
+    {WHEN_ATTACH, "l0   send break per config file"},
+    {WHEN_ATTACH, "l1-9 send specific break sequence"},
     {WHEN_ALWAYS, "o    (re)open the tty and log file"},
     {WHEN_ALWAYS, "p    replay the last 60 lines"},
     {WHEN_ALWAYS, "r    replay the last 20 lines"},

@@ -1,7 +1,7 @@
 /*
- *  $Id: consent.h,v 5.22 2001-07-23 00:28:00-07 bryan Exp $
+ *  $Id: consent.h,v 5.25 2002-01-21 02:48:33-08 bryan Exp $
  *
- *  Copyright conserver.com, 2000-2001
+ *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
@@ -65,12 +65,14 @@ typedef struct consent {	/* console information                  */
     PARITY *pparity;		/* the parity on this line              */
     int mark;			/* Mark (chime) interval                */
     long nextMark;		/* Next mark (chime) time               */
+    short int breakType;	/* break type [1-9]                     */
 
     /* Used if network console */
     int isNetworkConsole;
     char networkConsoleHost[MAXSERVLEN];
     int networkConsolePort;
     int telnetState;
+    int autoReUp;
 
     /* used if virtual console */
     char acslave[MAXDEVLEN];	/* pseudo-device slave side             */

@@ -1,4 +1,4 @@
-.\" $Id: console.man,v 1.12 2001-10-15 22:46:09-07 bryan Exp $
+.\" $Id: console.man,v 1.16 2002-01-20 20:03:10-08 bryan Exp $
 .TH CONSOLE 1 "Local"
 .SH NAME
 console \- console server client program
@@ -115,9 +115,11 @@ using the \fB--with-port\fP option.
 Display the pid of the master daemon process on each server.
 .TP
 .B \-q
-The \fBconsole\fP client requests that the server daemon quit (shut down).
-A password is sent in the protocol stream; if none is required for
-the local host to shut down the server, just press <return>.
+The \fBconsole\fP client connects to each server to request that the
+server daemon quit (shut down).  The root password of the host(s)
+running conserver is required unless the local host is listed as
+``trusted'' in the conserver.cf file; in that case, just
+press <return>.
 .TP
 .B \-Q
 Same as \fB\-q\fP but just acts on the primary server.
@@ -186,12 +188,12 @@ forcibly attach read-write
 group info
 .IP L
 toggle logging on/off
-.IP l1
-send a 3-second serial line break (might halt a Sun)
-("ell" then "one", not the L1 key)
-.IP l2
-send the alternate break sequence (<CR>, tilde, CTRL-B)
-(might halt a Sun)
+.IP l?
+list the break sequences available
+.IP l0
+send the break sequence associated with this console
+.IP l1-9
+send the specific break sequence
 .IP o
 close (if open) and reopen the line (to clear errors (silo overflows))
 and the log file
@@ -217,7 +219,7 @@ display list of commands
 continue, ignore the escape sequence
 .IP "^R (ctrl-R)"
 replay the last line only
-.IP \\\fIooo\fP
+.IP \\\\\fIooo\fP
 send character having octal code \fIooo\fP
 (must specify three octal digits)
 .IP \.
@@ -282,8 +284,9 @@ console \-e \*(lq^[1\*(rq lv426
 Requests a connection to the host ``lv426'' with the escape characters
 set to ``escape one''.
 .SH BUGS
-Connections suspended under Dynix sometimes break the kernel when
-resumed.
+All client/server traffic (including root and user passwords) is
+passed ``in the clear''.  Extreme care should be taken to insure no one
+is ``snooping'' this private data.  One day the traffic will be encrypted.
 .PP
 It is possible to create a loop of console connections, with ugly results.
 Never run \fBconsole\fP from within a console connection (unless you set each

@@ -1,7 +1,7 @@
 /*
- *  $Id: readcfg.c,v 5.62 2001-08-04 18:33:54-07 bryan Exp $
+ *  $Id: readcfg.c,v 5.70 2002-01-21 02:48:33-08 bryan Exp $
  *
- *  Copyright conserver.com, 2000-2001
+ *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
@@ -66,6 +66,7 @@ int
 ACCESS *pACList;		/* `who do you love' (or trust)         */
 int
   iAccess;			/* how many access restrictions we have */
+STRING *breakList = (STRING *) 0;	/* list of break sequences */
 
 /* Parse the [number(m|h|d|l)[a]] spec
  * return 0 on invalid spec, non-zero on valid spec
@@ -75,6 +76,7 @@ parseMark(pcFile, iLine, pcMark, tyme, pCE)
     const char *pcFile;
     const int iLine;
     const char *pcMark;
+    time_t tyme;
     CONSENT *pCE;
 {
     char mark[BUFSIZ];
@@ -157,7 +159,24 @@ parseMark(pcFile, iLine, pcMark, tyme, pCE)
 	if (factor && value) {
 	    pCE->mark = value;
 	    if (factor > 0) {
-		pCE->nextMark = tyme + value;
+		tyme -= (tyme % 60);	/* minute boundary */
+		if ((value <= 60 * 60 && (60 * 60) % value == 0)
+		    || (value > 60 * 60 && (60 * 60 * 24) % value == 0)) {
+		    struct tm *tm;
+		    time_t now;
+
+		    /* the increment is a "nice" subdivision of an hour
+		     * or a day
+		     */
+		    now = tyme;
+		    if ((struct tm *)0 != (tm = localtime(&tyme))) {
+			tyme -= tm->tm_min * 60;	/* hour boundary */
+			tyme -= tm->tm_hour * 60 * 60;	/* day boundary */
+			tyme += ((now - tyme) / value) * value;
+			/* up to nice bound */
+		    }
+		}
+		pCE->nextMark = tyme + value;	/* next boundary */
 	    } else {
 		pCE->nextMark = value;
 	    }
@@ -234,11 +253,20 @@ ReadCfg(pcFile, fp)
     ppRC = &pRCList;
     iLocal = 0;
 
+    if ((STRING *) 0 == breakList) {
+	breakList = (STRING *) calloc(9, sizeof(STRING));
+	if ((STRING *) 0 == breakList) {
+	    OutOfMem();
+	}
+    }
     buildMyString((char *)0, &acInSave);
+    buildMyString("\\z", &breakList[0]);
+    buildMyString("\\r~^b", &breakList[1]);
+    buildMyString("#.reset -x\\r", &breakList[2]);
     iG = minG = 0;
     iLine = 0;
     while ((acIn = readLine(fp, &acInSave, &iLine)) != (unsigned char *)0) {
-	char *pcLine, *pcMode, *pcLog, *pcRem, *pcStart, *pcMark;
+	char *pcLine, *pcMode, *pcLog, *pcRem, *pcStart, *pcMark, *pcBreak;
 
 	acStart = pruneSpace(acIn);
 
@@ -259,6 +287,17 @@ ReadCfg(pcFile, fp)
 		    defMark[0] = '\000';
 	    } else if (0 == strcmp(acStart, "DOMAINHACK")) {
 		domainHack = 1;
+	    } else if (0 == strncmp(acStart, "BREAK", 5) &&
+		       acStart[5] >= '1' && acStart[5] <= '9' &&
+		       acStart[6] == '\000') {
+		Debug("BREAK%c found with `%s'", acStart[5], pcLine);
+		if (pcLine[0] == '\000') {
+		    buildMyString((char *)0, &breakList[acStart[5] - '1']);
+		} else {
+		    buildMyString((char *)0, &breakList[acStart[5] - '1']);
+		    buildMyString(pcLine, &breakList[acStart[5] - '1']);
+		    cleanupBreak(acStart[5] - '0');
+		}
 	    } else {
 		Error("%s(%d) unknown variable `%s'", pcFile, iLine,
 		      acStart);
@@ -287,6 +326,19 @@ ReadCfg(pcFile, fp)
 	    /* Skip null intervals */
 	    if (pcMark[0] == '\000')
 		pcMark = (char *)0;
+	}
+
+	if ((char *)0 == pcMark) {
+	    pcBreak = (char *)0;
+	} else {
+	    if ((char *)0 != (pcBreak = strchr(pcMark, ':'))) {
+		*pcBreak++ = '\000';
+		pcMark = pruneSpace(pcMark);
+		pcBreak = pruneSpace(pcBreak);
+		/* Ignore null specs */
+		if (pcBreak[0] == '\000')
+		    pcBreak = (char *)0;
+	    }
 	}
 
 	/* if this server remote?
@@ -395,6 +447,18 @@ ReadCfg(pcFile, fp)
 	    (void)parseMark(pcFile, iLine, defMark, tyme, pCE);
 	}
 
+	pCE->breakType = 1;
+	if (pcBreak) {
+	    int bt;
+	    bt = atoi(pcBreak);
+	    if (bt > 9 || bt < 0) {
+		Error("%s(%d) bad break spec `%d'", pcFile, iLine, bt);
+	    } else {
+		pCE->breakType = (short int)bt;
+		Debug("breakType set to %d", pCE->breakType);
+	    }
+	}
+
 	if (pcLine[0] == '!') {
 	    pcLine = pruneSpace(pcLine + 1);
 	    pCE->isNetworkConsole = 1;
@@ -452,7 +516,7 @@ ReadCfg(pcFile, fp)
     }
     *ppRC = (REMOTE *) 0;
 
-    /* make a vector of access restructions
+    /* make a vector of access restrictions
      */
     iG = iAccess = 0;
     pACList = (ACCESS *) 0;

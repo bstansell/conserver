@@ -1,7 +1,7 @@
 /*
- *  $Id: access.c,v 5.35 2001-07-23 00:45:49-07 bryan Exp $
+ *  $Id: access.c,v 5.36 2002-01-21 02:48:33-08 bryan Exp $
  *
- *  Copyright conserver.com, 2000-2001
+ *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *

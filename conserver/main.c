@@ -1,7 +1,7 @@
 /*
- *  $Id: main.c,v 5.78 2001-07-27 12:34:48-07 bryan Exp $
+ *  $Id: main.c,v 5.81 2002-01-21 02:48:33-08 bryan Exp $
  *
- *  Copyright conserver.com, 2000-2001
+ *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
@@ -56,7 +56,8 @@
 #include <version.h>
 
 int fAll = 0, fVerbose = 0, fSoftcar = 0, fNoinit = 0, fVersion =
-    0, fStrip = 0, fDaemon = 0, fUseLogfile = 0;
+    0, fStrip = 0, fDaemon = 0, fUseLogfile = 0, fReopen = 0, fReopenall =
+    0;
 
 char chDefAcc = 'r';
 
@@ -163,7 +164,7 @@ daemonize()
 
 
 static char u_terse[] =
-    " [-7dDhinuvV] [-a type] [-M addr] [-p port] [-b port] [-C config] [-P passwd] [-L logfile]";
+    " [-7dDhinouvV] [-a type] [-M addr] [-p port] [-b port] [-C config] [-P passwd] [-L logfile] [-O min]";
 static char *apcLong[] = {
     "7          strip the high bit of all console data",
     "a type     set the default access type",
@@ -176,6 +177,8 @@ static char *apcLong[] = {
     "L logfile  give a new logfile path to the server process",
     "M addr     address to listen on (all addresses by default)",
     "n          obsolete - see -u",
+    "o          reopen downed console on client connect",
+    "O min      reopen all downed consoles every <min> minutes",
     "p port     port to listen on",
     "P passwd   give a new passwd file to the server process",
     "u          copy \"unloved\" console data to stdout",
@@ -279,7 +282,7 @@ main(argc, argv)
     int i, j;
     FILE *fpConfig;
     struct hostent *hpMe;
-    static char acOpts[] = "7a:b:C:dDhiL:M:np:P:suVv";
+    static char acOpts[] = "7a:b:C:dDhiL:M:noO:p:P:suVv";
     extern int optopt;
     extern char *optarg;
     REMOTE *pRCUniq;		/* list of uniq console servers         */
@@ -374,6 +377,14 @@ main(argc, argv)
 	    case 'n':
 		/* noop now */
 		break;
+	    case 'o':
+		/* try reopening downed consoles on connect */
+		fReopen = 1;
+		break;
+	    case 'O':
+		/* How often to try opening all down consoles, in minutes */
+		fReopenall = atoi(optarg);
+		break;
 	    case 'p':
 		pcPort = optarg;
 		break;
@@ -438,6 +449,7 @@ main(argc, argv)
     else
 	Info("Started as `%s' by `%s' at %s", curuser,
 	     (origuser == (char *)0) ? curuser : origuser, strtime(NULL));
+    (void)endpwent();
 
 #if HAVE_GETSPNAM
     if (0 != geteuid()) {

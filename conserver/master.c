@@ -1,7 +1,7 @@
 /*
- *  $Id: master.c,v 5.63 2001-10-10 11:52:57-07 bryan Exp $
+ *  $Id: master.c,v 5.65 2002-01-21 02:48:33-08 bryan Exp $
  *
- *  Copyright conserver.com, 2000-2001
+ *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  *
@@ -437,7 +437,7 @@ Master(pRCUniq)
 
 	    if ('t' == cType) {
 		fileWrite(csocket, "trusted -- terminated\r\n", -1);
-		fSawQuit = 1;
+		kill(parentpid, SIGTERM);
 	    } else if ((char *)0 == pcArgs) {
 		fileWrite(csocket, "must be trusted to terminate\r\n", -1);
 	    } else if ((struct passwd *)0 == (pwd = getpwuid(0))) {
@@ -452,7 +452,7 @@ Master(pRCUniq)
 	    exit(EX_OK);
 	}
 	if (0 == strcmp(acIn, "pid")) {
-	    sprintf(acOut, "%d\r\n", (int)getpid());
+	    sprintf(acOut, "%d\r\n", parentpid);
 	    (void)fileWrite(csocket, acOut, -1);
 	    (void)fileClose(csocket);
 	    exit(EX_OK);

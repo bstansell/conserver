@@ -1,7 +1,7 @@
 /*
- *  $Id: util.c,v 1.26 2001-08-04 18:33:27-07 bryan Exp $
+ *  $Id: util.c,v 1.31 2002-01-21 02:48:33-08 bryan Exp $
  *
- *  Copyright conserver.com, 2000-2001
+ *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  */
@@ -15,6 +15,7 @@
 #include <config.h>
 #include <sys/socket.h>
 #include <ctype.h>
+#include <sys/select.h>
 
 #include <compat.h>
 #include <port.h>
@@ -35,6 +36,38 @@ OutOfMem()
     write(2, progname, strlen(progname));
     write(2, acNoMem, sizeof(acNoMem) - 1);
     exit(EX_UNAVAILABLE);
+}
+
+char *
+buildMyStringChar(ch, msg)
+    const int ch;
+    STRING *msg;
+{
+    if (msg->used + 1 >= msg->allocated) {
+	if (0 == msg->allocated) {
+	    msg->allocated = 1024 * sizeof(char);
+	    msg->string = (char *)calloc(1, msg->allocated);
+	} else {
+	    msg->allocated += 1024 * sizeof(char);
+	    msg->string = (char *)realloc(msg->string, msg->allocated);
+	}
+	Debug("buildMyStringChar: tried allocating %lu bytes",
+	      msg->allocated);
+	if (msg->string == (char *)0)
+	    OutOfMem();
+    }
+    if (msg->used) {
+	msg->string[msg->used - 1] = ch;	/* overwrite NULL and */
+	msg->string[msg->used++] = '\000';	/* increment by one */
+	Debug("buildMyStringChar: added 1 char (%d/%d now)", msg->used,
+	      msg->allocated);
+    } else {
+	msg->string[msg->used++] = ch;	/* no NULL, so store stuff */
+	msg->string[msg->used++] = '\000';	/* and increment by two */
+	Debug("buildMyStringChar: added 2 chars (%d/%d now)", msg->used,
+	      msg->allocated);
+    }
+    return msg->string;
 }
 
 char *
@@ -64,7 +97,13 @@ buildMyString(str, msg)
 	if (msg->string == (char *)0)
 	    OutOfMem();
     }
-    strcat(msg->string, str);
+#if HAVE_MEMCPY
+    (void)memcpy(msg->string + (msg->used ? msg->used - 1 : 0), str, len);
+#else
+    (void)bcopy(str, msg->string + (msg->used ? msg->used - 1 : 0), len);
+#endif
+    if (msg->used)
+	len--;
     msg->used += len;
     Debug("buildMyString: added %d chars (%d/%d now)", len, msg->used,
 	  msg->allocated);
@@ -284,6 +323,11 @@ maxfiles()
 #  endif /* HAVE_GETDTABLESIZE */
 # endif	/* HAVE_GETRLIMIT */
 #endif /* HAVE_SYSCONF */
+#ifdef FD_SETSIZE
+    if (FD_SETSIZE <= mf) {
+	mf = (FD_SETSIZE - 1);
+    }
+#endif
     Debug("maxfiles=%d", mf);
     return mf;
 }
@@ -430,12 +474,10 @@ fileRead(cfp, buf, len)
     void *buf;
     int len;
 {
-    int retval;
+    int retval = 0;
 
     switch (cfp->ftype) {
 	case simpleFile:
-	    retval = read(cfp->fd, buf, len);
-	    break;
 	case simpleSocket:
 	    retval = read(cfp->fd, buf, len);
 	    break;
@@ -446,7 +488,13 @@ fileRead(cfp, buf, len)
 #endif
     }
 
-    Debug("File I/O: Read %d bytes from fd %d", retval, cfp->fd);
+    if (retval >= 0) {
+	Debug("File I/O: Read %d byte%s from fd %d", retval,
+	      (retval == 1) ? "" : "s", cfp->fd);
+    } else {
+	Debug("File I/O: Read of %d byte%s from fd %d: %s", len,
+	      (retval == 1) ? "" : "s", cfp->fd, strerror(errno));
+    }
     return retval;
 }
 
@@ -457,26 +505,39 @@ fileWrite(cfp, buf, len)
     const char *buf;
     int len;
 {
-    int retval;
+    int len_orig = len;
+    int len_out = 0;
+    int retval = 0;
 
     if (len < 0)
 	len = strlen(buf);
 
     switch (cfp->ftype) {
 	case simpleFile:
-	    retval = write(cfp->fd, buf, len);
-	    break;
 	case simpleSocket:
-	    retval = write(cfp->fd, buf, len);
+	    while (len > 0) {
+		if ((retval = write(cfp->fd, buf, len)) < 0) {
+		    break;
+		}
+		buf += retval;
+		len -= retval;
+		len_out += retval;
+	    }
 	    break;
 #ifdef TLS_SUPPORT
 	case TLSSocket:
-	    retval = SSL_write(cfp->sslfd, buf, len);
+	    len_out = retval = SSL_write(cfp->sslfd, buf, len);
 	    break;
 #endif
     }
 
-    Debug("File I/O: Wrote %d bytes to fd %d", retval, cfp->fd);
+    if (retval >= 0) {
+	Debug("File I/O: Wrote %d byte%s to fd %d", len_out,
+	      (retval == 1) ? "" : "s", cfp->fd);
+    } else {
+	Debug("File I/O: Write of %d byte%s to fd %d: %s", len_orig,
+	      (retval == 1) ? "" : "s", cfp->fd, strerror(errno));
+    }
     return retval;
 }
 

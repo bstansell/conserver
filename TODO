@@ -30,6 +30,8 @@ Bryan Stansell
 - PAM support
 
 - syslog?
+    Daniel E. Singer <des@cs.duke.edu> would like to see it - especially
+    in regards to --use-libwrap code
 
 - alternate (md5) password encryption support in conserver.passwd
 
@@ -113,5 +115,5 @@ Bryan Stansell
   things) once instead of leaving it down.
 
 #
-#  $Id: TODO,v 1.16 2001-10-16 00:13:27-07 bryan Exp $
+#  $Id: TODO,v 1.17 2002-01-18 09:56:57-08 bryan Exp $
 #

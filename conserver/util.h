@@ -1,7 +1,7 @@
 /*
- *  $Id: util.h,v 1.11 2001-08-04 18:33:17-07 bryan Exp $
+ *  $Id: util.h,v 1.13 2002-01-21 02:48:33-08 bryan Exp $
  *
- *  Copyright conserver.com, 2000-2001
+ *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
  */
@@ -59,4 +59,5 @@ extern int fileFDNum();
 extern void OutOfMem();
 extern char *buildString();
 extern char *buildMyString();
+extern char *buildMyStringChar();
 extern char *readLine();
