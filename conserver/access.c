@@ -1,5 +1,5 @@
 /*
- *  $Id: access.c,v 5.15 2000-12-13 12:31:07-08 bryan Exp $
+ *  $Id: access.c,v 5.17 2001-02-08 15:31:07-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -38,37 +38,31 @@ static char copyright[] =
 "@(#) Copyright 1992 Purdue Research Foundation.\nAll rights reserved.\n";
 #endif
 
+#include <config.h>
+
 #include <sys/types.h>
 #include <sys/param.h>
-#include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/file.h>
 #include <sys/stat.h>
-#include <sys/resource.h>
-#include <sys/wait.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <errno.h>
 #include <signal.h>
 #include <pwd.h>
 
-#include "cons.h"
-#include "port.h"
-#include "access.h"
-#include "consent.h"
-#include "client.h"
-#include "group.h"
-#include "readcfg.h"
-#include "main.h"
+#include <compat.h>
 
-#if USE_STRINGS
-#include <strings.h>
-#else
-#include <string.h>
-#endif
+#include <port.h>
+#include <access.h>
+#include <consent.h>
+#include <client.h>
+#include <group.h>
+#include <readcfg.h>
+#include <main.h>
+
 
 
 /* in the routines below (the init code) we can bomb if malloc fails	(ksb)

@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.37 2000-12-13 12:31:07-08 bryan Exp $
+ *  $Id: main.c,v 5.39 2001-02-08 15:31:58-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -26,52 +26,50 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
+
+#include <config.h>
+
 #include <sys/types.h>
 #include <sys/param.h>
-#include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/file.h>
 #include <sys/stat.h>
-#include <sys/resource.h>
-#include <sys/wait.h>
-#include <sys/ioctl.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <errno.h>
 #include <signal.h>
 #include <pwd.h>
 
-#include "cons.h"
-#include "port.h"
-#include "consent.h"
-#include "client.h"
-#include "group.h"
-#include "master.h"
-#include "access.h"
-#include "readcfg.h"
-#include "version.h"
-#if USE_STRINGS
-#include <strings.h>
-#else
-#include <string.h>
-#endif
+#include <compat.h>
+
+#include <port.h>
+#include <consent.h>
+#include <client.h>
+#include <group.h>
+#include <master.h>
+#include <access.h>
+#include <readcfg.h>
+#include <version.h>
 
 char rcsid[] =
-	"$Id: main.c,v 5.37 2000-12-13 12:31:07-08 bryan Exp $";
+	"$Id: main.c,v 5.39 2001-02-08 15:31:58-08 bryan Exp $";
 char *progname =
 	rcsid;
 int fAll = 1, fVerbose = 0, fSoftcar = 0, fNoinit = 0, fDebug = 0, fVersion = 0;
 int fDaemon = 0;
 char chDefAcc = 'r';
-char *pcConfig = CONFIG;
-char *pcPasswd = PASSWD_FILE;
+
+#define FULLCFPATH SYSCONFDIR "/" CONFIGFILE;
+#define FULLPDPATH SYSCONFDIR "/" PASSWDFILE;
+
+char *pcConfig = FULLCFPATH;
+char *pcPasswd = FULLPDPATH;
 int domainHack = 0;
 
-#if defined(SERVICE)
-char acService[] = SERVICE;
+#if defined(SERVICENAME)
+char acService[] = SERVICENAME;
 #endif
 
 struct sockaddr_in in_port;
@@ -175,7 +173,7 @@ Version()
 #else
 	printf("%s: high-bit of data *not* stripped (8-bit clean)\n", progname);
 #endif
-#if defined(SERVICE)
+#if defined(SERVICENAME)
 	{
 		struct servent *pSE;
 		if ((struct servent *)0 == (pSE = getservbyname(acService, "tcp"))) {
@@ -189,8 +187,8 @@ Version()
 		printf(" on port %d\n", ntohs((u_short)pSE->s_port));
 	}
 #else
-#if defined(PORT)
-	printf("%s: on port %d\n", progname, PORT);
+#if defined(PORTNUMBER)
+	printf("%s: on port %d\n", progname, PORTNUMBER);
 #else
 	printf("%s: no service or port compiled in\n", progname);
 	exit(1);
@@ -228,10 +226,10 @@ char **argv;
 	}
 
 	(void)setpwent();
-#if USE_SETLINEBUF
+#if HAVE_SETLINEBUF
 	setlinebuf(stderr);
 #endif
-#if USE_SETVBUF
+#if HAVE_SETVBUF
 	setvbuf(stderr, NULL, _IOLBF, BUFSIZ);
 #endif
 
@@ -244,10 +242,10 @@ char **argv;
 		fprintf(stderr, "%s: wrong address size (4 != %d) or adress family (%d != %d)\n", progname, hpMe->h_length, AF_INET, hpMe->h_addrtype);
 		exit(1);
 	}
-#if USE_STRINGS
-	(void)bcopy(hpMe->h_addr, &acMyAddr[0], hpMe->h_length);
-#else
+#if HAVE_MEMCPY
 	(void)memcpy(&acMyAddr[0], hpMe->h_addr, hpMe->h_length);
+#else
+	(void)bcopy(hpMe->h_addr, &acMyAddr[0], hpMe->h_length);
 #endif
 
 	while (EOF != (i = getopt(argc, argv, acOpts))) {
@@ -312,7 +310,7 @@ char **argv;
 		exit(0);
 	}
 
-#if HAVE_SHADOW
+#if HAVE_GETSPNAM
 /*  Why force root???  Cause of getsp*() calls... */
 	if (0 != geteuid()) {
 		fprintf(stderr, "%s: must be the superuser\n", progname);
@@ -328,7 +326,7 @@ char **argv;
 	}
 	ReadCfg(pcConfig, fpConfig);
 
-#if USE_FLOCK
+#if HAVE_FLOCK
 	/* we lock the configuration file so that two identical
 	 * conservers will not be running together  (but two with
 	 * different configurations can run on the same host).
@@ -345,10 +343,10 @@ char **argv;
 		SetDefAccess(hpMe);
 	}
 
-#if USE_SETLINEBUF
+#if HAVE_SETLINEBUF
 	setlinebuf(stdout);
 #endif
-#if USE_SETVBUF
+#if HAVE_SETVBUF
 	setvbuf(stdout, NULL, _IOLBF, BUFSIZ);
 #endif
 

@@ -1,8 +1,0 @@
-#	$Id: IRIX6,v 1.1 1999-01-15 15:28:51-08 bryan Exp $
-#
-'CC=cc'
-'INSTALL=/sbin/install'
-'INCLUDE='
-'DEBUG=-O'
-'CDEFS=-DIRIX6'
-'LIBS='

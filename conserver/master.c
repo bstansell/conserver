@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.27 2000-12-13 12:31:07-08 bryan Exp $
+ *  $Id: master.c,v 5.29 2001-02-08 15:32:28-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -26,58 +26,44 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
+#include <config.h>
+
 #include <sys/types.h>
 #include <sys/param.h>
-#include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/file.h>
 #include <sys/stat.h>
-#include <sys/wait.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <errno.h>
 #include <signal.h>
 #include <pwd.h>
 
-#include "cons.h"
-#include "port.h"
-#include "consent.h"
-#include "client.h"
-#include "group.h"
-#include "access.h"
-#include "master.h"
-#include "readcfg.h"
-#include "version.h"
-#include "main.h"
+#include <compat.h>
 
-#if USE_STRINGS
-#include <strings.h>
-#else
-#include <string.h>
-#endif
-
-#if USE_SYS_TIME_H
-#include <sys/time.h>
-#else
-#include <time.h>
-#endif
-#include <sys/resource.h>
-
-extern char *crypt();
-extern time_t time();
-
-static SIGFLAG fSawQuit, fSawHUP, fSawUSR1, fSawCHLD;
+#include <port.h>
+#include <consent.h>
+#include <client.h>
+#include <group.h>
+#include <access.h>
+#include <master.h>
+#include <readcfg.h>
+#include <version.h>
+#include <main.h>
 
 
-static SIGRETS
+
+static sig_atomic_t fSawQuit, fSawHUP, fSawUSR1, fSawCHLD;
+
+
+static RETSIGTYPE
 FlagSawCHLD(sig)
 	int sig;
 {
 	fSawCHLD = 1;
-#if !USE_SIGACTION
+#if !HAVE_SIGACTION
 	(void)signal(SIGCHLD, FlagSawCHLD);
 #endif
 }
@@ -89,8 +75,8 @@ static void
 FixKids()
 {
 	register int i, pid;
-	auto long tyme;
-	auto WAIT_T UWbuf;
+	auto time_t tyme;
+	auto int UWbuf;
 
 #if HAVE_WAIT3
 	while (-1 != (pid = wait3(& UWbuf, WNOHANG, (struct rusage *)0))) {
@@ -115,7 +101,7 @@ FixKids()
 			/* this kid kid is dead, start another
 			 */
 			Spawn(& aGroups[i]);
-			tyme = time((long *)0);
+			tyme = time((time_t *)0);
 			printf("%s: %s: exit(%d), restarted %s", progname, aGroups[i].pCElist[0].server, WEXITSTATUS(UWbuf), ctime(&tyme));
 		}
 	}
@@ -124,29 +110,29 @@ FixKids()
 /* kill all the kids and exit.
  * Called when master process receives SIGTERM
  */
-static SIGRETS
+static RETSIGTYPE
 QuitIt(arg)
 	int arg;
 {
 	fSawQuit = 1;
 }
 
-static SIGRETS
+static RETSIGTYPE
 FlagSawHUP(arg)
 	int arg;
 {
 	fSawHUP = 1;
-#if !USE_SIGACTION
+#if !HAVE_SIGACTION
 	(void)signal(SIGHUP, FlagSawHUP);
 #endif
 }
 
-static SIGRETS
+static RETSIGTYPE
 FlagSawUSR1(arg)
 	int arg;
 {
 	fSawUSR1 = 1;
-#if !USE_SIGACTION
+#if !HAVE_SIGACTION
 	(void)signal(SIGUSR1, FlagSawUSR1);
 #endif
 }
@@ -198,14 +184,14 @@ REMOTE
 
 	/* set up port for master to listen on
 	 */
-#if USE_STRINGS
-	(void)bzero((char *)&master_port, sizeof(master_port));
-#else
+#if HAVE_MEMSET
         (void)memset((void *)&master_port, 0, sizeof(master_port));
+#else
+	(void)bzero((char *)&master_port, sizeof(master_port));
 #endif
 	master_port.sin_family = AF_INET;
 	*(u_long *)&master_port.sin_addr = INADDR_ANY;
-#if defined(SERVICE)
+#if defined(SERVICENAME)
 	{
 		struct servent *pSE;
 		if ((struct servent *)0 == (pSE = getservbyname(acService, "tcp"))) {
@@ -215,11 +201,11 @@ REMOTE
 		master_port.sin_port = pSE->s_port;
 	}
 #else
-#if defined(PORT)
-	master_port.sin_port = htons((u_short)PORT);
-#else
+# if defined(PORTNUMBER)
+	master_port.sin_port = htons((u_short)PORTNUMBER);
+# else
 	fprintf(stderr, "%s: no port or service compiled in?\n", progname);
-#endif
+# endif
 #endif
 
 	if ((msfd=socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -268,7 +254,7 @@ REMOTE
 			continue;
 		}
 		so = sizeof(response_port);
-		cfd = accept(msfd, (struct sockaddr *)&response_port, &so);
+		cfd = accept(msfd, (struct sockaddr *)&response_port, (socklen_t *)&so);
 		if (cfd < 0) {
 			fprintf(stderr, "%s: accept: %s\n", progname, strerror(errno));
 			continue;
@@ -276,7 +262,7 @@ REMOTE
 
 
 		so = sizeof(in_port);
-		if (-1 == getpeername(cfd, (struct sockaddr *)&in_port, &so)) {
+		if (-1 == getpeername(cfd, (struct sockaddr *)&in_port, (socklen_t *)&so)) {
 			CSTROUT(cfd, "getpeername failed\r\n");
 			(void)close(cfd);
 			continue;

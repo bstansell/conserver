@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.63 2000-12-13 12:31:07-08 bryan Exp $
+ *  $Id: group.c,v 5.65 2001-02-08 15:31:40-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -57,80 +57,45 @@ static char copyright[] =
 @(#) Copyright 1992 Purdue Research Foundation.\n\
 All rights reserved.\n";
 #endif
+
+#include <config.h>
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/file.h>
 #include <sys/stat.h>
-#include <sys/wait.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <errno.h>
 #include <signal.h>
 #include <pwd.h>
 
-#include "cons.h"
-#include "port.h"
-#include "consent.h"
-#include "client.h"
-#include "access.h"
-#include "group.h"
-#include "version.h"
-#include "main.h"
+#include <compat.h>
+
+#include <port.h>
+#include <consent.h>
+#include <client.h>
+#include <access.h>
+#include <group.h>
+#include <version.h>
+#include <main.h>
 
 #if DO_VIRTUAL
-#if HAVE_PTYD
-#include "local/openpty.h"
-#else
+# if HAVE_PTYD
+#  include "local/openpty.h"
+# else
 extern int FallBack();
-#endif /* ptyd */
+# endif /* ptyd */
 #endif /* virtual consoles */
-
-#if USE_SYS_TIME_H
-#include <sys/time.h>
-#else
-#include <time.h>
-#endif
-#include <sys/resource.h>
-
-#if USE_TERMIO
-#include <termio.h>
-
-#else
-#if USE_TERMIOS
-#include <termios.h>
-#include <unistd.h>
-
-#else	/* use ioctl stuff */
-#include <sgtty.h>
-#include <sys/ioctl.h>
-#endif
-#endif
-
-#if USE_STREAMS
-#include <stropts.h>
-#endif
-
-#if USE_STRINGS
-#include <strings.h>
-#else
-#include <string.h>
-#endif
 
 #include <arpa/telnet.h>
 
-#if HAVE_SHADOW
-#include <shadow.h>
-#endif
-
-extern char *crypt(), *calloc();
-extern time_t time();
 
 /* flags that a signal has occurred */
-static SIGFLAG fSawReOpen, fSawReUp, fSawMark, fSawGoAway;
+static sig_atomic_t fSawReOpen, fSawReUp, fSawMark, fSawGoAway;
 
 /* Is this passwd a match for this user's passwd? 		(gregf/ksb)
  * look up passwd in shadow file if we have to, if we are
@@ -141,7 +106,7 @@ CheckPass(pwd, pcEPass, pcWord)
 struct passwd *pwd;
 char *pcEPass, *pcWord;
 {
-#if HAVE_SHADOW
+#if HAVE_GETSPNAM
 	register struct spwd *spwd;
 #endif
 
@@ -150,7 +115,7 @@ char *pcEPass, *pcWord;
 			return 1;
 		}
 	}
-#if HAVE_SHADOW
+#if HAVE_GETSPNAM
 	if ('x' == pwd->pw_passwd[0] && '\000' == pwd->pw_passwd[1]) {
 		if ((struct spwd *)0 != (spwd = getspnam(pwd->pw_name)))
 			return 0 == strcmp(spwd->sp_pwdp, crypt(pcWord, spwd->sp_pwdp));
@@ -163,12 +128,12 @@ char *pcEPass, *pcWord;
 /* on an HUP close and re-open log files so lop can trim them		(ksb)
  * lucky for us: log file fd's can change async from the group driver!
  */
-static SIGRETS
+static RETSIGTYPE
 FlagReOpen(sig)
 	int sig;
 {
 	fSawReOpen = 1;
-#if !USE_SIGACTION
+#if !HAVE_SIGACTION
 	(void)signal(SIGHUP, FlagReOpen);
 #endif
 }
@@ -196,12 +161,12 @@ ReOpen()
 	}
 }
 
-static SIGRETS
+static RETSIGTYPE
 FlagReUp(sig)
 	int sig;
 {
 	fSawReUp = 1;
-#if !USE_SIGACTION
+#if !HAVE_SIGACTION
 	(void)signal(SIGUSR1, FlagReUp);
 #endif
 }
@@ -227,12 +192,12 @@ ReUp()
 	}
 }
 
-static SIGRETS
+static RETSIGTYPE
 FlagMark(sig)
     int sig;
 {
 	fSawMark = 1;
-#if !USE_SIGACTION
+#if !HAVE_SIGACTION
 	signal(SIGALRM, FlagMark);
 #endif
 }
@@ -240,7 +205,7 @@ FlagMark(sig)
 static void
 Mark()
 {
-    long tyme;
+    time_t tyme;
     char acOut[BUFSIZ];
     char styme[26];
     register int i;
@@ -250,7 +215,7 @@ Mark()
 	    return;
     }
 
-    tyme = time((long *)0);
+    tyme = time((time_t *)0);
     (void)strcpy(styme, ctime(&tyme));
     styme[24] = '\000';
     /* [-- MARK -- `date`] */
@@ -273,13 +238,13 @@ SendClientsMsg(pGE, message)
 GRPENT *pGE;
 char *message;
 {
-	register CLIENT *pCL;
+	register CONSCLIENT *pCL;
 
 	if ((GRPENT *)0 == pGE) {
 		return;
 	}
 
-	for (pCL = pGE->pCLall; (CLIENT *)0 != pCL; pCL = pCL->pCLscan) {
+	for (pCL = pGE->pCLall; (CONSCLIENT *)0 != pCL; pCL = pCL->pCLscan) {
 	    if (pCL->fcon) {
 		    (void)write(pCL->fd, message, strlen(message));
 	    }
@@ -293,7 +258,7 @@ GRPENT *pGE;
     SendClientsMsg(pGE, "[-- Console server shutting down --]\r\n");
 }
 
-static SIGRETS
+static RETSIGTYPE
 FlagGoAway(sig)
 int sig;
 {
@@ -329,11 +294,11 @@ DeUtmp()
 		if (-1 == pCE->fdtty || 0 == pCE->fvirtual) {
 			continue;
 		}
-#if HAVE_PTYD
+# if HAVE_PTYD
 		(void)closepty(pCE->acslave, pCE->dfile, OPTY_UTMP, pCE->fdlog);
-#else
+# else
 		(void)close(pCE->fdlog);
-#endif
+# endif
 	}
 	exit(0);
 	_exit(0);
@@ -345,19 +310,19 @@ DeUtmp()
  * which will send us here to clean up the exit code.  The lack of a
  * reader on the pseudo will cause us to notice the death in Kiddie...
  */
-static SIGRETS
+static RETSIGTYPE
 ReapVirt(sig)
 int sig;
 {
 	register int i, pid;
 	auto long tyme;
-	auto WAIT_T UWbuf;
+	auto int UWbuf;
 
-#if HAVE_WAIT3
+# if HAVE_WAIT3
 	while (-1 != (pid = wait3(& UWbuf, WNOHANG, (struct rusage *)0))) {
-#else
+# else
 	while (-1 != (pid = wait(& UWbuf))) {
-#endif
+# endif
 		if (0 == pid) {
 			break;
 		}
@@ -368,7 +333,7 @@ int sig;
 		}
 	}
 }
-#endif
+#endif /* DO_VIRUAL */
 
 
 static char acStop[] = {	/* buffer for oob stop command		*/
@@ -376,7 +341,7 @@ static char acStop[] = {	/* buffer for oob stop command		*/
 };
 
 int CheckPasswd(pCLServing, pw_string)
-CLIENT *pCLServing;
+CONSCLIENT *pCLServing;
 char *pw_string;
 {
     struct passwd *pwd;
@@ -384,7 +349,7 @@ char *pw_string;
     char buf[100];
     char *server, *servers, *this_pw, *user;
     char username[64];  /* same as acid */
-#if HAVE_SHADOW
+#if HAVE_GETSPNAM
     register struct spwd *spwd;
 #endif
 
@@ -421,7 +386,7 @@ char *pw_string;
 	    if (strcmp(this_pw, "*passwd*") == 0) {
 		    this_pw = NULL;
 		    if ((struct passwd *)0 != (pwd = getpwnam(user))) {
-    #if HAVE_SHADOW
+#if HAVE_GETSPNAM
 			    if ('x' == pwd->pw_passwd[0] && '\000' == pwd->pw_passwd[1]) {
 				    if ((struct spwd *)0 != (spwd = getspnam(pwd->pw_name))) {
 					    this_pw = spwd->sp_pwdp;
@@ -429,9 +394,9 @@ char *pw_string;
 			    } else {
 				    this_pw = pwd->pw_passwd;
 			    }
-    #else
+#else
 			    this_pw = pwd->pw_passwd;
-    #endif
+#endif
 		    }
 	    }
 	    if (this_pw == NULL)
@@ -545,7 +510,7 @@ Kiddie(pGE, sfd)
 register GRPENT *pGE;
 int sfd;
 {
-	register CLIENT
+	register CONSCLIENT
 		*pCL,		/* console we must scan/notify		*/
 		*pCLServing,	/* client we are serving		*/
 		*pCLFree;	/* head of free list			*/
@@ -558,25 +523,23 @@ int sfd;
 	register struct passwd *pwd;
 	register char *pcPass;
 	register long tyme;
-	long tymee;
+	time_t tymee;
 	char stymee[26];
 	auto CONSENT CECtl;		/* our control `console'	*/
 	auto char cType;
 	auto int maxfd, so;
 	auto fd_set rmask, rinit;
 	auto char acOut[BUFSIZ], acIn[BUFSIZ], acNote[132*2];
-	auto CLIENT dude[MAXMEMB];	/* alloc one set per console	*/
+	auto CONSCLIENT dude[MAXMEMB];	/* alloc one set per console	*/
 #if HAVE_RLIMIT
 	struct rlimit rl;
 #endif
-#if USE_TERMIO
-	auto struct sgttyb sty;
-#else
-#if USE_TERMIOS
+#if HAVE_TERMIOS_H
 	auto struct termios sbuf;
-#else /* ioctl, like BSD4.2 */
+#else
+# if HAVE_SGTTY_H
 	auto struct sgttyb sty;
-#endif
+# endif
 #endif
 
 	/* turn off signals that master() might have turned on
@@ -595,7 +558,7 @@ int sfd;
 	pCE = pGE->pCElist;
 	for (iConsole = 0; iConsole < pGE->imembers; ++iConsole) {
 		pCE[iConsole].fup = 0;
-		pCE[iConsole].pCLon = pCE[iConsole].pCLwr = (CLIENT *)0;
+		pCE[iConsole].pCLon = pCE[iConsole].pCLwr = (CONSCLIENT *)0;
 #if DO_VIRTUAL
 		pCE[iConsole].fdlog = -1;
 		if (0 == pCE[iConsole].fvirtual) {
@@ -604,13 +567,13 @@ int sfd;
 		}
 		/* open a pty for each vitrual console
 		 */
-#if HAVE_PTYD
+# if HAVE_PTYD
 		pCE[iConsole].fdtty = openpty(pCE[iConsole].acslave, pCE[iConsole].dfile, OPTY_UTMP, 0);
-#else /* oops, get ptyd soon */
+# else /* oops, get ptyd soon */
 		/* we won't get a utmp entry... *sigh*
 		 */
 		pCE[iConsole].fdtty = FallBack(pCE[iConsole].acslave, pCE[iConsole].dfile);
-#endif /* find openpty */
+# endif /* find openpty */
 #else
 		pCE[iConsole].fdlog = pCE[iConsole].fdtty = -1;
 #endif
@@ -658,7 +621,7 @@ int sfd;
 	for (i = 0; i < MAXMEMB-1; ++i) {
 		dude[i].pCLnext = & dude[i+1];
 	}
-	dude[MAXMEMB-1].pCLnext = (CLIENT *)0;
+	dude[MAXMEMB-1].pCLnext = (CONSCLIENT *)0;
 
 	/* on a SIGHUP we should close and reopen our log files
 	 */ 
@@ -675,7 +638,7 @@ int sfd;
 
 	/* the MAIN loop a group server
 	 */
-	pGE->pCLall = (CLIENT *)0;
+	pGE->pCLall = (CONSCLIENT *)0;
 	while (1) {
 		/* check signal flags */
 		if (fSawGoAway) {
@@ -747,7 +710,7 @@ int sfd;
 
 			/* output all console info nobody is attached
 			 */
-			if (fAll && (CLIENT *)0 == pCEServing->pCLwr) {
+			if (fAll && (CONSCLIENT *)0 == pCEServing->pCLwr) {
 				/* run through the console ouptut,
 				 * add each character to the output line
 				 * drop and reset if we have too much
@@ -765,7 +728,7 @@ int sfd;
 
 			/* write console info to clients (not suspended)
 			 */
-			for (pCL = pCEServing->pCLon; (CLIENT *)0 != pCL; pCL = pCL->pCLnext) {
+			for (pCL = pCEServing->pCLon; (CONSCLIENT *)0 != pCL; pCL = pCL->pCLnext) {
 				if (pCL->fcon) {
 					(void)write(pCL->fd, acIn, nr);
 				}
@@ -775,7 +738,7 @@ int sfd;
 
 		/* anything from a connection?
 		 */
-		for (pCLServing = pGE->pCLall; (CLIENT *)0 != pCLServing; pCLServing = pCLServing->pCLscan) {
+		for (pCLServing = pGE->pCLall; (CONSCLIENT *)0 != pCLServing; pCLServing = pCLServing->pCLscan) {
 			if (!FD_ISSET(pCLServing->fd, &rmask)) {
 				continue;
 			}
@@ -795,12 +758,12 @@ drop:
 				 * close gap in table, restart loop
 				 */
 				if (&CECtl != pCEServing) {
-					tymee = time((long *)0);
+					tymee = time((time_t *)0);
 					(void)strcpy(stymee, ctime(&tymee));
 					stymee[24] = '\000';
 					printf("%s: %s: logout %s [%s]\n", progname, pCEServing->server, pCLServing->acid, stymee);
 				}
-				if (fNoinit && (CLIENT *)0 ==
+				if (fNoinit && (CONSCLIENT *)0 ==
 				    pCLServing->pCEto->pCLon->pCLnext)
 					ConsDown(pCLServing->pCEto, &rinit);
 
@@ -826,11 +789,11 @@ drop:
 				 * lists (all clients, and this console)
 				 */
 				pCLServing->fcon = 0;
-				if ((CLIENT *)0 != pCLServing->pCLnext) {
+				if ((CONSCLIENT *)0 != pCLServing->pCLnext) {
 					pCLServing->pCLnext->ppCLbnext = pCLServing->ppCLbnext;
 				}
 				*(pCLServing->ppCLbnext) = pCLServing->pCLnext;
-				if ((CLIENT *)0 != pCLServing->pCLscan) {
+				if ((CONSCLIENT *)0 != pCLServing->pCLscan) {
 					pCLServing->pCLscan->ppCLbscan = pCLServing->ppCLbscan;
 				}
 				*(pCLServing->ppCLbscan) = pCLServing->pCLscan;
@@ -847,7 +810,7 @@ drop:
 
 	    /* update last keystroke time
 	     */
-	    pCLServing->typetym = tyme = time((long *)0);
+	    pCLServing->typetym = tyme = time((time_t *)0);
 
 #if CPARITY
 			/* clear parity from the network
@@ -968,7 +931,7 @@ drop:
 				}
 				pCLServing->icursor = 0;
 
-				/* in the CONFIG file gave this group a
+				/* in the CONFIGFILE file gave this group a
 				 * password use it before root's
 				 * password  (for malowany)
 				 */
@@ -987,7 +950,7 @@ drop:
 	shift_console:
 				/* remove from current host
 				 */
-				if ((CLIENT *)0 != pCLServing->pCLnext) {
+				if ((CONSCLIENT *)0 != pCLServing->pCLnext) {
 					pCLServing->pCLnext->ppCLbnext = pCLServing->ppCLbnext;
 				}
 				*(pCLServing->ppCLbnext) = pCLServing->pCLnext;
@@ -1000,7 +963,7 @@ drop:
 				/* inform operators of the change
 				 */
 /*				if (fVerbose) { */
-					tymee = time((long *)0);
+					tymee = time((time_t *)0);
 					(void)strcpy(stymee, ctime(&tymee));
 					stymee[24] = '\000';
 					if (&CECtl == pCEServing) {
@@ -1016,7 +979,7 @@ drop:
 				pCLServing->pCEto = pCEServing;
 				pCLServing->pCLnext = pCEServing->pCLon;
 				pCLServing->ppCLbnext = & pCEServing->pCLon;
-				if ((CLIENT *)0 != pCLServing->pCLnext) {
+				if ((CONSCLIENT *)0 != pCLServing->pCLnext) {
 					pCLServing->pCLnext->ppCLbnext = & pCLServing->pCLnext;
 				}
 				pCEServing->pCLon = pCLServing;
@@ -1030,7 +993,7 @@ drop:
 					CSTROUT(pCLServing->fd, "line to host is down]\r\n");
 				} else if (pCEServing->fronly) {
 					CSTROUT(pCLServing->fd, "host is read-only]\r\n");
-				} else if ((CLIENT *)0 == pCEServing->pCLwr) {
+				} else if ((CONSCLIENT *)0 == pCEServing->pCLwr) {
 					pCEServing->pCLwr = pCLServing;
 					pCLServing->fwr = 1;
 					CSTROUT(pCLServing->fd, "attached]\r\n");
@@ -1067,7 +1030,7 @@ drop:
 					CSTROUT(pCLServing->fd, " -- line down]\r\n");
 				} else if (pCEServing->fronly) {
 					CSTROUT(pCLServing->fd, " -- read-only]\r\n");
-				} else if ((CLIENT *)0 == pCEServing->pCLwr) {
+				} else if ((CONSCLIENT *)0 == pCEServing->pCLwr) {
 					pCEServing->pCLwr = pCLServing;
 					pCLServing->fwr = 1;
 					if ( pCEServing->nolog ) {
@@ -1126,19 +1089,19 @@ drop:
 		}
 		else
 		{
-#if USE_TERMIO
+#if HAVE_TERMIO_H
 				if (-1 == ioctl(pCEServing->fdtty, TCSBRK, (char *)0)) {
 					CSTROUT(pCLServing->fd, "failed]\r\n");
 					continue;
 				}
 #else
-#if USE_TCBREAK
+# if HAVE_TCSENDBREAK
 				if (-1 == tcsendbreak(pCEServing->fdtty, 0)) {
 					CSTROUT(pCLServing->fd, "failed]\r\n");
 					continue;
 				}
-#else
-#if USE_TERMIOS
+# else
+#  if HAVE_TERMIOS_H
 				if (-1 == ioctl(pCEServing->fdtty, TIOCSBRK, (char *)0)) {
 					CSTROUT(pCLServing->fd, "failed]\r\n");
 					continue;
@@ -1149,8 +1112,8 @@ drop:
 					CSTROUT(pCLServing->fd, "failed]\r\n");
 					continue;
 				}
-#endif
-#endif
+#  endif
+# endif
 #endif
 		}
 				CSTROUT(pCLServing->fd, "sent]\r\n");
@@ -1234,7 +1197,7 @@ drop:
 						sprintf(acOut, "line to host is down]\r\n");
 					} else if (pCEServing->fronly) {
 						sprintf(acOut, "host is read-only]\r\n");
-					} else if ((CLIENT *)0 == (pCL = pCEServing->pCLwr)) {
+					} else if ((CONSCLIENT *)0 == (pCL = pCEServing->pCLwr)) {
 						pCEServing->pCLwr = pCLServing;
 						pCLServing->fwr = 1;
 						if ( pCEServing->nolog ) {
@@ -1266,7 +1229,7 @@ drop:
 					}
 #endif
 
-#if USE_TERMIOS
+#if HAVE_TERMIOS_H
 					if (-1 == tcgetattr(pCEServing->fdtty, & sbuf)) {
 						CSTROUT(pCLServing->fd, "failed]\r\n");
 						continue;
@@ -1314,13 +1277,13 @@ drop:
 					}
 
 					pCLServing->fwr = 0;
-					pCEServing->pCLwr = (CLIENT *)0;
+					pCEServing->pCLwr = (CONSCLIENT *)0;
 					ConsDown(pCEServing, &rinit);
 					CSTROUT(pCLServing->fd, "line down]\r\n");
 
 					/* tell all who closed it */
 					sprintf(acOut, "[line down by %s]\r\n", pCLServing->acid);
-					for (pCL = pCEServing->pCLon; (CLIENT *)0 != pCL; pCL = pCL->pCLnext) {
+					for (pCL = pCEServing->pCLon; (CONSCLIENT *)0 != pCL; pCL = pCL->pCLnext) {
 						if (pCL == pCLServing)
 							continue;
 						if (pCL->fcon) {
@@ -1352,7 +1315,7 @@ drop:
 					} else {
 					    sprintf(acOut, "attached]\r\n");
 					}
-					if ((CLIENT *)0 != (pCL = pCEServing->pCLwr)) {
+					if ((CONSCLIENT *)0 != (pCL = pCEServing->pCLwr)) {
 						if (pCL == pCLServing) {
 							if ( pCEServing->nolog ) {
 							    CSTROUT(pCLServing->fd, "ok (nologging)]\r\n");
@@ -1383,7 +1346,7 @@ drop:
 					 */
 					sprintf(acOut, "group %s]\r\n", CECtl.server);
 					(void)write(pCLServing->fd, acOut, strlen(acOut));
-					for (pCL = pGE->pCLall; (CLIENT *)0 != pCL; pCL = pCL->pCLscan) {
+					for (pCL = pGE->pCLall; (CONSCLIENT *)0 != pCL; pCL = pCL->pCLscan) {
 						if (&CECtl == pCL->pCEto)
 							continue;
 						sprintf(acOut, " %-24.24s %c %-7.7s %5s %.32s\r\n", pCL->acid, pCL == pCLServing ? '*' : ' ', pCL->fcon ? (pCL->fwr ? "attach" : "spy") : "stopped", IdleTyme(tyme - pCL->typetym), pCL->pCEto->server);
@@ -1465,7 +1428,7 @@ drop:
 						sprintf(acOut, "line to host is still down]\r\n");
 					} else if (pCEServing->fronly) {
 						sprintf(acOut, "up read-only]\r\n");
-					} else if ((CLIENT *)0 == (pCL = pCEServing->pCLwr)) {
+					} else if ((CONSCLIENT *)0 == (pCL = pCEServing->pCLwr)) {
 						pCEServing->pCLwr = pCLServing;
 						pCLServing->fwr = 1;
 						sprintf(acOut, "up -- attached]\r\n");
@@ -1528,7 +1491,7 @@ drop:
 				case 'W':
 					sprintf(acOut, "who %s]\r\n", pCEServing->server);
 					(void)write(pCLServing->fd, acOut, strlen(acOut));
-					for (pCL = pCEServing->pCLon; (CLIENT *)0 != pCL; pCL = pCL->pCLnext) {
+					for (pCL = pCEServing->pCLon; (CONSCLIENT *)0 != pCL; pCL = pCL->pCLnext) {
 						sprintf(acOut, " %-24.24s %c %-7.7s %5s %s\r\n", pCL->acid, pCL == pCLServing ? '*' : ' ', pCL->fcon ? (pCL->fwr ? "attach" : "spy") : "stopped", IdleTyme(tyme - pCL->typetym), pCL->actym);
 						(void)write(pCLServing->fd, acOut, strlen(acOut));
 					}
@@ -1554,23 +1517,23 @@ drop:
 					if (pCEServing->pCLwr == pCLServing) {
 						pCLServing->fwr = 0;
 						pCLServing->fwantwr = 0;
-						pCEServing->pCLwr = (CLIENT *)0;
+						pCEServing->pCLwr = (CONSCLIENT *)0;
 					}
 					break;
 
 				case '\t':	/* toggle tab expand	*/
 					CSTROUT(pCLServing->fd, "tabs]\r\n");
-#if USE_TERMIO
+#if HAVE_TERMIO_H
 					/* ZZZ */
 #else
-#if USE_TERMIOS
+# if HAVE_TERMIOS_H
 					if (-1 == tcgetattr(pCEServing->fdtty, & sbuf)) {
 						CSTROUT(pCLServing->fd, "failed]\r\n");
 						continue;
 					}
-#if !defined(XTABS)		/* XXX hack */
-#define XTABS   TAB3
-#endif
+#  if !defined(XTABS)		/* XXX hack */
+#   define XTABS   TAB3
+#  endif
 					if (XTABS == (TABDLY&sbuf.c_oflag)) {
 						sbuf.c_oflag &= ~TABDLY;
 						sbuf.c_oflag |= TAB0;
@@ -1582,9 +1545,9 @@ drop:
 						CSTROUT(pCLServing->fd, "failed]\r\n");
 						continue;
 					}
-#else
+# else
 					/* ZZZ */
-#endif
+# endif
 #endif
 					break;
 
@@ -1606,7 +1569,7 @@ drop:
 					}
 #endif
 
-#if USE_TERMIOS
+#if HAVE_TERMIOS_H
 					if (-1 == tcgetattr(pCEServing->fdtty, & sbuf)) {
 						CSTROUT(pCLServing->fd, "[failed]\r\n");
 						continue;
@@ -1662,7 +1625,7 @@ unknown:
 		/* accept new connections and deal with them
 		 */
 		so = sizeof(struct sockaddr_in);
-		pCLFree->fd = accept(sfd, (struct sockaddr *)&pCLFree->cnct_port, &so);
+		pCLFree->fd = accept(sfd, (struct sockaddr *)&pCLFree->cnct_port, (socklen_t *)&so);
 		if (pCLFree->fd < 0) {
 			fprintf(stderr, "%s: accept: %s\n", progname, strerror(errno));
 			continue;
@@ -1672,7 +1635,7 @@ unknown:
 		 * the source machine as being local.
 		 */
 		so = sizeof(in_port);
-		if (-1 == getpeername(pCLFree->fd, (struct sockaddr *)&in_port, &so)) {
+		if (-1 == getpeername(pCLFree->fd, (struct sockaddr *)&in_port, (socklen_t *)&so)) {
 			CSTROUT(pCLFree->fd, "getpeername failed\r\n");
 			(void)close(pCLFree->fd);
 			continue;
@@ -1697,7 +1660,7 @@ unknown:
 		/* init the identification stuff
 		 */
 		sprintf(pCL->acid, "client@%.*s", sizeof(pCL->acid)-10, hpPeer->h_name);
-	pCL->typetym = pCL->tym = time((long *)0);
+	pCL->typetym = pCL->tym = time((time_t *)0);
 		(void)strcpy(pCL->actym, ctime(&(pCL->tym)));
 		pCL->actym[24] = '\000';
 
@@ -1706,7 +1669,7 @@ unknown:
 		pCL->pCEto = & CECtl;
 		pCL->pCLnext = CECtl.pCLon;
 		pCL->ppCLbnext = & CECtl.pCLon;
-		if ((CLIENT *)0 != pCL->pCLnext) {
+		if ((CONSCLIENT *)0 != pCL->pCLnext) {
 			pCL->pCLnext->ppCLbnext = & pCL->pCLnext;
 		}
 		CECtl.pCLon = pCL;
@@ -1715,7 +1678,7 @@ unknown:
 		 */
 		pCL->pCLscan = pGE->pCLall;
 		pCL->ppCLbscan = & pGE->pCLall;
-		if ((CLIENT *)0 != pCL->pCLscan) {
+		if ((CONSCLIENT *)0 != pCL->pCLscan) {
 			pCL->pCLscan->ppCLbscan = & pCL->pCLscan;
 		}
 		pGE->pCLall = pCL;
@@ -1743,9 +1706,9 @@ unknown:
 		/* remove from the free list
 		 * if we ran out of static connections calloc some...
 		 */
-		if ((CLIENT *)0 == pCLFree) {
-			pCLFree = (CLIENT *)calloc(2, sizeof(CLIENT));
-			if ((CLIENT *)0 == pCLFree) {
+		if ((CONSCLIENT *)0 == pCLFree) {
+			pCLFree = (CONSCLIENT *)calloc(2, sizeof(CONSCLIENT));
+			if ((CONSCLIENT *)0 == pCLFree) {
 				CSTROUT(2, "no memory in console server, help\n");
 			} else {
 				pCLFree->pCLnext = &pCLFree[1];
@@ -1768,10 +1731,10 @@ GRPENT *pGE;
 
 	/* get a socket for listening
 	 */
-#if USE_STRINGS
-	(void)bzero((char *)&lstn_port, sizeof(lstn_port));
-#else
+#if HAVE_MEMSET
 	(void)memset((void *)&lstn_port, 0, sizeof(lstn_port));
+#else
+	(void)bzero((char *)&lstn_port, sizeof(lstn_port));
 #endif
 	lstn_port.sin_family = AF_INET;
 	*(u_long *)&lstn_port.sin_addr = INADDR_ANY;
@@ -1796,7 +1759,7 @@ GRPENT *pGE;
 	}
 	so = sizeof(lstn_port);
 
-	if (-1 == getsockname(sfd, (struct sockaddr *)&lstn_port, &so)) {
+	if (-1 == getsockname(sfd, (struct sockaddr *)&lstn_port, (socklen_t *)&so)) {
 		fprintf(stderr, "%s: getsockname: %s\n", progname, strerror(errno));
 		exit(9);
 	}
@@ -1830,10 +1793,10 @@ GRPENT *pGE;
 	/*NOTREACHED*/
 }
 
-#if USE_SIGACTION
+#ifdef HAVE_SIGACTION
 void Set_signal(sig, disp)
     int sig;
-    SIGRETS (*disp)(int);
+    RETSIGTYPE (*disp)(int);
 {
 	struct sigaction sa;
 

@@ -1,5 +1,5 @@
 /*
- *  $Id: version.h,v 1.19 2000-12-14 16:21:18-08 bryan Exp $
+ *  $Id: version.h,v 1.20 2001-02-17 08:37:24-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -8,4 +8,4 @@
  *  Copyright GNAC, Inc., 1998
  */
 
-#define THIS_VERSION "conserver.com version 6.1.7"
+#define THIS_VERSION "conserver.com version 7.0.0"

@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.36 2000-12-13 12:31:07-08 bryan Exp $
+ *  $Id: consent.c,v 5.39 2001-02-17 08:36:13-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -42,52 +42,27 @@ static char copyright[] =
 "@(#) Copyright 1992 Purdue Research Foundation.\nAll rights reserved.\n";
 #endif
 
+#include <config.h>
+
 #include <sys/types.h>
 #include <sys/param.h>
-#include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/file.h>
 #include <sys/stat.h>
-#include <sys/resource.h>
-#include <sys/wait.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <errno.h>
 #include <signal.h>
 #include <pwd.h>
 
-#include "cons.h"
-#include "port.h"
-#include "consent.h"
-#include "client.h"
-#include "main.h"
+#include <compat.h>
 
-#if USE_TERMIO
-#include <termio.h>
-
-#else
-#if USE_TERMIOS
-#include <termios.h>
-#include <unistd.h>
-
-#else	/* use ioctl stuff */
-#include <sgtty.h>
-#include <sys/ioctl.h>
-#endif
-#endif
-
-#if USE_STREAMS
-#include <stropts.h>
-#endif
-
-#if USE_STRINGS
-#include <strings.h>
-#else
-#include <string.h>
-#endif
+#include <port.h>
+#include <consent.h>
+#include <client.h>
+#include <main.h>
 
 
 struct hostcache *hostcachelist=NULL;
@@ -131,24 +106,23 @@ char *pcMode;
 
 
 PARITY parity[] = {
-#if USE_TERMIOS
-#if !defined(PAREXT)
-#define PAREXT	0
-#endif
+#if HAVE_TERMIOS_H
 	{' ', 0, 0}, 	/* Blank for network */
+# if !defined(PAREXT)
+#  define PAREXT	0
+# endif
 	{'e', PARENB|CS7, 0},			/* even			*/
 	{'m', PARENB|CS7|PARODD|PAREXT, 0},	/* mark			*/
 	{'o', PARENB|CS7|PARODD, 0},		/* odd			*/
 	{'p', CS8, 0},				/* pass 8 bits, no parity */
 	{'s', PARENB|CS7|PAREXT, 0},		/* space		*/
-#else
-	{' ', 0, 0}, 	/* Blank for network */
+#else /* ! HAVE_TERMIOS_H */
 	{'e', EVENP, ODDP},	/* even					*/
 	{'m', EVENP|ODDP, 0},	/* mark					*/
 	{'o', ODDP, EVENP},	/* odd					*/
-#if defined(PASS8)
+# if defined(PASS8)
 	{'p', PASS8,EVENP|ODDP},/* pass 8 bits, no parity		*/
-#endif
+# endif
 	{'s', 0, EVENP|ODDP}	/* space				*/
 #endif
 };
@@ -177,7 +151,7 @@ char *pcMode;
 }
 
 
-#if USE_TERMIOS
+#if HAVE_TERMIOS_H
 /* setup a tty device							(ksb)
  */
 static int
@@ -243,18 +217,21 @@ CONSENT *pCE;
 		return -1;
 	}
 
-#if USE_STREAMS
+# if HAVE_STROPTS_H
 	/*
 	 * eat all the streams modules upto and including ttcompat
 	 */
-        while (ioctl(pCE->fdtty, I_FIND, "ttcompat") == 0) {
+        while (ioctl(pCE->fdtty, I_FIND, "ttcompat") == 1) {
         	(void)ioctl(pCE->fdtty, I_POP, 0);
         }
-#endif
+# endif
 	pCE->fup = 1;
 	return 0;
 }
-#else
+
+#else /* ! HAVE_TERMIOS_H */
+
+# ifdef HAVE_SGTTY_H
 
 /* setup a tty device							(ksb)
  */
@@ -277,14 +254,12 @@ CONSENT *pCE;
 		pCE->fronly = 1;
 	}
 
-#if USE_SOFTCAR
-#if defined(TIOCSSOFTCAR)
+#  if defined(TIOCSSOFTCAR)
 	if (-1 == ioctl(pCE->fdtty, TIOCSSOFTCAR, &fSoftcar)) {
 		fprintf(stderr, "%s: softcar: %d: %s\n", progname, pCE->fdtty, strerror(errno));
 		return -1;
 	}
-#endif
-#endif
+#  endif
 
 	/* stty 9600 raw cs7
 	 */
@@ -333,18 +308,20 @@ CONSENT *pCE;
 		fprintf(stderr, "%s: ioctl6: %d: %s\n", progname, pCE->fdtty, strerror(errno));
 		return -1;
 	}
-#if USE_STREAMS
+#  if HAVE_STROPTS_H
 	/* pop off the un-needed streams modules (on a sun3 machine esp.)
 	 * (Idea by jrs@ecn.purdue.edu)
 	 */
         while (ioctl(pCE->fdtty, I_POP, 0) == 0) {
 		/* eat all the streams modules */;
         }
-#endif
+#  endif
 	pCE->fup = 1;
 	return 0;
 }
-#endif
+# endif /* HAVE_SGTTY_H */
+
+#endif /* HAVE_TERMIOS_H */
 
 #if DO_VIRTUAL
 /* setup a virtual device						(ksb)
@@ -353,16 +330,18 @@ static int
 VirtDev(pCE)
 CONSENT *pCE;
 {
-#if USE_TERMIOS
+# if HAVE_TERMIOS_H
 	static struct termios n_tio;
-#else
+# else
+#  ifdef HAVE_SGTTY_H
 	auto struct sgttyb sty;
 	auto struct tchars m_tchars;
 	auto struct ltchars m_ltchars;
-#endif
-#if HAVE_RLIMIT
+#  endif
+# endif
+# if HAVE_RLIMIT
 	auto struct rlimit rl;
-#endif
+# endif
 	auto int i, iNewGrp;
 	auto int fd;
 	extern char **environ;
@@ -391,12 +370,12 @@ CONSENT *pCE;
 
 	/* setup new process with clean filew descriptors
 	 */
-#if HAVE_RLIMIT
+# if HAVE_RLIMIT
 	getrlimit(RLIMIT_NOFILE, &rl);
 	i = rl.rlim_cur;
-#else
+# else
 	i = getdtablesize();
-#endif
+# endif
 	for (/* i above */; i-- > 2; ) {
 		close(i);
 	}
@@ -404,45 +383,50 @@ CONSENT *pCE;
 	 */
 	close(1);
 	close(0);
-#if defined(TIOCNOTTY)
+# if defined(TIOCNOTTY)
 	if (-1 != (i = open("/dev/tty", 2, 0))) {
 		ioctl(i, TIOCNOTTY, (char *)0);
 		close(i);
 	}
-#endif
+# endif
 
-#if HAVE_SETSID
+# if HAVE_SETSID
 	iNewGrp = setsid();
 	if (-1 == iNewGrp) {
 		fprintf(stderr, "%s: %s: setsid: %s\n", progname, pCE->server, strerror(errno));
 		iNewGrp = getpid();
 	}
-#else
+# else
 	iNewGrp = getpid();
-#endif
+# endif
 
 	if (0 != open(pCE->acslave, 2, 0) || 1 != dup(0)) {
 		fprintf(stderr, "%s: %s: fd sync error\n", progname, pCE->server);
 		exit(1);
 	}
-#if HAVE_PTSNAME
+# if HAVE_PTSNAME
 	/* SYSVr4 semantics for opening stream ptys			(gregf)
 	 * under PTX (others?) we have to push the compatibility
 	 * streams modules `ptem' and `ld'
 	 */
 	(void)ioctl(0, I_PUSH, "ptem");
 	(void)ioctl(0, I_PUSH, "ld");
-#endif
-#if HAVE_LDTERM
+# endif
+# if HAVE_LDTERM
 	(void)ioctl(0, I_PUSH, "ptem");
 	(void)ioctl(0, I_PUSH, "ldterm");
-#endif
-#if HAVE_STTY_LD
+# endif
+# if HAVE_STTY_LD
 	(void)ioctl(0, I_PUSH, "stty_ld");
-#endif
+# endif
 
-#if USE_TERMIOS
-	if (0 != ioctl(0, TCGETS, & n_tio)) {
+# if HAVE_TERMIOS_H
+#  ifdef HAVE_TCGETATTR
+	if (0 != tcgetattr(0, &n_tio))
+#  else
+	if (0 != ioctl(0, TCGETS, & n_tio))
+#  endif
+	{
 		fprintf(stderr, "%s: iotcl: getsw: %s\n", progname, strerror(errno));
 		exit(1);
 	}
@@ -462,13 +446,18 @@ CONSENT *pCE;
 	n_tio.c_cc[VSTART] = '\021';
 	n_tio.c_cc[VSTOP] = '\023';
 	n_tio.c_cc[VSUSP] = '\032';
-	if (0 != ioctl(0, TCSETS, & n_tio)) {
+#  ifdef HAVE_TCSETATTR
+	if (0 != tcsetattr(0, TCSANOW, & n_tio))
+#  else
+	if (0 != ioctl(0, TCSETS, & n_tio))
+#  endif
+	{
 		fprintf(stderr, "%s: getarrt: %s\n", progname, strerror(errno));
 		exit(1);
 	}
 
 	tcsetpgrp(0, iNewGrp);
-#else
+# else /* ! HAVE_TERMIOS_H */
 	/* stty 9600 raw cs7
 	 */
 	if (-1 == ioctl(0, TIOCGETP, (char *)&sty)) {
@@ -520,10 +509,14 @@ CONSENT *pCE;
 	/* give us a process group to work in
 	 */
 	ioctl(0, TIOCGPGRP, (char *)&i);
+#  ifndef SETPGRP_VOID
 	setpgrp(0, i);
+#  endif
 	ioctl(0, TIOCSPGRP, (char *)&iNewGrp);
+#  ifndef SETPGRP_VOID
 	setpgrp(0, iNewGrp);
-#endif
+#  endif
+# endif /* HAVE_TERMIOS_H */
 
 	close(2);
 	(void)dup(1);		/* better be 2, but it is too late now */
@@ -555,7 +548,7 @@ CONSENT *pCE;
 	exit(1);
 	/*NOTREACHED*/
 }
-#endif
+#endif /* DO_VIRTUAL */
 
 /* down a console, virtual or real					(ksb)
  */
@@ -682,7 +675,7 @@ int useHostCache;
 	{
 	    struct sockaddr_in port;
 	    struct hostent *hp;
-	    int one = 1;
+	    size_t one = 1;
 	    int flags;
 	    fd_set fds;
 	    struct timeval tv;
@@ -695,9 +688,9 @@ int useHostCache;
 		  return;
 	    }
 
-#if USLEEP_FOR_SLOW_PORTS
+# if USLEEP_FOR_SLOW_PORTS
 	    usleep( USLEEP_FOR_SLOW_PORTS );  /* Sleep for slow network ports */
-#endif
+# endif
 
 	    bzero(&port, sizeof(port));
 
@@ -776,11 +769,7 @@ int useHostCache;
 		if (getsockopt(pCE->fdtty, SOL_SOCKET, SO_ERROR,
 		    (char*)&flags, &one) < 0)
 		{
-#if defined(SUN5)
-		    fprintf(stderr, "%s: connect: %s (%d@%s): %s: forcing down\n",
-#else
 		    fprintf(stderr, "%s: getsockopt SO_ERROR: %s (%d@%s): %s: forcing down\n",
-#endif
 			    progname, pCE->server, ntohs(port.sin_port),
 			    pCE->networkConsoleHost, strerror(errno));
 		    ConsDown(pCE, pfdSet);
@@ -800,9 +789,9 @@ int useHostCache;
 	     * Poke the connection to get the annex to wake up and
 	     * register this connection.
 	     */
-#ifdef POKE_ANNEX
+# ifdef POKE_ANNEX
 	    write(pCE->fdtty, "\r\n", 2);
-#endif
+# endif
 	} else if (-1 == (pCE->fdtty = open(pCE->dfile, O_RDWR|O_NDELAY, 0600))) {
 		fprintf(stderr, "%s: open: %s: %s\n", progname, pCE->dfile, strerror(errno));
 		(void)close(pCE->fdlog);
@@ -824,7 +813,7 @@ int useHostCache;
 	{
 		TtyDev(pCE);
 	}
-#else
+#else /* ! DO_VIRTUAL */
 	if (-1 == (pCE->fdtty = open(pCE->dfile, O_RDWR|O_NDELAY, 0600))) {
 		fprintf(stderr, "%s: open: %s: %s\n", progname, pCE->dfile, strerror(errno));
 		(void)close(pCE->fdlog);
@@ -836,5 +825,5 @@ int useHostCache;
 	/* ok, now setup the device
 	 */
 	TtyDev(pCE);
-#endif
+#endif /* DO_VIRTUAL */
 }

@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.31 2000-12-13 12:31:56-08 bryan Exp $
+ *  $Id: console.c,v 5.35 2001-02-18 22:00:47-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -27,62 +27,32 @@
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
+#include <config.h>
+
 #include <sys/types.h>
-#include <sys/time.h>
 #include <sys/socket.h>
-#include <sys/ioctl.h>
 #include <netinet/in.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
 #include <netdb.h>
 #include <pwd.h>
-#include <errno.h>
 #include <ctype.h>
 
-#include "cons.h"
-#include "port.h"
-#include "version.h"
+#include <compat.h>
 
-#if USE_STRINGS
-#include <strings.h>
-#else
-#include <string.h>
-#endif
+#include <port.h>
+#include <version.h>
 
-#if USE_TERMIOS
-#include <termios.h>
-#include <unistd.h>
-
-#else
-#if USE_TERMIO
-#include <termio.h>
-
-#else   /* use ioctl stuff */
-#include <sgtty.h>
-#include <sys/ioctl.h>
-#endif
-#endif
-
-extern char *getenv();
-extern char *getpass();
-extern char *calloc(), *realloc();
-/* extern short htons(); */
-extern int errno;
-
-#if !HAVE_STRERROR
-extern char *sys_errlist[];
-#define strerror(Me) (sys_errlist[Me])
-#endif
 
 static char rcsid[] =
-	"$Id: console.c,v 5.31 2000-12-13 12:31:56-08 bryan Exp $";
+	"$Id: console.c,v 5.35 2001-02-18 22:00:47-08 bryan Exp $";
 static char *progname =
 	rcsid;
 int fVerbose = 0, fReplay = 0, fRaw = 0;
 int chAttn = -1, chEsc = -1;
 char *pcInMaster =	/* which machine is current */
-	HOST;
+	MASTERHOST;
 
 /* panic -- we have no more momory
  */
@@ -187,7 +157,7 @@ char **ppc;
 static void
 Version()
 {
-	register unsigned char *puc;
+/*	register unsigned char *puc; */
 
 	printf("%s: %s\n", progname, THIS_VERSION);
 	printf("%s: initial master server `%s\'\n", progname, pcInMaster);
@@ -195,8 +165,8 @@ Version()
 	putCtlc(DEFATTN, stdout);
 	putCtlc(DEFESC, stdout);
 	printf("\'\n");
-	puc = (unsigned char *)&local_port.sin_addr;
-	printf("%s: loopback address for %s is %d.%d.%d.%d\n", progname, acMyName, puc[0], puc[1], puc[2], puc[3]);
+/*	puc = (unsigned char *)&local_port.sin_addr;
+	printf("%s: loopback address for %s is %d.%d.%d.%d\n", progname, acMyName, puc[0], puc[1], puc[2], puc[3]); */
 }
 
 
@@ -284,23 +254,25 @@ short sPort;
 	register int s;
 	register struct hostent *hp;
 
-#if USE_STRINGS
-	(void)bzero((char *)pPort, sizeof(*pPort));
-#else
+#if HAVE_MEMSET
 	memset((void *)pPort, '\000', sizeof(*pPort));
+#else
+	(void)bzero((char *)pPort, sizeof(*pPort));
 #endif
+/*
 	if (0 == strcmp(pcToHost, strcpy(acThisHost, acMyName))) {
 		(void)strcpy(pcToHost, acLocalhost);
-#if USE_STRINGS
-		(void)bcopy((char *)&local_port.sin_addr, (char *)&pPort->sin_addr, sizeof(local_port.sin_addr));
-#else
+#if HAVE_MEMCPY
 		memcpy((char *)&pPort->sin_addr, (char *)&local_port.sin_addr, sizeof(local_port.sin_addr));
-#endif
-	} else if ((struct hostent *)0 != (hp = gethostbyname(pcToHost))) {
-#if USE_STRINGS
-		(void)bcopy((char *)hp->h_addr, (char *)&pPort->sin_addr, hp->h_length);
 #else
+		(void)bcopy((char *)&local_port.sin_addr, (char *)&pPort->sin_addr, sizeof(local_port.sin_addr));
+#endif
+	} else */
+	if ((struct hostent *)0 != (hp = gethostbyname(pcToHost))) {
+#if HAVE_MEMCPY
 		memcpy((char *)&pPort->sin_addr, (char *)hp->h_addr, hp->h_length);
+#else
+		(void)bcopy((char *)hp->h_addr, (char *)&pPort->sin_addr, hp->h_length);
 #endif
 	} else {
 		fprintf(stderr, "%s: gethostbyname: %s: %s\n", progname, pcToHost, hstrerror(h_errno));
@@ -340,16 +312,16 @@ short sPort;
  * correct mode for us to do our thing
  */
 static int screwy = 0;
-#if USE_TERMIOS
+#if HAVE_TERMIOS_H
 static struct termios o_tios;
 #else
-#if USE_TERMIO
+# if HAVE_TERMIO_H
 static struct termio o_tio;
-#else
+# else
 static struct sgttyb o_sty;
 static struct tchars o_tchars;
 static struct ltchars o_ltchars;
-#endif
+# endif
 #endif
 
 
@@ -361,23 +333,28 @@ static struct ltchars o_ltchars;
 static void
 c2raw()
 {
-#if USE_TERMIOS
+#if HAVE_TERMIOS_H
 	auto struct termios n_tios;
 #else
-#if USE_TERMIO
+# if HAVE_TERMIO_H
 	auto struct termio n_tio;
-#else
+# else
 	auto struct sgttyb n_sty;
 	auto struct tchars n_tchars;
 	auto struct ltchars n_ltchars;
-#endif
+# endif
 #endif
 
 	if (!isatty(0) || 0 != screwy)
 		return;
 
-#if USE_TERMIOS
-	if (0 != ioctl(0, TCGETS, & o_tios)) {
+#ifdef HAVE_TERMIOS_H
+# ifdef HAVE_TCGETATTR
+	if (0 != tcgetattr(0, & o_tios))
+# else
+	if (0 != ioctl(0, TCGETS, & o_tios))
+# endif
+	{
 		fprintf(stderr, "%s: iotcl: getsw: %s\n", progname, strerror(errno));
 		exit(10);
 	}
@@ -387,12 +364,17 @@ c2raw()
 	n_tios.c_lflag &= ~(ICANON|ISIG|ECHO);
 	n_tios.c_cc[VMIN] = 1;
 	n_tios.c_cc[VTIME] = 0;
-	if (0 != ioctl(0, TCSETS, & n_tios)) {
+# ifdef HAVE_TCSETATTR
+	if (0 != tcsetattr(0, TCSANOW, & n_tios))
+# else
+	if (0 != ioctl(0, TCSETS, & n_tios))
+# endif
+	{
 		fprintf(stderr, "%s: getarrt: %s\n", progname, strerror(errno));
 		exit(10);
 	}
 #else
-#if USE_TERMIO
+# ifdef HAVE_TERMIO_H
 	if (0 != ioctl(0, TCGETA, & o_tio)) {
 		fprintf(stderr, "%s: iotcl: geta: %s\n", progname, strerror(errno));
 		exit(10);
@@ -407,7 +389,7 @@ c2raw()
 		fprintf(stderr, "%s: iotcl: seta: %s\n", progname, strerror(errno));
 		exit(10);
 	}
-#else
+# else
 	if (0 != ioctl(0, TIOCGETP, (char *)&o_sty)) {
 		fprintf(stderr, "%s: iotcl: getp: %s\n", progname, strerror(errno));
 		exit(10);
@@ -449,7 +431,7 @@ c2raw()
 		fprintf(stderr, "%s: ioctl: sltc: %s\n", progname, strerror(errno));
 		return;
 	}
-#endif
+# endif
 #endif
 	screwy = 1;
 }
@@ -462,16 +444,20 @@ c2cooked()
 {
 	if (!screwy)
 		return;
-#if USE_TERMIOS
+#ifdef HAVE_TERMIOS_H
+# ifdef HAVE_TCSETATTR
+	tcsetattr(0, TCSANOW, &o_tios);
+# else
 	(void)ioctl(0, TCSETS, (char *)&o_tios);
+# endif
 #else
-#if USE_TERMIO
+# ifdef HAVE_TERMIO_H
 	(void)ioctl(0, TCSETA, (char *)&o_tio);
-#else
+# else
 	(void)ioctl(0, TIOCSETP, (char *)&o_sty);
 	(void)ioctl(0, TIOCSETC, (char *)&o_tchars);
 	(void)ioctl(0, TIOCSLTC, (char *)&o_ltchars);
-#endif
+# endif
 #endif
 	screwy = 0;
 }
@@ -549,7 +535,7 @@ char *pcBuf, *pcWant;
 	return strcmp(pcBuf, pcWant);
 }
 
-#if defined(SERVICE)
+#if defined(SERVICENAME)
 static struct servent *pSE;
 #endif
 
@@ -586,16 +572,16 @@ char *pcPorts, *pcMaster, *pcTo, *pcCmd, *pcWho;
 		}
 
 		if ('\000' == *pcPorts) {
-#if defined(SERVICE)
+#if defined(SERVICENAME)
 			/* in net order -- ksb */
 			j = pSE->s_port;
 #else
-#if defined(PORT)
-			j = htons(PORT);
-#else
+# if defined(PORTNUMBER)
+			j = htons(PORTNUMBER);
+# else
 			fprintf(stderr, "%s: no port or service compiled in?\n", progname);
 			exit(8);
-#endif
+# endif
 #endif
 		} else if (!isdigit(pcPorts[0])) {
 			fprintf(stderr, "%s: %s: %s\n", progname, pcMaster, pcPorts);
@@ -627,7 +613,7 @@ static int SawUrg = 0;
  * an out of band command to suspend ourself.  We just tell the reader
  * routine we saw one
  */
-SIGRETS
+RETSIGTYPE
 oob(sig)
 int sig;
 {
@@ -705,7 +691,7 @@ char *pcMaster, *pcMach, *pcHow, *pcUser;
 		fprintf(stderr, "%s: fcntl: %d: %s\n", progname, s, strerror(errno));
 	}
 #else
-#if defined(SIOCSPGRP)
+# if defined(SIOCSPGRP)
 	{
 	auto int iTemp;
 	/* on the HP-UX systems if different
@@ -715,7 +701,7 @@ char *pcMaster, *pcMach, *pcHow, *pcUser;
 		fprintf(stderr, "%s: ioctl: %d: %s\n", progname, s, strerror(errno));
 	}
 	}
-#endif
+# endif
 #endif
 #if defined(SIGURG)
 	(void)signal(SIGURG, oob);
@@ -1167,9 +1153,9 @@ char **argv;
 		++progname;
 	}
 
-#if defined(SERVICE)
-	if ((struct servent *)0 == (pSE = getservbyname(SERVICE, "tcp"))) {
-		fprintf(stderr, "%s: getservbyname: %s: %s\n", progname, SERVICE, strerror(errno));
+#if defined(SERVICENAME)
+	if ((struct servent *)0 == (pSE = getservbyname(SERVICENAME, "tcp"))) {
+		fprintf(stderr, "%s: getservbyname: %s: %s\n", progname, SERVICENAME, strerror(errno));
 		exit(1);
 	}
 #endif
@@ -1192,10 +1178,10 @@ char **argv;
 		exit(2);
 	}
 	if ((struct hostent *)0 != (hp = gethostbyname(acLocalhost))) {
-#if USE_STRINGS
-		(void)bcopy((char *)hp->h_addr, (char *)&local_port.sin_addr, hp->h_length);
-#else
+#if HAVE_MEMCPY
 		memcpy((char *)&local_port.sin_addr, (char *)hp->h_addr, hp->h_length);
+#else
+		(void)bcopy((char *)hp->h_addr, (char *)&local_port.sin_addr, hp->h_length);
 #endif
 	} else {
 		acLocalhost[0] = '\000';

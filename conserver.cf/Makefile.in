@@ -1,0 +1,28 @@
+### Path settings
+srcdir = @srcdir@
+prefix = @prefix@
+mandir = @mandir@
+sysconfdir = @sysconfdir@
+
+### Installation programs and flags
+INSTALL = @INSTALL@
+MKDIR = @MKDIR@
+@SET_MAKE@
+
+
+### Makefile rules - no user-servicable parts below
+
+all:
+
+.PHONY: clean distclean install
+
+clean:
+	rm -f *~ *.o $(ALL) core
+
+distclean: clean
+	rm -f Makefile
+
+install:
+	$(MKDIR) $(DESTDIR)$(mandir)/man8
+	$(INSTALL) conserver.cf.man $(DESTDIR)$(mandir)/man8/conserver.cf.8
+

@@ -10,6 +10,8 @@
  *
  * This program was written to be run out of inittab.
  */
+#include <config.h>
+
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/param.h>
@@ -18,165 +20,27 @@
 #include <grp.h>
 #include <pwd.h>
 #include <utmp.h>
-#include <string.h>
 
+#include <compat.h>
 
-#include <errno.h>
-#if !defined IBMR2
-extern char *sys_errlist[];
-#define strerror(Me) (sys_errlist[Me])
-#endif
-
-#define NEED_PUTENV	(!(defined(IBMR2) || defined(EPIX) || defined(SUNOS) || defined(SUN5)))
-
-#if S81
-#include <sys/vlimit.h>
-#else
-#include <limits.h>
-#endif
-
-#if SUN5
-#define USE_UTENT	1
-#include <sys/time.h>
-#include <sys/resource.h>
-
-static int
-getdtablesize()
-{
-	auto struct rlimit rl;
-
-	(void)getrlimit(RLIMIT_NOFILE, &rl);
-	return rl.rlim_cur;
-}
-#endif
-
-/* yucky kludges
- */
-#ifdef EPIX
-#include "/bsd43/usr/include/ttyent.h"
-#include <posix/sys/termios.h>
-#define NGROUPS_MAX 8
-#define getsid(Mp)	(Mp)
-#define getdtablesize() 64
-struct timeval {
-        long    tv_sec;         /* seconds */
-        long    tv_usec;        /* and microseconds */
-};
-typedef int mode_t;
-extern struct passwd *getpwnam();
-extern struct group *getgrnam();
-#define USE_TC		1
-#define USE_UTENT	1
-#else 
-
-#if defined IBMR2
-#include <termios.h>
-#define setsid()	getpid()
-#define getsid(Mp)	(Mp)
-#define HAVE_GETUSERATTR 1
-#define USE_TC		1
-#define USE_UTENT	1
-#else
-
-#if defined V386
-typedef int mode_t;
-#define getdtablesize()	OPEN_MAX
-#define setsid()	getpid()
-#define getsid(Mp)	(Mp)
-#define setgroups(x, y)	0
-#include <sys/ttold.h>
-#include <sys/ioctl.h>
-#define USE_IOCTL	1
-#define USE_TC		1
-#else
-
-#if defined S81
-#include <sys/time.h>
-#include <sys/ioctl.h>
-typedef int mode_t;
-#define setsid()	getpid()
-#define getsid(Mp)	(Mp)
-#define USE_IOCTL	1
-#define USE_TC		0
-#define USE_OLD_UTENT	1
-#else
-
-#if defined(NETBSD)
-#include <sys/time.h>
-#include <sys/ioctl.h>
-#include <sys/uio.h>
-#include <sys/proc.h>
-#include <sys/ioctl_compat.h>
-#define setsid()	getpid()
-#define getsid(Mp)	(Mp)
-#define USE_IOCTL	1
-#define USE_OLD_UTENT	1
-#define PATH_SU		"/usr/ucb/su"
-#define UTMP_PATH	"/var/run/utmp"
-#else
-
-#if defined(FREEBSD)
-#include <sys/time.h>
-#include <sys/ioctl.h>
-#include <sys/uio.h>
-#include <sys/proc.h>
-#include <sys/ioctl_compat.h>
-#define setsid()	getpid()
-#define getsid(Mp)	(Mp)
-#define USE_IOCTL	1
-#define USE_OLD_UTENT	1
-#define PATH_SU		"/usr/ucb/su"
-#else
-
-#include <sys/termios.h>
-#endif	/* NETBSD */
-#endif	/* 386bsd or equiv */
-#endif	/* sequent */
-#endif	/* intel v386 */
-#endif	/* find termios */
-#endif	/* find any term stuff */
-
-
-#ifdef SUNOS
-#include <sys/time.h>
-#include <ttyent.h>
-#define setsid()	getpid()
-#define getsid(Mp)	(Mp)
-#endif
-
-#if ! defined V386
-#include <sys/vnode.h>
-#endif
-
-#ifdef	IBMR2
-#include <sys/ioctl.h>
-#include <usersec.h>
-#endif	/* IBMR2 */
-
-#include "main.h"
+#include <main.h>
 
 
 #define	TTYMODE	0600
 
 #ifndef O_RDWR
-#define O_RDWR	2
+# define O_RDWR	2
 #endif
 
-#ifndef NGROUPS_MAX
-#define NGROUPS_MAX	8
+#ifndef UTMP_FILE
+# if defined(_PATH_UTMP)
+#  define UTMP_FILE	_PATH_UTMP
+# else
+#  define UTMP_FILE	"/etc/utmp"
+# endif
 #endif
 
-#if !defined(UTMP_FILE)
-#if defined(_PATH_UTMP)
-#define UTMP_FILE	_PATH_UTMP
-#else
-#define UTMP_FILE	"/etc/utmp"
-#endif
-#endif
-
-#if !defined(PATH_SU)
 #define PATH_SU		"/bin/su"
-#endif
 
 /*
  * Global variables
@@ -185,7 +49,7 @@ typedef int mode_t;
 #ifndef	lint
 char	*rcsid = "$Id: autologin.c,v 1.22 93/09/04 21:48:41 ksb Exp $";
 #endif	/* not lint */
-char	*progname;
+extern char	*progname;
 gid_t	 awGrps[NGROUPS_MAX];
 int	 iGrps = 0;
 
@@ -210,23 +74,28 @@ Process()
 	char			*pcCmd = (char *)0,
 				*pcDevTty = (char *)0;
 	char			*pcTmp;
-#ifdef	IBMR2
+#ifdef	HAVE_GETUSERATTR
 	char			*pcGrps;
-#endif	/* IBMR2 */
+#endif
 	struct	passwd		*pwd;
 	struct	stat		 st;
-#if USE_IOCTL
-	auto struct sgttyb n_sty;
-#if USE_TC
-	auto struct tc n_tchars;
-#else
-	auto struct tchars n_tchars;
-#endif
-#if HAVE_JOBS
-	auto struct ltchars n_ltchars;
-#endif
-#else
+#ifdef HAVE_TERMIOS_H
 	struct	termios		 n_tio;
+#else
+# ifdef TIOCNOTTY
+#  ifdef O_CBREAK
+	auto struct tc n_tchars;
+#  else
+	auto struct tchars n_tchars;
+#  endif
+#  ifdef TIOCGLTC
+	auto struct ltchars n_ltchars;
+#  endif
+# else
+#  ifdef TIOCGETP
+	auto struct sgttyb n_sty;
+#  endif
+# endif
 #endif
 
 
@@ -289,7 +158,7 @@ Process()
 		if (0 != stat(pcDevTty, &st)) {
 			(void) fprintf(stderr, "%s: Can't stat %s: %s\n", progname, pcDevTty, strerror(errno));
 			++iErrs;
-#ifdef IBMR2
+#if defined(VCHR) && defined(VMPC)
 		} else if (VCHR != st.st_type && VMPC != st.st_type) {
 			(void) fprintf(stderr, "%s: %s is not a character device\n", progname, pcDevTty);
 			++iErrs;
@@ -351,39 +220,36 @@ Process()
 
 	/* put the tty in out process group
 	 */
-#if ! (EPIX || SUN5)
-#if USE_TC
+#ifdef HAVE_TCGETPGRP
 	if (-1 >= (i = tcgetpgrp(0))){
 		(void) fprintf(stderr, "%s: tcgetpgrp: %s\n", progname, strerror(errno));
 	}
 #endif
-#if USE_SETPGRP
+#ifndef SETPGRP_VOID
 	if (-1 != i && setpgrp(0, i) ){
 		(void) fprintf(stderr, "%s: setpgrp: %s, i = %d\n", progname, strerror(errno), i);
 	}
 #endif
 
-#if USE_TC
+#ifdef HAVE_TCSETPGRP
 	if (tcsetpgrp(0, iNewGrp)){
 		(void) fprintf(stderr, "%s: tcsetpgrp: %s\n", progname, strerror(errno));
 	}
 #endif
-#if USE_SETPGRP
+#ifndef SETPGRP_VOID
 	if (-1 != iNewGrp && setpgrp(0, iNewGrp)){
 		(void) fprintf(stderr, "%s: setpgrp: %s, iNewGrp = %d\n", progname, strerror(errno), iNewGrp);
 	}
 #endif
 
-#endif
-
 	/* put the tty in the correct mode
 	 */
-#if USE_IOCTL
+#ifndef HAVE_TERMIOS_H
 	if (0 != ioctl(0, TIOCGETP, (char *)&n_sty)) {
 		fprintf(stderr, "%s: iotcl: getp: %s\n", progname, strerror(errno));
 		exit(10);
 	}
-#if USE_TC
+#ifdef O_CBREAK
 	n_sty.sg_flags &= ~(O_CBREAK);
 	n_sty.sg_flags |= (O_CRMOD|O_ECHO);
 #else
@@ -411,7 +277,7 @@ Process()
 		return;
 	}
 #endif
-#if HAVE_JOBS
+#ifdef TIOCGLTC
 	if (-1 == ioctl(0, TIOCGLTC, (char *)&n_ltchars)) {
 		fprintf(stderr, "%s: ioctl: gltc: %s\n", progname, strerror(errno));
 		return;
@@ -426,7 +292,7 @@ Process()
 	}
 #endif
 #else	/* not using ioctl, using POSIX or sun stuff */
-#if USE_TC
+#ifdef HAVE_TCGETATTR
 	if (0 != tcgetattr(0, &n_tio)) {
 		(void) fprintf(stderr, "%s: tcgetattr: %s\n", progname, strerror(errno));
 		exit(1);
@@ -455,18 +321,20 @@ Process()
 	n_tio.c_cc[VSTART] = '\021';		/* ^Q	*/
 	n_tio.c_cc[VSTOP] = '\023';		/* ^S	*/
 	n_tio.c_cc[VSUSP] = '\032';		/* ^Z	*/
-#if USE_TC
+#ifdef HAVE_TCSETATTR
 	if (0 != tcsetattr(0, TCSANOW, &n_tio)) {
 		(void) fprintf(stderr, "%s: tcsetattr: %s\n", progname, strerror(errno));
 		exit(1);
 		/* NOTREACHED */
 	}
 #else
+#ifndef HAVE_TERMIOS_H
 	if (0 != ioctl(0, TCSETS, &n_tio)) {
 		(void) fprintf(stderr, "%s: ioctl: TCSETS: %s\n", progname, strerror(errno));
 		exit(1);
 		/* NOTREACHED */
 	}
+#endif
 #endif
 #endif	/* setup tty */
 
@@ -488,7 +356,7 @@ Process()
 	}
 }
 
-#if NEED_PUTENV
+#ifndef HAVE_PUTENV
 int
 putenv(pcAssign)
 char *pcAssign;
@@ -567,20 +435,7 @@ char	*pctty;
 		pcDev = pctty;
 	}
 
-#if USE_OLD_UTENT
-	/* look through /etc/utmp by hand (sigh)
-	 */
-	iFound = iPos = 0;
-	while (sizeof(utmp) == read(fdUtmp, & utmp, sizeof(utmp))) {
-		if (0 == strncmp(utmp.ut_line, pcDev, sizeof(utmp.ut_line))) {
-			++iFound;
-			break;
-		}
-		iPos++;
-	}
-	(void)strncpy(utmp.ut_name, pclogin, sizeof(utmp.ut_name));
-#else
-#if USE_UTENT
+#ifdef HAVE_GETUTENT
 	/* look through getutent's by pid
 	 */
 	(void)setutent();
@@ -603,6 +458,7 @@ char	*pctty;
 		(void)strncpy(utmp.ut_line, pcDev, sizeof(utmp.ut_line));
 	}
 #else
+#ifdef HAVE_SETTTYENT
 	{
 	register struct ttyent *ty;
 
@@ -623,6 +479,18 @@ char	*pctty;
 	(void)strncpy(utmp.ut_line, pcDev, sizeof(utmp.ut_line));
 	(void)strncpy(utmp.ut_name, pclogin, sizeof(utmp.ut_name));
 	(void)strncpy(utmp.ut_host, "(autologin)", sizeof(utmp.ut_host));
+#else
+	/* look through /etc/utmp by hand (sigh)
+	 */
+	iFound = iPos = 0;
+	while (sizeof(utmp) == read(fdUtmp, & utmp, sizeof(utmp))) {
+		if (0 == strncmp(utmp.ut_line, pcDev, sizeof(utmp.ut_line))) {
+			++iFound;
+			break;
+		}
+		iPos++;
+	}
+	(void)strncpy(utmp.ut_name, pclogin, sizeof(utmp.ut_name));
 #endif
 #endif
 	utmp.ut_time = time((time_t *) 0);

@@ -1,6 +1,16 @@
 				CHANGES
 				=======
 
+version 7.0.0 (Feb 18, 2001):
+	- GNU configure-based packaging!!!
+	  All work done by Mark D. Roth <roth@feep.net>.
+	  Thank you!
+	- Removed conserver/cons.h and moved options into --with
+	  and --enable configure arguments
+	- ioctl() bug found by Ross Parker <parker@redback.com>
+	- Removed last of the "loopback preference" code in
+	  console/console.c - should have been removed a long time ago
+
 version 6.1.7 (Dec 14, 2000):
 	- Documented no parity option in conserver.cf.man
 	- Lowered default CONNECTTIMEOUT to 10 seconds
@@ -91,5 +101,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.20 2000-12-14 16:32:46-08 bryan Exp $
+#  $Id: CHANGES,v 1.23 2001-02-18 22:36:45-08 bryan Exp $
 #

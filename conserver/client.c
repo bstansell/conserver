@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.22 2000-12-13 12:31:07-08 bryan Exp $
+ *  $Id: client.c,v 5.24 2001-02-08 15:31:40-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -37,46 +37,41 @@
 static char copyright[] =
 "@(#) Copyright 1992 Purdue Research Foundation.\nAll rights reserved.\n";
 #endif
+
+#include <config.h>
+
 #include <sys/types.h>
 #include <sys/param.h>
-#include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/file.h>
 #include <sys/stat.h>
-#include <sys/resource.h>
-#include <sys/wait.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <errno.h>
 #include <signal.h>
 #include <pwd.h>
 
-#include "cons.h"
-#include "port.h"
-#include "consent.h"
-#include "client.h"
+#include <compat.h>
 
-#if USE_STRINGS
-#include <strings.h>
-#else
-#include <string.h>
-#endif
+#include <port.h>
+#include <consent.h>
+#include <client.h>
+
 
 /* find the next guy who wants to write on the console			(ksb)
  */
-CLIENT *
+CONSCLIENT *
 FindWrite(pCL)
-CLIENT *pCL;
+CONSCLIENT *pCL;
 {
 	/* return the first guy to have the `want write' bit set
 	 * (tell him of the promotion, too)  we could look for the
 	 * most recent or some such... I guess it doesn't matter that
 	 * much.
 	 */
-	for (/*passed in*/; (CLIENT *)0 != pCL; pCL = pCL->pCLnext) {
+	for (/*passed in*/; (CONSCLIENT *)0 != pCL; pCL = pCL->pCLnext) {
 		if (!pCL->fwantwr)
 			continue;
 		if (!pCL->pCEto->fup || pCL->pCEto->fronly)
@@ -90,7 +85,7 @@ CLIENT *pCL;
 		}
 		return pCL;
 	}
-	return (CLIENT *)0;
+	return (CONSCLIENT *)0;
 }
 
 #if HAVE_IDENTD
@@ -99,7 +94,7 @@ CLIENT *pCL;
  * limits.  We call identd/tap/auth to get info and compare
  */
 IdentifyMe(pCL)
-CLIENT *pCL;
+CONSCLIENT *pCL;
 {
 	/* ZZZ */
 	/* we would have to getsockname(fdClient)
@@ -261,7 +256,7 @@ static HELP aHLTable[] = {
  */
 void
 HelpUser(pCL)
-CLIENT *pCL;
+CONSCLIENT *pCL;
 {
 	register int i, j, iCmp;
 	static char

@@ -1,8 +1,0 @@
-#	$Id: SunOS5,v 1.2 1999-01-14 13:33:09-08 bryan Exp $
-#
-'CC=gcc'
-'INSTALL=/usr/ucb/install'
-'INCLUDE='
-'DEBUG=-O'
-'CDEFS=-DSUN5'
-'LIBS=-lsocket -lnsl'

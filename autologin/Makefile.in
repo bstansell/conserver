@@ -1,0 +1,51 @@
+### Path settings
+srcdir = @srcdir@
+top_srcdir = @top_srcdir@
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+bindir = @bindir@
+sysconfdir = @sysconfdir@
+
+### Installation programs and flags
+INSTALL = @INSTALL@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@ -s
+LN_S = @LN_S@
+MKDIR = @MKDIR@
+
+### Compiler and link options
+CC	= @CC@
+CFLAGS	= @CFLAGS@ # -DPUCC -DSUN5
+DEFS	= @DEFS@ -DSYSCONFDIR=\"$(sysconfdir)\"
+CPPFLAGS = -I.. -I$(top_srcdir) -I$(srcdir) $(DEFS) @CPPFLAGS@
+LDFLAGS	= @LDFLAGS@
+LIBS	= @LIBS@
+@SET_MAKE@
+
+
+### Makefile rules - no user-servicable parts below
+
+AUTOLOGIN_OBJS = main.o autologin.o
+AUTOLOGIN_HDRS = ../config.h $(top_srcdir)/compat.h $(srcdir)/main.h
+ALL = autologin
+
+
+all: $(ALL)
+
+.PHONY: clean distclean install
+
+autologin: $(AUTOLOGIN_OBJS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o autologin $(AUTOLOGIN_OBJS) $(LIBS)
+
+%.o: $(srcdir)/%.c $(AUTOLOGIN_HDRS)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
+
+clean:
+	rm -f *~ *.o $(ALL) core
+
+distclean: clean
+	rm -f Makefile
+
+install:
+	$(MKDIR) $(DESTDIR)$(bindir)
+	$(INSTALL_PROGRAM) autologin $(DESTDIR)$(bindir)
+

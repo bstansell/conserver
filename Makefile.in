@@ -1,0 +1,43 @@
+### Path settings
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+bindir = @bindir@
+mandir = @mandir@
+libdir = @libdir@
+includedir = @includedir@
+sysconfdir = @sysconfdir@
+
+@SET_MAKE@
+
+
+### Makefile rules - no user-servicable parts below
+
+SUBDIRS = conserver console conserver.cf
+
+all:
+	for n in $(SUBDIRS); do \
+		( cd $$n && $(MAKE) $@ $(MAKE_FLAGS) ) || exit 1; \
+	done
+
+autologin:
+	( cd autologin && $(MAKE) $@ $(MAKE_FLAGS) ) || exit 1;
+
+autologin.install:
+	( cd autologin && $(MAKE) install $(MAKE_FLAGS) ) || exit 1;
+
+install:
+	for n in $(SUBDIRS); do \
+		( cd $$n && $(MAKE) $@ $(MAKE_FLAGS) ) || exit 1; \
+	done
+
+clean:
+	for n in $(SUBDIRS); do \
+		( cd $$n && $(MAKE) $@ $(MAKE_FLAGS) ) || exit 1; \
+	done
+
+distclean:
+	for n in $(SUBDIRS); do \
+		( cd $$n && $(MAKE) $@ $(MAKE_FLAGS) ) || exit 1; \
+	done
+	rm -f config.cache config.log config.status config.h Makefile
+

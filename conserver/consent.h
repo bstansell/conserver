@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.15 2000-12-13 12:31:07-08 bryan Exp $
+ *  $Id: consent.h,v 5.16 2001-02-03 20:19:14-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -84,7 +84,7 @@ typedef struct consent {	/* console information			*/
 	int fdtty;		/* the port to talk to machine on	*/
 	short int fup;		/* we setup this line?			*/
 	short int fronly;	/* we can only read this console	*/
-	short int iend;		/* like icursor in CLIENT		*/
+	short int iend;		/* like icursor in CONSCLIENT		*/
 	short int inamelen;	/* strlen(server)			*/
 	struct client *pCLon;	/* clients on this console		*/
 	struct client *pCLwr;	/* client that is writting on console	*/

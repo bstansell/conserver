@@ -1,5 +1,5 @@
 /*
- *  $Id: client.h,v 5.14 2000-12-13 12:31:07-08 bryan Exp $
+ *  $Id: client.h,v 5.15 2001-02-03 20:17:02-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -55,8 +55,8 @@ typedef struct client {		/* Connection Information:		*/
 	short fwantwr;		/* (client) wants to write		*/
 	short fecho;		/* echo commands (not set by machines)	*/
 	char acid[128];		/* login and location of client		*/
-	long tym;		/* time of connect			*/
-	long typetym;		/* time of last keystroke		*/
+	time_t tym;		/* time of connect			*/
+	time_t typetym;		/* time of last keystroke		*/
 	char actym[32]; 	/* pre-formatted time			*/
 	struct consent
 		*pCEwant,	/* what machine we would like to be on	*/
@@ -75,9 +75,9 @@ typedef struct client {		/* Connection Information:		*/
 	int mcursor;		/* the length of the message		*/
 	struct sockaddr_in
 		cnct_port; 	/* where from				*/
-} CLIENT;
+} CONSCLIENT;
 
 extern char *FmtCtl();
 extern void Replay();
 extern void HelpUser();
-extern CLIENT *FindWrite();
+extern CONSCLIENT *FindWrite();

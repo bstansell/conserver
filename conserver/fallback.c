@@ -1,5 +1,5 @@
 /*
- *  $Id: fallback.c,v 5.22 2000-12-13 12:31:07-08 bryan Exp $
+ *  $Id: fallback.c,v 5.24 2001-02-08 15:31:58-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -13,6 +13,9 @@
  *
  * Mike Rowan (mtr@mace.cc.purdue.edu)
  */
+
+#include <config.h>
+
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -20,7 +23,6 @@
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <sys/errno.h>
-#include <sys/ioctl.h>
 #include <netinet/in.h>
 #include <sys/un.h>
 #include <syslog.h>
@@ -29,33 +31,11 @@
 #include <stdio.h>
 #include <ctype.h>
 
-#include "cons.h"
-#include "port.h"
+#include <compat.h>
 
-#if HAVE_PTSNAME
-/* for grantpt() and unlockpt()						(gregf)
- */
-#include <stdlib.h>
-#endif
-
-#if NEED_UNISTD_H
-#include <unistd.h>
-#endif
-
-#if USE_STRINGS
-#include <strings.h>
-#else
-#include <string.h>
-#endif
+#include <port.h>
 
 #if DO_VIRTUAL && ! HAVE_PTYD
-
-extern int errno;
-#if !HAVE_STRERROR
-extern char *sys_errlist[], *strchr();
-#define strerror(Me) (sys_errlist[Me])
-#endif
-
 
 static char *__pty_host;
 static char *__pty_fmt;
@@ -69,42 +49,42 @@ static int iLogPri = LOG_DEBUG;
  * everything that uses pty's.  For the most part, we'll be trying to
  * make /dev/ptyq* the "free" pty's.
  */
-#if defined(sun)
+# if defined(sun)
 static char charone[] =
 	"prstuvwxyzPQRSTUVWq";
-#else
-#if defined(dynix)
+# else
+#  if defined(dynix)
 static char charone[] =
 	"prstuvwxyzPQRSTUVWq";
-#else
-#if defined(ultrix)
+#  else
+#   if defined(ultrix)
 static char charone[] =
 	"prstuvwxyzPQRSTUVWq";
-#else
+#   else
 /* all the world's a vax ;-) */
 static char charone[] =
 	"prstuvwxyzPQRSTUVWq";
-#endif
-#endif
-#endif
+#   endif
+#  endif
+# endif
 
 static char chartwo[] =
 	"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-#if (defined(_AIX) || defined(PTX4))
+# if (defined(_AIX) || defined(PTX4))
 static char acMaster[] =
 	"/dev/ptc/XXXXXXXXX";
 static char acSlave[] =
 	"/dev/pts/XXXXXXXXX";
-#else
+# else
 static char acMaster[] =
 	"/dev/ptyXX";
 static char acSlave[] =
 	"/dev/ttyXX";
-#endif /* _AIX */
+# endif /* _AIX */
 
-#if !HAVE_GETPSEUDO
-#ifdef _AIX
+# if !HAVE_GETPSEUDO
+#  ifdef _AIX
 /*
  * get a pty for the user (emulate the neato sequent call)		(mm)
  */
@@ -131,8 +111,8 @@ char **master, **slave;
 	return fd;
 }
 
-#else
-#if  HAVE_PTSNAME
+#  else
+#   if  HAVE_PTSNAME
 
 /* get a pty for the user -- emulate the neato sequent call under	(gregf)
  * DYNIX/ptx v4.0
@@ -165,7 +145,7 @@ char **master, **slave;
 	return fd;
 }
 
-#else
+#   else
 /*
  * get a pty for the user (emulate the neato sequent call)		(ksb)
  */
@@ -218,9 +198,9 @@ char **master, **slave;
 	*slave = acSlave;
 	return fd;
 }
-#endif /* PTX version */
-#endif /* _AIX */
-#endif /* !HAVE_GETPSEUDO */
+#   endif /* PTX version */
+#  endif /* _AIX */
+# endif /* !HAVE_GETPSEUDO */
 
 /*
  * get a Joe pty bacause the daemon is not with us, sadly.		(ksb)

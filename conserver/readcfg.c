@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.28 2000-12-13 12:31:07-08 bryan Exp $
+ *  $Id: readcfg.c,v 5.30 2001-02-08 15:32:28-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -29,38 +29,32 @@
 /*
  * Network console modifications by Robert Olson, olson@mcs.anl.gov.
  */
+
+#include <config.h>
+
 #include <sys/types.h>
 #include <sys/param.h>
-#include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/file.h>
 #include <sys/stat.h>
-#include <sys/resource.h>
-#include <sys/wait.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <errno.h>
 #include <signal.h>
 #include <pwd.h>
 
-#include "cons.h"
-#include "port.h"
-#include "consent.h"
-#include "client.h"
-#include "group.h"
-#include "access.h"
-#include "readcfg.h"
-#include "master.h"
-#include "main.h"
+#include <compat.h>
 
-#if USE_STRINGS
-#include <strings.h>
-#else
-#include <string.h>
-#endif
+#include <port.h>
+#include <consent.h>
+#include <client.h>
+#include <group.h>
+#include <access.h>
+#include <readcfg.h>
+#include <master.h>
+#include <main.h>
 
 
 GRPENT
@@ -93,9 +87,9 @@ register FILE *fp;
 	register CONSENT *pCE;
 	register REMOTE **ppRC;
 	char LogDirectory[MAXLOGLEN];
-	long tyme;
+	time_t tyme;
 
-	tyme = time((long *)0);
+	tyme = time((time_t *)0);
 	LogDirectory[0] = '\000';
 	pGEAll = aGroups;		/* fill in these structs	*/
 	pCE = aConsoles;
@@ -172,10 +166,10 @@ register FILE *fp;
 			}
 
 			if ( 0 !=
-#if USE_STRINGS
-			    bcmp(&acMyAddr[0], hpMe->h_addr, hpMe->h_length)
-#else
+#if HAVE_MEMCMP
 			    memcmp(&acMyAddr[0], hpMe->h_addr, hpMe->h_length)
+#else
+			    bcmp(&acMyAddr[0], hpMe->h_addr, hpMe->h_length)
 #endif
 			    ) {
 

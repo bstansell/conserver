@@ -1,5 +1,5 @@
 /*
- *  $Id: main.h,v 5.15 2000-12-13 12:31:07-08 bryan Exp $
+ *  $Id: main.h,v 5.16 2001-02-08 15:31:58-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -47,7 +47,7 @@ extern char acMyHost[];
 extern char acMyAddr[];
 extern int domainHack;
 
-#if defined(SERVICE)
+#if defined(SERVICENAME)
 extern char acService[];
 #endif
 

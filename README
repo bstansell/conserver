@@ -1,32 +1,62 @@
 				README
 				======
 
+
 Maintainer/Enhancer
 
     Bryan Stansell (bryan@conserver.com) of Certainty Solutions, Inc. -
-    formerly Global Networking and Computing (GNAC)
+    formerly Global Networking and Computing (GNAC).
+
+
+Big new version released!
+
+    7.0.0 is out! What's so great about 7.0.0? GNU's autoconf has been
+    integrated by Mark Roth (roth@feep.net)! I met Mark at the [1]LISA
+    conference last December and he (quite quickly) provided the patches.
+    I've been dragging my heels getting it out to others, but it's now
+    available.
+
+    Now that I have autoconf capabilities, I've taken out the need to edit
+    the conserver/cons.h file - everything is now a --with or --enable
+    configure argument (makes sense, doesn't it!?!). As with any X.0.0
+    release, I may have introduced something bad into the code for systems
+    I don't have access to, so be careful.
+
+    I've successfully built 7.0.0 on Solaris and Linux. I've been told the
+    client has built successfully under cygwin on NT (progress on the NT
+    front!). Last report shows FreeBSD as a failure (any coders out there
+    with FreeBSD have time to send me patches?). If anyone successfully
+    builds and installs the software under other operating systems, I'd
+    love to hear about it.
+
+
+Finally, a FAQ!
+
+    Here's the start of a conserver [2]FAQ. Got any additions? Let me
+    know.
 
 
 Mailing Lists
 
-    There are currently two mailing lists available at conserver.com.
-    announce@conserver.com is an announcement-only mailing list for
+    There are currently two mailing lists available.
+    [3]announce@conserver.com is an announcement-only mailing list for
     informing of new versions, major developments, etc.
-    users@conserver.com is for general Q&A, discussions, ideas, etc for
-    conserver users.  See http://www.conserver.com/ for pointers to
-    these and possibly future lists.
+    [4]users@conserver.com is for general Q&A, discussions, ideas, etc
+    for conserver users. You can sign up my sending a message to
+    list-request@conserver.com with a subject of "subscribe" or head
+    over to the online [5]web pages.
 
 
 Origin
 
     The console server software found here is a heavily modified
-    version originally written by Tom Fine (fine@cis.ohio-state.edu)
-    and then Kevin S Braunsdorf (ksb+conserver@sa.fedex.com).  Patches
+    version originally written by Tom Fine (fine@head-cfa.harvard.edu)
+    and then Kevin S Braunsdorf (ksb+conserver@sa.fedex.com). Patches
     from Robert Olson (olson@mcs.anl.gov) were then applied to get
     network console support.
 
     Arnold de Leon (arnold@corp.webtv.net) then fixed various bugs and
-    added enhancements while at Synopsys.  I then took the result and
+    added enhancements while at Synopsys. I then took the result and
     continued fixing things and adding features we found useful.
     Certainty Solutions has been supporting my coding efforts (in too
     many ways to list) since 1996.
@@ -34,16 +64,16 @@ Origin
 
 The conserver.com Distribution
 
-    The result is a combination of many people's work.  This version is
-    being released in hopes that it will help others.  There is no
+    The result is a combination of many people's work. This version is
+    being released in hopes that it will help others. There is no
     warranty or support implied by the distribution of the software.
 
-    As of version 6.1.7, the packaging and numbering sheme has
-    changed.  I used to package conserver as conserver-GNAC-v.vv.
-    Since GNAC (now Certainty Solutions) has changed it's name I've
+    As of version 6.1.7, the packaging and numbering scheme has
+    changed.  I used to package conserver as conserver-GNAC-v.vv. Since
+    GNAC (now [6]Certainty Solutions) has changed it's name I've
     decided to drop the GNAC portion and use a 3 digit version number
-    (conserver-v.v.v).  Why change the version numbering?  I need to
-    differenciate this thread of the code from the original authors and
+    (conserver-v.v.v). Why change the version numbering? I need to
+    differentiate this thread of the code from the original authors and
     I couldn't come up with a good replacement for the GNAC name - sad,
     but true.
 
@@ -55,11 +85,20 @@ Downloading
 
 Other Good Information
 
-    Zonker Harris has fabulous documents regarding the hookup
-    of consoles to terminal servers and other such devices.  His
-    Greater Scroll of Console Knowledge is a great place to start
-    (http://www.conserver.com/consoles/).
+    Zonker Harris has fabulous documents regarding the hookup of
+    consoles to terminal servers and other such devices. His
+    [13]Greater Scroll of Console Knowledge is a great place to start.
+
+
+References
+
+   1. http://www.usenix.org/publications/library/proceedings/lisa2000/
+   2. http://www.conserver.com/FAQ
+   3. mailto:announce@conserver.com
+   4. mailto:users@conserver.com
+   5. https://www.conserver.com/mailman/listinfo
+   6. http://www.certaintysolutions.com/
 
 #
-#  $Id: README,v 1.12 2000-12-14 16:31:04-08 bryan Exp $
+#  $Id: README,v 1.14 2001-02-18 22:49:41-08 bryan Exp $
 #
