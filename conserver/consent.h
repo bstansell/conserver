@@ -1,7 +1,7 @@
 /*
- *  $Id: consent.h,v 5.12 1998-12-17 17:21:24-08 bryan Exp $
+ *  $Id: consent.h,v 5.13 1999-01-26 20:35:17-08 bryan Exp $
  *
- *  GNAC, Inc., 1998
+ *  Copyright GNAC, Inc., 1998
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
  */

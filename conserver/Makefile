@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.10 1999-01-21 23:32:43-08 bryan Exp $
+#	$Id: Makefile,v 1.11 1999-01-25 18:40:48-08 bryan Exp $
 #
 #	Makefile for console server
 #
@@ -42,7 +42,8 @@ ${MAN}/man${MANSECT}:
 	${INSTALL} -d $@
 
 install.man: ${MAN}/man${MANSECT}
-	${INSTALL} -c conserver.man ${MAN}/man${MANSECT}/conserver.${MANSECT}
+	tbl conserver.man > conserver.tbl
+	${INSTALL} -c conserver.tbl ${MAN}/man${MANSECT}/conserver.${MANSECT}
 
 lint: ${HDR} ${SRC} FRC
 	lint -h ${CDEFS} ${INCLUDE} ${SRC}

@@ -1,7 +1,7 @@
 /*
- *  $Id: client.h,v 5.11 1998-12-17 17:20:37-08 bryan Exp $
+ *  $Id: client.h,v 5.12 1999-01-26 20:35:17-08 bryan Exp $
  *
- *  GNAC, Inc., 1998
+ *  Copyright GNAC, Inc., 1998
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
  */

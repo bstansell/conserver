@@ -1,9 +1,9 @@
 /*
- *  $Id: version.h,v 1.9 1999-01-15 16:02:17-08 bryan Exp bryan $
+ *  $Id: version.h,v 1.10 1999-01-26 20:35:17-08 bryan Exp $
  *
- *  GNAC, Inc., 1998
+ *  Copyright GNAC, Inc., 1998
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
  */
 
-#define GNAC_VERSION "GNAC version 6.09"
+#define GNAC_VERSION "GNAC version 6.10"

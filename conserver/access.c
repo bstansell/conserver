@@ -1,7 +1,7 @@
 /*
- *  $Id: access.c,v 5.11 1999-01-13 11:48:11-08 bryan Exp $
+ *  $Id: access.c,v 5.12 1999-01-26 20:35:17-08 bryan Exp $
  *
- *  GNAC, Inc., 1998
+ *  Copyright GNAC, Inc., 1998
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
  */

@@ -1,7 +1,7 @@
 /*
- *  $Id: console.c,v 5.24 1999-01-25 15:10:14-08 bryan Exp $
+ *  $Id: console.c,v 5.25 1999-01-26 20:35:17-08 bryan Exp $
  *
- *  GNAC, Inc., 1998
+ *  Copyright GNAC, Inc., 1998
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
  */
@@ -77,7 +77,7 @@ extern char *sys_errlist[];
 #endif
 
 static char rcsid[] =
-	"$Id: console.c,v 5.24 1999-01-25 15:10:14-08 bryan Exp $";
+	"$Id: console.c,v 5.25 1999-01-26 20:35:17-08 bryan Exp $";
 static char *progname =
 	rcsid;
 int fVerbose = 0, fReplay = 0, fRaw = 0;

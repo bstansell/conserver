@@ -1,4 +1,4 @@
-.\" $Id: console.man,v 1.2 1999-01-25 14:01:56-08 bryan Exp $
+.\" $Id: console.man,v 1.3 1999-01-25 18:37:20-08 bryan Exp $
 .TH CONSOLE 8L "Local"
 .SH NAME
 console \- console server client program
@@ -52,8 +52,10 @@ rather than the hard coded default (``console'').
 .B \-q
 The \fIconsole\fP client requests the server daemon quit (shutdown).
 A password is sent in the protocol stream, if none is required for
-the local host to shutdown the server just press return.  The uppercase
-varient of this command just acts on the primary server.
+the local host to shutdown the server just press return.
+.TP
+.B \-Q
+Like -q, but just acts on the primary server.
 .TP
 .B \-r
 Request a raw connection to the group control virtual console,
@@ -66,7 +68,7 @@ If this mode all the escape sequences (below) work, or report errors,
 but all other keyboard input is discarded.
 .TP
 .B \-u
-Show a list of consoles and the users on each.
+Show a list of all consoles with status and attached users.
 .TP
 .B \-V
 Output the version of the console client program.
@@ -77,7 +79,7 @@ Use this option in combination with any of `show' options (below)
 for added benefit.
 .TP
 .B \-w
-Show a list of all connections to all consoles.
+Show a list of all connections to consoles.
 .TP
 .B \-x
 Show a list of consoles and devices.
@@ -103,7 +105,8 @@ e	change the escape sequence to the next two characters
 f	force a switch to attach mode
 g	group info
 L	toggle logging on/off
-l1	send a 3 second serial line break (might halt a Sun)
+l1	send a 3-second serial line break (might halt a Sun)
+	("ell" then "one", not the L1 key)
 o	reopen the line to clear errors (silo overflows)
 p	replay the last 60 lines of output
 r	replay the last 20 lines of output

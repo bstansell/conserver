@@ -1,7 +1,7 @@
 /*
- *  $Id: main.c,v 5.30 1999-01-22 00:02:35-08 bryan Exp $
+ *  $Id: main.c,v 5.31 1999-01-26 20:35:17-08 bryan Exp $
  *
- *  GNAC, Inc., 1998
+ *  Copyright GNAC, Inc., 1998
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
  */
@@ -58,7 +58,7 @@
 #endif
 
 char rcsid[] =
-	"$Id: main.c,v 5.30 1999-01-22 00:02:35-08 bryan Exp $";
+	"$Id: main.c,v 5.31 1999-01-26 20:35:17-08 bryan Exp $";
 char *progname =
 	rcsid;
 int fAll = 1, fVerbose = 0, fSoftcar = 0;

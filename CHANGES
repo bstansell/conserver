@@ -1,6 +1,10 @@
 				CHANGES
 				=======
 
+version 6.10:
+	- Documentation fixes
+	- Web page up and running
+
 version 6.09:
 	- Added more documentation (look for README and INSTALL files).
 	- Fixed up man pages so they are more accurate.
@@ -29,5 +33,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.5 1999-01-25 15:37:38-08 bryan Exp $
+#  $Id: CHANGES,v 1.6 1999-01-26 20:42:36-08 bryan Exp $
 #

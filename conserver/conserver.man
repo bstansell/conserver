@@ -1,5 +1,5 @@
 .\" @(#)conserver.8 01/06/91 OSU CIS; Thomas A. Fine
-.\" $Id: conserver.man,v 1.3 1999-01-25 15:05:07-08 bryan Exp $
+.\" $Id: conserver.man,v 1.4 1999-01-25 18:57:52-08 bryan Exp $
 .TH CONSERVER 8L "LOCAL"
 .SH NAME
 conserver \- console server daemon
@@ -15,13 +15,13 @@ program.
 It provides remote access to the server consoles,
 and logs all console data.
 Slave hosts which have no current connection might produce important
-error messages, these unloved errors are labeled with a machine name
+error messages; these unloved errors are labeled with a machine name
 and output on stdout.
 .PP
-When started, it forks a child for each group in /etc/conserver.cf,
-and assigns each process a port number to listen on.
-The \fIconsole\fP client program knows how to request port numbers and
-forwards to find the various slave hosts.
+When started, it forks a child for each group in /etc/conserver.cf and
+assigns each process a port number to listen on.  The \fIconsole\fP
+client program communicates with the master console server to find
+the host and port the child is listening on.
 .PP
 .B Conserver
 completely controls any connection to a controlled host.
@@ -60,7 +60,7 @@ Output the version of the console server (only) and exit.
 l l.
 /etc/conserver.cf	description of console terminal lines
 /etc/conserver.passwd	users allowed to access consoles
-\fIstdout\fP	summary of unloved console errors
+\fIstdout\fP	unloved console errors
 .TE
 .SH AUTHORS
 Thomas A. Fine, Ohio State Computer Science

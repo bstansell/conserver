@@ -1,7 +1,7 @@
 /*
- *  $Id: cons-test.h,v 1.4 1999-01-14 13:33:25-08 bryan Exp $
+ *  $Id: cons-test.h,v 1.5 1999-01-26 20:35:17-08 bryan Exp $
  *
- *  GNAC, Inc., 1998
+ *  Copyright GNAC, Inc., 1998
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@gnac.com)
  */

@@ -22,7 +22,7 @@ Detailed Instructions
     - First thing to do is set up a custom conserver/cons.h file.  If you
       like all the defaults provided in conserver/port.h, your set.
       Just use the default cons.h cons.h file.  Here are some of the
-      more important #define's to look for:
+      more important #defines to look for:
 
 	PORT or SERVICE		- Socket used to communicate
 	HOST			- Hostname of console server
@@ -71,5 +71,5 @@ Detailed Instructions
     - That's it!  Just start up the console server and enjoy!
 
 #
-#  $Id: INSTALL,v 1.4 1999-01-25 18:30:03-08 bryan Exp $
+#  $Id: INSTALL,v 1.5 1999-01-26 11:45:04-08 bryan Exp $
 #
