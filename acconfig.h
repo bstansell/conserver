@@ -57,3 +57,8 @@
  * use ansi prototypes/decls
  */
 #undef USE_ANSI_PROTO
+
+/*
+ * have POSIX regcomp
+ */
+#undef HAVE_POSIX_REGCOMP

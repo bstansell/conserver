@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.82 2002-03-11 18:21:37-08 bryan Exp $
+ *  $Id: readcfg.c,v 5.84 2002-03-25 17:10:15-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -82,7 +82,7 @@ parseMark(pcFile, iLine, pcMark, tyme, pCE)
 {
     static STRING mark = { (char *)0, 0, 0 };
     char *p, *n = (char *)0;
-    int activity = 0;
+    int activity = 0, bactivity = 0;
     int factor = 0, pfactor = 0;
     int value = 0, pvalue = 0;
 
@@ -99,6 +99,13 @@ parseMark(pcFile, iLine, pcMark, tyme, pCE)
 		     pcFile, iLine, pcMark);
 	    }
 	    activity = 1;
+	} else if (*p == 'b' || *p == 'B') {
+	    if (n != (char *)0) {
+		Error
+		    ("%s(%d) bad timestamp specification `%s': numeral before `b' (ignoring numeral)",
+		     pcFile, iLine, pcMark);
+	    }
+	    bactivity = 1;
 	} else if (*p == 'm' || *p == 'M') {
 	    pfactor = 60;
 	} else if (*p == 'h' || *p == 'H') {
@@ -153,11 +160,13 @@ parseMark(pcFile, iLine, pcMark, tyme, pCE)
 	value = pvalue * factor;
     }
 
-    Debug(1, "Mark spec of `%s' parsed: factor=%d, value=%d, activity=%d",
-	  pcMark, factor, value, activity);
+    Debug(1,
+	  "Mark spec of `%s' parsed: factor=%d, value=%d, activity=%d, bactivity=%d",
+	  pcMark, factor, value, activity, bactivity);
 
     if (pCE != (CONSENT *) 0) {
 	pCE->activitylog = activity;
+	pCE->breaklog = bactivity;
 	if (factor && value) {
 	    pCE->mark = value;
 	    if (factor > 0) {
@@ -400,6 +409,8 @@ ReadCfg(pcFile, fp, master)
 		pcMark = pruneSpace(pcMark);
 		pcBreak = pruneSpace(pcBreak);
 		/* Ignore null specs */
+		if (pcMark[0] == '\000')
+		    pcMark = (char *)0;
 		if (pcBreak[0] == '\000')
 		    pcBreak = (char *)0;
 	    }
@@ -825,6 +836,7 @@ ReadCfg(pcFile, fp, master)
 		}
 	    }
 	    pCEmatch->activitylog = pCE->activitylog;
+	    pCEmatch->breaklog = pCE->breaklog;
 	    pCEmatch->mark = pCE->mark;
 	    pCEmatch->nextMark = pCE->nextMark;
 	    pCEmatch->breakType = pCE->breakType;

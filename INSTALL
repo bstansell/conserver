@@ -68,6 +68,7 @@ Detailed Instructions
 	--with-maxmemb=MAXMEMB  Specify maximum consoles per process [16]
 	--with-timeout=TIMEOUT  Specify connect() timeout in seconds [10]
 	--with-libwrap[=PATH]   Compile in libwrap (tcp_wrappers) support
+	--with-regex            Use regular expressions in conserver.passwd
 
       Not surprisingly, some match the old conserver/cons.h items...here
       they are for reference:
@@ -124,6 +125,41 @@ Detailed Instructions
 
     - That's it!  Just start up the console server and enjoy!
 
+
+Other Information And Gotchas
+
+    - Debian Linux Distribution
+
+	The Debian folks have conserver distributed with the package
+	names of conserver-client and conserver-server.  They are in
+	the distribution "sid" and the "non-free" part (because the
+	Ohio State license doesn't explicitly allow for modification to
+	the code, even though it's totally implied and the intention of
+	the author - I've even got proof in email!  Oh well, can't
+	blame the Debian folks for being cautious - they've been burned
+	before, apparently).
+
+    - Potential GCC bug
+
+	Adam Morris <AMorris@providence.org> reported a problem with
+	the following line in console/console.c:
+
+	    if ((in_addr_t) (-1) == pPort->sin_addr.s_addr) {
+
+	This tickles a GCC bug under HP-UX 11.11 using GCC 3.0.2 in
+	64-bit mode with optimization enabled (-O).  The bug could
+	possibly be provoked in other combinations as well.  His fix is
+	to change the line to:
+
+	    if ((in_addr_t) (-1) == inet_addr(pcToHost)) {
+
+	It's also reported that newer versions of the compiler fix the
+	issue, so if you happen to have problems with the client
+	connecting to servers, you might be tickling this bug and you
+	can upgrade the compiler, turn off the optimization, or apply
+	this code change.
+
+
 #
-#  $Id: INSTALL,v 1.21 2002-03-12 00:19:25-08 bryan Exp $
+#  $Id: INSTALL,v 1.22 2002-03-25 16:16:17-08 bryan Exp $
 #

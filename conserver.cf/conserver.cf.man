@@ -1,4 +1,4 @@
-.\" $Id: conserver.cf.man,v 1.23 2002-01-20 21:14:43-08 bryan Exp $
+.\" $Id: conserver.cf.man,v 1.24 2002-03-25 17:14:34-08 bryan Exp $
 .\" @(#)constab.5 01/06/91 OSU CIS; Thomas A. Fine
 .TH CONSERVER.CF 5 "Local"
 .SH NAME
@@ -84,7 +84,7 @@ specifies the time between
 timestamps applied to the console log file and
 whether to log read/write connection actions.
 The format of the specification is
-[\fImark-interval\fP[\fBm\fP|\fBh\fP|\fBd\fP|\fBl\fP]][\fBa\fP].
+[\fImark-interval\fP[\fBm\fP|\fBh\fP|\fBd\fP|\fBl\fP]][\fBa\fP][\fBb\fP].
 The timestamps look like `[-- MARK -- Mon Jan 25 14:46:56 1999]'.
 The `\fBm\fP', `\fBh\fP', and `\fBd\fP' tags specify
 `minutes' (the default), `hours', and `days'.  The `\fBl\fP' tag
@@ -98,6 +98,8 @@ An `\fBa\fP' can be specified to add logs of
 including the user's name and the host from which the
 \fBconsole\fP connection was made,
 to the logfile.
+A `\fBb\fP' can be specified to add logging of break sequences sent
+to the console.
 .IP
 A default \fItimestamp-spec\fP can be specified by using the
 \fB\s-1TIMESTAMP=\s0\fP syntax.

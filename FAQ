@@ -14,6 +14,7 @@ directed to faq@conserver.com.  The FAQ answers the following questions:
     6) What does "console: gethostbyname: console: host lookup error"
        mean (or something close to that)?
     7) How do I set up a serial port for no parity?
+    8) Is "Conserver" a Trademark or Registered Trademark?
    99) Ok, things just don't seem to work.  Help?!?
 
 
@@ -79,6 +80,16 @@ directed to faq@conserver.com.  The FAQ answers the following questions:
     but the answer is to use a 'p' after the baud rate.  So, '9600p'
     is 9600 baud, no parity.
 
+ 8) Is "Conserver" a trademark or registered trademark?
+
+    The best answer I can give is "not as far as I know".  A couple of
+    quick searches through the source code doesn't find any claim of a
+    trademark.  I've never done a registered trademark search, but if
+    it had been registered (by a previous author), I'm sure it would be
+    mentioned.  But I'm no lawyer and don't deal with these types of
+    things, so I'm not exactly sure what I'm taking about and my answer
+    becomes a very vague "not as far as I know".
+
 99) Ok, things just don't seem to work.  Help?!?
 
     Yes, this is a pretty vague question, but here are a few tips that
@@ -119,5 +130,5 @@ directed to faq@conserver.com.  The FAQ answers the following questions:
       through the same problem?
 
 #
-#  $Id: FAQ,v 1.5 2002-01-20 19:06:42-08 bryan Exp $
+#  $Id: FAQ,v 1.6 2002-03-25 16:16:29-08 bryan Exp $
 #

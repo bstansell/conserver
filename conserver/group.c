@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.168 2002-03-11 18:05:40-08 bryan Exp $
+ *  $Id: group.c,v 5.176 2002-03-25 17:46:04-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -72,6 +72,9 @@
 #include <varargs.h>
 #endif
 #include <arpa/telnet.h>
+#if HAVE_POSIX_REGCOMP
+#include <regex.h>
+#endif
 
 #if defined(USE_LIBWRAP)
 #include <syslog.h>
@@ -192,9 +195,9 @@ destroyConsent(pGE, pCE)
 	    tagLogfile(pCE, "%s detached", pCL->acid.string);
 	    if (pCE->nolog) {
 		pCE->nolog = 0;
-		fileWrite(pCE->fdlog,
-			  "[-- Console logging restored (logout) --]\r\n",
-			  -1);
+		filePrint(pCE->fdlog,
+			  "[-- Console logging restored (logout) -- %s]\r\n",
+			  strtime(NULL));
 	    }
 	}
 	/* mark as unconnected and remove from both
@@ -781,11 +784,35 @@ CheckPasswd(pCLServing, pw_string)
 			return 1;
 		    } else {
 			char *p;
-			int max;
-			max = strlen(server);
+			int status;
+			static STRING tomatch = { (char *)0, 0, 0 };
+#if HAVE_POSIX_REGCOMP
+			regex_t re;
+#endif
+			buildMyString((char *)0, &tomatch);
+#if HAVE_POSIX_REGCOMP
+			buildMyStringChar('^', &tomatch);
+			buildMyString(server, &tomatch);
+			buildMyStringChar('$', &tomatch);
+#else
+			buildMyString(server, &tomatch);
+#endif
 			p = pCLServing->pCEwant->server.string;
-			while (strlen(p) >= max) {
-			    if (strcmp(server, p) == 0) {
+			while (p != (char *)0) {
+#if HAVE_POSIX_REGCOMP
+			    if (regcomp(&re, tomatch.string, REG_NOSUB)
+				!= 0) {
+				Error
+				    ("%s(%d) server name `%s' not a valid regular expression",
+				     pcPasswd, iLine, server);
+				break;
+			    }
+			    status = regexec(&re, p, 0, NULL, 0);
+			    regfree(&re);
+#else
+			    status = strcmp(tomatch.string, p);
+#endif
+			    if (status == 0) {
 				if (fVerbose) {
 				    Info("User %s logging into server %s",
 					 pCLServing->acid.string,
@@ -919,7 +946,7 @@ doBreakWork(pCLServing, pCEServing, bt, cleanup)
 #endif
 {
     char *p, s;
-    short int backslash;
+    short int backslash = 0, waszero = 0;
     short int cntrl;
     char oct[3];
     short int octs = -1;
@@ -930,11 +957,14 @@ doBreakWork(pCLServing, pCEServing, bt, cleanup)
     if (cleanup && (bt < 1 || bt > 9))
 	return;
     if (bt < 0 || bt > 9) {
-	(void)fileWrite(pCLServing->fd, "aborted]\r\n", -1);
+	if (!cleanup)
+	    (void)fileWrite(pCLServing->fd, "aborted]\r\n", -1);
 	return;
     }
-    if (bt == 0)
+    if (bt == 0) {
 	bt = pCEServing->breakType;
+	waszero = 1;
+    }
     if (bt == 0 || breakList[bt - 1].used == 0) {
 	if (!cleanup)
 	    (void)fileWrite(pCLServing->fd, "undefined]\r\n", -1);
@@ -1117,8 +1147,20 @@ doBreakWork(pCLServing, pCEServing, bt, cleanup)
     if (cleanup) {
 	buildMyString((char *)0, &breakList[bt - 1]);
 	buildMyString(cleaned.string, &breakList[bt - 1]);
-    } else
+    } else {
 	fileWrite(pCLServing->fd, "sent]\r\n", -1);
+	if (pCEServing->breaklog) {
+	    if (waszero) {
+		filePrint(pCEServing->fdlog,
+			  "[-- break #0(%d) sent -- `%s' -- %s]\r\n", bt,
+			  breakList[bt - 1].string, strtime(NULL));
+	    } else {
+		filePrint(pCEServing->fdlog,
+			  "[-- break #%d sent -- `%s' -- %s]\r\n", bt,
+			  breakList[bt - 1].string, strtime(NULL));
+	    }
+	}
+    }
 }
 
 void
@@ -1527,9 +1569,9 @@ Kiddie(pGE, sfd)
 			       pCLServing->acid.string);
 		    if (pCEServing->nolog) {
 			pCEServing->nolog = 0;
-			fileWrite(pCEServing->fdlog,
-				  "[-- Console logging restored (logout) --]\r\n",
-				  -1);
+			filePrint(pCEServing->fdlog,
+				  "[-- Console logging restored (logout) -- %s]\r\n",
+				  strtime(NULL));
 		    }
 		    pCEServing->pCLwr = FindWrite(pCEServing->pCLon);
 		}
@@ -2320,7 +2362,7 @@ Kiddie(pGE, sfd)
 				    }
 
 				    filePrint(pCLServing->fd,
-					      ":%s:%s:%s,%s,%s,%d,%d:%d:%s\r\n",
+					      ":%s:%s:%s,%s,%s,%s,%d,%d:%d:%s\r\n",
 					      (pCE->fup ? "up" : "down"),
 					      (pCE->fronly ? "ro" : "rw"),
 					      pCE->lfile.string,
@@ -2328,7 +2370,10 @@ Kiddie(pGE, sfd)
 					       nolog ? "nolog" : "log"),
 					      (pCE->
 					       activitylog ? "act" :
-					       "noact"), pCE->mark,
+					       "noact"),
+					      (pCE->
+					       breaklog ? "brk" : "nobrk"),
+					      pCE->mark,
 					      (pCE->fdlog ? pCE->fdlog->
 					       fd : -1), pCE->breakType,
 					      (pCE->
@@ -2343,14 +2388,16 @@ Kiddie(pGE, sfd)
 					fileWrite(pCLServing->fd,
 						  "logging off]\r\n", -1);
 					filePrint(pCEServing->fdlog,
-						  "[-- Console logging disabled by %s --]\r\n",
-						  pCLServing->acid.string);
+						  "[-- Console logging disabled by %s -- %s]\r\n",
+						  pCLServing->acid.string,
+						  strtime(NULL));
 				    } else {
 					fileWrite(pCLServing->fd,
 						  "logging on]\r\n", -1);
 					filePrint(pCEServing->fdlog,
-						  "[-- Console logging restored by %s --]\r\n",
-						  pCLServing->acid.string);
+						  "[-- Console logging restored by %s -- %s]\r\n",
+						  pCLServing->acid.string,
+						  strtime(NULL));
 				    }
 				} else {
 				    filePrint(pCLServing->fd,

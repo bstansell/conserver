@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.85 2002-02-25 14:00:38-08 bryan Exp $
+ *  $Id: consent.c,v 5.86 2002-03-25 17:26:28-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -595,8 +595,9 @@ ConsDown(pCE, pfdSet)
     }
     if ((CONSFILE *) 0 != pCE->fdlog) {
 	if (pCE->nolog) {
-	    fileWrite(pCE->fdlog, "[-- Console logging restored --]\r\n",
-		      -1);
+	    filePrint(pCE->fdlog,
+		      "[-- Console logging restored -- %s]\r\n",
+		      strtime(NULL));
 	}
 	filePrint(pCE->fdlog, "[-- Console down -- %s]\r\n",
 		  strtime(NULL));

@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.89 2002-02-27 18:21:51-08 bryan Exp $
+ *  $Id: main.c,v 5.90 2002-03-25 17:08:35-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -338,10 +338,9 @@ dumpDataStructures()
 		  pCE->fvirtual, pCE->acslave.string, pCE->pccmd.string,
 		  pCE->ipid);
 
-	    Debug(1,
-		  "  nolog=%d, fdtty=%d, activitylog=%d, fup=%d, fronly=%d",
-		  pCE->nolog, pCE->fdtty, pCE->activitylog, pCE->fup,
-		  pCE->fronly);
+	    Debug(1, "  nolog=%d, fdtty=%d, activitylog=%d, breaklog=%d",
+		  pCE->nolog, pCE->fdtty, pCE->activitylog, pCE->breaklog);
+	    Debug(1, "  fup=%d, fronly=%d", pCE->fup, pCE->fronly);
 	    Debug(1, "  ------");
 	}
     }

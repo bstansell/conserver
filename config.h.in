@@ -59,6 +59,11 @@
  */
 #undef USE_ANSI_PROTO
 
+/*
+ * have POSIX regcomp
+ */
+#undef HAVE_POSIX_REGCOMP
+
 /* Define if you have the <crypt.h> header file. */
 #undef HAVE_CRYPT_H
 

@@ -1,4 +1,4 @@
-.\" $Id: conserver.passwd.man,v 1.4 2001-08-04 20:54:25-07 bryan Exp $
+.\" $Id: conserver.passwd.man,v 1.5 2002-03-25 15:45:43-08 bryan Exp $
 .TH CONSERVER.PASSWD 5 "Local"
 .SH NAME
 conserver.passwd \- user access information for conserver(8)
@@ -45,6 +45,8 @@ a comma- and/or space-separated list of consoles
 to which the user is permitted to connect,
 or the string ``\fBany\fP'' to allow access to any console.
 These names must match the console names in the \fBconserver.cf\fP file.
+If regular expression support was compiled in using --with-regex, the
+names here are treated as regular expressions.
 .SH EXAMPLE
 .TP 30
 \fBmary:r71mXjfALB5Ak:any\fP

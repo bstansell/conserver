@@ -216,10 +216,10 @@ AC_SUBST(WRAPINCS)
 AC_ARG_WITH(libwrap,
     AC_HELP_STRING([--with-libwrap@<:@=PATH@:>@],
 	[Compile in libwrap (tcp_wrappers) support]),
-    [if test "$with_libwrap" != "no"; then
-	if test "$with_libwrap" != "yes"; then
-	    WRAPCPPFLAGS="-I$with_libwrap/include"
-	    WRAPLDFLAGS="-L$with_libwrap/lib"
+    [if test "$withval" != "no"; then
+	if test "$withval" != "yes"; then
+	    WRAPCPPFLAGS="-I$withval/include"
+	    WRAPLDFLAGS="-L$withval/lib"
 	else
 	    WRAPCPPFLAGS=""
 	    WRAPLDFLAGS=""
@@ -254,6 +254,40 @@ AC_ARG_WITH(libwrap,
 
 
 dnl ### Check for needed functions. ################################
+
+dnl The following basically stollen from the less-358 distribution, but
+dnl modified for my own purposes
+AC_MSG_CHECKING(for POSIX regex)
+AC_ARG_WITH(regex,
+    AC_HELP_STRING([--with-regex],
+	[Use regular expressions in conserver.passwd]),
+	[if test "$withval" = yes; then
+	    AC_TRY_RUN([
+		#include <sys/types.h>
+		#include <regex.h>
+		main() { regex_t r; regmatch_t rm; char *text = "xabcy";
+		if (regcomp(&r, "abc", 0)) exit(1);
+		if (regexec(&r, text, 1, &rm, 0)) exit(1);
+		if (rm.rm_so != 1) exit(1); /* check for correct offset */
+		exit(0); }
+	    ],have_posix_regex=yes,have_posix_regex=no,have_posix_regex=unknown)
+	    if test $have_posix_regex = yes; then
+	      AC_MSG_RESULT(yes)
+	      AC_DEFINE(HAVE_POSIX_REGCOMP)
+	    elif test $have_posix_regex = unknown; then
+		AC_TRY_LINK([
+		    #include <sys/types.h>
+		    #include <regex.h>],
+		[regex_t *r; regfree(r);],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_POSIX_REGCOMP))
+	    else
+	      AC_MSG_RESULT(no)
+	    fi
+	else
+	    AC_MSG_RESULT(no)
+	fi],[AC_MSG_RESULT(no)])
+
 AC_CHECK_FUNCS(getopt strerror getrlimit getsid setsid getuserattr setgroups tcgetpgrp tcsetpgrp tcgetattr tcsetattr tcsendbreak setpgrp getutent setttyent getspnam setlinebuf setvbuf ptsname grantpt unlockpt flock sigaction setsockopt getdtablesize putenv memset memcpy memcmp sysconf getpassphrase getlogin)
 AC_FUNC_SETPGRP
 

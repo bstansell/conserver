@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.29 2002-02-25 14:00:38-08 bryan Exp $
+ *  $Id: consent.h,v 5.30 2002-03-25 17:07:04-08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -81,6 +81,7 @@ typedef struct consent {	/* console information                  */
     CONSFILE *fdlog;		/* the local log file                   */
     int fdtty;			/* the port to talk to machine on       */
     int activitylog;		/* log attach/detach/bump               */
+    int breaklog;		/* log breaks sent                      */
     short int fup;		/* we setup this line?                  */
     short int fronly;		/* we can only read this console        */
     struct client *pCLon;	/* clients on this console              */
