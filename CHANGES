@@ -1,6 +1,22 @@
 				CHANGES
 				=======
 
+version 7.1.1 (Aug 4, 2001):
+	- Now using getlogin() for real username info - suggested by
+	  Dave Stuit <djs@gnac.com>
+	- gethostbyname() failure for a console now doesn't cause a
+	  shutdown - reported by Todd Stansell <todd@stansell.org>
+	- Shutdown via client -q/-Q fixed (broken in 7.1.0 because of
+	  master process fork() code)
+	- Password file parsing fixed to allow for empty passwords -
+	  allowing users to access conserver without a password prompt
+	- Both the password and configuration files no longer have
+	  line length limitations, they now support comments (`#' lines),
+	  and lines with leading whitespace are continuations of
+	  previous lines
+	- Client hostname/ip sometimes not printed - reported by Todd
+	  Stansell <todd@stansell.org>
+
 version 7.1.0 (Jul 26, 2001):
 	- Hostname in access list that began with a digit was treated as
 	  an IP address - only strings using [0-9./] are considered CIDR
@@ -206,5 +222,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.41 2001-07-26 16:42:26-07 bryan Exp $
+#  $Id: CHANGES,v 1.45 2001-08-04 21:09:12-07 bryan Exp $
 #

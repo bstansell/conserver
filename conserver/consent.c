@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.68 2001-07-26 11:48:43-07 bryan Exp $
+ *  $Id: consent.c,v 5.69 2001-07-29 22:28:40-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -688,9 +688,10 @@ ConsInit(pCE, pfdSet, useHostCache)
 #endif
 
 	if ((hp = gethostbyname(pCE->networkConsoleHost)) == NULL) {
-	    Error("gethostbyname(%s): %s", pCE->networkConsoleHost,
-		  hstrerror(h_errno));
-	    exit(EX_UNAVAILABLE);
+	    Error("gethostbyname(%s): %s: forcing down",
+		  pCE->networkConsoleHost, hstrerror(h_errno));
+	    ConsDown(pCE, pfdSet);
+	    return;
 	}
 #if HAVE_MEMCPY
 	(void)memcpy(&port.sin_addr.s_addr, hp->h_addr, hp->h_length);

@@ -1,5 +1,5 @@
 /*
- *  $Id: group.h,v 5.17 2001-07-11 12:48:01-07 bryan Exp $
+ *  $Id: group.h,v 5.18 2001-07-30 01:57:42-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -42,7 +42,6 @@ typedef struct grpent {		/* group info                           */
     int imembers;		/* number of consoles in this group     */
     CONSENT *pCElist;		/* list of consoles in this group       */
     CONSCLIENT *pCLall;		/* all clients to scan after select     */
-    char passwd[MAXPSWDLEN];	/* encrypted password for this group    */
 } GRPENT;
 
 

@@ -10,6 +10,13 @@ Upgrading?
     new features added to the client if you're considering *not*
     upgrading.
 
+    Version 7.1.1
+
+	- Both conserver.passwd and conserver.cf file parsing behaves
+	  the same now.  Both use leading whitespace as a continuation
+	  line indicator - if you have leading whitespace on a line
+	  (aside from comments) you probably should remove it.
+
     Version 7.1.0
 
 	- The client/server protocol has changed.  You *MUST* use a
@@ -112,5 +119,5 @@ Detailed Instructions
     - That's it!  Just start up the console server and enjoy!
 
 #
-#  $Id: INSTALL,v 1.17 2001-07-25 17:33:29-07 bryan Exp $
+#  $Id: INSTALL,v 1.18 2001-08-04 21:11:09-07 bryan Exp $
 #

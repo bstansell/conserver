@@ -1,4 +1,4 @@
-.\" $Id: conserver.cf.man,v 1.15 2001-07-26 10:23:16-07 bryan Exp $
+.\" $Id: conserver.cf.man,v 1.17 2001-08-04 20:54:25-07 bryan Exp $
 .\" @(#)constab.5 01/06/91 OSU CIS; Thomas A. Fine
 .TH CONSERVER.CF 5 "Local"
 .SH NAME
@@ -24,10 +24,14 @@ is the configuration file for
 .BR conserver (8).
 It is read once upon startup;
 modifications to the file take effect only upon restarting \fBconserver\fP.
-All lines starting with the pound sign `#' are considered comment lines.
-Blank lines are ignored.
 .PP
-The first section of the file has lines that are separated into
+Blank lines and comment lines (those beginning with a ``#'' and
+optional leading whitespace) are ignored.  Non-ignored lines
+beginning with whitespace are considered continuations of the
+previous line.  This allows you to span one logical line over
+many physical lines and insert comments wherever appropriate.
+.PP
+The first section of the file has logical lines that are separated into
 five colon-separated fields.  Leading and trailing white space in each
 field is ignored.
 .TP

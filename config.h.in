@@ -58,6 +58,9 @@
 /* Define if you have the `getdtablesize' function. */
 #undef HAVE_GETDTABLESIZE
 
+/* Define if you have the `getlogin' function. */
+#undef HAVE_GETLOGIN
+
 /* Define if you have the `getopt' function. */
 #undef HAVE_GETOPT
 

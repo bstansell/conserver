@@ -1,5 +1,5 @@
 /*
- *  $Id: util.h,v 1.8 2001-07-22 12:54:59-07 bryan Exp $
+ *  $Id: util.h,v 1.11 2001-08-04 18:33:17-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -17,6 +17,12 @@ enum consFileType {
     TLSSocket,
 #endif
 };
+
+typedef struct dynamicString {
+    char *string;
+    int used;
+    int allocated;
+} STRING;
 
 typedef struct consFile {
     /* Standard socket type stuff */
@@ -52,3 +58,5 @@ extern int fileSend();
 extern int fileFDNum();
 extern void OutOfMem();
 extern char *buildString();
+extern char *buildMyString();
+extern char *readLine();

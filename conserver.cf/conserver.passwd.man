@@ -1,4 +1,4 @@
-.\" $Id: conserver.passwd.man,v 1.2 2001-07-22 11:48:29-07 bryan Exp $
+.\" $Id: conserver.passwd.man,v 1.4 2001-08-04 20:54:25-07 bryan Exp $
 .TH CONSERVER.PASSWD 5 "Local"
 .SH NAME
 conserver.passwd \- user access information for conserver(8)
@@ -14,8 +14,15 @@ Upon each incoming client connection,
 so edits to the file take effect immediately.
 It reads only until the first \fIusername\fP match.
 .PP
-Each line consists of three colon-separated fields,
-as follows:
+Blank lines and comment lines (those beginning with a ``#'' and
+optional leading whitespace) are ignored.  Non-ignored lines
+beginning with whitespace are considered continuations of the
+previous line.  This allows you to span one logical line over
+many physical lines and insert comments wherever appropriate.
+.PP
+Each logical line consists of three colon-separated fields.
+Leading and trailing white space in each
+field is ignored.
 .TP
 .I username
 the login name of the authorized user,

@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.h,v 5.12 2001-07-06 17:11:47-07 bryan Exp $
+ *  $Id: readcfg.h,v 5.13 2001-07-30 01:57:27-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -49,3 +49,4 @@ extern int
   iLocal;			/* how many local consoles we have      */
 
 extern void ReadCfg();
+extern char *pruneSpace();

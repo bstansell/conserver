@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.60 2001-07-26 00:49:48-07 bryan Exp $
+ *  $Id: master.c,v 5.61 2001-07-30 01:58:00-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -217,7 +217,7 @@ Master(pRCUniq)
     unsigned char acIn[1024], acOut[BUFSIZ];
     struct sockaddr_in master_port, response_port;
     int true = 1;
-    int pid;
+    int pid, parentpid;
     char *ambiguous = (char *)0;
 
     /* set up signal handler */
@@ -357,6 +357,7 @@ Master(pRCUniq)
 #endif
 		continue;
 	    case 0:
+		parentpid = thepid;
 		thepid = getpid();
 		break;
 	}
@@ -365,24 +366,22 @@ Master(pRCUniq)
 	 * (port lookup, who, users, or quit)
 	 */
 	fileWrite(csocket, "ok\r\n", -1);
-	for (i = 0; i < sizeof(acIn); /* i+=nr */ ) {
-	    if (0 >=
-		(nr = fileRead(csocket, &acIn[i], sizeof(acIn) - 1 - i))) {
-		i = 0;
+	for (i = 0; i < sizeof(acIn) - 1; /* i+=nr */ ) {
+	    if ((nr =
+		 fileRead(csocket, &acIn[i], sizeof(acIn) - 1 - i)) <= 0) {
 		break;
 	    }
-	    i += nr;
-	    if ('\n' == acIn[i - 1]) {
-		acIn[i] = '\000';
-		--i;
-		break;
+	    for (j = 0; j < nr; j++, i++) {
+		if (acIn[i] == '\n') {
+		    acIn[i] = '\000';
+		    if (i > 0 && acIn[i - 1] == '\r')
+			acIn[--i] = '\000';
+		    break;
+		}
 	    }
-	}
-	if (i > 0 && '\n' == acIn[i - 1]) {
-	    acIn[--i] = '\000';
-	}
-	if (i > 0 && '\r' == acIn[i - 1]) {
-	    acIn[--i] = '\000';
+	    if (j != nr)
+		break;
+	    acIn[i] = '\000';
 	}
 	if (0 == i) {
 	    Error("lost connection");
@@ -422,11 +421,11 @@ Master(pRCUniq)
 		fileWrite(csocket, "must be trusted to terminate\r\n", -1);
 	    } else if ((struct passwd *)0 == (pwd = getpwuid(0))) {
 		fileWrite(csocket, "no root passwd?\r\n", -1);
-	    } else if (0 == CheckPass(pwd, (char *)0, pcArgs)) {
+	    } else if (0 == CheckPass(pwd, pcArgs)) {
 		fileWrite(csocket, "Sorry.\r\n", -1);
 	    } else {
 		fileWrite(csocket, "ok -- terminated\r\n", -1);
-		fSawQuit = 1;
+		kill(parentpid, SIGTERM);
 	    }
 	    (void)fileClose(csocket);
 	    exit(EX_OK);

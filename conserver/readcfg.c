@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.61 2001-07-23 00:45:49-07 bryan Exp $
+ *  $Id: readcfg.c,v 5.62 2001-08-04 18:33:54-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -216,7 +216,8 @@ ReadCfg(pcFile, fp)
     GRPENT *pGE;
     int iG, minG;
     int iLine;
-    unsigned char acIn[BUFSIZ];
+    unsigned char *acIn;
+    static STRING acInSave = { (char *)0, 0, 0 };
     char *acStart;
     GRPENT *pGEAll;
     CONSENT *pCE;
@@ -233,18 +234,14 @@ ReadCfg(pcFile, fp)
     ppRC = &pRCList;
     iLocal = 0;
 
+    buildMyString((char *)0, &acInSave);
     iG = minG = 0;
     iLine = 0;
-    while (fgets(acIn, sizeof(acIn) - 1, fp) != NULL) {
+    while ((acIn = readLine(fp, &acInSave, &iLine)) != (unsigned char *)0) {
 	char *pcLine, *pcMode, *pcLog, *pcRem, *pcStart, *pcMark;
-
-	++iLine;
 
 	acStart = pruneSpace(acIn);
 
-	if ('#' == acStart[0] || '\000' == acStart[0]) {
-	    continue;
-	}
 	if ('%' == acStart[0] && '%' == acStart[1] && '\000' == acStart[2]) {
 	    break;
 	}
@@ -459,18 +456,13 @@ ReadCfg(pcFile, fp)
      */
     iG = iAccess = 0;
     pACList = (ACCESS *) 0;
-    while (fgets(acIn, sizeof(acIn) - 1, fp) != NULL) {
+    while ((acIn = readLine(fp, &acInSave, &iLine)) != (unsigned char *)0) {
 	char *pcMach, *pcNext, *pcMem;
 	char cType;
 	int iLen;
 
-	++iLine;
-
 	acStart = pruneSpace(acIn);
 
-	if ('#' == acStart[0] || '\000' == acStart[0]) {
-	    continue;
-	}
 	if ('%' == acStart[0] && '%' == acStart[1] && '\000' == acStart[2]) {
 	    break;
 	}

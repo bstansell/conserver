@@ -1,5 +1,5 @@
 /*
- *  $Id: util.c,v 1.19 2001-07-26 00:50:17-07 bryan Exp $
+ *  $Id: util.c,v 1.26 2001-08-04 18:33:27-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -14,6 +14,7 @@
 #include <signal.h>
 #include <config.h>
 #include <sys/socket.h>
+#include <ctype.h>
 
 #include <compat.h>
 #include <port.h>
@@ -37,37 +38,135 @@ OutOfMem()
 }
 
 char *
-buildString(str)
+buildMyString(str, msg)
     const char *str;
+    STRING *msg;
 {
-    static char *msg = (char *)0;
-    static size_t cursize = 0;
-    static size_t msgsize = 0;
     int len;
 
     if ((char *)0 == str) {
-	if ((char *)0 != msg) {
-	    free(msg);
-	    msg = (char *)0;
-	    msgsize = cursize = 0;
-	}
-	return msg;
+	msg->used = 0;
+	if (msg->string != (char *)0)
+	    msg->string[0] = '\000';
+	Debug("buildMyString: reset", len);
+	return msg->string;
     }
-    len = strlen(str);
-    if (cursize + len >= msgsize) {
-	if (0 == msgsize) {
-	    msgsize = (len / 1024 + 1) * 1024 * sizeof(char);
-	    msg = (char *)calloc(1, msgsize);
+    len = strlen(str) + 1;
+    if (msg->used + len >= msg->allocated) {
+	if (0 == msg->allocated) {
+	    msg->allocated = (len / 1024 + 1) * 1024 * sizeof(char);
+	    msg->string = (char *)calloc(1, msg->allocated);
 	} else {
-	    msgsize += (len / 1024 + 1) * 1024 * sizeof(char);
-	    msg = (char *)realloc(msg, msgsize);
+	    msg->allocated += (len / 1024 + 1) * 1024 * sizeof(char);
+	    msg->string = (char *)realloc(msg->string, msg->allocated);
 	}
-	if ((char *)0 == msg)
+	Debug("buildMyString: tried allocating %lu bytes", msg->allocated);
+	if (msg->string == (char *)0)
 	    OutOfMem();
     }
-    strcat(msg, str);
-    cursize += len;
-    return msg;
+    strcat(msg->string, str);
+    msg->used += len;
+    Debug("buildMyString: added %d chars (%d/%d now)", len, msg->used,
+	  msg->allocated);
+    return msg->string;
+}
+
+char *
+buildString(str)
+    const char *str;
+{
+    static STRING msg = { (char *)0, 0, 0 };
+
+    return buildMyString(str, &msg);
+}
+
+char *
+readLine(fp, save, iLine)
+    FILE *fp;
+    STRING *save;
+    int *iLine;
+{
+    static char buf[1024];
+    char *wholeline = (char *)0;
+    char *ret;
+    int i, buflen, peek, commentCheck = 1, comment = 0;
+    static STRING bufstr = { (char *)0, 0, 0 };
+    static STRING wholestr = { (char *)0, 0, 0 };
+
+
+    peek = 0;
+    wholeline = (char *)0;
+    buildMyString((char *)0, &bufstr);
+    buildMyString((char *)0, &wholestr);
+    while (save->used || ((ret = fgets(buf, sizeof(buf), fp)) != (char *)0)
+	   || peek) {
+	/* If we have a previously saved line, use it instead */
+	if (save->used) {
+	    (void)strcpy(buf, save->string);
+	    buildMyString((char *)0, save);
+	}
+
+	if (peek) {
+	    /* End of file?  Never mind. */
+	    if (ret == (char *)0)
+		break;
+
+	    /* If we don't have a line continuation and we've seen
+	     * some worthy data
+	     */
+	    if (!isspace((int)buf[0]) && (wholeline != (char *)0)) {
+		buildMyString((char *)0, save);
+		buildMyString(buf, save);
+		break;
+	    }
+
+	    peek = 0;
+	}
+
+	if (commentCheck) {
+	    for (i = 0; buf[i] != '\000'; i++)
+		if (!isspace((int)buf[i]))
+		    break;
+	    if (buf[i] == '#') {
+		comment = 1;
+		commentCheck = 0;
+	    } else if (buf[i] != '\000') {
+		commentCheck = 0;
+	    }
+	}
+
+	/* Check for EOL */
+	buflen = strlen(buf);
+	if ((buflen >= 1) && (buf[buflen - 1] == '\n')) {
+	    (*iLine)++;		/* Finally have a whole line */
+	    if (comment == 0 && commentCheck == 0) {
+		/* Finish off the chunk without the \n */
+		buf[buflen - 1] = '\000';
+		buildMyString(buf, &bufstr);
+		wholeline = buildMyString(bufstr.string, &wholestr);
+	    }
+	    peek = 1;
+	    comment = 0;
+	    commentCheck = 1;
+	    buildMyString((char *)0, &bufstr);
+	} else {
+	    /* Save off the partial chunk */
+	    buildMyString(buf, &bufstr);
+	}
+    }
+
+    /* If we hit the EOF and weren't peeking ahead
+     * and it's not a comment
+     */
+    if (!peek && (ret == (char *)0) && (comment == 0) &&
+	(commentCheck == 0)) {
+	(*iLine)++;
+	wholeline = buildMyString(bufstr.string, &wholestr);
+    }
+
+    Debug("readLine: returning <%s>",
+	  (wholeline != (char *)0) ? wholeline : "<NULL>");
+    return wholeline;
 }
 
 void

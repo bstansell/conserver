@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.126 2001-07-26 11:50:13-07 bryan Exp $
+ *  $Id: group.c,v 5.132 2001-08-04 17:03:30-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -94,19 +94,14 @@ static sig_atomic_t fSawReOpen = 0, fSawReUp = 0, fSawMark =
  * given a special epass try it first.
  */
 int
-CheckPass(pwd, pcEPass, pcWord)
+CheckPass(pwd, pcWord)
     struct passwd *pwd;
-    char *pcEPass, *pcWord;
+    char *pcWord;
 {
 #if HAVE_GETSPNAM
     struct spwd *spwd;
 #endif
 
-    if ((char *)0 != pcEPass && '\000' != pcEPass[0]) {
-	if (0 == strcmp(pcEPass, crypt(pcWord, pcEPass))) {
-	    return 1;
-	}
-    }
 #if HAVE_GETSPNAM
     if ('x' == pwd->pw_passwd[0] && '\000' == pwd->pw_passwd[1]) {
 	if ((struct spwd *)0 != (spwd = getspnam(pwd->pw_name)))
@@ -430,8 +425,7 @@ ReapVirt(pGE, prinit)
 	    /* If someone was writing, they fall back to read-only */
 	    if (pCE->pCLwr != (CONSCLIENT *) 0) {
 		pCE->pCLwr->fwr = 0;
-		tagLogfile(pCE, "%s detached",
-			   pCE->pCLwr->acid);
+		tagLogfile(pCE, "%s detached", pCE->pCLwr->acid);
 		pCE->pCLwr = (CONSCLIENT *) 0;
 	    }
 
@@ -451,7 +445,7 @@ CheckPasswd(pCLServing, pw_string)
 {
     struct passwd *pwd;
     FILE *fp;
-    char buf[BUFSIZ];
+    int iLine = 0;
     char *server, *servers, *this_pw, *user;
     char username[64];		/* same as acid */
 #if HAVE_GETSPNAM
@@ -462,31 +456,46 @@ CheckPasswd(pCLServing, pw_string)
     if ((user = strchr(username, '@')))
 	*user = '\000';
 
-    if ((fp = fopen(pcPasswd, "r")) == NULL) {
+    if ((fp = fopen(pcPasswd, "r")) == (FILE *) 0) {
 	Info("Cannot open passwd file %s: %s", pcPasswd, strerror(errno));
 
 	if ((struct passwd *)0 == (pwd = getpwuid(0))) {
 	    fileWrite(pCLServing->fd, "no root passwd?\r\n", -1);
 	    return 0;
 	}
-	if (0 != CheckPass(pwd, pw_string, pCLServing->accmd)) {
-	    if (fVerbose) {
-		Info("User %s logging into server %s via root or console passwd", pCLServing->acid, pCLServing->pCEwant->server);
-	    }
+	if (0 != CheckPass(pwd, pw_string)) {
+	    if (fVerbose)
+		Info("User %s logging into server %s via root passwd",
+		     pCLServing->acid, pCLServing->pCEwant->server);
 	    return 1;
 	}
     } else {
-	while (fgets(buf, sizeof(buf), fp) != NULL) {
-	    user = strtok(buf, ":\n");
-	    if (user == NULL)
+	char *wholeLine;
+	STRING saveLine = { (char *)0, 0, 0 };
+
+	while ((wholeLine = readLine(fp, &saveLine, &iLine)) != (char *)0) {
+	    pruneSpace(wholeLine);
+	    /*printf("whole=<%s>\n", wholeLine); */
+	    if (wholeLine[0] == '\000')
 		continue;
-	    if (!
-		(strcmp(user, "*any*") == 0 ||
-		 strcmp(user, username) == 0))
+
+	    if ((char *)0 == (this_pw = strchr(wholeLine, ':')) ||
+		(char *)0 == (servers = strchr(this_pw + 1, ':'))) {
+		Error("%s(%d) bad password line `%s'", pcPasswd, iLine,
+		      wholeLine);
 		continue;
-	    this_pw = strtok(NULL, ":\n");
+	    }
+	    *this_pw++ = '\000';
+	    *servers++ = '\000';
+	    user = pruneSpace(wholeLine);
+	    this_pw = pruneSpace(this_pw);
+	    servers = pruneSpace(servers);
+
+	    if (strcmp(user, "*any*") != 0 && strcmp(user, username) != 0)
+		continue;
+
 	    if (strcmp(this_pw, "*passwd*") == 0) {
-		this_pw = NULL;
+		this_pw = (char *)0;
 		if ((struct passwd *)0 != (pwd = getpwnam(username))) {
 #if HAVE_GETSPNAM
 		    if ('x' == pwd->pw_passwd[0] &&
@@ -503,19 +512,23 @@ CheckPasswd(pCLServing, pw_string)
 #endif
 		}
 	    }
-	    if (this_pw == NULL)
-		break;
-	    servers = strtok(NULL, ":\n");
-	    if (servers == NULL)
+	    if (this_pw == (char *)0)
 		break;
 
 	    /*
-	       printf("Got servers <%s> passwd <%s> user <%s>, want <%s>\n",
-	       servers, this_pw, user,
-	       pCLServing->pCEwant->server);
+	       printf
+	       ("Got servers <%s> passwd <%s> user <%s>, want <%s>\n",
+	       servers, this_pw, user, pCLServing->pCEwant->server);
 	     */
 
-	    if (strcmp(this_pw, crypt(pCLServing->accmd, this_pw)) == 0) {
+	    /* If one is empty and the other isn't, instant failure */
+	    if ((*this_pw == '\000' && *pw_string != '\000') ||
+		(*this_pw != '\000' && *pw_string == '\000')) {
+		break;
+	    }
+
+	    if ((*this_pw == '\000' && *pw_string == '\000') ||
+		(strcmp(this_pw, crypt(pw_string, this_pw)) == 0)) {
 		server = strtok(servers, ", \t\n");
 		while (server) {	/* For each server */
 		    if (strcmp(server, "any") == 0) {
@@ -555,8 +568,7 @@ CheckPasswd(pCLServing, pw_string)
 		    server = strtok(NULL, ", \t\n");
 		}
 	    }
-	    fclose(fp);
-	    return 0;
+	    break;
 	}
 	fclose(fp);
     }
@@ -1025,8 +1037,7 @@ Kiddie(pGE, sfd)
 			    for (j = 0;
 				 pCLServing->icursor <
 				 (sizeof(pCLServing->acid) - 1) &&
-				 pCLServing->peername[iConsole] !=
-				 '\000';) {
+				 pCLServing->peername[j] != '\000';) {
 				pCLServing->acid[pCLServing->icursor++] =
 				    pCLServing->peername[j++];
 			    }
@@ -1095,7 +1106,8 @@ Kiddie(pGE, sfd)
 			    goto drop;
 			}
 
-			if ('t' == pCLServing->caccess) {
+			if (('t' == pCLServing->caccess) ||
+			    (0 != CheckPasswd(pCLServing, ""))) {
 			    goto shift_console;
 			}
 			fileWrite(pCLServing->fd, "passwd:\r\n", -1);
@@ -1126,7 +1138,8 @@ Kiddie(pGE, sfd)
 			}
 			pCLServing->icursor = 0;
 
-			if (0 == CheckPasswd(pCLServing, pGE->passwd)) {
+			if (0 ==
+			    CheckPasswd(pCLServing, pCLServing->accmd)) {
 			    fileWrite(pCLServing->fd, "Sorry.\r\n", -1);
 			    Info("%s: %s: bad passwd",
 				 pCLServing->pCEwant->server,

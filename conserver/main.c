@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.75 2001-07-26 11:49:41-07 bryan Exp $
+ *  $Id: main.c,v 5.78 2001-07-27 12:34:48-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -284,6 +284,9 @@ main(argc, argv)
     extern char *optarg;
     REMOTE *pRCUniq;		/* list of uniq console servers         */
     struct passwd *pwd;
+    char *origuser = (char *)0;
+    char *curuser = (char *)0;
+    int curuid;
 
     outputPid = 1;		/* make sure stuff has the pid */
 
@@ -417,10 +420,24 @@ main(argc, argv)
     }
 
     Info("%s", THIS_VERSION);
-    if ((struct passwd *)0 == (pwd = getpwuid(getuid())))
-	Info("Started by uid %d at %s", getuid(), strtime(NULL));
+
+#if HAVE_GETLOGIN
+    origuser = getlogin();
+#endif
+    curuid = getuid();
+    if ((struct passwd *)0 != (pwd = getpwuid(curuid)))
+	curuser = pwd->pw_name;
+
+    if (curuser == (char *)0)
+	if (origuser == (char *)0)
+	    Info("Started as uid %d by uid %d at %s", curuid, curuid,
+		 strtime(NULL));
+	else
+	    Info("Started as uid %d by `%s' at %s", curuid, origuser,
+		 strtime(NULL));
     else
-	Info("Started by `%s' at %s", pwd->pw_name, strtime(NULL));
+	Info("Started as `%s' by `%s' at %s", curuser,
+	     (origuser == (char *)0) ? curuser : origuser, strtime(NULL));
 
 #if HAVE_GETSPNAM
     if (0 != geteuid()) {
