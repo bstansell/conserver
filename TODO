@@ -9,6 +9,9 @@ Bryan Stansell
 
 ---------------------------------------------------------------------------
 
+- Singular logging so that swatch/logsurfer can watch for errors across
+  the board - unloved output comes close
+
 - Telnet protocol should be improved
     - Not even RFC 854 compliant
     - Data sent to terminal server not encapsulated
@@ -47,7 +50,9 @@ Bryan Stansell
 
 - "listen" capability (watch all/multiple consoles)
 
-- alternate break (^ecl2?)
+- alternate break (^ecl2) sends 'CR-~-^B' sequence (solaris 8 default)
+    - probably should be able to redefine it like the escape sequence
+    - to support older alt-break code it would need .5 second delays
 
 - aliases for console entries
 
@@ -79,11 +84,33 @@ Bryan Stansell
 
 - logfile rotation based on size
 
+- automatic log rotation in general : Egan Ford <egan@us.ibm.com>
+
 - website docs on serial port configs
     - PCs (solaris x86, linux, *bsd, etc)
     - lilo
     - bios support
 
+- suggestions by Trevor Fiatal <trevor@seven.com>
+    - include server hostname on 'console -x' output
+    - non-interactively be able to
+	- disconnect a single user-to-port session
+	- disconnect all sessions to a given port
+	- disconnect all sessions registered to a particular user
+    - non-interactively be able to send messages to
+	- all sessions open by a particular user
+	  console -t user "Time to go home."
+	- a particular user-session
+	  console -t user@managed-host "Please disconnect from this host."
+	- all users on a given host
+	  console -t @managed-host "I am taking over this host."
+
+- support 2 stop bits (as well as other stty-type options in console
+  definitions) : Kelly Setzer <setzer@placemark.com>
+
+- try to reopen downed console (from loss of carrier, maybe other
+  things) once instead of leaving it down.
+
 #
-#  $Id: TODO,v 1.12 2001-07-30 23:28:56-07 bryan Exp $
+#  $Id: TODO,v 1.15 2001-10-15 17:19:17-07 bryan Exp $
 #

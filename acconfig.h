@@ -47,3 +47,8 @@
  * pidfile to write to
  */
 #undef PIDFILE
+
+/*
+ * use tcp_wrappers libwrap
+ */
+#undef USE_LIBWRAP

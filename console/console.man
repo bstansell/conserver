@@ -1,4 +1,4 @@
-.\" $Id: console.man,v 1.11 2001-07-26 10:25:24-07 bryan Exp $
+.\" $Id: console.man,v 1.12 2001-10-15 22:46:09-07 bryan Exp $
 .TH CONSOLE 1 "Local"
 .SH NAME
 console \- console server client program
@@ -189,6 +189,9 @@ toggle logging on/off
 .IP l1
 send a 3-second serial line break (might halt a Sun)
 ("ell" then "one", not the L1 key)
+.IP l2
+send the alternate break sequence (<CR>, tilde, CTRL-B)
+(might halt a Sun)
 .IP o
 close (if open) and reopen the line (to clear errors (silo overflows))
 and the log file

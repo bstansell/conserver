@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.32 2001-07-23 00:54:11-07 bryan Exp $
+ *  $Id: client.c,v 5.34 2001-10-15 17:24:16-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -213,6 +213,7 @@ static HELP aHLTable[] = {
     {WHEN_ALWAYS, "g    group info"},
     {WHEN_ATTACH, "L    toggle logging on/off"},
     {WHEN_ATTACH, "l1   send break (halt host!)"},
+    {WHEN_ATTACH, "l2   send alt. break (halt host!)"},
     {WHEN_ALWAYS, "o    (re)open the tty and log file"},
     {WHEN_ALWAYS, "p    replay the last 60 lines"},
     {WHEN_ALWAYS, "r    replay the last 20 lines"},

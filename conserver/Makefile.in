@@ -17,9 +17,9 @@ MKDIR = @MKDIR@
 CC	= @CC@
 CFLAGS	= @CFLAGS@ # -DPUCC -DSUN5
 DEFS	= @DEFS@ -DSYSCONFDIR=\"$(sysconfdir)\"
-CPPFLAGS = -I.. -I$(top_srcdir) -I$(srcdir) $(DEFS) @CPPFLAGS@
+CPPFLAGS = -I.. -I$(top_srcdir) -I$(srcdir) $(DEFS) @CPPFLAGS@ @WRAPINCS@
 LDFLAGS	= @LDFLAGS@
-LIBS	= @LIBS@
+LIBS	= @LIBS@ @WRAPLIBS@
 @SET_MAKE@
 
 

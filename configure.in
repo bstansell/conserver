@@ -14,7 +14,7 @@ AC_SUBST(MKDIR)
 dnl ### Custom settings. ############################################
 AC_MSG_CHECKING(for port number specification)
 AC_ARG_WITH(port,
-	AC_HELP_STRING([--with-port=PORT],[Specify port number [[conserver]]]),
+	AC_HELP_STRING([--with-port=PORT],[Specify port number @<:@conserver@:>@]),
 	[if test "$withval" != yes -a "$withval" != no; then
 		AC_DEFINE_UNQUOTED(DEFPORT, "$withval")
 		AC_MSG_RESULT(port '$withval')
@@ -27,7 +27,7 @@ AC_ARG_WITH(port,
 
 AC_MSG_CHECKING(for secondary channel base port)
 AC_ARG_WITH(base,
-	AC_HELP_STRING([--with-base=PORT], [Base port for secondary channel [[0]]]),
+	AC_HELP_STRING([--with-base=PORT], [Base port for secondary channel @<:@0@:>@]),
 	[if test "$withval" != yes -a "$withval" != no; then
 		AC_DEFINE_UNQUOTED(DEFBASEPORT, "$withval")
 		AC_MSG_RESULT(port '$withval')
@@ -40,7 +40,7 @@ AC_ARG_WITH(base,
 
 AC_MSG_CHECKING(for master conserver hostname)
 AC_ARG_WITH(master,
-	AC_HELP_STRING([--with-master=MASTER],[Specify master server hostname [[console]]]),
+	AC_HELP_STRING([--with-master=MASTER],[Specify master server hostname @<:@console@:>@]),
 	[if test "$withval" != yes; then
 		AC_DEFINE_UNQUOTED(MASTERHOST, "$withval")
 		AC_MSG_RESULT('$withval')
@@ -53,7 +53,7 @@ AC_ARG_WITH(master,
 
 AC_MSG_CHECKING(for configuration filename)
 AC_ARG_WITH(cffile,
-	AC_HELP_STRING([--with-cffile=CFFILE],[Specify config filename [[conserver.cf]]]),
+	AC_HELP_STRING([--with-cffile=CFFILE],[Specify config filename @<:@conserver.cf@:>@]),
 	[if test "$withval" != yes; then
 		AC_DEFINE_UNQUOTED(CONFIGFILE, "$withval")
 		AC_MSG_RESULT('$withval')
@@ -66,7 +66,7 @@ AC_ARG_WITH(cffile,
 
 AC_MSG_CHECKING(for password filename)
 AC_ARG_WITH(pwdfile,
-	AC_HELP_STRING([--with-pwdfile=PWDFILE],[Specify password filename [[conserver.passwd]]]),
+	AC_HELP_STRING([--with-pwdfile=PWDFILE],[Specify password filename @<:@conserver.passwd@:>@]),
 	[if test "$withval" != yes; then
 		AC_DEFINE_UNQUOTED(PASSWDFILE, "$withval")
 		AC_MSG_RESULT('$withval')
@@ -79,7 +79,7 @@ AC_ARG_WITH(pwdfile,
 
 AC_MSG_CHECKING(for log filename)
 AC_ARG_WITH(logfile,
-	AC_HELP_STRING([--with-logfile=LOGFILE],[Specify log filename [[/var/log/conserver]]]),
+	AC_HELP_STRING([--with-logfile=LOGFILE],[Specify log filename @<:@/var/log/conserver@:>@]),
 	[if test "$withval" != yes; then
 		AC_DEFINE_UNQUOTED(LOGFILEPATH, "$withval")
 		AC_MSG_RESULT('$withval')
@@ -92,7 +92,7 @@ AC_ARG_WITH(logfile,
 
 AC_MSG_CHECKING(for PID filename)
 AC_ARG_WITH(pidfile,
-	AC_HELP_STRING([--with-pidfile=PIDFILE],[Specify PID filepath [[/var/run/conserver.pid]]]),
+	AC_HELP_STRING([--with-pidfile=PIDFILE],[Specify PID filepath @<:@/var/run/conserver.pid@:>@]),
 	[if test "$withval" != yes; then
 		AC_DEFINE_UNQUOTED(PIDFILE, "$withval")
 		AC_MSG_RESULT('$withval')
@@ -105,7 +105,7 @@ AC_ARG_WITH(pidfile,
 
 AC_MSG_CHECKING(for MAXMEMB setting)
 AC_ARG_WITH(maxmemb,
-	AC_HELP_STRING([--with-maxmemb=MAXMEMB],[Specify maximum consoles per process [[16]]]),
+	AC_HELP_STRING([--with-maxmemb=MAXMEMB],[Specify maximum consoles per process @<:@16@:>@]),
 	[if test "$withval" != yes; then
 		AC_DEFINE_UNQUOTED(MAXMEMB, $withval)
 		AC_MSG_RESULT($withval)
@@ -118,7 +118,7 @@ AC_ARG_WITH(maxmemb,
 
 AC_MSG_CHECKING(for MAXGRP setting)
 AC_ARG_WITH(maxgrp,
-	AC_HELP_STRING([--with-maxgrp=MAXGRP],[Specify maximum number of processes [[32]]]),
+	AC_HELP_STRING([--with-maxgrp=MAXGRP],[Specify maximum number of processes @<:@32@:>@]),
 	[if test "$withval" != yes; then
 		AC_DEFINE_UNQUOTED(MAXGRP, $withval)
 		AC_MSG_RESULT($withval)
@@ -131,7 +131,7 @@ AC_ARG_WITH(maxgrp,
 
 AC_MSG_CHECKING(for connect() timeout)
 AC_ARG_WITH(timeout,
-	AC_HELP_STRING([--with-timeout=TIMEOUT],[Specify connect() timeout in seconds [[10]]]),
+	AC_HELP_STRING([--with-timeout=TIMEOUT],[Specify connect() timeout in seconds @<:@10@:>@]),
 	[if test "$withval" -gt 0 -o "$withval" -lt 300; then
 		AC_DEFINE_UNQUOTED(CONNECTTIMEOUT, $withval)
 		AC_MSG_RESULT($withval)
@@ -212,9 +212,50 @@ fi
 
 
 dnl ### Check for libraries. #######################################
-AC_CHECK_LIB(socket,socket)
-AC_CHECK_LIB(nsl,gethostbyname)
-AC_CHECK_LIB(crypt,crypt)
+AC_SEARCH_LIBS(socket,socket)
+AC_SEARCH_LIBS(gethostbyname,nsl)
+AC_SEARCH_LIBS(crypt,crypt)
+
+AC_SUBST(WRAPLIBS)
+AC_SUBST(WRAPINCS)
+AC_ARG_WITH(libwrap,
+    AC_HELP_STRING([--with-libwrap@<:@=PATH@:>@],
+	[Compile in libwrap (tcp_wrappers) support]),
+    [if test "$with_libwrap" != "no"; then
+	if test "$with_libwrap" != "yes"; then
+	    WRAPCPPFLAGS="-I$with_libwrap/include"
+	    WRAPLDFLAGS="-L$with_libwrap/lib"
+	else
+	    WRAPCPPFLAGS=""
+	    WRAPLDFLAGS=""
+	fi
+
+	oCPPFLAGS="$CPPFLAGS"
+	oLDFLAGS="$LDFLAGS"
+	oLIBS="$LIBS"
+
+	CPPFLAGS="$CPPFLAGS $WRAPCPPFLAGS"
+	LDFLAGS="$LDFLAGS $WRAPLDFLAGS"
+
+	AC_MSG_CHECKING(for TCP wrappers header tcpd.h)
+	AC_CHECK_HEADER(tcpd.h,
+	    [LIBS="$LIBS -lwrap"
+	    AC_MSG_CHECKING(for TCP wrappers library -lwrap)
+	    AC_TRY_LINK([#include <tcpd.h>
+		int allow_severity = 0;
+		int deny_severity  = 0;
+		],[hosts_access((void *)0)],
+		[AC_MSG_RESULT(yes)
+		AC_DEFINE(USE_LIBWRAP)
+		WRAPLIBS="$WRAPLDFLAGS -lwrap"
+		WRAPINCS="$WRAPCPPFLAGS"],
+		[AC_MSG_RESULT(no)])],)
+
+	LIBS="$oLIBS"
+	CPPFLAGS="$oCPPFLAGS"
+	LDFLAGS="$oLDFLAGS"
+    fi]
+)
 
 
 dnl ### Check for needed functions. ################################

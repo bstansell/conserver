@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.132 2001-08-04 17:03:30-07 bryan Exp $
+ *  $Id: group.c,v 5.138 2001-10-15 17:17:27-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -71,6 +71,11 @@
 #define TELCMDS
 #define TELOPTS
 #include <arpa/telnet.h>
+
+#if defined(USE_LIBWRAP)
+#include <syslog.h>
+#include <tcpd.h>
+#endif
 
 #include <compat.h>
 #include <port.h>
@@ -285,15 +290,19 @@ writeLog(pCE, s, len)
     }
     acOut[0] = '\000';
     for (j = 0; j < len; j++) {
-	if (s[j] == '\n') {
-	    Debug("Found newline for %s (nextMark=%d, mark=%d)",
-		  pCE->server, pCE->nextMark, pCE->mark);
-	    (void)fileWrite(pCE->fdlog, s + i, j - i + 1);
-	    i = j + 1;
+	if (pCE->nextMark == 0) {
+	    (void)fileWrite(pCE->fdlog, s + i, j - i);
+	    i = j;
 	    if (acOut[0] == '\000') {
 		sprintf(acOut, "[%s]", strtime(NULL));
 	    }
 	    (void)fileWrite(pCE->fdlog, acOut, -1);
+	    pCE->nextMark = pCE->mark;
+	}
+	if (s[j] == '\n') {
+	    Debug("Found newline for %s (nextMark=%d, mark=%d)",
+		  pCE->server, pCE->nextMark, pCE->mark);
+	    pCE->nextMark++;
 	}
     }
     if (i < j) {
@@ -775,9 +784,9 @@ Kiddie(pGE, sfd)
 		 read(pCEServing->fdtty, acInOrig,
 		      sizeof(acInOrig))) <= 0) {
 		/* carrier lost */
-		Error("lost carrier on %s (%s)!", pCEServing->server,
+		Error("lost carrier on %s (%s)! [%s]", pCEServing->server,
 		      pCEServing->fvirtual ? pCEServing->
-		      acslave : pCEServing->dfile);
+		      acslave : pCEServing->dfile, strtime(NULL));
 
 		/* If someone was writing, they fall back to read-only */
 		if (pCEServing->pCLwr != (CONSCLIENT *) 0) {
@@ -1295,7 +1304,7 @@ Kiddie(pGE, sfd)
 
 		    case S_HALT1:	/* halt sequence? */
 			pCLServing->iState = S_NORMAL;
-			if (acIn[i] != '1') {
+			if (acIn[i] != '1' && acIn[i] != '2') {
 			    fileWrite(pCLServing->fd, "aborted]\r\n", -1);
 			    continue;
 			}
@@ -1303,11 +1312,21 @@ Kiddie(pGE, sfd)
 			/* send a break
 			 */
 			if (pCEServing->isNetworkConsole) {
-			    char haltseq[2];
+			    if (acIn[i] == 1) {
+				char haltseq[2];
 
-			    haltseq[0] = IAC;
-			    haltseq[1] = BREAK;
-			    write(pCEServing->fdtty, haltseq, 2);
+				haltseq[0] = IAC;
+				haltseq[1] = BREAK;
+				write(pCEServing->fdtty, haltseq, 2);
+			    } else {
+				char haltseq[3];
+
+				/* The default Solaris 8 `alternate' break... */
+				haltseq[0] = 0x0D;	/* CR     */
+				haltseq[1] = 0x7E;	/* Tilde  */
+				haltseq[2] = 0x02;	/* Ctrl-B */
+				write(pCEServing->fdtty, haltseq, 3);
+			    }
 			} else {
 #if HAVE_TERMIO_H
 			    if (-1 ==
@@ -1647,7 +1666,7 @@ Kiddie(pGE, sfd)
 				    if (&CECtl == pCL->pCEto)
 					continue;
 				    sprintf(acOut,
-					    " %-24.24s %c %-7.7s %5s %.32s\r\n",
+					    " %-32.32s %c %-7.7s %5s %s\r\n",
 					    pCL->acid,
 					    pCL == pCLServing ? '*' : ' ',
 					    pCL->fcon ? (pCL->
@@ -1838,7 +1857,7 @@ Kiddie(pGE, sfd)
 				     (CONSCLIENT *) 0 != pCL;
 				     pCL = pCL->pCLnext) {
 				    sprintf(acOut,
-					    " %-24.24s %c %-7.7s %5s %s\r\n",
+					    " %-32.32s %c %-7.7s %5s %s\r\n",
 					    pCL->acid,
 					    pCL == pCLServing ? '*' : ' ',
 					    pCL->fcon ? (pCL->
@@ -2017,12 +2036,26 @@ Kiddie(pGE, sfd)
 	    Error("accept: %s", strerror(errno));
 	    continue;
 	}
+
 	pCLFree->fd = fileOpenFD(fd, simpleSocket);
 	if (pCLFree->fd < 0) {
 	    Error("fileOpenFD: %s", strerror(errno));
 	    close(fd);
 	    continue;
 	}
+#if defined(USE_LIBWRAP)
+	{
+	    struct request_info request;
+	    request_init(&request, RQ_DAEMON, progname, RQ_FILE, fd, 0);
+	    fromhost(&request);
+	    if (!hosts_access(&request)) {
+		fileWrite(pCLFree->fd, "access from your host refused\r\n",
+			  -1);
+		(void)fileClose(pCLFree->fd);
+		continue;
+	    }
+	}
+#endif
 
 	/* We use this information to verify                    (ksb)
 	 * the source machine as being local.

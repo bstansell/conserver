@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.70 2001-07-26 11:03:32-07 bryan Exp $
+ *  $Id: console.c,v 5.71 2001-10-10 11:30:17-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -386,7 +386,8 @@ c2raw()
     n_tio = o_tio;
     n_tio.c_iflag &= ~(INLCR | IGNCR | ICRNL | IUCLC | IXON);
     n_tio.c_oflag &= ~OPOST;
-    n_tio.c_lflag &= ~(ICANON | ISIG | ECHO | ECHOE | ECHOK | ECHONL | IEXTEN);
+    n_tio.c_lflag &=
+	~(ICANON | ISIG | ECHO | ECHOE | ECHOK | ECHONL | IEXTEN);
     n_tio.c_cc[VMIN] = 1;
     n_tio.c_cc[VTIME] = 0;
     if (0 != ioctl(0, TCSETAF, &n_tio)) {
@@ -822,7 +823,8 @@ CallUp(s, pcMaster, pcMach, pcHow, pcUser)
 	(void)ReadReply(s, acMesg, sizeof(acMesg), (char *)0);
 	if (0 == strcmp(acMesg, "passwd:")) {
 	    char pass[256];
-	    (void)sprintf(acMesg, "Enter %s's password:", pcUser);
+	    (void)sprintf(acMesg, "Enter %s@%s's password:", pcUser,
+			  pcMaster);
 #if defined(HAVE_GETPASSPHRASE)
 	    (void)strcpy(pass, getpassphrase(acMesg));
 #else

@@ -49,6 +49,11 @@
  */
 #undef PIDFILE
 
+/*
+ * use tcp_wrappers libwrap
+ */
+#undef USE_LIBWRAP
+
 /* Define if you have the <crypt.h> header file. */
 #undef HAVE_CRYPT_H
 
@@ -90,15 +95,6 @@
 
 /* Define if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
-
-/* Define if you have the `crypt' library (-lcrypt). */
-#undef HAVE_LIBCRYPT
-
-/* Define if you have the `nsl' library (-lnsl). */
-#undef HAVE_LIBNSL
-
-/* Define if you have the `socket' library (-lsocket). */
-#undef HAVE_LIBSOCKET
 
 /* Define if you have the `memcmp' function. */
 #undef HAVE_MEMCMP

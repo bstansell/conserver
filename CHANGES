@@ -1,6 +1,24 @@
 				CHANGES
 				=======
 
+version 7.1.2 (Oct 15, 2001):
+	- fixed line-based timestamp code - reported by Benn Oshrin
+	  <benno@columbia.edu>
+	- tcp_wrappers support (--with-libwrap)
+	- CLOCAL bit set for local ports - patch by Egan Ford
+	  <egan@us.ibm.com>
+	- timestamp added to 'lost carrier' error - suggested by Todd
+	  Stansell <todd@stansell.org>
+	- Alternate break sequence for Solaris 8 is available as ^ecl2
+	  escape sequence - patch by William Charles
+	  <william.charles@db.com>
+    The following suggested by Trevor Fiatal <trevor@seven.com>
+	- Widened username field of 'console -w' output
+	- Added server hostname to password entry prompt
+	- AC_CHECK_LIB replaced with AC_SEARCH_LIBS in configure.in so
+	  that irrelavent (and sometimes incompatible) libraries aren't
+	  linked in
+
 version 7.1.1 (Aug 4, 2001):
 	- Now using getlogin() for real username info - suggested by
 	  Dave Stuit <djs@gnac.com>
@@ -222,5 +240,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.45 2001-08-04 21:09:12-07 bryan Exp $
+#  $Id: CHANGES,v 1.48 2001-10-15 22:37:08-07 bryan Exp $
 #

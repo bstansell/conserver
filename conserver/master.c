@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.61 2001-07-30 01:58:00-07 bryan Exp $
+ *  $Id: master.c,v 5.63 2001-10-10 11:52:57-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -41,6 +41,13 @@
 #include <ctype.h>
 #include <signal.h>
 #include <pwd.h>
+
+#if defined(USE_LIBWRAP)
+#include <syslog.h>
+#include <tcpd.h>
+int allow_severity = LOG_INFO;
+int deny_severity = LOG_WARNING;
+#endif
 
 #include <compat.h>
 #include <port.h>
@@ -304,11 +311,25 @@ Master(pRCUniq)
 	    Error("accept: %s", strerror(errno));
 	    continue;
 	}
+
 	if ((CONSFILE *) 0 == (csocket = fileOpenFD(cfd, simpleSocket))) {
 	    Error("fileOpenFD: %s", strerror(errno));
 	    close(cfd);
 	    continue;
 	}
+#if defined(USE_LIBWRAP)
+	{
+	    struct request_info request;
+	    request_init(&request, RQ_DAEMON, progname, RQ_FILE, cfd, 0);
+	    fromhost(&request);
+	    if (!hosts_access(&request)) {
+		fileWrite(csocket, "access from your host refused\r\n",
+			  -1);
+		(void)fileClose(csocket);
+		continue;
+	    }
+	}
+#endif
 
 	so = sizeof(in_port);
 	if (-1 ==

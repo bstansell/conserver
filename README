@@ -17,7 +17,18 @@ Downloading
 
     The latest version can be found at http://www.conserver.com/
 
+Contributions
+
+    Contributions distributed with the code can be found in the contrib
+    subdirectory.  Other tools that complement conserver are listed
+    below.
+
+    Zinc
+    ----
+    According to the website, Zinc is a console log output management
+    program.  For more information, visit the website at:
+    http://www.columbia.edu/acis/sy/unixdev/zinc
 
 #
-#  $Id: README,v 1.16 2001-06-15 04:34:31-07 bryan Exp $
+#  $Id: README,v 1.17 2001-10-15 16:58:45-07 bryan Exp $
 #

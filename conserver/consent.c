@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.69 2001-07-29 22:28:40-07 bryan Exp $
+ *  $Id: consent.c,v 5.70 2001-08-28 15:23:04-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000-2001
  *
@@ -197,7 +197,10 @@ TtyDev(pCE)
      */
     termp.c_iflag = IXON | IXOFF | BRKINT;
     termp.c_oflag = 0;
-    termp.c_cflag = CREAD;
+    /* CLOCAL suggested by egan@us.ibm.com
+     * carrier transitions result in dropped consoles otherwise
+     */
+    termp.c_cflag = CREAD | CLOCAL;
     termp.c_cflag |= pCE->pparity->iset;
     termp.c_lflag = 0;
     /*
