@@ -1,5 +1,5 @@
 /*
- *  $Id: convert.c,v 1.9 2004/05/21 04:15:17 bryan Exp $
+ *  $Id: convert.c,v 1.10 2004/05/28 01:08:28 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -40,6 +40,12 @@
 #include <readcfg.h>
 #include <master.h>
 #include <main.h>
+
+#if defined(USE_LIBWRAP)
+/* we don't use it...but we link to it */
+int allow_severity;
+int deny_severity;
+#endif
 
 
 SECTION sections[] = {

@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.83 2004/04/13 18:12:00 bryan Exp $
+ *  $Id: client.c,v 5.84 2004/05/28 16:39:51 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -514,6 +514,7 @@ ClientAccessOk(pCL)
 # if defined(USE_LIBWRAP)
     {
 	struct request_info request;
+	CONDDEBUG((1, "ClientAccessOk(): doing tcpwrappers check"));
 	request_init(&request, RQ_DAEMON, progname, RQ_FILE, cfd, 0);
 	fromhost(&request);
 	if (!hosts_access(&request)) {

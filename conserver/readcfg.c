@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.176 2004/05/25 00:38:15 bryan Exp $
+ *  $Id: readcfg.c,v 5.177 2004/05/27 23:40:36 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -24,8 +24,6 @@
  */
 
 #include <compat.h>
-
-#include <grp.h>
 
 #include <cutil.h>
 #include <consent.h>
@@ -148,17 +146,30 @@ ConsentAddUser(ppCU, id, not)
 #endif
 {
     CONSENTUSERS *u = (CONSENTUSERS *)0;
+    CONSENTUSERS *p = (CONSENTUSERS *)0;
 
-    if ((u = ConsentFindUser(*ppCU, id)) == (CONSENTUSERS *)0) {
-	if ((u = (CONSENTUSERS *)calloc(1, sizeof(CONSENTUSERS)))
-	    == (CONSENTUSERS *)0)
-	    OutOfMem();
-	u->user = AddUserList(id);
-	u->not = not;
-	u->next = *ppCU;
-	*ppCU = u;
-    } else
-	u->not = not;
+    for (u = *ppCU; u != (CONSENTUSERS *)0; u = u->next) {
+	if (strcmp(u->user->name, id) == 0) {
+	    u->not = not;
+	    /* at head of list already? */
+	    if (p != (CONSENTUSERS *)0) {
+		/* move it */
+		p->next = u->next;
+		u->next = *ppCU;
+		*ppCU = u;
+	    }
+	    return u;
+	}
+	p = u;
+    }
+
+    if ((u = (CONSENTUSERS *)calloc(1, sizeof(CONSENTUSERS)))
+	== (CONSENTUSERS *)0)
+	OutOfMem();
+    u->user = AddUserList(id);
+    u->not = not;
+    u->next = *ppCU;
+    *ppCU = u;
     return u;
 }
 
@@ -284,15 +295,9 @@ BreakItemDelay(id)
 }
 
 /* 'group' handling */
-typedef struct parserGroupUsers {
-    NAMES *user;
-    short not;
-    struct parserGroupUsers *next;
-} PARSERGROUPUSERS;
-
 typedef struct parserGroup {
     STRING *name;
-    PARSERGROUPUSERS *users;
+    CONSENTUSERS *users;
     struct parserGroup *next;
 } PARSERGROUP;
 
@@ -308,11 +313,12 @@ DestroyParserGroup(pg)
 #endif
 {
     PARSERGROUP **ppg = &parserGroups;
-    PARSERGROUPUSERS *u = (PARSERGROUPUSERS *)0;
-    char *m = (char *)0;
 
     if (pg == (PARSERGROUP *)0)
 	return;
+
+    CONDDEBUG((2, "DestroyParserGroup(): %s", pg->name->string));
+
     while (*ppg != (PARSERGROUP *)0) {
 	if (*ppg == pg) {
 	    break;
@@ -321,20 +327,14 @@ DestroyParserGroup(pg)
 	}
     }
 
-    BuildTmpString((char *)0);
-    m = BuildTmpString(pg->name->string);
     if (*ppg != (PARSERGROUP *)0)
 	*ppg = pg->next;
+
     DestroyString(pg->name);
-    for (u = pg->users; u != (PARSERGROUPUSERS *)0;) {
-	PARSERGROUPUSERS *n = u->next;
-	BuildTmpStringChar(',');
-	m = BuildTmpString(u->user->name);
-	free(u);
-	u = n;
-    }
+
+    DestroyConsentUsers(&(pg->users));
+
     free(pg);
-    CONDDEBUG((2, "DestroyParserGroup(): %s", m));
 }
 
 PARSERGROUP *
@@ -429,11 +429,11 @@ GroupDestroy()
 	PARSERGROUP *pg;
 	NAMES *u;
 	for (pg = parserGroups; pg != (PARSERGROUP *)0; pg = pg->next) {
-	    PARSERGROUPUSERS *pgu;
+	    CONSENTUSERS *pcu;
 	    Msg("Group = %s", pg->name->string);
-	    for (pgu = pg->users; pgu != (PARSERGROUPUSERS *)0;
-		 pgu = pgu->next) {
-		Msg("    User = %s", pgu->user->name);
+	    for (pcu = pg->users; pcu != (CONSENTUSERS *)0;
+		 pcu = pcu->next) {
+		Msg("    User = %s", pcu->user->name);
 	    }
 	}
 	Msg("UserList...");
@@ -448,25 +448,7 @@ GroupDestroy()
     parserGroups = parserGroupTemp = (PARSERGROUP *)0;
 }
 
-PARSERGROUPUSERS *
-#if PROTOTYPES
-GroupFindUser(PARSERGROUP *pg, char *id)
-#else
-GroupFindUser(pg, id)
-    PARSERGROUP *pg;
-    char *id;
-#endif
-{
-    PARSERGROUPUSERS *pgu;
-    for (pgu = pg->users; pgu != (PARSERGROUPUSERS *)0; pgu = pgu->next) {
-	if (strcmp(pgu->user->name, id) == 0) {
-	    return pgu;
-	}
-    }
-    return pgu;
-}
-
-PARSERGROUPUSERS *
+CONSENTUSERS *
 #if PROTOTYPES
 GroupAddUser(PARSERGROUP *pg, char *id, short not)
 #else
@@ -476,20 +458,27 @@ GroupAddUser(pg, id, not)
     short not;
 #endif
 {
-    PARSERGROUPUSERS *pgu = (PARSERGROUPUSERS *)0;
-
-    if ((pgu = GroupFindUser(pg, id)) == (PARSERGROUPUSERS *)0) {
-	if ((pgu = (PARSERGROUPUSERS *)calloc(1, sizeof(PARSERGROUPUSERS)))
-	    == (PARSERGROUPUSERS *)0)
-	    OutOfMem();
-	pgu->user = AddUserList(id);
-	pgu->next = pg->users;
-	pgu->not = not;
-	pg->users = pgu;
-    } else
-	pgu->not = not;
-    return pgu;
+    return ConsentAddUser(&(pg->users), id, not);
 }
+
+void
+#if PROTOTYPES
+CopyConsentUserList(CONSENTUSERS *s, CONSENTUSERS **d)
+#else
+CopyConsentUserList(CONSENTUSERS *s, CONSENTUSERS **d)
+    CONSENTUSERS *s;
+    CONSENTUSERS **d;
+#endif
+{
+    /* we have to add things backwards, since it's an ordered list */
+    if (s == (CONSENTUSERS *)0 || d == (CONSENTUSERS **)0)
+	return;
+
+    CopyConsentUserList(s->next, d);
+
+    ConsentAddUser(d, s->user->name, s->not);
+}
+
 
 void
 #if PROTOTYPES
@@ -505,12 +494,7 @@ GroupItemUsers(id)
     CONDDEBUG((1, "GroupItemUsers(%s) [%s:%d]", id, file, line));
 
     if ((id == (char *)0) || (*id == '\000')) {
-	PARSERGROUPUSERS *u;
-	for (u = parserGroupTemp->users; u != (PARSERGROUPUSERS *)0;) {
-	    PARSERGROUPUSERS *n = u->next;
-	    free(u);
-	    u = n;
-	}
+	DestroyConsentUsers(&(parserGroupTemp->users));
 	return;
     }
 
@@ -522,28 +506,10 @@ GroupItemUsers(id)
 	    not = 1;
 	} else
 	    not = 0;
-	if ((pg = GroupFind(token)) == (PARSERGROUP *)0) {
-	    if (token[0] == '@' && token[1] != '\000') {
-		struct group *g;
-		if ((g = getgrnam(token + 1)) == (struct group *)0) {
-		    if (isMaster)
-			Error("unknown group name `%s': %s [%s:%d]",
-			      token + 1, strerror(errno), file, line);
-		} else if (g->gr_mem != (char **)0) {
-		    char **m;
-		    for (m = g->gr_mem; *m != (char *)0; m++)
-			GroupAddUser(parserGroupTemp, *m, not);
-		}
-	    } else
-		GroupAddUser(parserGroupTemp, token, not);
-	} else {
-	    PARSERGROUPUSERS *pgu;
-	    for (pgu = pg->users; pgu != (PARSERGROUPUSERS *)0;
-		 pgu = pgu->next) {
-		GroupAddUser(parserGroupTemp, pgu->user->name,
-			     (not ? !pgu->not : pgu->not));
-	    }
-	}
+	if ((pg = GroupFind(token)) == (PARSERGROUP *)0)
+	    GroupAddUser(parserGroupTemp, token, not);
+	else
+	    CopyConsentUserList(pg->users, &(parserGroupTemp->users));
     }
 }
 
@@ -773,18 +739,8 @@ ApplyDefault(d, c)
 	if ((c->idlestring = StrDup(d->idlestring)) == (char *)0)
 	    OutOfMem();
     }
-    if (d->ro != (CONSENTUSERS *)0) {
-	CONSENTUSERS *u;
-	for (u = d->ro; u != (CONSENTUSERS *)0; u = u->next) {
-	    ConsentAddUser(&(c->ro), u->user->name, u->not);
-	}
-    }
-    if (d->rw != (CONSENTUSERS *)0) {
-	CONSENTUSERS *u;
-	for (u = d->rw; u != (CONSENTUSERS *)0; u = u->next) {
-	    ConsentAddUser(&(c->rw), u->user->name, u->not);
-	}
-    }
+    CopyConsentUserList(d->ro, &(c->ro));
+    CopyConsentUserList(d->rw, &(c->rw));
 }
 
 void
@@ -1772,28 +1728,10 @@ ProcessRoRw(ppCU, id)
 	    not = 1;
 	} else
 	    not = 0;
-	if ((pg = GroupFind(token)) == (PARSERGROUP *)0) {
-	    if (token[0] == '@' && token[1] != '\000') {
-		struct group *g;
-		if ((g = getgrnam(token + 1)) == (struct group *)0) {
-		    if (isMaster)
-			Error("unknown group name `%s': %s [%s:%d]",
-			      token + 1, strerror(errno), file, line);
-		} else if (g->gr_mem != (char **)0) {
-		    char **m;
-		    for (m = g->gr_mem; *m != (char *)0; m++)
-			ConsentAddUser(ppCU, *m, not);
-		}
-	    } else
-		ConsentAddUser(ppCU, token, not);
-	} else {
-	    PARSERGROUPUSERS *pgu;
-	    for (pgu = pg->users; pgu != (PARSERGROUPUSERS *)0;
-		 pgu = pgu->next) {
-		ConsentAddUser(ppCU, pgu->user->name,
-			       (not ? !pgu->not : pgu->not));
-	    }
-	}
+	if ((pg = GroupFind(token)) == (PARSERGROUP *)0)
+	    ConsentAddUser(ppCU, token, not);
+	else
+	    CopyConsentUserList(pg->users, ppCU);
     }
 }
 
@@ -2275,7 +2213,6 @@ ConsoleAdd(c)
     CONSENT *pCEmatch = (CONSENT *)0;
     GRPENT *pGEmatch = (GRPENT *)0, *pGEtmp = (GRPENT *)0;
     CONSCLIENT *pCLtmp = (CONSCLIENT *)0;
-    CONSENTUSERS *u;
 
     /* check for remote consoles */
     if (!IsMe(c->master)) {
@@ -2688,12 +2625,8 @@ ConsoleAdd(c)
 	DestroyConsentUsers(&(pCEmatch->ro));
 	DestroyConsentUsers(&(pCEmatch->rw));
 	/* now copy over the new stuff */
-	for (u = c->ro; u != (CONSENTUSERS *)0; u = u->next) {
-	    ConsentAddUser(&(pCEmatch->ro), u->user->name, u->not);
-	}
-	for (u = c->rw; u != (CONSENTUSERS *)0; u = u->next) {
-	    ConsentAddUser(&(pCEmatch->rw), u->user->name, u->not);
-	}
+	CopyConsentUserList(c->ro, &(pCEmatch->ro));
+	CopyConsentUserList(c->rw, &(pCEmatch->rw));
 
 	/* the code above shouldn't touch any of the "runtime" members
 	 * 'cause the ConsDown() code needs to be able to rely on those
@@ -3658,13 +3591,8 @@ AccessItemInclude(id)
 	    for (a = pa->access; a != (ACCESS *)0; a = a->pACnext) {
 		AccessAddACL(parserAccessTemp, a);
 	    }
-	    if (pa->admin != (CONSENTUSERS *)0) {
-		CONSENTUSERS *u;
-		for (u = pa->admin; u != (CONSENTUSERS *)0; u = u->next) {
-		    ConsentAddUser(&(parserAccessTemp->admin),
-				   u->user->name, u->not);
-		}
-	    }
+	    if (pa->admin != (CONSENTUSERS *)0)
+		CopyConsentUserList(pa->admin, &(parserAccessTemp->admin));
 	}
     }
 }

@@ -282,6 +282,21 @@ AC_ARG_WITH(uds,
 		;;
 	esac],[AC_MSG_RESULT(no)])
 
+use_dash_r=no
+AC_MSG_CHECKING(whether to use -R paths as well as -L)
+AC_ARG_WITH(rpath,
+	AS_HELP_STRING([--with-rpath],[Use -R as well as -L for libraries]),
+	[case "$withval" in
+	    yes|no)
+		AC_MSG_RESULT($withval)
+		use_dash_r=$withval
+		;;
+	    *)
+		AC_MSG_RESULT(no)
+		;;
+	esac],
+	[AC_MSG_RESULT(no)])
+
 dnl ### Check for compiler et al. ###################################
 AC_PROG_CC
 AC_PROG_INSTALL
@@ -374,7 +389,11 @@ AC_ARG_WITH(libwrap,
     [if test "$withval" != "no"; then
 	if test "$withval" != "yes"; then
 	    WRAPCPPFLAGS="-I$withval/include"
-	    WRAPLDFLAGS="-L$withval/lib"
+	    if test "$use_dash_r" != "yes"; then
+		WRAPLDFLAGS="-L$withval/lib"
+	    else
+		WRAPLDFLAGS="-L$withval/lib -R$withval/lib"
+	    fi
 	else
 	    WRAPCPPFLAGS=""
 	    WRAPLDFLAGS=""
@@ -427,7 +446,11 @@ AC_ARG_WITH(openssl,
     [if test "$withval" != "no"; then
 	if test "$withval" != "yes"; then
 	    OPENSSLCPPFLAGS="-I$withval/include"
-	    OPENSSLLDFLAGS="-L$withval/lib"
+	    if test "$use_dash_r" != "yes"; then
+		OPENSSLLDFLAGS="-L$withval/lib"
+	    else
+		OPENSSLLDFLAGS="-L$withval/lib -R$withval/lib"
+	    fi
 	else
 	    OPENSSLCPPFLAGS=""
 	    OPENSSLLDFLAGS=""
@@ -467,7 +490,11 @@ AC_ARG_WITH(dmalloc,
     [if test "$withval" != "no"; then
 	if test "$withval" != "yes"; then
 	    DMALLOCCPPFLAGS="-I$withval/include"
-	    DMALLOCLDFLAGS="-L$withval/lib"
+	    if test "$use_dash_r" != "yes"; then
+		DMALLOCLDFLAGS="-L$withval/lib"
+	    else
+		DMALLOCLDFLAGS="-L$withval/lib -R$withval/lib"
+	    fi
 	else
 	    DMALLOCCPPFLAGS=""
 	    DMALLOCLDFLAGS=""

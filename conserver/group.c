@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.301 2004/05/25 00:38:15 bryan Exp $
+ *  $Id: group.c,v 5.302 2004/05/27 23:40:35 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -55,6 +55,7 @@
 #include <compat.h>
 
 #include <pwd.h>
+#include <grp.h>
 #if PROTOTYPES
 #include <stdarg.h>
 #else
@@ -393,10 +394,39 @@ ConsentFindUser(pCU, id)
     char *id;
 #endif
 {
+    short close = 0;
+    struct group *g = (struct group *)0;
+    struct passwd *pwd = (struct passwd *)0;
+
     for (; pCU != (CONSENTUSERS *)0; pCU = pCU->next) {
-	if (strcmp(pCU->user->name, id) == 0) {
-	    return pCU;
+	if (pCU->user->name[0] == '@' && pCU->user->name[1] != '\000') {
+	    if (close == 0) {
+		close = 1;
+		/* try to grab the primary group */
+		pwd = getpwnam(id);
+	    }
+
+	    /* grab the group info */
+	    if ((g = getgrnam(pCU->user->name + 1)) == (struct group *)0) {
+		Error("ConsentFindUser(): unknown group name `%s'",
+		      pCU->user->name + 1);
+	    } else if (pwd != (struct passwd *)0 &&
+		       pwd->pw_gid == g->gr_gid) {
+		goto donehunting;
+	    } else if (g->gr_mem != (char **)0) {
+		char **m;
+		for (m = g->gr_mem; *m != (char *)0; m++)
+		    if (strcmp(*m, id) == 0)
+			goto donehunting;
+	    }
+	} else if (strcmp(pCU->user->name, id) == 0) {
+	    goto donehunting;
 	}
+    }
+  donehunting:
+    if (close) {
+	endgrent();
+	endpwent();
     }
     return pCU;
 }

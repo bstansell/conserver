@@ -1,10 +1,26 @@
 				CHANGES
 				=======
 
+version 8.1.7 (May 28, 2004):
+	- cleaned up the manpages a bit to make things clearer and more
+	  standard - reported by Dave Stuit <djs@tellme.com>
+	- added an east coast mirror!  http://conserver.syr.edu/ -
+	  thanks to Christopher T. Beers <ctbeers@syr.edu>
+	- primary group of users not included in '@group' syntax -
+	  reported by Phil Dibowitz <phil@usc.edu>
+	- changed '@group' behavior such that groups are checked when
+	  needed, instead of cached at startup, which is more logical
+	- missing variables when building convert with tcp_wrappers -
+	  reported by Nikolaos Papavassiliou
+	  <Nikolaos.Papavassiliou@reuters.com>
+	- added --with-rpath option - suggested by Phil Dibowitz
+	  <phil@usc.edu>
+
 version 8.1.6 (May 25, 2004):
-	- added ability to configure client via sytem-wide console.cf
-	  file and per-user .consolerc - suggested by Erik Sjolund
-	  <erik.sjolund@sbc.su.se>
+	- added ability to configure client via system-wide console.cf
+	  file and per-user .consolerc - suggested (independently) by
+	  Erik Sjolund <erik.sjolund@sbc.su.se> and Trevor Fiatal
+	  <trevor@fiatal.net>
 	- fixed bug where break strings were not properly sent -
 	  reported by Tim Small <tim@buttersideup.com>
 	- fixed bug in config file 'protocol' value handling - reported
@@ -738,5 +754,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.179 2004/05/26 00:14:07 bryan Exp $
+#  $Id: CHANGES,v 1.186 2004/05/28 18:01:10 bryan Exp $
 #

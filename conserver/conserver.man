@@ -1,6 +1,6 @@
 .\" @(#)conserver.8 01/06/91 OSU CIS; Thomas A. Fine
-.\" $Id: conserver.man,v 1.47 2004/05/21 04:15:17 bryan Exp $
-.TH CONSERVER 8 "2004/05/21" "conserver-8.1.6" "conserver"
+.\" $Id: conserver.man,v 1.48 2004/05/28 02:02:36 bryan Exp $
+.TH CONSERVER 8 "2004/05/28" "conserver-8.1.7" "conserver"
 .SH NAME
 conserver \- console server daemon
 .SH SYNOPSIS
@@ -448,7 +448,9 @@ any interaction with the server is done with the default escape sequence.
 This is, by no means, a complete description of the entire client/server
 interaction.
 It is, however, a brief explanation in order to give a idea of
-what the program does.
+what the program does.  See the
+.B \s-1PROTOCOLS\s0
+file in the distribution for further details.
 .SH FILES
 .PP
 The following default file locations may be overridden

@@ -1,5 +1,5 @@
-.\" $Id: conserver.cf.man,v 1.63 2004/05/07 03:42:51 bryan Exp $
-.TH CONSERVER.CF 5 "2004/05/07" "conserver-8.1.6" "conserver"
+.\" $Id: conserver.cf.man,v 1.65 2004/05/27 23:39:06 bryan Exp $
+.TH CONSERVER.CF 5 "2004/05/27" "conserver-8.1.7" "conserver"
 .SH NAME
 conserver.cf \- console configuration file for
 .BR conserver (8)
@@ -126,9 +126,8 @@ must begin in ``column 0'' - no whitespace is allowed between it and
 the start of the physical line.
 There is an include file depth limit of 10 to prevent infinite recursion.
 .SH BLOCKS
-.TP 8
-.B access
-.RI [ " hostname " | " ipaddr " ]
+.TP
+\f3access\fP \f2hostname\fP|\f2ipaddr\fP
 .br
 Define an access block for the host named
 .I hostname
@@ -139,10 +138,8 @@ all conserver hosts.
 Access lists are used in a first match
 fashion (top down), so order is important.
 .RS
-.TP 15
-.B admin
-.RI "[ [\f3!\fP]" username ,...
-| "" ]
+.TP
+\f3admin\fP [\f3!\fP]\f2username\fP[\f3,\fP...]|\f3""\fP
 .br
 Define a list of users making up the admin list for the console server.
 If
@@ -162,38 +159,33 @@ If
 .I username
 doesn't match a previous group and doesn't begin with `@', the users
 will be granted (or denied, if prefixed with `!') access.
-If the null string (``""'') is used, any
+If the null string (``\f3""\fP'') is used, any
 users previously defined for the console servers's admin list are removed.
 .TP
-.B allowed
-.IR hostname ", ..."
+\f3allowed\fP \f2hostname\fP[\f3,\fP...]
 .br
 The list of hostnames are added to the ``allowed'' list, which grants
 connections from the hosts but requires username authentication.
 .TP
-.B include
-.I accessgroup
+\f3include\fP \f2accessgroup\fP
 .br
 The access lists defined using the name
 .I accessgroup
 are applied to the current access block.
 The included access block must be previously defined.
 .TP
-.B rejected
-.IR hostname ", ..."
+\f3rejected\fP \f2hostname\fP[\f3,\fP...]
 .br
 The list of hostnames are added to the ``rejected'' list, which rejects
 connections from the hosts.
 .TP
-.B trusted
-.IR hostname ", ..."
+\f3trusted\fP \f2hostname\fP[\f3,\fP...]
 .br
 The list of hostnames are added to the ``trusted'' list, which grants
 connections from the hosts without username authentication.
 .RE
-.TP 8
-.B break
-.I n
+.TP
+\f3break\fP \f2n\fP
 .br
 Define a break sequence where 0 < 
 .I n
@@ -202,9 +194,8 @@ Break sequences are accessed via the
 .RI ``^El n ''
 client escape sequence.
 .RS
-.TP 15
-.B delay
-.I n
+.TP
+\f3delay\fP \f2n\fP
 .br
 Set the time delay for the
 .B \ed
@@ -213,8 +204,7 @@ sequence to
 milliseconds.
 The default time delay is 250ms.
 .TP
-.B string
-.I breakseq
+\f3string\fP \f2breakseq\fP
 .br
 Assign the string
 .IR breakseq
@@ -222,6 +212,7 @@ to the specified slot
 .IR n .
 A break sequence is a simple character string with the exception of `\e'
 and `^':
+.RS
 .RS
 .sp
 .PD 0
@@ -280,9 +271,9 @@ is ``and''ed with 0x1f)
 .PD
 .RE
 .RE
-.TP 8
-.B config
-.RI [ " hostname " | " ipaddr " ]
+.RE
+.TP
+\f3config\fP \f2hostname\fP|\f2ipaddr\fP
 .br
 Define a configuration block for the host named
 .I hostname
@@ -291,27 +282,21 @@ or using the address
 If the value of ``*'' is used, the configuration block will be applied to
 all conserver hosts.
 .RS
-.TP 15
-.B defaultaccess
-.RB [ " rejected " | " trusted "
-.RB | " allowed " ]
+.TP
+\f3defaultaccess\fP \f3rejected\fP|\f3trusted\fP|\f3allowed\fP
 .br
 Set the default access permission for all hosts not matched by
 an access list (see the
 .B \-a
 command-line flag).
 .TP
-.B daemonmode
-.RB [ " yes " | " true "
-.RB | " on " | " no "
-.RB | " false " | " off " ]
+\f3daemonmode\fP \f3yes\fP|\f3true\fP|\f3on\fP|\f3no\fP|\f3false\fP|\f3off
 .br
 Set whether or not to become a daemon when run (see the
 .B \-d
 command-line flag).
 .TP
-.B initdelay
-.I number
+\f3initdelay\fP \f2number\fP
 .br
 Set the number of seconds between console initializations.
 All consoles with the same
@@ -337,54 +322,43 @@ If
 .I number
 is zero, all consoles are initialized without delay.
 .TP
-.B logfile
-.I filename
+\f3logfile\fP \f2filename\fP
 .br
 Set the logfile to write to when in daemon mode (see the
 .B \-L
 command-line flag).
 .TP
-.B passwdfile
-.I filename
+\f3passwdfile\fP \f2filename\fP
 .br
 Set the password file location used for authentication (see the
 .B \-P
 command-line flag).
 .TP
-.B primaryport
-.RI [ " number " | " name " ]
+\f3primaryport\fP \f2number\fP|\f2name\fP
 .br
 Set the port used by the master conserver process (see the
 .B \-p
 command-line flag).
 .TP
-.B redirect
-.RB [ " yes " | " true "
-.RB | " on " | " no "
-.RB | " false " | " off " ]
+\f3redirect\fP \f3yes\fP|\f3true\fP|\f3on\fP|\f3no\fP|\f3false\fP|\f3off
 .br
 Turn redirection on or off (see the
 .B \-R
 command-line flag).
 .TP
-.B reinitcheck
-.I number
+\f3reinitcheck\fP \f2number\fP
 .br
 Set the number of minutes used between reinitialization checks (see the
 .B \-O
 command-line flag).
 .TP
-.B secondaryport
-.RI [ " number " | " name " ]
+\f3secondaryport\fP \f2number\fP|\f2name\fP
 .br
 Set the base port number used by child processes (see the
 .B \-b
 command-line flag).
 .TP
-.B setproctitle
-.RB [ " yes " | " true "
-.RB | " on " | " no "
-.RB | " false " | " off " ]
+\f3setproctitle\fP \f3yes\fP|\f3true\fP|\f3on\fP|\f3no\fP|\f3false\fP|\f3off
 .br
 Set whether or not the process title shows master/group functionality
 as well as the port number the process is listening on and how many
@@ -393,8 +367,7 @@ The operating system must support the
 .BR setproctitle ()
 call.
 .TP
-.B sslcredentials
-.I filename
+\f3sslcredentials\fP \f2filename\fP
 .br
 Set the
 .SM SSL
@@ -402,17 +375,13 @@ credentials file location (see the
 .B \-c
 command-line flag).
 .TP
-.B sslrequired
-.RB [ " yes " | " true "
-.RB | " on " | " no "
-.RB | " false " | " off " ]
+\f3sslrequired\fP \f3yes\fP|\f3true\fP|\f3on\fP|\f3no\fP|\f3false\fP|\f3off
 .br
 Set whether or not encryption is required when talking to clients (see the
 .B \-E
 command-line flag).
 .TP
-.B unifiedlog
-.I filename
+\f3unifiedlog\fP \f2filename\fP
 .br
 Set the location of the unified log to
 .IR filename .
@@ -420,9 +389,8 @@ See the
 .B \-U
 command-line flag for details.
 .RE
-.TP 8
-.B console
-.I name
+.TP
+\f3console\fP \f2name\fP
 .br
 Define a console identified as
 .IR name .
@@ -430,18 +398,15 @@ The keywords are the same as the
 .B default
 block with the following addition.
 .RS
-.TP 15
-.B aliases
-.RI [ " name" ", ..."
-| "" ]
+.TP
+\f3aliases\fP \f2name\fP[\f3,\fP...]|\f3""\fP
 .br
 Define a list of console aliases.
-If the null string (``""'') is used, any
+If the null string (``\f3""\fP'') is used, any
 aliases previously defined for the console are removed.
 .RE
-.TP 8
-.B default
-.I name
+.TP
+\f3default\fP \f2name\fP
 .br
 Define a block of defaults identified as
 .IR name .
@@ -451,36 +416,27 @@ is ``*'', the automatically applied default block is defined (basically
 all consoles have an implicit ``include "*";'' at the beginning
 of their definition).
 .RS
-.TP 15
-.B baud
-.RB [ " 300 " | " 600 "
-.RB | " 1800 " | " 2400 "
-.RB | " 4800 "  | " 9600 "
-.RB | " 19200 " | " 38400 "
-.RB | " 57600 " | " 115200 " ]
+.TP
+\f3baud\fP \f3300\fP|\f3600\fP|\f31800\fP|\f32400\fP|\f34800\fP|\f39600\fP|\f319200\fP|\f338400\fP|\f357600\fP|\f3115200\fP
 .br
 Assign the baud rate to the console.
 Only consoles of type ``device'' will use this value.
 .TP
-.B break
-.I n
+\f3break\fP \f2n\fP
 .br
 Assign the break sequence
 .I n
 as the default for the console, which is used by
 the ``^Ecl0'' client escape sequence.
 .TP
-.B device
-.I filename
+\f3device\fP \f2filename\fP
 .br
 Assign the serial device
 .I filename
 as the access to the console.
 Only consoles of type ``device'' will use this value.
 .TP
-.B devicesubst
-[\f2c\fP=\f2t\fP[\f2n\fP]\f2f\fP[,...]
-| "" ]
+\f3devicesubst\fP \f2c\fP\f3=\fP\f2t\fP[\f2n\fP]\f2f\fP[\f3,\fP...]|\f3""\fP
 .br
 Perform character substitutions on the
 .B device
@@ -546,25 +502,21 @@ begins with a 0, and space characters otherwise.
 .I f
 must be either `d', `x' or `X', specifying a decimal, lower-case
 hexadecimal, or an uppercase hexadecimal conversion.
-If the null string (``""'') is used, no replacements will be done.
+If the null string (``\f3""\fP'') is used, no replacements will be done.
 .TP
-.B exec
-.RI [ " command "
-| "" ]
+\f3exec\fP \f2command|\f3""\fP
 .br
 Assign the string
 .I command
 as the command to access the console.
 Conserver will run the command by
 invoking ``/bin/sh -ce "\f2command\fP"''.
-If the null string (``""'') is used or no
+If the null string (``\f3""\fP'') is used or no
 .B exec
 keyword is specified, conserver will use the command ``/bin/sh -i''.
 Only consoles of type ``exec'' will use this value.
 .TP
-.B execsubst
-[\f2c\fP=\f2t\fP[\f2n\fP]\f2f\fP[,...]
-| "" ]
+\f3execsubst\fP \f2c\fP\f3=\fP\f2t\fP[\f2n\fP]\f2f\fP[\f3,\fP...]|\f3""\fP
 .br
 Perform character substitutions on the
 .B exec
@@ -572,10 +524,9 @@ value.
 See the
 .B devicesubst
 option for an explanation of the format string.
-If the null string (``""'') is used, no replacements will be done.
+If the null string (``\f3""\fP'') is used, no replacements will be done.
 .TP
-.B host
-.I hostname
+\f3host\fP \f2hostname\fP
 .br
 Assign
 .I hostname
@@ -591,16 +542,14 @@ or
 .B initsubst
 keywords are used in any console type, this value is used.
 .TP
-.B idlestring
-.RI [ " string "
-| "" ]
+\f3idlestring\fP \f2string\fP|\f3""\fP
 .br
 Assign the
 .I string
 that is sent to the console once the console is idle for an
 .I idletimeout
 amount of time.
-If the null string (``""'') is used, the string is unset and
+If the null string (``\f3""\fP'') is used, the string is unset and
 the default is used.
 The string is interpreted just as a
 .B break
@@ -610,8 +559,7 @@ configuration items for details) where all delays specified (via ``\ed'')
 use the default delay time.
 The default string is ``\en''.
 .TP
-.B idletimeout
-\f2number\fP[\f3s\fP|\f3m\fP|\f3h\fP]
+\f3idletimeout\fP \f2number\fP[\f3s\fP|\f3m\fP|\f3h\fP]
 .br
 Set the idle timeout of the console to
 .I number
@@ -621,17 +569,14 @@ If an `s', `m', or `h' is used after
 the specified time is interpreted as seconds, minutes, or hours.
 Set the timeout to zero to disable the idle timeout (the default).
 .TP
-.B include
-.I default
+\f3include\fP \f2default\fP
 .br
 The default block defined using the name
 .I default
 is applied to the current console or default block.
 The included default block must be previously defined.
 .TP
-.B initcmd
-.RI [ " command "
-| "" ]
+\f3initcmd\fP \f3command\fP|\f3""\fP
 .br
 Invoke
 .I command
@@ -641,12 +586,10 @@ to stdin, stdout, and stderr of
 The
 .I command
 is passed as an argument to ``/bin/sh -ce''.
-If the null string (``""'') is used, the command is unset and
+If the null string (``\f3""\fP'') is used, the command is unset and
 nothing is invoked.
 .TP
-.B initsubst
-[\f2c\fP=\f2t\fP[\f2n\fP]\f2f\fP[,...]
-| "" ]
+\f3initsubst\fP \f2c\fP\f3=\fP\f2t\fP[\f2n\fP]\f2f\fP[\f3,\fP...]|\f3""\fP
 .br
 Perform character substitutions on the
 .B initcmd
@@ -654,11 +597,9 @@ value.
 See the
 .B devicesubst
 option for an explanation of the format string.
-If the null string (``""'') is used, no replacements will be done.
+If the null string (``\f3""\fP'') is used, no replacements will be done.
 .TP
-.B logfile
-.RI [ " filename "
-| "" ]
+\f3logfile\fP \f2filename\fP|\f3""\fP
 .br
 Assign the logfile specified by
 .I filename
@@ -666,11 +607,10 @@ to the console.
 Any occurrence of ``&'' in
 .I filename
 will be replaced with the name of the console.
-If the null string (``""'') is used, the logfile name is unset and
+If the null string (``\f3""\fP'') is used, the logfile name is unset and
 no logging will occur.
 .TP
-.B logfilemax
-\f2number\fP[\f3k\fP|\f3m\fP]
+\f3logfilemax\fP \f2number\fP[\f3k\fP|\f3m\fP]
 .br
 Enable automatic rotation of
 .B logfile
@@ -703,8 +643,7 @@ logfile is read from the end of the file.
 All data past the first newline is moved (not copied) to the new logfile
 so that a replay of the console works and starts on a line boundary.
 .TP
-.B master
-.RI [ " hostname " | " ipaddr " ]
+\f3master\fP \f2hostname\fP|\f3ipaddr\fP
 .br
 Define which conserver host manages the console.
 The host may be specified by
@@ -712,19 +651,15 @@ The host may be specified by
 or using the address
 .IR ipaddr .
 .TP
-.B motd
-.RI [ " message "
-| "" ]
+\f3motd\fP \f2message\fP|\f3""\fP
 .br
 Set the "message of the day" for the console to
 .IR message ,
 which gets displayed when a client attaches to the console.
-If the null string (``""'') is used, the MOTD is unset and
+If the null string (``\f3""\fP'') is used, the MOTD is unset and
 no message will occur.
 .TP
-.B options
-.RI [ " option" ,...
-| "" ]
+\f3options\fP [\f3!\fP]option[\f3,\fP...]|\f3""\fP
 .br
 You can negate the option by prefixing it with a
 .RB `` ! ''
@@ -839,16 +774,12 @@ Default is
 .PD
 .RE
 .TP
-.B parity
-.RB [ " even " | " mark "
-.RB | " none " | " odd "
-.RB | " space " ]
+\f3parity\fP \f3even\fP|\f3mark\fP|\f3none\fP|\f3odd\fP|\f3space\fP
 .br
 Set the parity option for the console.
 Only consoles of type ``device'' will use this value.
 .TP
-.B port
-.RI [ " number " | " name " ]
+\f3port\fP \f2number\fP|\f2name\fP
 .br
 Set the port used to access the console.
 The port may be specified as a
@@ -890,8 +821,7 @@ or
 .B initsubst
 keywords are used in any console type, this value is used.
 .TP
-.B portbase
-.I number
+\f3portbase\fP \f2number\fP
 .br
 Set the base value for the port calculation formula.
 .I number
@@ -901,8 +831,7 @@ See
 .B port
 for the details of the formula.
 .TP
-.B portinc
-.I number
+\f3portinc\fP \f2number\fP
 .br
 Set the increment value for the port calculation formula.
 .I number
@@ -912,8 +841,7 @@ See
 .B port
 for the details of the formula.
 .TP
-.B protocol
-.RB [ " telnet " | " raw " ]
+\f3protocol\fP \f3telnet\fP|\f3raw\fP
 .br
 Set the protocol used to send and receive data from the console.
 If
@@ -927,9 +855,7 @@ The
 console option still applies when data is read by the server, and if enabled,
 can impact the encapsulation process.
 .TP
-.B ro
-.RI "[ [\f3!\fP]" username ,...
-| "" ]
+\f3ro\fP [\f3!\fP]\f2username\fP[\f3,\fP...]|\f3""\fP
 .br
 Define a list of users making up the read-only access list
 for the console.
@@ -950,12 +876,10 @@ If
 .I username
 doesn't match a previous group and doesn't begin with `@', the users
 will be granted (or denied, if prefixed with `!') read-only access.
-If the null string (``""'') is used, any
+If the null string (``\f3""\fP'') is used, any
 users previously defined for the console's read-only list are removed.
 .TP
-.B rw
-.RI "[ [\f3!\fP]" username ,...
-| "" ]
+\f3rw\fP [\f3!\fP]\f2username\fP[\f3,\fP...]|\f3""\fP
 .br
 Define a list of users making up the read-write access list
 for the console.
@@ -976,13 +900,10 @@ If
 .I username
 doesn't match a previous group and doesn't begin with `@', the users
 will be granted (or denied, if prefixed with `!') read-write access.
-If the null string (``""'') is used, any
+If the null string (``\f3""\fP'') is used, any
 users previously defined for the console's read-write list are removed.
 .TP
-.B timestamp
-[
-[\f2number\fP[\f3m\fP|\f3h\fP|\f3d\fP|\f3l\fP]][\f3a\fP][\f3b\fP]
-| "" ]
+\f3timestamp\fP [\f2number\fP[\f3m\fP|\f3h\fP|\f3d\fP|\f3l\fP]][\f3a\fP][\f3b\fP]|\f3""\fP
 .br
 Specifies the time between timestamps applied to the console
 log file and whether to log read/write connection actions.
@@ -1011,9 +932,7 @@ A
 .RB ` b '
 can be specified to add logging of break sequences sent to the console.
 .TP
-.B type
-.RB [ " device " | " exec "
-.RB | " host " ]
+\f3type\fP \f3device\fP|\f3exec\fP|\f3host\fP
 .br
 Set the type of console.
 The type
@@ -1033,17 +952,14 @@ and
 .B port
 options).
 .RE
-.TP 8
-.B group
-.I name
+.TP
+\f3group\fP \f2name\fP
 .br
 Define a user group identified as
 .I name
 .RS
-.TP 15
-.B users
-.RI "[ [\f3!\fP]" username ,...
-| "" ]
+.TP
+\f3users\fP [\f3!\fP]\f2username\fP[\f3,\fP...]|\f3""\fP
 .br
 Define a list of users making up the group
 .IR name .
@@ -1064,7 +980,7 @@ If
 .I username
 doesn't match a previous group and doesn't begin with `@', the users
 will be recorded with (or without, if prefixed with `!') access.
-If the null string (``""'') is used, any
+If the null string (``\f3""\fP'') is used, any
 users previously defined for this group are removed.
 .RE
 .SH AUTHORS

@@ -1,5 +1,5 @@
-.\" $Id: console.man,v 1.51 2004/05/25 00:38:15 bryan Exp $
-.TH CONSOLE 1 "2004/05/25" "conserver-8.1.6" "conserver"
+.\" $Id: console.man,v 1.54 2004/05/28 00:02:16 bryan Exp $
+.TH CONSOLE 1 "2004/05/28" "conserver-8.1.7" "conserver"
 .SH NAME
 console \- console server client program
 .SH SYNOPSIS
@@ -441,27 +441,24 @@ The configuration file is read using the same parser as
 and you should check that manpage for parser details.
 .B Console
 recognizes the following configuration blocks.
-.TP 8
-.B config
-.RI [ " hostname " | " ipaddr " ]
+.TP
+\f3config\fP \f2hostname\fP|\f2ipaddr\fP
 .br
-Define a configuration block for the host named
+Define a configuration block for the client host named
 .I hostname
 or using the address
 .IR ipaddr .
 If the value of ``*'' is used, the configuration block will be applied to
-all hosts.
+all client hosts.
 .RS
-.TP 15
-.B escape
-.I esc
+.TP
+\f3escape\fP \f2esc\fP
 .br
 Set the escape sequence (see the
 .B \-e
 command-line flag).
 .TP
-.B master
-.I master
+\f3master\fP \f2master\fP
 .br
 Set the default master to
 .I master
@@ -469,8 +466,7 @@ Set the default master to
 .B \-M
 command-line flag).
 .TP
-.B port
-.I port
+\f3port\fP \f2port\fP
 .br
 Set the default port to
 .I port
@@ -478,8 +474,7 @@ Set the default port to
 .B \-p
 command-line flag).
 .TP
-.B sslcredentials
-.I filename
+\f3sslcredentials\fP \f2filename\fP
 .br
 Set the
 .SM SSL
@@ -487,36 +482,26 @@ credentials file location (see the
 .B \-c
 command-line flag).
 .TP
-.B sslenabled
-.RB [ " yes " | " true "
-.RB | " on " | " no "
-.RB | " false " | " off " ]
+\f3sslenabled\fP \f3yes\fP|\f3true\fP|\f3on\fP|\f3no\fP|\f3false\fP|\f3off\fP
 .br
 Set whether or not encryption is attempted when talking to servers (see the
 .B \-E
 command-line flag).
 .TP
-.B sslrequired
-.RB [ " yes " | " true "
-.RB | " on " | " no "
-.RB | " false " | " off " ]
+\f3sslrequired\fP \f3yes\fP|\f3true\fP|\f3on\fP|\f3no\fP|\f3false\fP|\f3off\fP
 .br
 Set whether or not encryption is required when talking to servers (see the
 .B \-U
 command-line flag).
 .TP
-.B striphigh
-.RB [ " yes " | " true "
-.RB | " on " | " no "
-.RB | " false " | " off " ]
+\f3striphigh\fP \f3yes\fP|\f3true\fP|\f3on\fP|\f3no\fP|\f3false\fP|\f3off\fP
 .br
 Set whether or not to strip the high bit off all data received
 (see the
 .B \-7
 command-line flag).
 .TP
-.B username
-.I user
+\f3username\fP \f2user\fP
 .br
 Set the username passed to the server to
 .I user
@@ -524,19 +509,16 @@ Set the username passed to the server to
 .B \-l
 command-line flag).
 .RE
-.TP 8
-.B terminal
-.I type
+.TP
+\f3terminal\fP \f2type\fP
 .br
 Define a configuration block when using a terminal of type
 .IR type .
 If the value of ``*'' is used, the configuration block will be applied to
 all terminal types.
 .RS
-.TP 15
-.B attach
-.RI [ " string "
-| "" ]
+.TP
+\f3attach\fP \f2string\fP|\f3""\fP
 .br
 Set a
 .I string
@@ -546,7 +528,7 @@ Character substitions will be performed based on the
 value and occur
 .I before
 interpretation of the special characters below.
-If the null string (``""'') is used, no string will be printed.
+If the null string (``\f3""\fP'') is used, no string will be printed.
 .I string
 is a simple character string with the exception of `\e'
 and `^':
@@ -619,16 +601,14 @@ terminal xterm {
 .ft
 .RE
 .TP
-.B attachsubst
-[\f2c\fP=\f2t\fP[\f2n\fP]\f2f\fP[,...]
-| "" ]
+\f3attachsubst\fP \f2c\fP\f3=\fP\f2t\fP[\f2n\fP]\f2f\fP[\f3,\fP...]|\f3""\fP
 .br
 Perform character substitutions on the
 .B attach
 value.
 A series of replacements can be defined by specifying a
 comma-separated list of
-\f2c\fP=\f2t\fP[\f2n\fP]\f2f\fP
+\f2c\fP\f3=\fP\f2t\fP[\f2n\fP]\f2f\fP
 sequences where
 .I c
 is any printable character,
@@ -680,11 +660,9 @@ begins with a 0, and space characters otherwise.
 .I f
 must be either `d', `x' or `X', specifying a decimal, lower-case
 hexadecimal, or an uppercase hexadecimal conversion.
-If the null string (``""'') is used, no replacements will be done.
-.TP 15
-.B detach
-.RI [ " string "
-| "" ]
+If the null string (``\f3""\fP'') is used, no replacements will be done.
+.TP
+\f3detach\fP \f2string\fP|\f3""\fP
 .br
 Set a
 .I string
@@ -696,11 +674,9 @@ See the
 .B attach
 option for an explanation of
 .IR string .
-If the null string (``""'') is used, no string will be printed.
+If the null string (``\f3""\fP'') is used, no string will be printed.
 .TP
-.B detachsubst
-[\f2c\fP=\f2t\fP[\f2n\fP]\f2f\fP[,...]
-| "" ]
+\f3detachsubst\fP \f2c\fP\f3=\fP\f2t\fP[\f2n\fP]\f2f\fP[\f3,\fP...]|\f3""\fP
 .br
 Perform character substitutions on the
 .B detach
@@ -834,7 +810,7 @@ specify three octal digits)
 If any other character is hit after the escape sequence, all three characters
 will be discarded.
 Note that a line break or a down command
-can only be sent from a full two-way attachment.
+can only be sent from a read-write connection.
 To send the escape sequence through the connection one must redefine
 the outer escape sequence, or use
 .BI ^Ec\e ooo
@@ -845,16 +821,16 @@ In the
 .B \-u
 output, the login ``<none>'' indicates no one is
 viewing that console, and the login ``<spies>'' indicates that
-no one has a full two-way attachment.
+no one has a read-write connection (only read-only).
 .PP
 When running a local command via
 .RB `` ^Ec| '',
 you can type 
-.B ^C
+.RB ` ^C '
 to send the command a SIGHUP,
-.B ^\e
+.RB ` ^\e '
 to send the command a SIGKILL, and
-.B o
+.RB ` o '
 to toggle the display of the console data.
 .SH EXAMPLES
 .TP 15
@@ -920,7 +896,7 @@ to see the defaults set at compile time.
 .B /etc/console.cf
 system-wide configuration file
 .TP
-.B $HOME/.consolerc
+.B \s-1$HOME\s0/.consolerc
 per-user configuration file
 .PD
 .SH BUGS

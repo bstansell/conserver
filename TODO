@@ -94,6 +94,9 @@ Bryan Stansell
 - strict file permission checks on conserver.passwd/conserver.cf : Erik
   Sjolund <erik.sjolund@sbc.su.se>
 
+- netgroup support?  : Nikolaos Papavassiliou
+  <Nikolaos.Papavassiliou@reuters.com>
+
 #
-#  $Id: TODO,v 1.49 2004/05/25 00:38:11 bryan Exp $
+#  $Id: TODO,v 1.50 2004/05/28 01:58:43 bryan Exp $
 #

@@ -16,6 +16,12 @@ Documentation
 Downloading
 
     The latest version can be found at http://www.conserver.com/
+    (US-West).
+
+    Mirrors of the site are at:
+
+	Australia	http://planetmirror.com/pub/conserver/
+	US-East		http://conserver.syr.edu/
 
 
 Systems Tested
@@ -55,5 +61,5 @@ Contributions
     http://www.columbia.edu/acis/sy/unixdev/zinc
 
 #
-#  $Id: README,v 1.22 2003/08/23 19:34:24 bryan Exp $
+#  $Id: README,v 1.23 2004/05/27 23:39:29 bryan Exp $
 #
