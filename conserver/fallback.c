@@ -1,5 +1,5 @@
 /*
- *  $Id: fallback.c,v 5.59 2003/10/03 13:32:34 bryan Exp $
+ *  $Id: fallback.c,v 5.60 2003/11/20 13:56:38 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -16,7 +16,7 @@
 
 #include <compat.h>
 
-#include <util.h>
+#include <cutil.h>
 
 /*
  * get a pty for the user

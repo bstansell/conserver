@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.75 2003/11/16 15:35:33 bryan Exp $
+ *  $Id: client.c,v 5.76 2003/11/20 13:56:38 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -36,7 +36,7 @@
 
 #include <compat.h>
 
-#include <util.h>
+#include <cutil.h>
 #include <consent.h>
 #include <access.h>
 #include <client.h>

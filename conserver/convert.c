@@ -1,5 +1,5 @@
 /*
- *  $Id: convert.c,v 1.7 2003/08/15 21:24:39 bryan Exp $
+ *  $Id: convert.c,v 1.8 2003/11/20 13:56:38 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -32,7 +32,7 @@
 
 #include <compat.h>
 
-#include <util.h>
+#include <cutil.h>
 #include <consent.h>
 #include <client.h>
 #include <group.h>

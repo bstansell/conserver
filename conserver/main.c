@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.171 2003/11/16 19:29:20 bryan Exp $
+ *  $Id: main.c,v 5.172 2003/11/20 13:56:39 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -31,7 +31,7 @@
 
 #include <pwd.h>
 
-#include <util.h>
+#include <cutil.h>
 #include <consent.h>
 #include <client.h>
 #include <group.h>

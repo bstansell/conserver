@@ -7,8 +7,8 @@
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <arpa/inet.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <netdb.h>
 #include <ctype.h>
 #include <signal.h>

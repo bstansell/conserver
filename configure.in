@@ -244,7 +244,13 @@ if test "$ac_cv_sys_posix_termios" != "yes"; then
     AC_MSG_ERROR([POSIX termios interface required])
 fi
 
-AC_CHECK_HEADERS(unistd.h getopt.h sys/vlimit.h sys/resource.h ttyent.h sys/ttold.h sys/uio.h sys/proc.h sys/ioctl_compat.h usersec.h sys/select.h stropts.h sys/audit.h shadow.h sys/time.h crypt.h sysexits.h types.h sys/sockio.h)
+AC_CHECK_HEADERS(unistd.h getopt.h sys/vlimit.h sys/resource.h ttyent.h sys/ttold.h sys/uio.h sys/ioctl_compat.h usersec.h sys/select.h stropts.h sys/audit.h shadow.h sys/time.h crypt.h sysexits.h types.h sys/sockio.h sys/param.h)
+dnl sys/proc.h needs sys/param.h on openbsd, apparently
+AC_CHECK_HEADERS(sys/proc.h, [], [],
+[#if HAVE_SYS_PARAM_H
+#include <sys/param.h>
+#endif
+])
 AC_HEADER_TIME
 AC_HEADER_SYS_WAIT
 AC_TYPE_MODE_T

@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.130 2003/11/08 05:16:36 bryan Exp $
+ *  $Id: consent.c,v 5.131 2003/11/20 13:56:38 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -42,7 +42,7 @@
 
 #include <pwd.h>
 
-#include <util.h>
+#include <cutil.h>
 #include <consent.h>
 #include <client.h>
 #include <group.h>

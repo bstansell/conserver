@@ -1,5 +1,5 @@
 /*
- *  $Id: util.h,v 1.56 2003/11/10 20:38:25 bryan Exp $
+ *  $Id: cutil.h,v 1.56 2003/11/10 20:38:25 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *

@@ -1,6 +1,14 @@
 				CHANGES
 				=======
 
+version 8.0.7 (Nov 20, 2003):
+	- renamed util.[ch] to cutil.[ch] to prevent name conflict with
+	  system util.h, reordered some #includes, and fixed a configure
+	  test for sys/proc.h to build on OpenBSD 3.4 (and probably
+	  others) - reported by Kurt Raschke <kurt@raschke.net>
+	- fixed missing semi-colon for cygwin build - reported by
+	  Raymond Richmond <raymond.richmond@ualberta.ca>
+
 version 8.0.6 (Nov 16, 2003):
 	- code was missing regarding the 'setproctitle' option - patch
 	  by Dmitry Morozovsky <marck@rinet.ru>
@@ -616,5 +624,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.131 2003/11/15 23:57:18 bryan Exp $
+#  $Id: CHANGES,v 1.135 2003/11/20 14:48:29 bryan Exp $
 #

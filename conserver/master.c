@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.122 2003/11/16 19:29:20 bryan Exp $
+ *  $Id: master.c,v 5.123 2003/11/20 13:56:39 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -29,7 +29,7 @@
 
 #include <compat.h>
 
-#include <util.h>
+#include <cutil.h>
 #include <consent.h>
 #include <client.h>
 #include <group.h>

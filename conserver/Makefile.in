@@ -27,7 +27,7 @@ LIBS	= @LIBS@ @CONSLIBS@
 ### Makefile rules - no user-servicable parts below
 
 CONSERVER_OBJS = access.o client.o consent.o group.o main.o master.o \
-		 readcfg.o fallback.o util.o
+		 readcfg.o fallback.o cutil.o
 CONSERVER_HDRS = ../config.h $(top_srcdir)/compat.h $(srcdir)/access.h \
 		 $(srcdir)/client.h $(srcdir)/consent.h $(srcdir)/group.h \
 		 $(srcdir)/main.h $(srcdir)/master.h $(srcdir)/readcfg.h \
@@ -40,8 +40,8 @@ all: $(ALL)
 conserver: $(CONSERVER_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o conserver $(CONSERVER_OBJS) $(LIBS)
 
-convert: convert.o util.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o convert convert.o util.o $(LIBS)
+convert: convert.o cutil.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o convert convert.o cutil.o $(LIBS)
 
 .c.o:
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<

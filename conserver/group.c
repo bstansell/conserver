@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.274 2003/11/16 19:29:20 bryan Exp $
+ *  $Id: group.c,v 5.275 2003/11/20 13:56:38 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -62,7 +62,7 @@
 #endif
 #include <arpa/telnet.h>
 
-#include <util.h>
+#include <cutil.h>
 #include <consent.h>
 #include <client.h>
 #include <access.h>

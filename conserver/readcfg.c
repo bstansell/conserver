@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.157 2003/11/15 20:00:09 bryan Exp $
+ *  $Id: readcfg.c,v 5.158 2003/11/20 13:56:39 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -25,7 +25,7 @@
 
 #include <compat.h>
 
-#include <util.h>
+#include <cutil.h>
 #include <consent.h>
 #include <client.h>
 #include <group.h>

@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.150 2003/11/15 16:32:21 bryan Exp $
+ *  $Id: console.c,v 5.151 2003/11/20 13:56:41 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -32,7 +32,7 @@
 #include <pwd.h>
 
 #include <getpassword.h>
-#include <util.h>
+#include <cutil.h>
 #include <version.h>
 #if HAVE_OPENSSL
 #include <openssl/ssl.h>

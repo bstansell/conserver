@@ -1,5 +1,5 @@
 /*
- *  $Id: getpassword.c,v 1.7 2003/09/28 19:29:17 bryan Exp $
+ *  $Id: getpassword.c,v 1.8 2003/11/20 13:56:41 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -12,7 +12,7 @@
 
 #include <pwd.h>
 
-#include <util.h>
+#include <cutil.h>
 #include <version.h>
 
 

@@ -1,5 +1,5 @@
 /*
- *  $Id: access.c,v 5.70 2003/11/04 19:41:00 bryan Exp $
+ *  $Id: access.c,v 5.71 2003/11/20 13:56:38 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -36,7 +36,7 @@
 
 #include <compat.h>
 
-#include <util.h>
+#include <cutil.h>
 #include <access.h>
 #include <consent.h>
 #include <client.h>

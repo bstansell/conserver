@@ -1,5 +1,5 @@
 /*
- *  $Id: util.c,v 1.105 2003/11/15 16:31:51 bryan Exp $
+ *  $Id: cutil.c,v 1.107 2003/11/20 13:59:55 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -8,7 +8,7 @@
 
 #include <compat.h>
 
-#include <util.h>
+#include <cutil.h>
 
 #if HAVE_OPENSSL
 #include <openssl/ssl.h>
@@ -879,15 +879,15 @@ FileClose(pcfp)
 	    /* flush out the client socket - set it to blocking,
 	     * then write to it
 	     */
-	    SetFlags(cfp->fd, 0, O_NONBLOCK)
+	    SetFlags(cfp->fd, 0, O_NONBLOCK);
 
-		/* sent it a byte - guaranteed to block - ensure delivery
-		 * of prior data yeah - this is a bit paranoid - try
-		 * without this at first
-		 */
-		/* write(cfp->fd, "\n", 1); */
-		/* this is the guts of the workaround for Winsock close bug */
-		shutdown(cfp->fd, 1);
+	    /* sent it a byte - guaranteed to block - ensure delivery
+	     * of prior data yeah - this is a bit paranoid - try
+	     * without this at first
+	     */
+	    /* write(cfp->fd, "\n", 1); */
+	    /* this is the guts of the workaround for Winsock close bug */
+	    shutdown(cfp->fd, 1);
 
 	    /* enable lingering */
 	    lingeropt.l_onoff = 1;
