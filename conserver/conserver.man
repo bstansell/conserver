@@ -1,10 +1,10 @@
 .\" @(#)conserver.8 01/06/91 OSU CIS; Thomas A. Fine
-.\" $Id: conserver.man,v 1.23 2002-02-25 13:58:45-08 bryan Exp $
+.\" $Id: conserver.man,v 1.26 2002-09-22 10:41:51-07 bryan Exp $
 .TH CONSERVER 8 "Local"
 .SH NAME
 conserver \- console server daemon
 .SH SYNOPSIS
-\fBconserver\fP [\fB\-7dDhinouvV\fP] [\fB\-a\fP \fItype\fP]
+\fBconserver\fP [\fB\-7dDFhinouvV\fP] [\fB\-a\fP \fItype\fP]
 [\fB\-m\fP \fImax\fP]
 [\fB\-M\fP \fIaddr\fP] [\fB\-p\fP \fIport\fP] [\fB\-b\fP \fIport\fP]
 [\fB\-C\fP \fIconfig\fP] [\fB\-P\fP \fIpasswd\fP]
@@ -151,6 +151,14 @@ all output to the logfile (see \fB\-L\fP).
 Enable debugging output, sent to stderr.  Multiple \fB-D\fP options
 increases debug output.
 .TP
+.B \-F
+Do not automatically reinitialize failed (unexpectedly closed)
+consoles.  If the console is a program (`|' syntax) and it closes
+with a zero exit status, the console is reinitialized regardless
+of this option.  Without this option, a console is immediately reopened,
+and if that fails, retried every minute until successful.
+This option has no effect on the \fB-o\fP and \fB-O\fP options.
+.TP
 .B \-h
 Output a brief help message.
 .TP
@@ -179,7 +187,7 @@ Obsolete (now a no-op); see \fB\-u\fP.
 .TP
 .B \-o
 Normally, a client connecting to a ``downed'' console does just that.
-Using this flag, the server will automatically attempt to open
+Using this option, the server will automatically attempt to open
 (``bring up'') the console when the client connects.
 .TP
 .BI \-O min

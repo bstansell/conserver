@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.178 2002-06-05 15:05:00-07 bryan Exp $
+ *  $Id: group.c,v 5.186 2002-09-23 11:40:35-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -74,6 +74,9 @@
 #include <arpa/telnet.h>
 #if HAVE_POSIX_REGCOMP
 #include <regex.h>
+#endif
+#if HAVE_PAM
+#include <security/pam_appl.h>
 #endif
 
 #if defined(USE_LIBWRAP)
@@ -280,32 +283,155 @@ destroyGroup(pGE)
     free(pGE);
 }
 
+#if HAVE_PAM
+int
+#if USE_ANSI_PROTO
+quiet_conv(int num_msg, struct pam_message **msg,
+	   struct pam_response **resp, void *appdata_ptr)
+#else
+quiet_conv(num_msg, msg, resp, appdata_ptr)
+    int num_msg;
+    struct pam_message **msg;
+    struct pam_response **resp;
+    void *appdata_ptr;
+#endif
+{
+    int i;
+    struct pam_response *response = NULL;
+    char *pcUser;
+    char *pcWord;
+    pcUser = ((char **)appdata_ptr)[0];
+    pcWord = ((char **)appdata_ptr)[1];
+
+    if (num_msg <= 0)
+	return PAM_CONV_ERR;
+
+    response =
+	(struct pam_response *)calloc(num_msg,
+				      sizeof(struct pam_response));
+
+    if (response == (struct pam_response *)0)
+	return PAM_CONV_ERR;
+
+    for (i = 0; i < num_msg; i++) {
+	response[i].resp_retcode = PAM_SUCCESS;
+	switch (msg[i]->msg_style) {
+	    case PAM_PROMPT_ECHO_ON:
+		response[i].resp =
+		    (pcUser != (char *)0 ? strdup(pcUser) : (char *)0);
+		break;
+
+	    case PAM_PROMPT_ECHO_OFF:
+		response[i].resp =
+		    (pcWord != (char *)0 ? strdup(pcWord) : (char *)0);
+		break;
+
+	    case PAM_TEXT_INFO:
+	    case PAM_ERROR_MSG:
+		/* Ignore it... */
+		response[i].resp = NULL;
+		break;
+
+	    default:
+		/* Must be an error of some sort... */
+		free(response);
+		return PAM_CONV_ERR;
+	}
+    }
+
+    *resp = response;
+    return PAM_SUCCESS;
+}
+#endif
+
 /* Is this passwd a match for this user's passwd? 		(gregf/ksb)
  * look up passwd in shadow file if we have to, if we are
  * given a special epass try it first.
  */
 int
 #if USE_ANSI_PROTO
-CheckPass(struct passwd *pwd, char *pcWord)
+CheckPass(char *pcUser, char *pcWord)
 #else
-CheckPass(pwd, pcWord)
-    struct passwd *pwd;
+CheckPass(pcUser, pcWord)
+    char *pcUser;
     char *pcWord;
 #endif
 {
+#if HAVE_PAM
+    int pam_error;
+    char *appdata[2];
+    static pam_handle_t *pamh = (pam_handle_t *) 0;
+    struct pam_conv conv;
+    appdata[0] = pcUser;
+    appdata[1] = pcWord;
+    conv.conv = &quiet_conv;
+    conv.appdata_ptr = (void *)&appdata;
+
+    Debug(1, "PAM: pam_start(conserver,%s,...)", pcUser);
+    pam_error = pam_start("conserver", pcUser, &conv, &pamh);
+
+    if (pam_error == PAM_SUCCESS) {
+	pam_set_item(pamh, PAM_RHOST, "IHaveNoIdeaHowIGotHere");
+	Debug(1, "PAM: pam_authenticate()", pcUser);
+	pam_error = pam_authenticate(pamh, PAM_SILENT);
+	if (pam_error == PAM_SUCCESS) {
+	    Debug(1, "PAM: pam_acct_mgmt()", pcUser);
+	    pam_error = pam_acct_mgmt(pamh, PAM_SILENT);
+	    if (pam_error != PAM_SUCCESS) {
+		Error("PAM(%s): %s", "conserver",
+		      pam_strerror(pamh, pam_error));
+	    }
+	} else if (pam_error != PAM_AUTH_ERR) {
+	    Error("PAM(%s): %s", "conserver",
+		  pam_strerror(pamh, pam_error));
+	}
+	Debug(1, "PAM: pam_end()", pcUser);
+	pam_end(pamh, pam_error);
+	if (pam_error == PAM_ABORT)	/* things just got real bad */
+	    fSawGoAway = 1;
+    } else {
+	Error("PAM(%s): %s", "conserver", pam_strerror(pamh, pam_error));
+    }
+    if (pam_error == PAM_SUCCESS)
+	return AUTH_SUCCESS;
+    if (pam_error == PAM_USER_UNKNOWN)
+	return AUTH_NOUSER;
+    return AUTH_INVALID;
+#else /* getpw*() */
 #if HAVE_GETSPNAM
+    struct passwd *pwd;
     struct spwd *spwd;
+    int retval = AUTH_SUCCESS;
 #endif
 
-#if HAVE_GETSPNAM
-    if ('x' == pwd->pw_passwd[0] && '\000' == pwd->pw_passwd[1]) {
-	if ((struct spwd *)0 != (spwd = getspnam(pwd->pw_name)))
-	    return 0 == strcmp(spwd->sp_pwdp,
-			       crypt(pcWord, spwd->sp_pwdp));
-	return 0;
+    if (pcWord == (char *)0) {
+	pcWord = "";
     }
+    if ((pwd = getpwnam(pcUser)) == (struct passwd *)0) {
+	retval = AUTH_NOUSER;
+    } else {
+#if HAVE_GETSPNAM
+	if ('x' == pwd->pw_passwd[0] && '\000' == pwd->pw_passwd[1]) {
+	    if ((spwd = getspnam(pwd->pw_name)) == (struct spwd *)0) {
+		retval = AUTH_NOUSER;
+	    } else {
+		if ((spwd->sp_pwdp[0] != '\000' || pcWord[0] != '\000') &&
+		    (strcmp(spwd->sp_pwdp, crypt(pcWord, spwd->sp_pwdp)) !=
+		     0)) {
+		    retval = AUTH_INVALID;
+		}
+	    }
+	} else
 #endif
-    return 0 == strcmp(pwd->pw_passwd, crypt(pcWord, pwd->pw_passwd));
+	    if ((pwd->pw_passwd[0] != '\000' || pcWord[0] != '\000') &&
+		(strcmp(pwd->pw_passwd, crypt(pcWord, pwd->pw_passwd))
+		 != 0)) {
+	    retval = AUTH_INVALID;
+	}
+    }
+    endpwent();
+    return retval;
+#endif /* getpw*() */
 }
 
 /* This returns a string with the current time in ascii form.
@@ -414,6 +540,8 @@ ReUp(pGE, automatic)
 	    Info("%s: automatic reinitialization [%s]", pCE->server.string,
 		 strtime(NULL));
 	ConsInit(pCE, &pGE->rinit, 1);
+	if (pCE->fup)
+	    pCE->pCLwr = FindWrite(pCE->pCLon);
     }
 }
 
@@ -429,6 +557,22 @@ FlagMark(sig)
 #if !HAVE_SIGACTION
     simpleSignal(SIGALRM, FlagMark);
 #endif
+}
+
+/* various areas of the code (sometimes not even our own) mess with
+ * the alarm signal, so this function is here to reset it to what
+ * we need.  We do not actually set an alarm here, but set the flag
+ * that will call Mark() which will set the next alarm.
+ */
+void
+#if USE_ANSI_PROTO
+resetMark(void)
+#else
+resetMark()
+#endif
+{
+    simpleSignal(SIGALRM, FlagMark);
+    fSawMark = 1;
 }
 
 void
@@ -654,18 +798,26 @@ ReapVirt(pGE)
 	    /* If someone was writing, they fall back to read-only */
 	    if (pCE->pCLwr != (CONSCLIENT *) 0) {
 		pCE->pCLwr->fwr = 0;
+		pCE->pCLwr->fwantwr = 1;
 		tagLogfile(pCE, "%s detached", pCE->pCLwr->acid.string);
 		pCE->pCLwr = (CONSCLIENT *) 0;
 	    }
 
-	    /* Try an initial reconnect */
-	    Info("%s: automatic reinitialization [%s]", pCE->server.string,
-		 strtime(NULL));
-	    ConsInit(pCE, &pGE->rinit, 0);
+	    if (fNoautoreup &&
+		!(WIFEXITED(UWbuf) && WEXITSTATUS(UWbuf) == 0)) {
+		ConsDown(pCE, &pGE->rinit);
+	    } else {
+		/* Try an initial reconnect */
+		Info("%s: automatic reinitialization [%s]",
+		     pCE->server.string, strtime(NULL));
+		ConsInit(pCE, &pGE->rinit, 0);
 
-	    /* If we didn't succeed, try again later */
-	    if (!pCE->fup)
-		pCE->autoReUp = 1;
+		/* If we didn't succeed, try again later */
+		if (!pCE->fup)
+		    pCE->autoReUp = 1;
+		else
+		    pCE->pCLwr = FindWrite(pCE->pCLon);
+	    }
 	}
     }
 }
@@ -683,14 +835,10 @@ CheckPasswd(pCLServing, pw_string)
     char *pw_string;
 #endif
 {
-    struct passwd *pwd;
     FILE *fp;
     int iLine = 0;
     char *server, *servers, *this_pw, *user;
     static STRING username = { (char *)0, 0, 0 };
-#if HAVE_GETSPNAM
-    struct spwd *spwd;
-#endif
 
     buildMyString((char *)0, &username);
     buildMyString(pCLServing->acid.string, &username);
@@ -700,18 +848,10 @@ CheckPasswd(pCLServing, pw_string)
     if ((fp = fopen(pcPasswd, "r")) == (FILE *) 0) {
 	Info("Cannot open passwd file %s: %s", pcPasswd, strerror(errno));
 
-	if ((struct passwd *)0 == (pwd = getpwuid(0))) {
-	    (void)endpwent();
-	    fileWrite(pCLServing->fd, "no root passwd?\r\n", -1);
-	    return 0;
-	}
-	if (0 != CheckPass(pwd, pw_string)) {
+	if (CheckPass("root", pw_string) == AUTH_SUCCESS) {
 	    if (fVerbose)
-		Info("User %s logging into server %s via root passwd",
-		     pCLServing->acid.string,
-		     pCLServing->pCEwant->server.string);
-	    (void)endpwent();
-	    return 1;
+		Info("User %s authenticated into server %s via root passwd", pCLServing->acid.string, pCLServing->pCEwant->server.string);
+	    return AUTH_SUCCESS;
 	}
     } else {
 	char *wholeLine;
@@ -735,37 +875,15 @@ CheckPasswd(pCLServing, pw_string)
 	    this_pw = pruneSpace(this_pw);
 	    servers = pruneSpace(servers);
 
-	    if (strcmp(user, "*any*") != 0 &&
-		strcmp(user, username.string) != 0)
-		continue;
-
-	    if (strcmp(this_pw, "*passwd*") == 0) {
-		this_pw = (char *)0;
-		if ((struct passwd *)0 !=
-		    (pwd = getpwnam(username.string))) {
-#if HAVE_GETSPNAM
-		    if ('x' == pwd->pw_passwd[0] &&
-			'\000' == pwd->pw_passwd[1]) {
-			if ((struct spwd *)0 !=
-			    (spwd = getspnam(pwd->pw_name))) {
-			    this_pw = spwd->sp_pwdp;
-			}
-		    } else {
-			this_pw = pwd->pw_passwd;
-		    }
-#else
-		    this_pw = pwd->pw_passwd;
-#endif
-		}
-	    }
-	    if (this_pw == (char *)0)
-		break;
-
 	    /*
 	       printf
 	       ("Got servers <%s> passwd <%s> user <%s>, want <%s>\n",
 	       servers, this_pw, user, pCLServing->pCEwant->server.string);
 	     */
+
+	    if (strcmp(user, "*any*") != 0 &&
+		strcmp(user, username.string) != 0)
+		continue;
 
 	    /* If one is empty and the other isn't, instant failure */
 	    if ((*this_pw == '\000' && *pw_string != '\000') ||
@@ -774,18 +892,22 @@ CheckPasswd(pCLServing, pw_string)
 	    }
 
 	    if ((*this_pw == '\000' && *pw_string == '\000') ||
-		(strcmp(this_pw, crypt(pw_string, this_pw)) == 0)) {
+		((strcmp(this_pw, "*passwd*") ==
+		  0) ? (CheckPass(username.string,
+				  pw_string) ==
+			AUTH_SUCCESS) : (strcmp(this_pw,
+						crypt(pw_string,
+						      this_pw)) == 0))) {
 		server = strtok(servers, ", \t\n");
 		while (server) {	/* For each server */
 		    if (strcmp(server, "any") == 0) {
 			if (fVerbose) {
-			    Info("User %s logging into server %s",
+			    Info("User %s authenticated into server %s",
 				 pCLServing->acid.string,
 				 pCLServing->pCEwant->server.string);
 			}
 			fclose(fp);
-			(void)endpwent();
-			return 1;
+			return AUTH_SUCCESS;
 		    } else {
 			char *p;
 			int status;
@@ -818,14 +940,10 @@ CheckPasswd(pCLServing, pw_string)
 #endif
 			    if (status == 0) {
 				if (fVerbose) {
-				    Info("User %s logging into server %s",
-					 pCLServing->acid.string,
-					 pCLServing->pCEwant->server.
-					 string);
+				    Info("User %s authenticated into server %s", pCLServing->acid.string, pCLServing->pCEwant->server.string);
 				}
 				fclose(fp);
-				(void)endpwent();
-				return 1;
+				return AUTH_SUCCESS;
 			    }
 			    if (domainHack) {
 				p = strchr(p, '.');
@@ -844,10 +962,9 @@ CheckPasswd(pCLServing, pw_string)
 	    break;
 	}
 	fclose(fp);
-	(void)endpwent();
     }
 
-    return 0;
+    return AUTH_INVALID;
 }
 
 static char *
@@ -902,7 +1019,7 @@ sendRealBreak(pCLServing, pCEServing)
 {
     Debug(1, "Sending a break to %s", pCEServing->server.string);
     if (pCEServing->isNetworkConsole) {
-	char haltseq[2];
+	unsigned char haltseq[2];
 
 	haltseq[0] = IAC;
 	haltseq[1] = BREAK;
@@ -926,7 +1043,8 @@ sendRealBreak(pCLServing, pCEServing)
 	    return;
 	}
 	fileWrite(pCLServing->fd, "- ", -1);
-	sleep(1);
+	usleep(999999);
+	resetMark();
 	if (-1 == ioctl(pCEServing->fdtty, TIOCCBRK, (char *)0)) {
 	    fileWrite(pCLServing->fd, "failed]\r\n", -1);
 	    return;
@@ -1241,7 +1359,8 @@ Kiddie(pGE, sfd)
     time_t lastup = time(NULL);	/* last time we tried to up all downed  */
     int fd;
     char cType;
-    int maxfd, so;
+    int maxfd;
+    socklen_t so;
     fd_set rmask;
     unsigned char acOut[BUFSIZ], acIn[BUFSIZ], acInOrig[BUFSIZ];
 #if HAVE_TERMIOS_H
@@ -1298,8 +1417,8 @@ Kiddie(pGE, sfd)
     simpleSignal(SIGCHLD, FlagReapVirt);
     simpleSignal(SIGINT, FlagGoAwayAlso);
 
-    sprintf(acOut, "ctl_%d", pGE->port);
-    buildMyString(acOut, &pGE->pCEctl->server);
+    sprintf((char *)acOut, "ctl_%d", pGE->port);
+    buildMyString((char *)acOut, &pGE->pCEctl->server);
     pGE->pCEctl->iend = 0;
     buildMyString((char *)0, &pGE->pCEctl->lfile);
     buildMyString("/dev/null", &pGE->pCEctl->lfile);
@@ -1348,8 +1467,7 @@ Kiddie(pGE, sfd)
     simpleSignal(SIGUSR1, FlagReUp);
 
     /* on a SIGALRM we should mark log files */
-    simpleSignal(SIGALRM, FlagMark);
-    fSawMark = 1;		/* start during first pass */
+    resetMark();
 
     /* the MAIN loop a group server
      */
@@ -1377,7 +1495,7 @@ Kiddie(pGE, sfd)
 	    fSawReUp = 0;
 	    ReUp(pGE, 0);
 
-	    if (fReopenall > 0) {
+	    if (fReopenall) {
 		lastup = time(NULL);
 	    }
 	}
@@ -1388,8 +1506,7 @@ Kiddie(pGE, sfd)
 	}
 
 	/* Is it time to reup everything? */
-	if ((fReopenall > 0) &&
-	    ((time(NULL) - lastup) > (fReopenall * 60))) {
+	if (fReopenall && ((time(NULL) - lastup) > (fReopenall * 60))) {
 	    /* Note the new lastup time only after we finish.
 	     */
 	    ReUp(pGE, 2);
@@ -1427,19 +1544,26 @@ Kiddie(pGE, sfd)
 		/* If someone was writing, they fall back to read-only */
 		if (pCEServing->pCLwr != (CONSCLIENT *) 0) {
 		    pCEServing->pCLwr->fwr = 0;
+		    pCEServing->pCLwr->fwantwr = 1;
 		    tagLogfile(pCEServing, "%s detached",
 			       pCEServing->pCLwr->acid.string);
 		    pCEServing->pCLwr = (CONSCLIENT *) 0;
 		}
 
-		/* Try an initial reconnect */
-		Info("%s: automatic reinitialization [%s]",
-		     pCEServing->server.string, strtime(NULL));
-		ConsInit(pCEServing, &pGE->rinit, 0);
+		if (fNoautoreup) {
+		    ConsDown(pCEServing, &pGE->rinit);
+		} else {
+		    /* Try an initial reconnect */
+		    Info("%s: automatic reinitialization [%s]",
+			 pCEServing->server.string, strtime(NULL));
+		    ConsInit(pCEServing, &pGE->rinit, 0);
 
-		/* If we didn't succeed, try again later */
-		if (!pCEServing->fup)
-		    pCEServing->autoReUp = 1;
+		    /* If we didn't succeed, try again later */
+		    if (!pCEServing->fup)
+			pCEServing->autoReUp = 1;
+		    else
+			pCEServing->pCLwr = FindWrite(pCEServing->pCLon);
+		}
 
 		continue;
 	    }
@@ -1506,7 +1630,7 @@ Kiddie(pGE, sfd)
 	    /* log it and write to all connections on this server
 	     */
 	    if (!pCEServing->nolog) {
-		(void)writeLog(pCEServing, acIn, nr);
+		(void)writeLog(pCEServing, (char *)acIn, nr);
 	    }
 
 	    /* output all console info nobody is attached
@@ -1537,7 +1661,7 @@ Kiddie(pGE, sfd)
 	    for (pCL = pCEServing->pCLon; (CONSCLIENT *) 0 != pCL;
 		 pCL = pCL->pCLnext) {
 		if (pCL->fcon) {
-		    (void)fileWrite(pCL->fd, acIn, nr);
+		    (void)fileWrite(pCL->fd, (char *)acIn, nr);
 		}
 	    }
 	}
@@ -1636,7 +1760,8 @@ Kiddie(pGE, sfd)
 				buildMyStringChar(acIn[i],
 						  &pCLServing->msg);
 				if (pGE->pCEctl != pCEServing)
-				    fileWrite(pCLServing->fd, &acIn[i], 1);
+				    fileWrite(pCLServing->fd,
+					      (char *)&acIn[i], 1);
 			    } else if ((acIn[i] == '\b' || acIn[i] == 0x7f)
 				       && pCLServing->msg.used > 1) {
 				if (pCLServing->msg.
@@ -1767,7 +1892,8 @@ Kiddie(pGE, sfd)
 			buildMyString((char *)0, &pCLServing->accmd);
 
 			if (('t' == pCLServing->caccess) ||
-			    (0 != CheckPasswd(pCLServing, ""))) {
+			    (CheckPasswd(pCLServing, "") ==
+			     AUTH_SUCCESS)) {
 			    goto shift_console;
 			}
 			fileWrite(pCLServing->fd, "passwd:\r\n", -1);
@@ -1791,9 +1917,9 @@ Kiddie(pGE, sfd)
 			    pCLServing->accmd.used--;
 			}
 
-			if (0 ==
-			    CheckPasswd(pCLServing,
-					pCLServing->accmd.string)) {
+			if (CheckPasswd
+			    (pCLServing,
+			     pCLServing->accmd.string) != AUTH_SUCCESS) {
 			    fileWrite(pCLServing->fd, "Sorry.\r\n", -1);
 			    Info("%s: %s: bad passwd",
 				 pCLServing->pCEwant->server.string,
@@ -1878,10 +2004,11 @@ Kiddie(pGE, sfd)
 			if (acIn[i] >= '0' && acIn[i] <= '7') {
 			    buildMyStringChar(acIn[i], &pCLServing->accmd);
 			    if (pCLServing->accmd.used < 4) {
-				fileWrite(pCLServing->fd, &acIn[i], 1);
+				fileWrite(pCLServing->fd, (char *)&acIn[i],
+					  1);
 				continue;
 			    }
-			    fileWrite(pCLServing->fd, &acIn[i], 1);
+			    fileWrite(pCLServing->fd, (char *)&acIn[i], 1);
 			    fileWrite(pCLServing->fd, "]", 1);
 
 			    pCLServing->accmd.string[0] =
@@ -2287,7 +2414,7 @@ Kiddie(pGE, sfd)
 				     pCL = pCL->pCLscan) {
 				    if (pGE->pCEctl == pCL->pCEto)
 					continue;
-				    sprintf(acOut,
+				    sprintf((char *)acOut,
 					    " %-32.32s %c %-7.7s %6s ",
 					    pCL->acid.string,
 					    pCL == pCLServing ? '*' : ' ',
@@ -2296,7 +2423,8 @@ Kiddie(pGE, sfd)
 							 "spy") :
 					    "stopped",
 					    IdleTyme(tyme - pCL->typetym));
-				    fileWrite(pCLServing->fd, acOut, -1);
+				    fileWrite(pCLServing->fd,
+					      (char *)acOut, -1);
 				    filePrint(pCLServing->fd, "%s\r\n",
 					      pCL->pCEto->server.string);
 				}
@@ -2363,14 +2491,20 @@ Kiddie(pGE, sfd)
 					    filePrint(pCLServing->fd, ",");
 					if (pCL->fcon)
 					    filePrint(pCLServing->fd,
-						      "r@%s@%ld",
+						      "r@%s@%ld@%s",
 						      pCL->acid.string,
-						      tyme - pCL->typetym);
+						      tyme - pCL->typetym,
+						      pCL->
+						      fwantwr ? "rw" :
+						      "ro");
 					else
 					    filePrint(pCLServing->fd,
-						      "s@%s@%ld",
+						      "s@%s@%ld@%s",
 						      pCL->acid.string,
-						      tyme - pCL->typetym);
+						      tyme - pCL->typetym,
+						      pCL->
+						      fwantwr ? "rw" :
+						      "ro");
 					comma = 1;
 				    }
 
@@ -2521,7 +2655,7 @@ Kiddie(pGE, sfd)
 				for (pCE = pGE->pCElist;
 				     pCE != (CONSENT *) 0;
 				     pCE = pCE->pCEnext) {
-				    sprintf(acOut,
+				    sprintf((char *)acOut,
 					    " %-24.24s %c %-4.4s %-.40s\r\n",
 					    pCE->server.string,
 					    pCE == pCEServing ? '*' : ' ',
@@ -2529,8 +2663,8 @@ Kiddie(pGE, sfd)
 					    pCE->pCLwr ? pCE->pCLwr->acid.
 					    string : pCE->
 					    pCLon ? "<spies>" : "<none>");
-				    (void)fileWrite(pCLServing->fd, acOut,
-						    -1);
+				    (void)fileWrite(pCLServing->fd,
+						    (char *)acOut, -1);
 				}
 				break;
 
@@ -2548,7 +2682,7 @@ Kiddie(pGE, sfd)
 				for (pCL = pCEServing->pCLon;
 				     (CONSCLIENT *) 0 != pCL;
 				     pCL = pCL->pCLnext) {
-				    sprintf(acOut,
+				    sprintf((char *)acOut,
 					    " %-32.32s %c %-7.7s %6s %s\r\n",
 					    pCL->acid.string,
 					    pCL == pCLServing ? '*' : ' ',
@@ -2558,8 +2692,8 @@ Kiddie(pGE, sfd)
 					    "stopped",
 					    IdleTyme(tyme - pCL->typetym),
 					    pCL->actym);
-				    (void)fileWrite(pCLServing->fd, acOut,
-						    -1);
+				    (void)fileWrite(pCLServing->fd,
+						    (char *)acOut, -1);
 				}
 				break;
 
@@ -2570,15 +2704,15 @@ Kiddie(pGE, sfd)
 				for (pCE = pGE->pCElist;
 				     pCE != (CONSENT *) 0;
 				     pCE = pCE->pCEnext) {
-				    sprintf(acOut,
+				    sprintf((char *)acOut,
 					    " %-24.24s on %-32.32s at %5.5s%c\r\n",
 					    pCE->server.string,
 					    pCE->fvirtual ? pCE->acslave.
 					    string : pCE->dfile.string,
 					    pCE->pbaud->acrate,
 					    pCE->pparity->ckey);
-				    (void)fileWrite(pCLServing->fd, acOut,
-						    -1);
+				    (void)fileWrite(pCLServing->fd,
+						    (char *)acOut, -1);
 				}
 				break;
 
@@ -2730,7 +2864,7 @@ Kiddie(pGE, sfd)
 	}
 
 	pGE->pCLfree->fd = fileOpenFD(fd, simpleSocket);
-	if (pGE->pCLfree->fd < 0) {
+	if ((CONSFILE *) 0 == pGE->pCLfree->fd) {
 	    Error("fileOpenFD: %s", strerror(errno));
 	    close(fd);
 	    continue;
@@ -2744,8 +2878,10 @@ Kiddie(pGE, sfd)
 		fileWrite(pGE->pCLfree->fd,
 			  "access from your host refused\r\n", -1);
 		fileClose(&pGE->pCLfree->fd);
+		resetMark();
 		continue;
 	    }
+	    resetMark();
 	}
 #endif
 
@@ -2856,7 +2992,7 @@ Spawn(pGE)
 #endif
 {
     int pid, sfd;
-    int so;
+    socklen_t so;
     struct sockaddr_in lstn_port;
     int true = 1;
     int portInc = 0;
@@ -2940,7 +3076,7 @@ Spawn(pGE)
 	exit(EX_UNAVAILABLE);
     }
     ssocket = fileOpenFD(sfd, simpleSocket);
-    if (ssocket < 0) {
+    if ((CONSFILE *) 0 == ssocket) {
 	Error("fileOpenFD: %s", strerror(errno));
 	close(sfd);
 	exit(EX_UNAVAILABLE);

@@ -1,13 +1,37 @@
 				CHANGES
 				=======
 
+version 7.2.3 (Sep 23, 2002):
+	- checking for duplicate console names got lost in the major
+	  7.2.0 rewrite of that code.  it's back now, with a couple of
+	  other edge-case fixes i noticed while scanning the code -
+	  reported by Dave Stuit <djs@tellme.com>
+	- added --with-pam and PAM authentication support - suggested
+	  by Stu May <jsmay@wasteofbits.com>
+	- added -F server option to prevent automatic reinitialization
+	  of failed consoles ('|' syntax consoles which exit with a
+	  zero status are still reinitialized) - requested by William P
+	  LePera <lepera@us.ibm.com> and Malcolm Gibbs
+	  <Malcolm.Gibbs005@msd.govt.nz>
+	- successful automatic reinitialization of consoles now attaches
+	  a client that wants read-write mode
+	- added read-only client wish to become read-write in -i output
+	- moved to autoconf-2.54 and fixed some small configure.in bugs
+    Many thanks to John R. Jackson <jrj@purdue.edu> for the following
+    fixes, cleanups, and enhancements...
+	- "lost timestamps" bug (SIGALRM/sleep()/usleep()/tcp_wrapper
+	  interaction)
+	- compiler warnings, bad fileOpenFD tests, and ability to use
+	  a colon after an equal in the config file (LOGDIR=C:\Logs)
+	- autologin fix for Solaris BSM support
+
 version 7.2.2 (Jun 05, 2002):
 	- added 'n' as token for no-parity - patch by Greg A. Woods
 	  <woods@weird.com>
 	- extra timestamps occur when consoles come back up after being
 	  down longer than their timestamp period - reported by Dave
 	  Stuit <djs@gnac.com>
-	- AIX 5.1 psuedo-terminal support broken - patch by William P
+	- AIX 5.1 pseudo-terminal support broken - patch by William P
 	  LePera <lepera@us.ibm.com>
 	- PID file overwritten and not unlinked on exit - reported by
 	  William P LePera <lepera@us.ibm.com>
@@ -321,5 +345,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.60 2002-06-05 15:05:13-07 bryan Exp $
+#  $Id: CHANGES,v 1.68 2002-09-23 14:20:20-07 bryan Exp $
 #

@@ -15,6 +15,7 @@ directed to faq@conserver.com.  The FAQ answers the following questions:
        mean (or something close to that)?
     7) How do I set up a serial port for no parity?
     8) Is "Conserver" a Trademark or Registered Trademark?
+    9) When I connect to a console, it says it is down.  Why?
    99) Ok, things just don't seem to work.  Help?!?
 
 
@@ -90,6 +91,21 @@ directed to faq@conserver.com.  The FAQ answers the following questions:
     things, so I'm not exactly sure what I'm taking about and my answer
     becomes a very vague "not as far as I know".
 
+ 9) When I connect to a console, it says it is down.  Why?
+
+    There are multiple reasons why this might happen.  First, see if it's
+    just a remnant of some other temporary problem.  Try and bring the
+    console up by doing a '^Eco' from the client.  If that doesn't work,
+    there's a more serious problem which, hopefully, the conserver logfile
+    will explain.  Check the log for any permission problems, connection
+    refused messages, etc.  You might get more useful information in
+    the log by using the -v option or even by enabling debugging with
+    -D (ideally that shouldn't be necessary).  Depending on the type of
+    console, your system might be out of pseudo-terminals, another process
+    might have a terminal server port occupied (another console server or
+    telnet session), or there was an unseen typo in a path or hostname.
+    The logfile should show hints of things like this and other issues.
+
 99) Ok, things just don't seem to work.  Help?!?
 
     Yes, this is a pretty vague question, but here are a few tips that
@@ -130,5 +146,5 @@ directed to faq@conserver.com.  The FAQ answers the following questions:
       through the same problem?
 
 #
-#  $Id: FAQ,v 1.6 2002-03-25 16:16:29-08 bryan Exp $
+#  $Id: FAQ,v 1.7 2002-09-22 10:21:06-07 bryan Exp $
 #

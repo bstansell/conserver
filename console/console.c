@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.84 2002-03-11 18:10:27-08 bryan Exp $
+ *  $Id: console.c,v 5.85 2002-09-23 11:40:51-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -878,7 +878,7 @@ CallUp(s, pcMaster, pcMach, pcHow, pcUser)
 	SendOut(s, acMesg, strlen(acMesg));
 	(void)ReadReply(s, acMesg, sizeof(acMesg), (char *)0);
 	if (0 == strcmp(acMesg, "passwd:")) {
-	    static STRING pass = {(char *)0,0,0};
+	    static STRING pass = { (char *)0, 0, 0 };
 	    buildMyString((char *)0, &pass);
 	    (void)sprintf(acMesg, "Enter %s@%s's password:", pcUser,
 			  pcMaster);

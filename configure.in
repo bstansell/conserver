@@ -1,3 +1,19 @@
+dnl ### autoheader templates. #######################################
+AH_TEMPLATE([CONFIGINVOCATION], [./configure invocation])
+AH_TEMPLATE([DEFPORT], [Socket used to communicate])
+AH_TEMPLATE([DEFBASEPORT], [Base socket used for secondary channel])
+AH_TEMPLATE([MASTERHOST], [Hostname of console server])
+AH_TEMPLATE([CONFIGFILE], [Config file path])
+AH_TEMPLATE([PASSWDFILE], [Password file path])
+AH_TEMPLATE([LOGFILEPATH], [Logfile path])
+AH_TEMPLATE([MAXMEMB], [Number of consoles per child process])
+AH_TEMPLATE([CONNECTTIMEOUT], [TCP connection timeout])
+AH_TEMPLATE([PIDFILE], [pidfile to write to])
+AH_TEMPLATE([USE_LIBWRAP], [use tcp_wrappers libwrap])
+AH_TEMPLATE([USE_ANSI_PROTO], [use ansi prototypes/decls])
+AH_TEMPLATE([HAVE_POSIX_REGCOMP], [have POSIX regcomp])
+AH_TEMPLATE([HAVE_PAM], [have PAM])
+
 dnl ### Normal initialization. ######################################
 AC_INIT
 AC_CONFIG_SRCDIR([conserver/main.c])
@@ -187,32 +203,26 @@ AC_HEADER_SYS_WAIT
 AC_TYPE_MODE_T
 AC_TYPE_SIGNAL
 
-AC_CACHE_CHECK([if sig_atomic_t is defined], ac_cv_type_sig_atomic_t,
-  AC_TRY_LINK([
-    #include <signal.h>
-  ], [
-    sig_atomic_t sigatom;
-    sigatom = 1;
-  ],
-    ac_cv_type_sig_atomic_t=yes,
-    ac_cv_type_sig_atomic_t=no
-  )
-)
-if test "$ac_cv_type_sig_atomic_t" != "yes"; then
-  AC_DEFINE(sig_atomic_t, volatile int, [Define if <signal.h> does not define sig_atomic_t])
-fi
+AC_CHECK_TYPE([sig_atomic_t],,
+    AC_DEFINE(sig_atomic_t, volatile int,
+	[Define if <signal.h> does not define sig_atomic_t]),
+    [#include <signal.h>])
 
-AC_CHECK_TYPES(in_addr_t,,,[$ac_includes_default
+AC_CHECK_TYPE([in_addr_t],[AC_DEFINE(HAVE_IN_ADDR_T,1,
+	[Defined if in_addr_t exists])],,[$ac_includes_default
 #include <netinet/in.h>])
-
+AC_CHECK_TYPE([socklen_t],[AC_DEFINE(HAVE_SOCKLEN_T,1,
+	[Defined if socklen_t exists])],,[$ac_includes_default
+#include <sys/socket.h>])
 
 dnl ### Check for libraries. #######################################
 AC_SEARCH_LIBS(socket,socket)
 AC_SEARCH_LIBS(gethostbyname,nsl)
 AC_SEARCH_LIBS(crypt,crypt)
 
-AC_SUBST(WRAPLIBS)
-AC_SUBST(WRAPINCS)
+AC_SUBST(CONSLIBS)
+AC_SUBST(CONSCPPFLAGS)
+AC_SUBST(CONSLDFLAGS)
 AC_ARG_WITH(libwrap,
     AC_HELP_STRING([--with-libwrap@<:@=PATH@:>@],
 	[Compile in libwrap (tcp_wrappers) support]),
@@ -232,7 +242,6 @@ AC_ARG_WITH(libwrap,
 	CPPFLAGS="$CPPFLAGS $WRAPCPPFLAGS"
 	LDFLAGS="$LDFLAGS $WRAPLDFLAGS"
 
-	AC_MSG_CHECKING(for TCP wrappers header tcpd.h)
 	AC_CHECK_HEADER(tcpd.h,
 	    [LIBS="$LIBS -lwrap"
 	    AC_MSG_CHECKING(for TCP wrappers library -lwrap)
@@ -242,8 +251,9 @@ AC_ARG_WITH(libwrap,
 		],[hosts_access((void *)0)],
 		[AC_MSG_RESULT(yes)
 		AC_DEFINE(USE_LIBWRAP)
-		WRAPLIBS="$WRAPLDFLAGS -lwrap"
-		WRAPINCS="$WRAPCPPFLAGS"],
+		CONSLIBS="$CONSLIBS -lwrap"
+		CONSLDFLAGS="$CONSLDFLAGS $WRAPLDFLAGS"
+		CONSCPPFLAGS="$CONSCPPFLAGS $WRAPCPPFLAGS"],
 		[AC_MSG_RESULT(no)])],)
 
 	LIBS="$oLIBS"
@@ -288,11 +298,44 @@ AC_ARG_WITH(regex,
 	    AC_MSG_RESULT(no)
 	fi],[AC_MSG_RESULT(no)])
 
+AC_ARG_WITH(pam,
+    AC_HELP_STRING([--with-pam],
+	[enable PAM support]),
+	[if test "$withval" = yes; then
+	    oLIBS="$LIBS"
+
+	    AC_CHECK_HEADER(security/pam_appl.h,
+		[LIBS="$LIBS -lpam"
+		AC_MSG_CHECKING(for PAM library -lpam)
+		AC_TRY_LINK_FUNC([pam_start],
+		    [AC_MSG_RESULT(yes)
+		    AC_DEFINE(HAVE_PAM)
+		    CONSLIBS="$CONSLIBS -lpam"],
+		    [LIBS="$LIBS -ldl"
+		    AC_MSG_RESULT(no)
+		    AC_MSG_CHECKING(for PAM library -lpam with -ldl)
+		    AC_TRY_LINK_FUNC([pam_end],
+			[AC_MSG_RESULT(yes)
+			AC_DEFINE(HAVE_PAM)
+			CONSLIBS="$CONSLIBS -lpam -ldl"],
+			[AC_MSG_RESULT(no)])])],)
+
+	    LIBS="$oLIBS"
+	fi],)
+
+
 AC_CHECK_FUNCS(getopt strerror getrlimit getsid setsid getuserattr setgroups tcgetpgrp tcsetpgrp tcgetattr tcsetattr tcsendbreak setpgrp getutent setttyent getspnam setlinebuf setvbuf ptsname grantpt unlockpt flock sigaction setsockopt getdtablesize putenv memset memcpy memcmp sysconf getpassphrase getlogin)
 AC_FUNC_SETPGRP
 
+dnl    Checks for libbsm functions
+AC_CHECK_HEADERS(bsm/audit.h)
+AC_CHECK_LIB(bsm, getaudit)
+AC_CHECK_FUNC(getaudit,
+    AC_DEFINE(HAVE_GETAUDIT, 1, [Define if libbsm has `getaudit'.]))
+AC_CHECK_FUNC(getaudit_addr,
+    AC_DEFINE(HAVE_GETAUDIT_ADDR, 1, [Define if libbsm has `getaudit_addr'.]))
+
 
 dnl ### Create output files. #######################################
-AC_SUBST(LIBOBJS)
 AC_CONFIG_FILES([Makefile conserver/Makefile conserver.cf/Makefile console/Makefile autologin/Makefile])
 AC_OUTPUT

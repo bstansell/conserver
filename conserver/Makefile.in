@@ -15,11 +15,11 @@ MKDIR = @MKDIR@
 
 ### Compiler and link options
 CC	= @CC@
-CFLAGS	= @CFLAGS@ # -DPUCC -DSUN5
+CFLAGS	= @CFLAGS@
 DEFS	= @DEFS@ -DSYSCONFDIR=\"$(sysconfdir)\"
-CPPFLAGS = -I.. -I$(top_srcdir) -I$(srcdir) $(DEFS) @CPPFLAGS@ @WRAPINCS@
-LDFLAGS	= @LDFLAGS@
-LIBS	= @LIBS@ @WRAPLIBS@
+CPPFLAGS = -I.. -I$(top_srcdir) -I$(srcdir) $(DEFS) @CPPFLAGS@ @CONSCPPFLAGS@
+LDFLAGS	= @LDFLAGS@ @CONSLDFLAGS@
+LIBS	= @LIBS@ @CONSLIBS@
 @SET_MAKE@
 
 

@@ -19,6 +19,29 @@
 #include <grp.h>
 #include <pwd.h>
 #include <utmp.h>
+#if defined(HAVE_BSM_AUDIT_H) && defined(HAVE_LIBBSM)
+
+/*
+ * There is no official registry of non-vendor audit event numbers,
+ * but the following should be OK.
+ *
+ * You need to add a line by hand to /etc/security/audit_event to make
+ * praudit(1) look pretty:
+ *
+ *  32900:AUE_autologin:autologin:lo
+ *
+ * If you have to change the value for AUE_autologin, you'll also need
+ * to change the /etc/security/audit_event line.
+ */
+
+#define	AUE_autologin			32900
+
+#include <sys/unistd.h>
+#include <netdb.h>
+#include <bsm/audit.h>
+#include <bsm/libbsm.h>
+#include <libintl.h>
+#endif
 
 #include <compat.h>
 
@@ -46,7 +69,7 @@
  */
 
 #ifndef	lint
-char	*rcsid = "$Id: autologin.c,v 1.22 93/09/04 21:48:41 ksb Exp $";
+char	*rcsid = "$Id: autologin.c,v 1.23 2002-09-20 23:29:39-07 bryan Exp $";
 #endif	/* not lint */
 extern char	*progname;
 gid_t	 awGrps[NGROUPS_MAX];
@@ -96,8 +119,18 @@ Process()
 #  endif
 # endif
 #endif
+#if defined(HAVE_BSM_AUDIT_H) && defined(HAVE_LIBBSM)
+	char			my_hostname[MAXHOSTNAMELEN];
+#endif
 
 
+#if defined(HAVE_BSM_AUDIT_H) && defined(HAVE_LIBBSM)
+	if (0 != gethostname(my_hostname, sizeof(my_hostname))) {
+		(void) fprintf(stderr, "%s: gethostname: %s\n", strerror(errno));
+		exit(1);
+		/* NOTREACHED */
+	}
+#endif
 	if ((char *)0 != pcCommand) {
 		if ((char *)0 == (pcCmd = (char *)malloc(strlen(pcCommand) + 4))) {
 			(void) fprintf(stderr, "%s: malloc: %s\n", progname, strerror(errno));
@@ -127,6 +160,7 @@ Process()
 	}
 	wUid = pwd->pw_uid;
 	wGid = pwd->pw_gid;
+	(void)endpwent();
 #ifdef	HAVE_GETUSERATTR
 	/* getuserattr() returns a funny list of groups:
 	 *	"grp1\0grp2\0grp3\0\0"
@@ -141,6 +175,7 @@ Process()
 		}
 	}
 #endif	/* HAVE_GETUSERATTR */
+	(void)endgrent();
 
 	if ((char *)0 != pcTty) {
 		if ( '/' == *pcTty ) {
@@ -198,6 +233,100 @@ Process()
 			iNewGrp = getpid();
 		}
 	}
+
+#if defined(HAVE_BSM_AUDIT_H) && defined(HAVE_LIBBSM)
+	if (!cannot_audit(0)) {
+# if defined(HAVE_GETAUDIT_ADDR)
+		struct auditinfo_addr	audit_info;
+# else
+		struct auditinfo	audit_info;
+# endif
+		au_mask_t		audit_mask;
+# if !defined(HAVE_GETAUDIT_ADDR)
+		struct hostent		*hp;
+# endif
+		int			iAuditFile;
+		int			fShowEvent = 1;
+		token_t			*ptAuditToken;
+
+		(void)memset(&audit_info, 0, sizeof(audit_info));
+		audit_info.ai_auid = wUid;
+		audit_info.ai_asid = getpid();
+		audit_mask.am_success = audit_mask.am_failure = 0;
+		(void) au_user_mask(pcLogin, &audit_mask);
+		audit_info.ai_mask.am_success = audit_mask.am_success;
+		audit_info.ai_mask.am_failure = audit_mask.am_failure;
+# if defined(HAVE_GETAUDIT_ADDR)
+		(void)aug_get_machine(my_hostname,
+				      &audit_info.ai_termid.at_addr[0],
+				      &audit_info.ai_termid.at_type);
+# else
+		if ((char *)0 != (hp = gethostbyname(my_hostname))
+		    && AF_INET == hp->h_addrtype) {
+			(void)memcpy(&audit_info.ai_termid.machine,
+				     hp->h_addr,
+				     sizeof(audit_info.ai_termid.machine));
+		}
+# endif
+# if defined(HAVE_GETAUDIT_ADDR)
+		if (0 > setaudit_addr(&audit_info, sizeof(audit_info)))
+# else
+		if (0 > setaudit(&audit_info))
+# endif
+		{
+			fprintf(stderr, "%s: setaudit failed: %s\n",
+				progname,
+				strerror(errno));
+			fShowEvent = 0;
+		}
+		if (fShowEvent) {
+			fShowEvent = au_preselect(AUE_autologin,
+						  &audit_mask,
+						  AU_PRS_SUCCESS,
+						  AU_PRS_REREAD);
+		}
+		if (fShowEvent) {
+			iAuditFile = au_open();
+# if defined(HAVE_GETAUDIT_ADDR)
+			ptAuditToken = au_to_subject_ex(wUid,
+						        wUid,
+						        wGid,
+						        wUid,
+						        wGid,
+						        audit_info.ai_asid,
+						        audit_info.ai_asid,
+						        &audit_info.ai_termid),
+# else
+			ptAuditToken = au_to_subject(wUid,
+						     wUid,
+						     wGid,
+						     wUid,
+						     wGid,
+						     audit_info.ai_asid,
+						     audit_info.ai_asid,
+						     &audit_info.ai_termid),
+# endif
+			(void)au_write(iAuditFile, ptAuditToken);
+			ptAuditToken = au_to_text(gettext("successful login"));
+			(void)au_write(iAuditFile, ptAuditToken);
+			if ((char *)0 != pcCmd) {
+				ptAuditToken = au_to_text(pcCmd);
+				(void)au_write(iAuditFile, ptAuditToken);
+			}
+# if defined(HAVE_GETAUDIT_ADDR)
+			ptAuditToken = au_to_return32(0, 0);
+# else
+			ptAuditToken = au_to_return(0, 0);
+# endif
+			(void)au_write(iAuditFile, ptAuditToken);
+			if(0 > au_close(iAuditFile, AU_TO_WRITE, AUE_autologin)) {
+				fprintf(stderr, "%s: audit write failed",
+					progname,
+					strerror(errno));
+			}
+		}
+	}
+#endif
 
 	/* Open the TTY for stdin, stdout and stderr
 	 */

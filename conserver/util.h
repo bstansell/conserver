@@ -1,5 +1,5 @@
 /*
- *  $Id: util.h,v 1.22 2002-02-25 14:00:38-08 bryan Exp $
+ *  $Id: util.h,v 1.24 2002-09-22 14:13:47-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -12,15 +12,20 @@
 #include <varargs.h>
 #endif
 
+/* communication constants
+ */
+#define OB_SUSP		'Z'	/* suspended by server          */
+#define OB_DROP		'.'	/* dropped by server            */
+
 /* Struct to wrap information about a "file"...
  * This can be a socket, local file, whatever.  We do this so
  * we can add encryption to sockets (and generalize I/O).
  */
 enum consFileType {
     simpleFile,
-    simpleSocket,
+    simpleSocket
 #ifdef TLS_SUPPORT
-    TLSSocket,
+    ,TLSSocket
 #endif
 };
 

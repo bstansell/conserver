@@ -186,6 +186,10 @@ extern char *h_errlist[];
 typedef unsigned long in_addr_t;
 #endif
 
+#ifndef HAVE_SOCKLEN_T
+typedef int socklen_t;
+#endif
+
 /*
  * IUCLC, OLCUC and XCASE were removed from IEEE Std 1003.1-200x
  *  as legacy definitions.

@@ -1,10 +1,15 @@
 
-I have not touched the autologin directory.  See the README.old and
-INSTALL.old files if you interested in the program.  I cannot guarantee
-it will compile, install, or run.  It is definately not integrated with
-../Makefile or any of the porting support.  If you have patches that
-make it work, please send them to me and I'll be more than happy to
-incorporate them.
+This file used to say "I have not touched the autologin directory."
+That's no longer true.  I've applied patches submitted by the user
+community (see the CHANGES file for details).  I still cannot guarantee
+anything, but it sounds like at least one person out there is
+successfully using the code.  And now for my original hand-waving...
+
+See the README.old and INSTALL.old files if you interested in the
+program.  I cannot guarantee it will compile, install, or run.  It is
+definately not integrated with ../Makefile or any of the porting
+support.  If you have patches that make it work, please send them to me
+and I'll be more than happy to incorporate them.
 
 No one I've ever talked to found a need for something like autologin.
 Good luck.
@@ -12,5 +17,5 @@ Good luck.
 Bryan Stansell
 
 #
-#  $Id: README,v 1.1 1999-01-21 22:59:40-08 bryan Exp $
+#  $Id: README,v 1.2 2002-09-23 14:08:42-07 bryan Exp $
 #

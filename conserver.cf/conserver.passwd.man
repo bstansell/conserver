@@ -1,4 +1,4 @@
-.\" $Id: conserver.passwd.man,v 1.5 2002-03-25 15:45:43-08 bryan Exp $
+.\" $Id: conserver.passwd.man,v 1.6 2002-09-23 14:15:53-07 bryan Exp $
 .TH CONSERVER.PASSWD 5 "Local"
 .SH NAME
 conserver.passwd \- user access information for conserver(8)
@@ -37,7 +37,9 @@ without an entry earlier in the file.
 the encrypted password,
 or the string ``\fB*passwd*\fP''
 to indicate that \fBconserver\fP should look up the user's password
-in the system \fBpasswd\fP (or \fBshadow\fP) database.
+in the system \fBpasswd\fP (or \fBshadow\fP) database.  If PAM
+support has been enabled (\fB--with-pam\fP), PAM lookups will be done instead
+of \fBpasswd\fP (or \fBshadow\fP) lookups.
 If this field is empty, password checking is bypassed for this user.
 .TP
 .I consoles

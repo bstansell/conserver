@@ -18,18 +18,23 @@ Downloading
     The latest version can be found at http://www.conserver.com/
 
 
-Postcard
+Systems Tested
 
-    I always like to hear from people who use conserver - it's exciting
-    to see how many people all over the world are using the package.
-    If you'd like to give me a real thrill, send me a postcard of your
-    site, town, or area!  Even if you're right around the corner, it
-    would be a blast to hear from you.
+    Here's a list of systems that I've been told can successfully
+    compile conserver.  If anyone has more to add to this list (or
+    something on the list doesn't work any more), please let me know.
 
-	    Bryan Stansell
-	    P.O. Box 984
-	    Redwood City, CA 94064-0984
-	    USA
+	Solaris 2.5.1 thru 9 (sparc/x86), gcc
+	BSDI BSD/OS 3.X, gcc
+	MacOS X
+	Linux 2.2.18 (x86), gcc
+	Linux 2.4.2 (x86), gcc
+	FreeBSD 4.2 (x86), gcc
+	cygwin (w2k),gcc 2.95.3
+	DEC Tru64 4.0, gcc
+	DEC Tru64 4.0/5.1, DEC cc
+	HP-UX 10.20, gcc
+	AIX 4.3.3, AIX cc
 
 
 Contributions
@@ -45,5 +50,5 @@ Contributions
     http://www.columbia.edu/acis/sy/unixdev/zinc
 
 #
-#  $Id: README,v 1.19 2002-02-16 17:31:44-08 bryan Exp $
+#  $Id: README,v 1.21 2002-09-23 10:10:11-07 bryan Exp $
 #

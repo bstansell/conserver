@@ -1,4 +1,4 @@
-.\" $Id: console.man,v 1.20 2002-03-11 18:06:31-08 bryan Exp $
+.\" $Id: console.man,v 1.21 2002-09-22 10:20:43-07 bryan Exp $
 .TH CONSOLE 1 "Local"
 .SH NAME
 console \- console server client program
@@ -194,8 +194,9 @@ and file descriptor for the socket connection.
 .B users-list
 The details of each user connected to the console.  The details for each
 user are an `@' seperated list of `w', `r', or `s' (for read-write, read-only,
-or suspended), username, hostname the user is on, and the user's idle time.
-Each user bundle is seperated by commas.
+or suspended), username, hostname the user is on, the user's idle time,
+and (for `r' and `s' users only) ``rw'' or ``ro'' (if the user wants
+read-write mode or not).  Each user bundle is seperated by commas.
 .TP
 .B state
 The state of the console.  Values with either be ``up'' or ``down''.

@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.94 2002-06-05 15:05:00-07 bryan Exp $
+ *  $Id: main.c,v 5.95 2002-09-22 09:31:54-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -56,7 +56,7 @@
 
 int fAll = 0, fVerbose = 0, fSoftcar = 0, fNoinit = 0, fVersion =
     0, fStrip = 0, fDaemon = 0, fUseLogfile = 0, fReopen = 0, fReopenall =
-    0;
+    0, fNoautoreup = 0;
 
 char chDefAcc = 'r';
 
@@ -167,7 +167,7 @@ daemonize()
 
 
 static char u_terse[] =
-    " [-7dDhinouvV] [-a type] [-m max] [-M addr] [-p port] [-b port] [-C config] [-P passwd] [-L logfile] [-O min]";
+    " [-7dDFhinouvV] [-a type] [-m max] [-M addr] [-p port] [-b port] [-C config] [-P passwd] [-L logfile] [-O min]";
 static char *apcLong[] = {
     "7          strip the high bit of all console data",
     "a type     set the default access type",
@@ -175,6 +175,7 @@ static char *apcLong[] = {
     "C config   give a new config file to the server process",
     "d          become a daemon, redirecting stdout/stderr to logfile",
     "D          enable debug output, sent to stderr",
+    "F          do not automatically reinitialize failed consoles",
     "h          output this message",
     "i          initialize console connections on demand",
     "L logfile  give a new logfile path to the server process",
@@ -368,7 +369,7 @@ main(argc, argv)
     int i;
     FILE *fpConfig;
     struct hostent *hpMe;
-    static char acOpts[] = "7a:b:C:dDhiL:m:M:noO:p:P:suVv";
+    static char acOpts[] = "7a:b:C:dDFhiL:m:M:noO:p:P:suVv";
     extern int optopt;
     extern char *optarg;
     struct passwd *pwd;
@@ -447,6 +448,9 @@ main(argc, argv)
 		break;
 	    case 'D':
 		fDebug++;
+		break;
+	    case 'F':
+		fNoautoreup = 1;
 		break;
 	    case 'h':
 		fprintf(stderr, "%s: usage%s\n", progname, u_terse);

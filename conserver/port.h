@@ -1,5 +1,5 @@
 /*
- *  $Id: port.h,v 1.31 2002-01-21 02:48:33-08 bryan Exp $
+ *  $Id: port.h,v 1.33 2002-09-20 23:04:21-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -36,14 +36,6 @@
  * 4. This notice may not be removed or altered.
  */
 
-/* Wait for a part of a second before slapping console server.
- * Good for CISCO terminal servers that get upset when you
- * attack with intense socket connections
- */
-#if !defined(USLEEP_FOR_SLOW_PORTS)
-# define USLEEP_FOR_SLOW_PORTS 100000
-#endif
-
 /* If, when processing a logfile for replaying the last N lines,
  * we end up seeing more than MAXREPLAYLINELEN characters in a line,
  * abort processing and display the data.  Why?  There could be some
@@ -64,11 +56,6 @@
 #if !defined(DEFESC)
 # define DEFESC		'c'
 #endif
-
-/* communication constants
- */
-#define OB_SUSP		'Z'	/* suspended by server          */
-#define OB_DROP		'.'	/* dropped by server            */
 
 /* For legacy compile-time setting of the port...
  */

@@ -4,7 +4,7 @@
 #
 
 %define pkg  conserver
-%define ver  7.2.2
+%define ver  7.2.3
 
 # define the name of the machine on which the main conserver
 # daemon will be running if you don't want to use the default

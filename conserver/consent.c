@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.88 2002-06-05 15:05:00-07 bryan Exp $
+ *  $Id: consent.c,v 5.90 2002-09-23 11:38:46-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -714,11 +714,8 @@ ConsInit(pCE, pfdSet, useHostCache)
      */
     if (pCE->fup) {
 	ConsDown(pCE, pfdSet);
-	if (pCE->isNetworkConsole) {
-	    sleep(1);		/* Give the terminal server a chance */
-	} else {
-	    usleep(USLEEP_FOR_SLOW_PORTS);
-	}
+	usleep(500000);		/* pause 0.50 sec to let things settle a bit */
+	resetMark();
     }
 
     pCE->autoReUp = 0;
@@ -758,7 +755,8 @@ ConsInit(pCE, pfdSet, useHostCache)
 	    ConsDown(pCE, pfdSet);
 	    return;
 	}
-	usleep(USLEEP_FOR_SLOW_PORTS);	/* Sleep for slow network ports */
+	usleep(100000);		/* Not all terminal servers can keep up */
+	resetMark();
 
 #if HAVE_MEMSET
 	(void)memset((void *)&port, 0, sizeof(port));
@@ -830,7 +828,7 @@ ConsInit(pCE, pfdSet, useHostCache)
 	    ConsDown(pCE, pfdSet);
 	    return;
 	} else {		/* Response */
-	    int slen;
+	    socklen_t slen;
 	    flags = 0;
 	    slen = sizeof(flags);
 	    /* So, getsockopt seems to return -1 if there is something

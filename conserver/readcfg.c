@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.84 2002-03-25 17:10:15-08 bryan Exp $
+ *  $Id: readcfg.c,v 5.87 2002-09-23 13:42:25-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -263,6 +263,7 @@ ReadCfg(pcFile, fp, master)
     static STRING acInSave = { (char *)0, 0, 0 };
     char *acStart;
     CONSENT *pCE = (CONSENT *) 0;
+    CONSENT *pCEtmp = (CONSENT *) 0;
     CONSENT *pCEmatch = (CONSENT *) 0;
     REMOTE **ppRC;
     REMOTE *pRCtmp;
@@ -337,16 +338,20 @@ ReadCfg(pcFile, fp, master)
     }
 
     iLine = 0;
-    while ((acIn = readLine(fp, &acInSave, &iLine)) != (unsigned char *)0) {
+    while ((acIn =
+	    (unsigned char *)readLine(fp, &acInSave,
+				      &iLine)) != (unsigned char *)0) {
 	char *pcLine, *pcMode, *pcLog, *pcRem, *pcStart, *pcMark, *pcBreak;
+	char *pcColon;
 
-	acStart = pruneSpace(acIn);
+	acStart = pruneSpace((char *)acIn);
 
 	if ('%' == acStart[0] && '%' == acStart[1] && '\000' == acStart[2]) {
 	    break;
 	}
-	if ((char *)0 == strchr(acStart, ':') &&
-	    (char *)0 != (pcLine = strchr(acStart, '='))) {
+	if ((char *)0 != (pcLine = strchr(acStart, '=')) &&
+	    ((char *)0 == (pcColon = strchr(acStart, ':')) ||
+	     pcColon > pcLine)) {
 	    *pcLine++ = '\000';
 	    acStart = pruneSpace(acStart);
 	    pcLine = pruneSpace(pcLine);
@@ -388,6 +393,69 @@ ReadCfg(pcFile, fp, master)
 	*pcLog++ = '\000';
 
 	acStart = pruneSpace(acStart);
+
+	/* before going any further, we might was well check for
+	 * duplicates.  gotta do it somewhere, and we only need
+	 * the console name to do it.  we have to look through
+	 * the pGroups and pGEstage lists.  we don't look at the
+	 * pGroupsOld list 'cause that's where the "to be
+	 * reconfiged" consoles live.
+	 *
+	 * i hope this is right...and why i said what i did above:
+	 *   in master during startup,
+	 *     pGroupsOld = *empty*
+	 *     pGroups = filling with groups of consoles
+	 *     pGEstage = *empty*
+	 *   in master during reread,
+	 *     pGroupsOld = shrinking groups as they move to pGEstage
+	 *     pGroups = filling with groups of new consoles
+	 *     pGEstage = filling with groups from pGroupsOld
+	 *   in slave during reread,
+	 *     pGroupsOld = shrinking groups as they move to pGEstage
+	 *     pGroups = *empty*
+	 *     pGEstage = filling with groups from pGroupsOld
+	 *
+	 * now, pGroups in the slave during a reread may actually be
+	 * temporarily used to hold stuff that's moving to pGEstage.
+	 * in the master it might also have group stubs as well.
+	 * but by the end, if it has anything, it's all empty groups
+	 * in the slave and a mix of real (new) and empty in the master.
+	 */
+	for (pGEtmp = pGroups; pGEtmp != (GRPENT *) 0;
+	     pGEtmp = pGEtmp->pGEnext) {
+	    for (pCEtmp = pGEtmp->pCElist; pCEtmp != (CONSENT *) 0;
+		 pCEtmp = pCEtmp->pCEnext) {
+		if (pCEtmp->server.used &&
+		    strcmp(acStart, pCEtmp->server.string) == 0) {
+		    if (isMaster)
+			Error("%s(%d) duplicate console name `%s'", pcFile,
+			      iLine, acStart);
+		    break;
+		}
+	    }
+	    if (pCEtmp != (CONSENT *) 0)
+		break;
+	}
+	if (pCEtmp != (CONSENT *) 0)
+	    continue;
+	for (pGEtmp = pGEstage; pGEtmp != (GRPENT *) 0;
+	     pGEtmp = pGEtmp->pGEnext) {
+	    for (pCEtmp = pGEtmp->pCElist; pCEtmp != (CONSENT *) 0;
+		 pCEtmp = pCEtmp->pCEnext) {
+		if (pCEtmp->server.used &&
+		    strcmp(acStart, pCEtmp->server.string) == 0) {
+		    if (isMaster)
+			Error("%s(%d) duplicate console name `%s'", pcFile,
+			      iLine, acStart);
+		    break;
+		}
+	    }
+	    if (pCEtmp != (CONSENT *) 0)
+		break;
+	}
+	if (pCEtmp != (CONSENT *) 0)
+	    continue;
+
 	pcLine = pruneSpace(pcLine);
 	pcMode = pruneSpace(pcMode);
 	pcLog = pruneSpace(pcLog);
@@ -749,7 +817,7 @@ ReadCfg(pcFile, fp, master)
 	    if (pCEmatch->isNetworkConsole != pCE->isNetworkConsole ||
 		pCEmatch->fvirtual != pCE->fvirtual)
 		closeMatch = 0;
-	    if (pCEmatch->dfile.used && pCEmatch->dfile.used) {
+	    if (pCEmatch->dfile.used && pCE->dfile.used) {
 		if (strcmp(pCEmatch->dfile.string, pCE->dfile.string) != 0) {
 		    buildMyString((char *)0, &pCEmatch->dfile);
 		    buildMyString(pCE->dfile.string, &pCEmatch->dfile);
@@ -762,7 +830,7 @@ ReadCfg(pcFile, fp, master)
 		if (!pCE->fvirtual)
 		    closeMatch = 0;
 	    }
-	    if (pCEmatch->lfile.used && pCEmatch->lfile.used) {
+	    if (pCEmatch->lfile.used && pCE->lfile.used) {
 		if (strcmp(pCEmatch->lfile.string, pCE->lfile.string) != 0) {
 		    buildMyString((char *)0, &pCEmatch->lfile);
 		    buildMyString(pCE->lfile.string, &pCEmatch->lfile);
@@ -793,7 +861,7 @@ ReadCfg(pcFile, fp, master)
 	    }
 	    if (pCE->isNetworkConsole) {
 		if (pCEmatch->networkConsoleHost.used &&
-		    pCEmatch->networkConsoleHost.used) {
+		    pCE->networkConsoleHost.used) {
 		    if (strcmp
 			(pCEmatch->networkConsoleHost.string,
 			 pCE->networkConsoleHost.string) != 0) {
@@ -822,7 +890,7 @@ ReadCfg(pcFile, fp, master)
 		}
 	    }
 	    if (pCE->fvirtual) {
-		if (pCEmatch->pccmd.used && pCEmatch->pccmd.used) {
+		if (pCEmatch->pccmd.used && pCE->pccmd.used) {
 		    if (strcmp(pCEmatch->pccmd.string, pCE->pccmd.string)
 			!= 0) {
 			buildMyString((char *)0, &pCEmatch->pccmd);
@@ -896,12 +964,14 @@ ReadCfg(pcFile, fp, master)
     pACList = (ACCESS *) 0;
     ppAC = &pACList;
 
-    while ((acIn = readLine(fp, &acInSave, &iLine)) != (unsigned char *)0) {
+    while ((acIn =
+	    (unsigned char *)readLine(fp, &acInSave,
+				      &iLine)) != (unsigned char *)0) {
 	char *pcMach, *pcNext, *pcMem;
 	char cType;
 	int iLen;
 
-	acStart = pruneSpace(acIn);
+	acStart = pruneSpace((char *)acIn);
 
 	if ('%' == acStart[0] && '%' == acStart[1] && '\000' == acStart[2]) {
 	    break;

@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.76 2002-06-05 15:05:00-07 bryan Exp $
+ *  $Id: master.c,v 5.79 2002-09-23 11:39:21-07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -39,7 +39,6 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <signal.h>
-#include <pwd.h>
 
 #if defined(USE_LIBWRAP)
 #include <syslog.h>
@@ -251,7 +250,7 @@ Master()
     unsigned short prnum = 0;
     struct hostent *hpPeer;
     char cType;
-    int so;
+    socklen_t so;
     fd_set rmask, rmaster;
     unsigned char acIn[1024];	/* a command to the master is limited to this */
     struct sockaddr_in master_port, response_port;
@@ -463,12 +462,12 @@ Master()
 	    fileClose(&csocket);
 	    exit(EX_OK);
 	}
-	if ((char *)0 != (pcArgs = strchr(acIn, ':'))) {
+	if ((char *)0 != (pcArgs = strchr((char *)acIn, ':'))) {
 	    *pcArgs++ = '\000';
-	} else if ((char *)0 != (pcArgs = strchr(acIn, ' '))) {
+	} else if ((char *)0 != (pcArgs = strchr((char *)acIn, ' '))) {
 	    *pcArgs++ = '\000';
 	}
-	if (0 == strcmp(acIn, "help")) {
+	if (0 == strcmp((char *)acIn, "help")) {
 	    static char *apcHelp[] = {
 		"call    provide port for given machine\r\n",
 		"groups  provide ports for group leaders\r\n",
@@ -486,17 +485,13 @@ Master()
 	    fileClose(&csocket);
 	    exit(EX_OK);
 	}
-	if (0 == strcmp(acIn, "quit")) {
-	    struct passwd *pwd;
-
+	if (0 == strcmp((char *)acIn, "quit")) {
 	    if ('t' == cType) {
 		fileWrite(csocket, "trusted -- terminated\r\n", -1);
 		kill(parentpid, SIGTERM);
 	    } else if ((char *)0 == pcArgs) {
 		fileWrite(csocket, "must be trusted to terminate\r\n", -1);
-	    } else if ((struct passwd *)0 == (pwd = getpwuid(0))) {
-		fileWrite(csocket, "no root passwd?\r\n", -1);
-	    } else if (0 == CheckPass(pwd, pcArgs)) {
+	    } else if (CheckPass("root", pcArgs) != AUTH_SUCCESS) {
 		fileWrite(csocket, "Sorry.\r\n", -1);
 	    } else {
 		fileWrite(csocket, "ok -- terminated\r\n", -1);
@@ -505,12 +500,12 @@ Master()
 	    fileClose(&csocket);
 	    exit(EX_OK);
 	}
-	if (0 == strcmp(acIn, "pid")) {
+	if (0 == strcmp((char *)acIn, "pid")) {
 	    filePrint(csocket, "%d\r\n", parentpid);
 	    fileClose(&csocket);
 	    exit(EX_OK);
 	}
-	if (0 == strcmp(acIn, "groups")) {
+	if (0 == strcmp((char *)acIn, "groups")) {
 	    int iSep = 1;
 
 	    for (pGE = pGroups; pGE != (GRPENT *) 0; pGE = pGE->pGEnext) {
@@ -523,7 +518,7 @@ Master()
 	    fileClose(&csocket);
 	    exit(EX_OK);
 	}
-	if (0 == strcmp(acIn, "master")) {
+	if (0 == strcmp((char *)acIn, "master")) {
 	    int iSep = 1;
 
 	    if ((GRPENT *) 0 != pGroups) {
@@ -549,12 +544,12 @@ Master()
 	    fileClose(&csocket);
 	    exit(EX_OK);
 	}
-	if (0 == strcmp(acIn, "version")) {
+	if (0 == strcmp((char *)acIn, "version")) {
 	    filePrint(csocket, "version `%s\'\r\n", THIS_VERSION);
 	    fileClose(&csocket);
 	    exit(EX_OK);
 	}
-	if (0 != strcmp(acIn, "call")) {
+	if (0 != strcmp((char *)acIn, "call")) {
 	    fileWrite(csocket, "unknown command\r\n", -1);
 	    fileClose(&csocket);
 	    exit(EX_OK);
