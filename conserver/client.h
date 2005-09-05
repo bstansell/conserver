@@ -1,5 +1,5 @@
 /*
- *  $Id: client.h,v 5.38 2004/10/25 07:18:18 bryan Exp $
+ *  $Id: client.h,v 5.40 2005/06/07 19:55:51 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *

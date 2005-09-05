@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.h,v 5.41 2004/07/14 05:28:42 bryan Exp $
+ *  $Id: readcfg.h,v 5.45 2005/06/07 19:55:51 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -42,12 +42,13 @@ extern REMOTE *pRCList;		/* list of remote consoles we know about */
 extern REMOTE *pRCUniq;		/* list of uniq console servers */
 extern ACCESS *pACList;		/* `who do you love' (or trust) */
 extern CONSENTUSERS *pADList;	/* list of admin users */
+extern CONSENTUSERS *pLUList;	/* list of limited users */
 extern BREAKS breakList[9];	/* list of break sequences */
 extern CONFIG *pConfig;		/* settings seen by config parser */
 extern SUBST *substData;	/* substitution function data */
 
 extern void ReadCfg PARAMS((char *, FILE *));
-extern void ReReadCfg PARAMS((int));
+extern void ReReadCfg PARAMS((int, int));
 extern void DestroyBreakList PARAMS((void));
 extern void DestroyUserList PARAMS((void));
 extern void DestroyConfig PARAMS((CONFIG *));

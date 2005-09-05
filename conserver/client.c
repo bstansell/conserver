@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.85 2004/10/25 07:18:18 bryan Exp $
+ *  $Id: client.c,v 5.89 2005/09/04 00:28:58 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -41,6 +41,7 @@
 #include <access.h>
 #include <client.h>
 #include <group.h>
+#include <readcfg.h>
 
 #if defined(USE_LIBWRAP)
 #include <syslog.h>
@@ -250,25 +251,21 @@ Replay(pCE, fdOut, iBack)
 		    /* this is a mark and the previous line is also
 		     * a mark, so make (or continue) that range
 		     */
-		    if (0 == lines[ln - 1].mark_end->allocated) {
+		    if (0 == lines[ln - 1].mark_end->used) {
 			/* this is a new range - shuffle pointers
 			 *
 			 * remember that we are moving backward
 			 */
-			*(lines[ln - 1].mark_end) = *(lines[ln - 1].line);
-			InitString(lines[ln - 1].line);
-		    }
-		    /* if unallocated, cheat and shuffle pointers */
-		    if (0 == lines[ln - 1].line->allocated) {
-			*(lines[ln - 1].line) = *(lines[ln].line);
-			InitString(lines[ln].line);
-		    } else {
+			BuildStringN(lines[ln - 1].line->string,
+				     lines[ln - 1].line->used - 1,
+				     lines[ln - 1].mark_end);
 			BuildString((char *)0, lines[ln - 1].line);
-			BuildStringN(lines[ln].line->string,
-				     lines[ln].line->used - 1,
-				     lines[ln - 1].line);
-			BuildString((char *)0, lines[ln].line);
 		    }
+		    BuildString((char *)0, lines[ln - 1].line);
+		    BuildStringN(lines[ln].line->string,
+				 lines[ln].line->used - 1,
+				 lines[ln - 1].line);
+		    BuildString((char *)0, lines[ln].line);
 		    ln--;
 		}
 		lines[ln].is_mark = is_mark;
@@ -385,6 +382,7 @@ Replay(pCE, fdOut, iBack)
 #define WHEN_ATTACH	0x02
 #define WHEN_EXPERT	0x04	/* ZZZ no way to set his yet    */
 #define WHEN_ALWAYS	0x40
+#define IS_LIMITED	0x100
 
 #define HALFLINE	40
 
@@ -395,7 +393,7 @@ typedef struct HLnode {
 
 static HELP aHLTable[] = {
     {WHEN_ALWAYS, ".    disconnect"},
-    {WHEN_ALWAYS, ";    move to another console"},
+    {WHEN_ALWAYS | IS_LIMITED, ";    move to another console"},
     {WHEN_ALWAYS, "a    attach read/write"},
     {WHEN_ALWAYS, "b    send broadcast message"},
     {WHEN_ATTACH, "c    toggle flow control"},
@@ -417,8 +415,8 @@ static HELP aHLTable[] = {
     {WHEN_ALWAYS, "v    show version info"},
     {WHEN_ALWAYS, "w    who is on this console"},
     {WHEN_ALWAYS, "x    show console baud info"},
-    {WHEN_ALWAYS, "z    suspend the connection"},
-    {WHEN_ATTACH, "|    attach local command"},
+    {WHEN_ALWAYS | IS_LIMITED, "z    suspend the connection"},
+    {WHEN_ATTACH | IS_LIMITED, "|    attach local command"},
     {WHEN_ALWAYS, "?    print this message"},
     {WHEN_ALWAYS, "<cr> ignore/abort command"},
     {WHEN_ALWAYS, "^R   replay the last line"},
@@ -433,7 +431,7 @@ void
 #if PROTOTYPES
 HelpUser(CONSCLIENT *pCL)
 #else
-HelpUser(pCL)
+HelpUser(pCL, pCE)
     CONSCLIENT *pCL;
 #endif
 {
@@ -456,9 +454,13 @@ HelpUser(pCL)
 
     BuildString((char *)0, acLine);
     for (i = 0; i < sizeof(aHLTable) / sizeof(HELP); ++i) {
-	if (0 == (aHLTable[i].iwhen & iCmp)) {
+	if (aHLTable[i].iwhen & IS_LIMITED &&
+	    ConsentUserOk(pLUList, pCL->username->string) == 1)
 	    continue;
-	}
+
+	if (0 == (aHLTable[i].iwhen & iCmp))
+	    continue;
+
 	if (acLine->used != 0) {	/* second part of line */
 	    if (strlen(aHLTable[i].actext) < HALFLINE) {
 		for (j = acLine->used; j <= HALFLINE; ++j) {

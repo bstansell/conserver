@@ -1,5 +1,5 @@
 /*
- *  $Id: cutil.c,v 1.121 2004/11/09 08:37:05 bryan Exp $
+ *  $Id: cutil.c,v 1.122 2005/06/11 02:31:05 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -3067,7 +3067,7 @@ ParseFile(filename, fp, level)
 
 void
 #if PROTOTYPES
-ProcessSubst(SUBST * s, char **repl, char **str, char *name, char *id)
+ProcessSubst(SUBST *s, char **repl, char **str, char *name, char *id)
 #else
 ProcessSubst(s, repl, str, name, id)
     SUBST *s;
@@ -3187,7 +3187,7 @@ ProcessSubst(s, repl, str, name, id)
 	    OutOfMem();
     }
 
-    if (s != (SUBST *) 0 && repl != (char **)0) {
+    if (s != (SUBST *)0 && repl != (char **)0) {
 	static STRING *result = (STRING *)0;
 
 	if (result == (STRING *)0)

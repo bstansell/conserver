@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.128 2004/07/14 05:28:42 bryan Exp $
+ *  $Id: master.c,v 5.132 2005/09/05 22:22:53 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -68,9 +68,10 @@ FlagSawCHLD(sig)
  */
 static void
 #if PROTOTYPES
-FixKids()
+FixKids(int msfd)
 #else
-FixKids()
+FixKids(msfd)
+    int msfd;
 #endif
 {
     pid_t pid;
@@ -124,7 +125,7 @@ FixKids()
 
 	    /* this kid kid is dead, start another
 	     */
-	    Spawn(pGE);
+	    Spawn(pGE, msfd);
 	    Verbose("group #%d pid %lu on port %hu", pGE->id,
 		    (unsigned long)pGE->pid, pGE->port);
 	}
@@ -497,15 +498,18 @@ DoNormalRead(pCLServing)
 		    (char *)0
 		};
 		static char *apcHelp2[] = {
-		    "call      provide port for given console\r\n",
-		    "exit      disconnect\r\n",
-		    "groups    provide ports for group leaders\r\n",
-		    "help      this help message\r\n",
-		    "master    provide a list of master servers\r\n",
-		    "pid       provide pid of master process\r\n",
-		    "quit*     terminate conserver (SIGTERM)\r\n",
-		    "restart*  restart conserver (SIGHUP)\r\n",
-		    "version   provide version info for server\r\n",
+		    "call       provide port for given console\r\n",
+		    "exit       disconnect\r\n",
+		    "groups     provide ports for group leaders\r\n",
+		    "help       this help message\r\n",
+		    "master     provide a list of master servers\r\n",
+		    "newlogs*   close and open all logfiles (SIGUSR2)\r\n",
+		    "pid        provide pid of master process\r\n",
+		    "quit*      terminate conserver (SIGTERM)\r\n",
+		    "restart*   restart conserver (SIGHUP) - deprecated\r\n",
+		    "reconfig*  reread config file (SIGHUP)\r\n",
+		    "version    provide version info for server\r\n",
+		    "up*        bring up all downed consoles (SIGUSR1)\r\n",
 		    "* = requires admin privileges\r\n",
 		    (char *)0
 		};
@@ -639,6 +643,41 @@ DoNormalRead(pCLServing)
 		    FileWrite(pCLServing->fd, FLAGFALSE,
 			      "unauthorized command\r\n", -1);
 	    } else if (pCLServing->iState == S_NORMAL &&
+		       strcmp(pcCmd, "reconfig") == 0) {
+		if (ConsentUserOk(pADList, pCLServing->username->string) ==
+		    1) {
+		    FileWrite(pCLServing->fd, FLAGFALSE,
+			      "ok -- reconfiguring\r\n", -1);
+		    Verbose("reconfig command by %s",
+			    pCLServing->acid->string);
+		    kill(thepid, SIGHUP);
+		} else
+		    FileWrite(pCLServing->fd, FLAGFALSE,
+			      "unauthorized command\r\n", -1);
+	    } else if (pCLServing->iState == S_NORMAL &&
+		       strcmp(pcCmd, "up") == 0) {
+		if (ConsentUserOk(pADList, pCLServing->username->string) ==
+		    1) {
+		    FileWrite(pCLServing->fd, FLAGFALSE,
+			      "ok -- bringing up consoles\r\n", -1);
+		    Verbose("up command by %s", pCLServing->acid->string);
+		    kill(thepid, SIGUSR1);
+		} else
+		    FileWrite(pCLServing->fd, FLAGFALSE,
+			      "unauthorized command\r\n", -1);
+	    } else if (pCLServing->iState == S_NORMAL &&
+		       strcmp(pcCmd, "newlogs") == 0) {
+		if (ConsentUserOk(pADList, pCLServing->username->string) ==
+		    1) {
+		    FileWrite(pCLServing->fd, FLAGFALSE,
+			      "ok -- opening new logfiles\r\n", -1);
+		    Verbose("newlogs command by %s",
+			    pCLServing->acid->string);
+		    kill(thepid, SIGUSR2);
+		} else
+		    FileWrite(pCLServing->fd, FLAGFALSE,
+			      "unauthorized command\r\n", -1);
+	    } else if (pCLServing->iState == S_NORMAL &&
 		       strcmp(pcCmd, "groups") == 0) {
 		int iSep = 1;
 		GRPENT *pGE;
@@ -707,6 +746,9 @@ Master()
 #endif
 #if defined(SIGPOLL)
     SimpleSignal(SIGPOLL, SIG_IGN);
+#endif
+#if defined(SIGXFSZ)
+    SimpleSignal(SIGXFSZ, SIG_IGN);
 #endif
     SimpleSignal(SIGCHLD, FlagSawCHLD);
     SimpleSignal(SIGTERM, FlagQuitIt);
@@ -816,7 +858,7 @@ Master()
     for (fSawQuit = 0; !fSawQuit; /* can't close here :-( */ ) {
 	if (fSawCHLD) {
 	    fSawCHLD = 0;
-	    FixKids();
+	    FixKids(msfd);
 	}
 	if (fSawHUP) {
 	    fSawHUP = 0;
@@ -824,7 +866,7 @@ Master()
 	    ReopenLogfile();
 	    ReopenUnifiedlog();
 	    SignalKids(SIGHUP);
-	    ReReadCfg(msfd);
+	    ReReadCfg(msfd, msfd);
 	    /* fix up the client descriptors since ReReadCfg() doesn't
 	     * see them like it can in the child processes */
 	    for (pCL = pCLmall; pCL != (CONSCLIENT *)0; pCL = pCL->pCLscan) {

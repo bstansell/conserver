@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.311 2004/10/25 07:25:35 bryan Exp $
+ *  $Id: group.c,v 5.318 2005/06/08 18:09:40 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -1869,6 +1869,53 @@ AttemptSSL(pCL)
 }
 #endif
 
+CONSENT *
+#if PROTOTYPES
+HuntForConsole(GRPENT *pGE, char *name)
+#else
+HuntForConsole(pGE, name)
+    GRPENT *pGE;
+    char *name;
+#endif
+{
+    /* try to find a given console
+     * we assume all the right checks for ambiguity
+     * were already done by the master process, so
+     * the first match should be what the user wants
+     */
+    CONSENT *pCE = (CONSENT *)0;
+
+    if (name == (char *)0)
+	return pCE;
+
+    for (pCE = pGE->pCElist; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
+	NAMES *n = (NAMES *)0;
+	if (strcasecmp(name, pCE->server) == 0)
+	    break;
+	for (n = pCE->aliases; n != (NAMES *)0; n = n->next) {
+	    if (strcasecmp(name, n->name) == 0)
+		break;
+	}
+	if (n != (NAMES *)0)
+	    break;
+    }
+    if (pCE == (CONSENT *)0 && config->autocomplete == FLAGTRUE) {
+	NAMES *n = (NAMES *)0;
+	int len = strlen(name);
+	for (pCE = pGE->pCElist; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
+	    if (strncasecmp(name, pCE->server, len) == 0)
+		break;
+	    for (n = pCE->aliases; n != (NAMES *)0; n = n->next) {
+		if (strncasecmp(name, n->name, len) == 0)
+		    break;
+	    }
+	    if (n != (NAMES *)0)
+		break;
+	}
+    }
+    return pCE;
+}
+
 void
 #if PROTOTYPES
 CommandAttach(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
@@ -2000,18 +2047,24 @@ CommandDown(pGE, pCLServing, pCEServing, tyme)
 void
 #if PROTOTYPES
 CommandExamine(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
-	       long tyme)
+	       long tyme, char *args)
 #else
-CommandExamine(pGE, pCLServing, pCEServing, tyme)
+CommandExamine(pGE, pCLServing, pCEServing, tyme, args)
     GRPENT *pGE;
     CONSCLIENT *pCLServing;
     CONSENT *pCEServing;
     long tyme;
+    char *args;
 #endif
 {
     CONSENT *pCE;
 
-    for (pCE = pGE->pCElist; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
+    if (args == (char *)0)
+	pCE = pGE->pCElist;
+    else
+	pCE = HuntForConsole(pGE, args);
+
+    for (; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
 	char *d = (char *)0;
 	char *b = (char *)0;
 	char p = '\000';
@@ -2038,6 +2091,8 @@ CommandExamine(pGE, pCLServing, pCEServing, tyme)
 	FilePrint(pCLServing->fd, FLAGFALSE,
 		  " %-24.24s on %-32.32s at %6.6s%c\r\n", pCE->server, d,
 		  b, p);
+	if (args != (char *)0)
+	    break;
     }
 }
 
@@ -2107,22 +2162,28 @@ CommandForce(pGE, pCLServing, pCEServing, tyme)
 void
 #if PROTOTYPES
 CommandGroup(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
-	     long tyme)
+	     long tyme, char *args)
 #else
-CommandGroup(pGE, pCLServing, pCEServing, tyme)
+CommandGroup(pGE, pCLServing, pCEServing, tyme, args)
     GRPENT *pGE;
     CONSCLIENT *pCLServing;
     CONSENT *pCEServing;
     long tyme;
+    char *args;
 #endif
 {
     CONSCLIENT *pCL;
+    CONSENT *pCE;
+
+    pCE = HuntForConsole(pGE, args);
 
     /* we do not show the ctl console
      * else we'd get the client always
      */
     for (pCL = pGE->pCLall; (CONSCLIENT *)0 != pCL; pCL = pCL->pCLscan) {
 	if (pGE->pCEctl == pCL->pCEto)
+	    continue;
+	if (pCE != (CONSENT *)0 && pCL->pCEto != pCE)
 	    continue;
 	FilePrint(pCLServing->fd, FLAGFALSE,
 		  " %-32.32s %c %-7.7s %6s %s\r\n", pCL->acid->string,
@@ -2135,18 +2196,24 @@ CommandGroup(pGE, pCLServing, pCEServing, tyme)
 void
 #if PROTOTYPES
 CommandHosts(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
-	     long tyme)
+	     long tyme, char *args)
 #else
-CommandHosts(pGE, pCLServing, pCEServing, tyme)
+CommandHosts(pGE, pCLServing, pCEServing, tyme, args)
     GRPENT *pGE;
     CONSCLIENT *pCLServing;
     CONSENT *pCEServing;
     long tyme;
+    char *args;
 #endif
 {
     CONSENT *pCE;
 
-    for (pCE = pGE->pCElist; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
+    if (args == (char *)0)
+	pCE = pGE->pCElist;
+    else
+	pCE = HuntForConsole(pGE, args);
+
+    for (; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
 	FilePrint(pCLServing->fd, FLAGFALSE,
 		  " %-24.24s %c %-4.4s %-.40s\r\n", pCE->server,
 		  pCE == pCEServing ? '*' : ' ', (pCE->fup &&
@@ -2159,25 +2226,33 @@ CommandHosts(pGE, pCLServing, pCEServing, tyme)
 		  "down",
 		  pCE->pCLwr ? pCE->pCLwr->acid->string : pCE->
 		  pCLon ? "<spies>" : "<none>");
+	if (args != (char *)0)
+	    break;
     }
 }
 
 void
 #if PROTOTYPES
 CommandInfo(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
-	    long tyme)
+	    long tyme, char *args)
 #else
-CommandInfo(pGE, pCLServing, pCEServing, tyme)
+CommandInfo(pGE, pCLServing, pCEServing, tyme, args)
     GRPENT *pGE;
     CONSCLIENT *pCLServing;
     CONSENT *pCEServing;
     long tyme;
+    char *args;
 #endif
 {
     CONSENT *pCE;
     CONSCLIENT *pCL;
 
-    for (pCE = pGE->pCElist; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
+    if (args == (char *)0)
+	pCE = pGE->pCElist;
+    else
+	pCE = HuntForConsole(pGE, args);
+
+    for (; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
 	int comma = 0;
 	char *s = (char *)0;
 	FilePrint(pCLServing->fd, FLAGTRUE, "%s:%s,%lu,%hu:", pCE->server,
@@ -2282,6 +2357,8 @@ CommandInfo(pGE, pCLServing, pCEServing, tyme)
 		  pCE->idletimeout,
 		  (pCE->idlestring == (char *)0 ? "" : pCE->idlestring));
 	BuildTmpString((char *)0);
+	if (args != (char *)0)
+	    break;
     }
 }
 
@@ -2721,7 +2798,6 @@ DoClientRead(pGE, pCLServing)
 {
     struct termios sbuf;
     CONSENT *pCEServing = pCLServing->pCEto;
-    CONSENT *pCE;
     int nr, i, l;
     unsigned char acIn[BUFSIZ], acInOrig[BUFSIZ];
     time_t tyme;
@@ -2919,53 +2995,8 @@ DoClientRead(pGE, pCLServing)
 				  "call requires argument\r\n", -1);
 		    else {
 			CONSENT *pCEwant = (CONSENT *)0;
-			/* try to move to the given console
-			 * we assume all the right checks for ambiguity
-			 * were already done by the master process, so
-			 * the first match should be what the user wants
-			 */
-			for (pCE = pGE->pCElist; pCE != (CONSENT *)0;
-			     pCE = pCE->pCEnext) {
-			    NAMES *n = (NAMES *)0;
-			    if (strcasecmp(pcArgs, pCE->server)
-				== 0) {
-				pCEwant = pCE;
-				break;
-			    }
-			    for (n = pCE->aliases; n != (NAMES *)0;
-				 n = n->next) {
-				if (strcasecmp(pcArgs, n->name)
-				    == 0) {
-				    pCEwant = pCE;
-				    break;
-				}
-			    }
-			    if (n != (NAMES *)0)
-				break;
-			}
-			if (pCEwant == (CONSENT *)0 &&
-			    config->autocomplete == FLAGTRUE) {
-			    NAMES *n = (NAMES *)0;
-			    int len = strlen(pcArgs);
-			    for (pCE = pGE->pCElist; pCE != (CONSENT *)0;
-				 pCE = pCE->pCEnext) {
-				if (strncasecmp(pcArgs, pCE->server, len)
-				    == 0) {
-				    pCEwant = pCE;
-				    break;
-				}
-				for (n = pCE->aliases; n != (NAMES *)0;
-				     n = n->next) {
-				    if (strncasecmp(pcArgs, n->name, len)
-					== 0) {
-					pCEwant = pCE;
-					break;
-				    }
-				}
-				if (n != (NAMES *)0)
-				    break;
-			    }
-			}
+
+			pCEwant = HuntForConsole(pGE, pcArgs);
 
 			if (pCEwant == (CONSENT *)0) {
 			    FilePrint(pCLServing->fd, FLAGFALSE,
@@ -3052,16 +3083,19 @@ DoClientRead(pGE, pCLServing)
 		    }
 		} else if (pCLServing->iState == S_NORMAL &&
 			   strcmp(pcCmd, "info") == 0) {
-		    CommandInfo(pGE, pCLServing, pCEServing, tyme);
+		    CommandInfo(pGE, pCLServing, pCEServing, tyme, pcArgs);
 		} else if (pCLServing->iState == S_NORMAL &&
 			   strcmp(pcCmd, "examine") == 0) {
-		    CommandExamine(pGE, pCLServing, pCEServing, tyme);
+		    CommandExamine(pGE, pCLServing, pCEServing, tyme,
+				   pcArgs);
 		} else if (pCLServing->iState == S_NORMAL &&
 			   strcmp(pcCmd, "group") == 0) {
-		    CommandGroup(pGE, pCLServing, pCEServing, tyme);
+		    CommandGroup(pGE, pCLServing, pCEServing, tyme,
+				 pcArgs);
 		} else if (pCLServing->iState == S_NORMAL &&
 			   strcmp(pcCmd, "hosts") == 0) {
-		    CommandHosts(pGE, pCLServing, pCEServing, tyme);
+		    CommandHosts(pGE, pCLServing, pCEServing, tyme,
+				 pcArgs);
 		} else if (pCLServing->iState == S_NORMAL &&
 			   strcmp(pcCmd, "broadcast") == 0) {
 		    if (pcArgs == (char *)0) {
@@ -3288,8 +3322,7 @@ DoClientRead(pGE, pCLServing)
 				m = "read-only";
 			    FilePrint(pCLServing->fd, FLAGFALSE,
 				      "[%s -- use %s %s ? for help]\r\n",
-				      m, FmtCtl(pCLServing->ic[0],
-						     acA1),
+				      m, FmtCtl(pCLServing->ic[0], acA1),
 				      FmtCtl(pCLServing->ic[1], acA2));
 			}
 			continue;
@@ -3400,7 +3433,7 @@ DoClientRead(pGE, pCLServing)
 			    case '=':
 				if (!pCLServing->fcon) {
 				    char *m = ConsState(pCEServing);
-				    if (strcmp(m,"up") == 0)
+				    if (strcmp(m, "up") == 0)
 					FileWrite(pCLServing->fd,
 						  FLAGFALSE, "up]\r\n",
 						  -1);
@@ -3414,6 +3447,11 @@ DoClientRead(pGE, pCLServing)
 				break;
 			    case ';':
 				if (pCLServing->fcon) {
+				    if (ConsentUserOk
+					(pLUList,
+					 pCLServing->username->string) ==
+					1)
+					goto unknownchar;
 				    FileSetQuoteIAC(pCLServing->fd,
 						    FLAGFALSE);
 				    FilePrint(pCLServing->fd, FLAGFALSE,
@@ -3490,7 +3528,7 @@ DoClientRead(pGE, pCLServing)
 					  "group %s]\r\n",
 					  pGE->pCEctl->server);
 				CommandGroup(pGE, pCLServing, pCEServing,
-					     tyme);
+					     tyme, (char *)0);
 				break;
 
 			    case 'H':
@@ -3507,7 +3545,7 @@ DoClientRead(pGE, pCLServing)
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "info]\r\n", -1);
 				CommandInfo(pGE, pCLServing, pCEServing,
-					    tyme);
+					    tyme, (char *)0);
 				break;
 
 			    case 'L':
@@ -3587,7 +3625,7 @@ DoClientRead(pGE, pCLServing)
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "hosts]\r\n", -1);
 				CommandHosts(pGE, pCLServing, pCEServing,
-					     tyme);
+					     tyme, (char *)0);
 				break;
 
 			    case 'V':
@@ -3614,10 +3652,14 @@ DoClientRead(pGE, pCLServing)
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "examine]\r\n", -1);
 				CommandExamine(pGE, pCLServing, pCEServing,
-					       tyme);
+					       tyme, (char *)0);
 				break;
 
 			    case '|':	/* wait for client */
+				if (ConsentUserOk
+				    (pLUList,
+				     pCLServing->username->string) == 1)
+				    goto unknownchar;
 				if (!pCLServing->fwr) {
 				    FileWrite(pCLServing->fd, FLAGFALSE,
 					      "attach to run local command]\r\n",
@@ -3636,6 +3678,10 @@ DoClientRead(pGE, pCLServing)
 				DEPRECATED;
 			    case 'z':	/* suspend the client */
 			    case '\032':
+				if (ConsentUserOk
+				    (pLUList,
+				     pCLServing->username->string) == 1)
+				    goto unknownchar;
 				FileSetQuoteIAC(pCLServing->fd, FLAGFALSE);
 				FilePrint(pCLServing->fd, FLAGFALSE,
 					  "%c%c", OB_IAC, OB_SUSP);
@@ -4095,6 +4141,9 @@ Kiddie(pGE, sfd)
 #if defined(SIGPOLL)
     SimpleSignal(SIGPOLL, SIG_IGN);
 #endif
+#if defined(SIGXFSZ)
+    SimpleSignal(SIGXFSZ, SIG_IGN);
+#endif
     SimpleSignal(SIGTERM, FlagGoAway);
     SimpleSignal(SIGCHLD, FlagReapVirt);
     SimpleSignal(SIGINT, FlagGoAwayAlso);
@@ -4166,7 +4215,7 @@ Kiddie(pGE, sfd)
 	    fSawChldHUP = 0;
 	    ReopenLogfile();
 	    ReopenUnifiedlog();
-	    ReReadCfg(sfd);
+	    ReReadCfg(sfd, -1);
 	    pGE = pGroups;
 	    ReOpen(pGE);
 	    ReUp(pGE, 0);
@@ -4644,10 +4693,11 @@ Kiddie(pGE, sfd)
  */
 void
 #if PROTOTYPES
-Spawn(GRPENT *pGE)
+Spawn(GRPENT *pGE, int msfd)
 #else
-Spawn(pGE)
+Spawn(pGE, msfd)
     GRPENT *pGE;
+    int msfd;
 #endif
 {
     pid_t pid;
@@ -4724,7 +4774,8 @@ Spawn(pGE)
     if (!SetFlags(sfd, O_NONBLOCK, 0))
 	Bye(EX_OSERR);
 
-    while (bind(sfd, (struct sockaddr *)&lstn_port, sizeof(lstn_port)) < 0) {
+    while (bind(sfd, (struct sockaddr *)&lstn_port, sizeof(lstn_port))
+	   < 0) {
 	if (bindBasePort && (
 # if defined(EADDRINUSE)
 				(errno == EADDRINUSE) ||
@@ -4780,6 +4831,10 @@ Spawn(pGE)
 		     pGE->imembers,
 		     pGE->imembers == 1 ? "console" : "consoles");
 #endif
+
+    /* close the master fd - which is there *except* on startup */
+    if (msfd != -1)
+	close(msfd);
 
     /* clean out the master client lists - they aren't useful here and just
      * cause extra file descriptors and memory allocation to lie around,

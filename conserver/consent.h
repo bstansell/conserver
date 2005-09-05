@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.59 2004/10/25 07:18:18 bryan Exp $
+ *  $Id: consent.h,v 5.63 2005/06/08 18:09:40 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -100,6 +100,8 @@ typedef struct consent {	/* console information                  */
     /* type == EXEC */
     char *exec;			/* exec command                         */
     char *execsubst;		/* exec substitution pattern            */
+    uid_t execuid;		/* user to run exec as                  */
+    gid_t execgid;		/* group to run exec as                 */
     /* global stuff */
     char *master;		/* master hostname                      */
     unsigned short breakNum;	/* break type [1-9]                     */
@@ -107,6 +109,8 @@ typedef struct consent {	/* console information                  */
     off_t logfilemax;		/* size limit for rolling logfile       */
     char *initcmd;		/* initcmd command                      */
     char *initsubst;		/* initcmd substitution pattern         */
+    uid_t inituid;		/* user to run initcmd as               */
+    gid_t initgid;		/* group to run initcmd as              */
     char *motd;			/* motd                                 */
     time_t idletimeout;		/* idle timeout                         */
     char *idlestring;		/* string to print when idle            */

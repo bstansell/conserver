@@ -1,5 +1,5 @@
 /*
- *  $Id: group.h,v 5.47 2004/10/10 18:46:15 bryan Exp $
+ *  $Id: group.h,v 5.48 2005/05/21 17:56:14 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -64,7 +64,7 @@ typedef struct grpent {		/* group info                           */
 
 extern time_t timers[];
 
-extern void Spawn PARAMS((GRPENT *));
+extern void Spawn PARAMS((GRPENT *, int));
 extern int CheckPass PARAMS((char *, char *));
 extern void TagLogfile PARAMS((const CONSENT *, char *, ...));
 extern void TagLogfileAct PARAMS((const CONSENT *, char *, ...));

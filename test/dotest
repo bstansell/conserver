@@ -94,5 +94,7 @@ dotest 'cocacoc.'
 dotest EVAL "echo 'tu.' | ../console/console -n -C /dev/null -M 127.0.0.1 -p 7777 -e 'tu' shell"
 dotest EVAL "../console/console -n -C /dev/null -M 127.0.0.1 -p 7777 -R | sed -e 's/ [^ ]*$//'"
 dotest EVAL "../console/console -n -C /dev/null -M 127.0.0.1 -p 7777 -x | sed -e 's/ on [^ ]* */ on /'"
+dotest EVAL "../console/console -n -C /dev/null -M 127.0.0.1 -p 7777 -x sh | sed -e '1s/^[^:]*//'"
+dotest EVAL "../console/console -n -C /dev/null -M 127.0.0.1 -p 7777 -x shell | sed -e 's/ on [^ ]* */ on /'"
 
 cleanup

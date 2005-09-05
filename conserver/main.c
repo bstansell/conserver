@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.186 2004/07/14 05:28:42 bryan Exp $
+ *  $Id: main.c,v 5.196 2005/06/11 02:31:05 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -323,6 +323,7 @@ SetupSSL()
 #endif
 {
     if (ctx == (SSL_CTX *)0) {
+	char *ciphers;
 	SSL_load_error_strings();
 	if (!SSL_library_init()) {
 	    Error("SetupSSL(): SSL_library_init() failed");
@@ -352,6 +353,9 @@ SetupSSL()
 		     config->sslcredentials);
 		Bye(EX_SOFTWARE);
 	    }
+	    ciphers = "ALL:!LOW:!EXP:!MD5:!aNULL:@STRENGTH";
+	} else {
+	    ciphers = "ALL:!LOW:!EXP:!MD5:@STRENGTH";
 	}
 	SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, SSLVerifyCallback);
 	SSL_CTX_set_options(ctx,
@@ -362,8 +366,7 @@ SetupSSL()
 			 SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |
 			 SSL_MODE_AUTO_RETRY);
 	SSL_CTX_set_tmp_dh_callback(ctx, TmpDHCallback);
-	if (SSL_CTX_set_cipher_list(ctx, "ALL:!LOW:!EXP:!MD5:@STRENGTH") !=
-	    1) {
+	if (SSL_CTX_set_cipher_list(ctx, ciphers) != 1) {
 	    Error("SetupSSL(): setting SSL cipher list failed");
 	    Bye(EX_SOFTWARE);
 	}
@@ -471,6 +474,9 @@ Daemonize()
 #endif
 #if defined(SIGTSTP)
     SimpleSignal(SIGTSTP, SIG_IGN);
+#endif
+#if defined(SIGXFSZ)
+    SimpleSignal(SIGXFSZ, SIG_IGN);
 #endif
 
     fflush(stdout);
@@ -697,6 +703,7 @@ DestroyDataStructures()
 	pACList = pAC;
     }
     DestroyConsentUsers(&pADList);
+    DestroyConsentUsers(&pLUList);
 
     DestroyConfig(pConfig);
     DestroyConfig(optConf);
@@ -721,7 +728,7 @@ DestroyDataStructures()
     DestroyBreakList();
     DestroyStrings();
     DestroyUserList();
-    if (substData != (SUBST *) 0)
+    if (substData != (SUBST *)0)
 	free(substData);
 }
 
@@ -892,6 +899,9 @@ DumpDataStructures()
 			       EMPTYSTR(pCE->execSlave),
 			       EMPTYSTR(pCE->exec),
 			       (unsigned long)pCE->ipid));
+		    CONDDEBUG((1,
+			       "DumpDataStructures():  execuid=%d, execgid=%d",
+			       pCE->execuid, pCE->execgid));
 
 		    break;
 		case HOST:
@@ -941,13 +951,16 @@ DumpDataStructures()
 		       FLAGSTR(pCE->crtscts)));
 #endif
 	    CONDDEBUG((1,
-		       "DumpDataStructures():  reinitoncc=%s, striphigh=%s, unloved=%s",
-		       FLAGSTR(pCE->reinitoncc), FLAGSTR(pCE->striphigh),
+		       "DumpDataStructures():  reinitoncc=%s, striphigh=%s",
+		       FLAGSTR(pCE->reinitoncc), FLAGSTR(pCE->striphigh)));
+	    CONDDEBUG((1, "DumpDataStructures():  unloved=%s",
 		       FLAGSTR(pCE->unloved)));
 	    CONDDEBUG((1,
 		       "DumpDataStructures():  initpid=%lu, initcmd=%s, initfile=%d",
 		       (unsigned long)pCE->initpid, EMPTYSTR(pCE->initcmd),
 		       FileFDNum(pCE->initfile)));
+	    CONDDEBUG((1, "DumpDataStructures():  inituid=%d, initgid=%d",
+		       pCE->inituid, pCE->initgid));
 	    CONDDEBUG((1,
 		       "DumpDataStructures():  motd=%s, idletimeout=%d, idlestring=%s",
 		       EMPTYSTR(pCE->motd), pCE->idletimeout,
@@ -1552,7 +1565,7 @@ main(argc, argv)
 	    if (pGE->imembers == 0)
 		continue;
 
-	    Spawn(pGE);
+	    Spawn(pGE, -1);
 	    Verbose("group #%d pid %lu on port %hu", pGE->id,
 		    (unsigned long)pGE->pid, pGE->port);
 	}

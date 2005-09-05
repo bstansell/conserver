@@ -106,10 +106,13 @@ Upon successful login, the commands available are:
     groups    provide ports for group leaders
     help      this help message
     master    provide a list of master servers
+    newlogs*  close and open all logfiles (SIGUSR2)
     pid       provide pid of master process
     quit*     terminate conserver (SIGTERM)
-    restart*  restart conserver (SIGHUP)
+    restart*  restart conserver (SIGHUP) - deprecated
+    reconfig* reread config file (SIGHUP)
     version   provide version info for server
+    up*       bring up all downed consoles (SIGUSR1)
     * = requires admin privileges
 
 "exit" and "help" are the same as before the client logged login.
@@ -130,22 +133,35 @@ names.  The list includes any hosts (including the possibility of the
 local host) which have locally managed consoles.  The client is not
 disconnected.
 
+The "newlogs" command reopens all logfiles used by conserver, assuming
+the user has administrative access.  It responds with a message starting
+with "ok" if successful and an error message otherwise (like
+"unauthorized command").  The client is disconnected if it's successful.
+
 The "pid" command responds with the pid of the master process (in this
 case, the one the client is talking to).  The client is not
 disconnected.
 
 The "quit" command will shut down conserver, assuming the user has
 administrative access.  It responds with a message starting with "ok" if
-successful, and an error message otherwise (like "unauthorized
-command").  The client is disconnected if it's successful.
+successful and an error message otherwise (like "unauthorized command").
+The client is disconnected if it's successful.
 
-The "restart" command will shut down conserver, assuming the user has
-administrative access.  It responds with a message starting with "ok" if
-successful, and an error message otherwise (like "unauthorized
-command").  The client is not disconnected.
+The "restart" command has been deprecated.  You should use "reconfig".
+
+The "reconfig" command will cause conserver to reread the configuration
+file and apply any changes, assuming the user has administrative access.
+It responds with a message starting with "ok" if successful and an error
+message otherwise (like "unauthorized command").  The client is not
+disconnected.
 
 The "version" command responds with the version string.  The client is
 not disconnected.
+
+The "up" command tries to "bring up" all disconnected consoles, assuming
+the user has administrative access.  It responds with a message starting
+with "ok" if successful and an error message otherwise (like
+"unauthorized command").  The client is disconnected if it's successful.
 
 
 "group" Mode
@@ -286,5 +302,5 @@ The more "interesting" escape sequences are the following.
 	    " -- spy mode]"
 
 #
-#  $Id: PROTOCOL,v 1.1 2004/04/16 16:50:55 bryan Exp $
+#  $Id: PROTOCOL,v 1.2 2005/09/05 21:54:03 bryan Exp $
 #

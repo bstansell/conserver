@@ -228,10 +228,10 @@ Detailed Instructions
         step.
 
       + Next, make sure conserver runs during boot.  The init script we
-        use under Solaris is installed in <PREFIX>/etc/conserver.rc.
-        Use that or some form of it for your own /etc/init.d script or
-        an entry in startup files (/etc/rc, /etc/rc.local, or
-        whatever).
+	use under Solaris is installed in
+	<DATADIR>/examples/conserver/conserver.rc.  Use that or some
+	form of it for your own /etc/init.d script or an entry in
+	startup files (/etc/rc, /etc/rc.local, or whatever).
 
       + Now for the fun stuff.  You need to create a conserver.cf and
         conserver.passwd file.  Those are defined with the
@@ -278,5 +278,5 @@ Other Information And Gotchas
 
 
 #
-#  $Id: INSTALL,v 1.38 2004/04/13 18:11:58 bryan Exp $
+#  $Id: INSTALL,v 1.39 2005/05/21 13:47:16 bryan Exp $
 #

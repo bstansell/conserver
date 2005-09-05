@@ -7,6 +7,8 @@ sbindir = @sbindir@
 sysconfdir = @sysconfdir@
 mandir = @mandir@
 datadir = @datadir@
+libdir = @libdir@
+pkglibdir = $(libdir)/conserver
 exampledir = $(datadir)/examples/conserver
 
 ### Installation programs and flags
@@ -63,5 +65,7 @@ install: conserver
 	$(INSTALL) conserver.man $(DESTDIR)$(mandir)/man8/conserver.8
 	$(MKDIR) $(DESTDIR)$(exampledir)
 	$(INSTALL) conserver.rc $(DESTDIR)$(exampledir)
+	$(MKDIR) $(DESTDIR)$(pkglibdir)
+	$(INSTALL) convert $(DESTDIR)$(pkglibdir)/convert
 
 .PHONY: clean distclean install

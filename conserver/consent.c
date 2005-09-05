@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.144 2004/10/25 07:25:35 bryan Exp $
+ *  $Id: consent.c,v 5.145 2005/06/08 18:09:40 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -421,6 +421,13 @@ StartInit(pCE)
     close(pout[0]);
     close(pin[1]);
 
+    if (geteuid() == 0) {
+	if (pCE->initgid != 0)
+	    setgid(pCE->initgid);
+	if (pCE->inituid != 0)
+	    setuid(pCE->inituid);
+    }
+
     tcsetpgrp(0, iNewGrp);
 
     apcArgv[2] = pCE->initcmd;
@@ -509,6 +516,15 @@ VirtDev(pCE)
     if (dup(pCE->execSlaveFD) != 0 || dup(pCE->execSlaveFD) != 1) {
 	Error("[%s] fd sync error", pCE->server);
 	Bye(EX_OSERR);
+    }
+
+    if (geteuid() == 0) {
+	if (pCE->execgid != 0)
+	    setgid(pCE->execgid);
+	if (pCE->execuid != 0) {
+	    fchown(0, pCE->execuid, -1);
+	    setuid(pCE->execuid);
+	}
     }
 # if HAVE_STROPTS_H  && !defined(_AIX)
     /* SYSVr4 semantics for opening stream ptys                     (gregf)

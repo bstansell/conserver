@@ -1,5 +1,5 @@
-.\" $Id: conserver.cf.man,v 1.69 2004/11/06 00:20:30 bryan Exp $
-.TH CONSERVER.CF 5 "2004/11/06" "conserver-8.1.11" "conserver"
+.\" $Id: conserver.cf.man,v 1.73 2005/06/09 07:09:31 bryan Exp $
+.TH CONSERVER.CF 5 "2005/06/09" "conserver-8.1.12" "conserver"
 .SH NAME
 conserver.cf \- console configuration file for
 .BR conserver (8)
@@ -173,6 +173,31 @@ The access lists defined using the name
 .I accessgroup
 are applied to the current access block.
 The included access block must be previously defined.
+.TP
+\f3limited\fP [\f3!\fP]\f2username\fP[\f3,\fP...]|\f3""\fP
+.br
+Define a list of users with limited functionality on the console server.
+These users will not be allowed to suspend their connection,
+shift to another console, or attach to a local command.
+If
+.I username
+matches a previously defined group name, all members of the previous
+group are applied to the admin list (with access reversed if prefixed
+with a `!').
+If
+.I username
+doesn't match a previously defined group and
+.I username
+begins with `@', the name (minus the `@') is checked against the
+host's group database.
+All users found in the group will be granted (or denied, if prefixed
+with `!') access.
+If
+.I username
+doesn't match a previous group and doesn't begin with `@', the users
+will be granted (or denied, if prefixed with `!') access.
+If the null string (``\f3""\fP'') is used, any
+users previously defined for the console server's limited list are removed.
 .TP
 \f3rejected\fP \f2hostname\fP[\f3,\fP...]
 .br
@@ -524,6 +549,27 @@ If the null string (``\f3""\fP'') is used or no
 keyword is specified, conserver will use the command ``/bin/sh -i''.
 Only consoles of type ``exec'' will use this value.
 .TP
+\f3execrunas\fP [\f2user\fP][:\f2group\fP]|\f3""\fP
+.br
+By default, the command invoked by
+.B exec
+is run with the same privileges as the server.
+If the server is running with root privileges, this option resets the user
+and/or group of the invoked process to
+.I user
+and
+.I group
+respectively.
+.I user
+may be a username or numeric uid and
+.I group
+may be a group name or numeric gid.
+Either one is optional.
+If the server is not running with root privileges, these values
+are not used.
+If the null string (``\f3""\fP'') is specified, the default of running
+with the same privileges as the server is restored.
+.TP
 \f3execsubst\fP \f2c\fP\f3=\fP\f2t\fP[\f2n\fP]\f2f\fP[\f3,\fP...]|\f3""\fP
 .br
 Perform character substitutions on the
@@ -584,7 +630,7 @@ The default block defined using the name
 is applied to the current console or default block.
 The included default block must be previously defined.
 .TP
-\f3initcmd\fP \f3command\fP|\f3""\fP
+\f3initcmd\fP \f2command\fP|\f3""\fP
 .br
 Invoke
 .I command
@@ -597,6 +643,27 @@ is passed as an argument to ``/bin/sh -ce''.
 If the null string (``\f3""\fP'') is used, the command is unset and
 nothing is invoked.
 .TP
+\f3initrunas\fP [\f2user\fP][:\f2group\fP]|\f3""\fP
+.br
+By default, the command invoked by
+.B initcmd
+is run with the same privileges as the server.
+If the server is running with root privileges, this option resets the user
+and/or group of the invoked process to
+.I user
+and
+.I group
+respectively.
+.I user
+may be a username or numeric uid and
+.I group
+may be a group name or numeric gid.
+Either one is optional.
+If the server is not running with root privileges, these values
+are not used.
+If the null string (``\f3""\fP'') is specified, the default of running
+with the same privileges as the server is restored.
+.TP
 \f3initspinmax\fP \f2n\fP|\f3""\fP
 .br
 Set the maximum number of ``spins'' allowed for the console to
@@ -607,7 +674,7 @@ where 0 <=
 A console is determined to be ``spinning'' if an attempt to initialize
 the console occurs in under
 .B initspintimer
-seconds from it's previous initialization and this quick
+seconds from its previous initialization and this quick
 initialization occurs
 .B initspinmax
 times in a row.
@@ -661,7 +728,7 @@ no logging will occur.
 .br
 Enable automatic rotation of
 .B logfile
-once it's size exceeds
+once its size exceeds
 .I number
 bytes.
 Specifying
@@ -810,7 +877,7 @@ Default is
 .BR autoreinit .
 .TP
 .B unloved
-Enable the sending of this console's output (prefixed with it's
+Enable the sending of this console's output (prefixed with its
 name) to the daemon's stdout (or the logfile if in daemon mode) when no
 clients are connected to the console.
 The conserver option

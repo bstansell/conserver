@@ -1,5 +1,5 @@
 /*
- *  $Id: readconf.c,v 5.2 2004/05/25 00:38:15 bryan Exp $
+ *  $Id: readconf.c,v 5.3 2005/06/11 02:32:21 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -510,7 +510,7 @@ ConfigItemUsername(id)
 	OutOfMem();
 }
 
-SUBST *substData = (SUBST *) 0;
+SUBST *substData = (SUBST *)0;
 
 int
 #if PROTOTYPES
@@ -524,9 +524,8 @@ SubstCallback(c, s, i)
 {
     int retval = 0;
 
-    if (substData == (SUBST *) 0) {
-	if ((substData =
-	     (SUBST *) calloc(1, sizeof(SUBST))) == (SUBST *) 0)
+    if (substData == (SUBST *)0) {
+	if ((substData = (SUBST *)calloc(1, sizeof(SUBST))) == (SUBST *)0)
 	    OutOfMem();
 	substData->callback = &SubstCallback;
 	substData->tokens['u'] = ISSTRING;

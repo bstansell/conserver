@@ -1,6 +1,6 @@
 .\" @(#)conserver.8 01/06/91 OSU CIS; Thomas A. Fine
-.\" $Id: conserver.man,v 1.50 2004/06/08 16:19:46 bryan Exp $
-.TH CONSERVER 8 "2004/06/08" "conserver-8.1.11" "conserver"
+.\" $Id: conserver.man,v 1.51 2005/04/02 09:59:48 bryan Exp $
+.TH CONSERVER 8 "2005/04/02" "conserver-8.1.12" "conserver"
 .SH NAME
 conserver \- console server daemon
 .SH SYNOPSIS
@@ -89,10 +89,10 @@ The server will
 .B not
 remove any files in the directory itself, just in case the directory is
 accidentally specified as ``/etc'' or some other critical location.
-The server will do it's best to remove all the sockets when it shuts down,
+The server will do its best to remove all the sockets when it shuts down,
 but it could stop ungracefully (crash, ``kill -9'', etc)
 and leave files behind.
-It's would then be up to the admin (or a creative startup script) to clean
+It would then be up to the admin (or a creative startup script) to clean
 up the directory before the server will start again.
 .PP
 .B Conserver
@@ -427,7 +427,7 @@ The second style is the character-based, escape-sequence mode, while
 connected to a console.
 .PP
 The initial line-based mode begins the same for both the master process
-and it's children.
+and its children.
 Upon a successful (non-rejected) client connection, an ``ok'' is sent.
 The client then issues a command and the server responds to it with a
 result string (``ok'' being the sign of success for most commands).
@@ -435,7 +435,7 @@ The commands available are ``help'', ``ssl'' (if
 SSL was built into the code), ``login'', and ``exit''.
 Using the ``login'' command, the client authenticates and gains access to
 the extended command set.
-This is where the master process and it's children differ.
+This is where the master process and its children differ.
 The master process gives the client access to global commands, and the
 child provides commands for interacting with the consoles it manages.
 The ``help'' command, in both cases, will provide a complete

@@ -1,10 +1,34 @@
-.\" $Id: console.man,v 1.55 2004/07/14 05:28:42 bryan Exp $
-.TH CONSOLE 1 "2004/07/14" "conserver-8.1.11" "conserver"
+.\" $Id: console.man,v 1.58 2005/09/05 22:17:33 bryan Exp $
+.TH CONSOLE 1 "2005/09/05" "conserver-8.1.12" "conserver"
 .SH NAME
 console \- console server client program
 .SH SYNOPSIS
 .B console
+.RI [ generic-args ]
 .RB [ \-aAfFsS ]
+.BR [ \-e
+.IR esc ]
+.I console
+.br
+.B console
+.RI [ generic-args ]
+.RB [ \-iIuwWx ]
+.RI [ console ]
+.br
+.B console
+.RI [ generic-args ]
+.RB [ \-hPqQrRV ]
+.RB [ \- [ bB ]
+.IR message ]
+.RB [ \-d
+.RI [ user ][\f3@\fP console ]]
+.RB [ \-t
+.RI [ user ][\f3@\fP console ]
+.IR message ]
+.RB [ \- [ zZ ]
+.IR cmd ]
+.PP
+.IR generic-args :
 .RB [ \-7DEnUv ]
 .RB [ \-c
 .IR cred ]
@@ -14,42 +38,8 @@ console \- console server client program
 .IR master ]
 .BR [ \-p
 .IR port ]
-.BR [ \-e
-.IR esc ]
 .BR [ \-l
 .IR user ]
-.I console
-.br
-.B console
-.RB [ \-hiIPrRuVwWx ]
-.RB [ \-7DEnUv ]
-.RB [ \-c
-.IR cred ]
-.RB [ \-C
-.IR config ]
-.RB [ \-M
-.IR master ]
-.RB [ \-p
-.IR port ]
-.RB [ \-d
-.RI [ user ][\f3@\fP console ]]
-.RB [ \- [ bB ]
-.IR message ]
-.RB [ \-t
-.RI [ user ][\f3@\fP console ]
-.IR message ]
-.br
-.B console
-.RB [ \-qQ ]
-.RB [ \-7DEnUv ]
-.RB [ \-c
-.IR cred ]
-.RB [ \-C
-.IR config ]
-.RB [ \-M
-.IR master ]
-.RB [ \-p
-.IR port ]
 .SH DESCRIPTION
 .B Console
 is used to manipulate console terminals remotely or to poll running
@@ -129,7 +119,7 @@ Load an SSL certificate and key from the PEM encoded file
 .TP
 .BI \-C config
 Use the per-user configuration file
-.IR conf .
+.IR config .
 .TP
 .B \-d
 Disconnect the users specified by
@@ -182,7 +172,7 @@ except it will force any existing connection into spy mode.
 Display a brief help message.
 .TP
 .B \-i
-Display information in a machine-parseable format (see below for the details).
+Display status information in a machine-parseable format (see below for the details).
 .TP
 .B \-I
 Same as
@@ -338,6 +328,72 @@ but just acts on the primary server.
 .TP
 .B \-x
 Show a list of consoles and devices.
+.TP
+.BI \-z cmd
+Sends a command
+.RI ( cmd )
+to each server and displays the result.
+The valid commands are:
+.RS
+.sp
+.PD 0
+.TP 12
+.B bringup
+Try to connect all consoles marked as down (this is equivalent
+to sending the server a SIGUSR1)
+.TP
+.B SIGUSR1
+Same as
+.B bringup
+.TP
+.B help
+Displays the help message
+.TP
+.B pid
+Returns the pid of the server (this is equivalent to
+.BR \-P )
+.TP
+.B quit
+Instructs the server to shut down (this is equivalent to
+.B \-q
+or sending the server a SIGTERM)
+.TP
+.B SIGTERM
+Same as
+.B quit
+.TP
+.B reconfig
+Instructs the server to reload the configuration file, then
+perform the actions of
+.B reopen
+(this is equivalent to sending the server a SIGHUP)
+.TP
+.B SIGHUP
+Same as
+.B reconfig
+.TP
+.B reopen
+Instructs the server to reopen all logfiles, then
+perform the actions of
+.B bringup
+(this is equivalent to sending the server a SIGUSR2)
+.TP
+.B SIGUSR2
+Same as
+.B reopen
+.TP
+.B version
+Returns the version of the server (this is equivalent to
+.BR \-V )
+.PD
+.RE
+.TP
+.BI \-Z cmd
+Same as
+.B \-z
+but just sends
+.I cmd
+to the primary server.
 .PP
 The
 .BR \-A ,
@@ -350,8 +406,15 @@ making the connection (as if
 were typed).
 .PP
 The
+.BR \-i ,
+.BR \-u ,
+.BR \-w ", and"
+.B \-x
+options can be given a console name, which will limit their output to that console.
+.PP
+The
 .B \-i
-option outputs information regarding each console in 15 colon-separated fields.
+option outputs status information regarding each console in 15 colon-separated fields.
 .TP
 .I name
 The name of the console.

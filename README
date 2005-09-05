@@ -21,7 +21,7 @@ Downloading
     Mirrors of the site are at:
 
 	Australia	http://planetmirror.com/pub/conserver/
-	US-East		http://conserver.syr.edu/
+	Russia		http://conserver.rinet.ru/
 
 
 Systems Tested
@@ -61,5 +61,5 @@ Contributions
     http://www.columbia.edu/acis/sy/unixdev/zinc
 
 #
-#  $Id: README,v 1.23 2004/05/27 23:39:29 bryan Exp $
+#  $Id: README,v 1.24 2005/09/05 21:46:43 bryan Exp $
 #

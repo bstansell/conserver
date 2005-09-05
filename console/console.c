@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.169 2004/10/25 07:18:20 bryan Exp $
+ *  $Id: console.c,v 5.176 2005/09/05 22:34:39 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -57,6 +57,7 @@ char *gotoName = (char *)0;
 char *prevName = (char *)0;
 CONFIG *optConf = (CONFIG *)0;
 CONFIG *config = (CONFIG *)0;
+FLAG interact = FLAGFALSE;
 
 #if HAVE_OPENSSL
 SSL_CTX *ctx = (SSL_CTX *)0;
@@ -69,6 +70,7 @@ SetupSSL()
 #endif
 {
     if (ctx == (SSL_CTX *)0) {
+	char *ciphers;
 	SSL_load_error_strings();
 	if (!SSL_library_init()) {
 	    Error("SSL library initialization failed");
@@ -95,6 +97,9 @@ SetupSSL()
 		      config->sslcredentials);
 		Bye(EX_UNAVAILABLE);
 	    }
+	    ciphers = "ALL:!LOW:!EXP:!MD5:!aNULL:@STRENGTH";
+	} else {
+	    ciphers = "ALL:!LOW:!EXP:!MD5:@STRENGTH";
 	}
 	SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, SSLVerifyCallback);
 	SSL_CTX_set_options(ctx,
@@ -104,8 +109,7 @@ SetupSSL()
 			 SSL_MODE_ENABLE_PARTIAL_WRITE |
 			 SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |
 			 SSL_MODE_AUTO_RETRY);
-	if (SSL_CTX_set_cipher_list(ctx, "ALL:!LOW:!EXP:!MD5:@STRENGTH") !=
-	    1) {
+	if (SSL_CTX_set_cipher_list(ctx, ciphers) != 1) {
 	    Error("Setting SSL cipher list failed");
 	    Bye(EX_UNAVAILABLE);
 	}
@@ -202,7 +206,7 @@ Usage(wantfull)
 #endif
 	"f(F)      force read/write connection (and replay)",
 	"h         output this message",
-	"i(I)      display information in machine-parseable form (on master)",
+	"i(I)      display status info in machine-parseable form (on master)",
 	"l user    use username instead of current username",
 	"M master  master server to poll first",
 	"n         do not read system-wide config file",
@@ -222,21 +226,20 @@ Usage(wantfull)
 	"V         show version information",
 	"w(W)      show who is on which console (on master)",
 	"x         examine ports and baud rates",
+	"z(Z) cmd  send a command to the (master) server (think 'z'ap)",
 	(char *)0
     };
 
-    fprintf(stderr,
-	    "usage: %s [-aAfFsS] [-7DEnUv] [-c cred] [-C config] [-M master] [-p port] [-e esc] [-l username] console\n",
-	    progname);
-    fprintf(stderr,
-	    "       %s [-hiIPrRuVwWx] [-7DEnUv] [-c cred] [-C config] [-M master] [-p port] [-d [user][@console]] [-[bB] message] [-t [user][@console] message]\n",
-	    progname);
-    fprintf(stderr,
-	    "       %s [-qQ] [-7DEnUv] [-c cred] [-C config] [-M master] [-p port]\n",
-	    progname);
+    fprintf(stderr, "usage: %s [generic-args] [-aAfFsS] [-e esc] console\n\
+       %s [generic-args] [-iIuwWx] [console]\n\
+       %s [generic-args] [-hPqQrRV] [-[bB] message] [-d [user][@console]]\n\
+                              [-t [user][@console] message] [-[zZ] cmd]\n\n\
+       generic-args: [-7DEnUv] [-c cred] [-C config] [-M master]\n\
+                     [-p port] [-l username]\n", progname, progname, progname);
 
     if (wantfull) {
 	int i;
+	fprintf(stderr, "\n");
 	for (i = 0; full[i] != (char *)0; i++)
 	    fprintf(stderr, "\t%s\n", full[i]);
     }
@@ -615,7 +618,7 @@ DestroyDataStructures()
     if (myAddrs != (struct in_addr *)0)
 	free(myAddrs);
     DestroyStrings();
-    if (substData != (SUBST *) 0)
+    if (substData != (SUBST *)0)
 	free(substData);
 }
 
@@ -1397,8 +1400,7 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
     /* try to grok the state of the console */
     FilePrint(pcf, FLAGFALSE, "%c%c=", chAttn, chEsc);
     r = ReadReply(pcf, 0);
-    if (strncmp(r, "[unknown", 8) != 0 &&
-	strncmp(r, "[up]", 4) != 0)
+    if (strncmp(r, "[unknown", 8) != 0 && strncmp(r, "[up]", 4) != 0)
 	FileWrite(cfstdout, FLAGFALSE, r, -1);
 
     printf("[Enter `");
@@ -1636,28 +1638,52 @@ DoCmds(master, pports, cmdi)
 		    Error("forwarding level too deep!");
 		    Bye(EX_SOFTWARE);
 		}
-	    } else if (result[0] != '[') {	/* did we not get a connection? */
-		limit = 0;
-		FilePrint(cfstdout, FLAGFALSE, "%s: %s", serverName,
-			  result);
-		FileClose(&pcf);
-		continue;
+		FileWrite(pcf, FLAGFALSE, "exit\r\n", 6);
+		t = ReadReply(pcf, 1);
 	    } else {
-		limit = 0;
-		CallUp(pcf, server, cmdarg, cmds[0], result);
-		if (pcf != gotoConsole)
+		/* if we're not trying to connect to a console */
+		if (interact == FLAGFALSE) {
+		    FilePrint(cfstdout, FLAGFALSE, "%s: %s", serverName,
+			      result);
 		    FileClose(&pcf);
-		break;
+		    continue;
+		}
+		if (result[0] != '[') {	/* did we not get a connection? */
+		    limit = 0;
+		    FilePrint(cfstdout, FLAGFALSE, "%s: %s", serverName,
+			      result);
+		    FileClose(&pcf);
+		    continue;
+		} else {
+		    limit = 0;
+		    CallUp(pcf, server, cmdarg, cmds[0], result);
+		    if (pcf != gotoConsole)
+			FileClose(&pcf);
+		    break;
+		}
 	    }
 	} else if (cmds[cmdi][0] == 'q') {
-	    t = ReadReply(pcf, 0);
-	    FileWrite(cfstdout, FLAGFALSE, t, -1);
+	    if (cmdi == 0) {
+		t = ReadReply(pcf, 0);
+		FilePrint(cfstdout, FLAGFALSE, "%s: %s", serverName, t);
+	    } else {
+		FilePrint(cfstdout, FLAGFALSE, "%s: %s", serverName,
+			  result);
+	    }
+	    /* only say 'exit' if 'quit' failed...since it's dying anyway */
 	    if (t[0] != 'o' || t[1] != 'k') {
 		FileWrite(pcf, FLAGFALSE, "exit\r\n", 6);
 		t = ReadReply(pcf, 1);
 	    }
 	} else {
 	    /* all done */
+	    /* ok, this is whacky.  if cmdi==0, we haven't read back the
+	     * reply yet, so 't' is going to have multiple lines out output
+	     * since we send the 'exit' command...first line (or set of
+	     * lines) would be the previous command, and then a 'goodbye'
+	     * (ideally).  we monkey around below because of this.
+	     * like i said.  wacky.
+	     */
 	    FileWrite(pcf, FLAGFALSE, "exit\r\n", 6);
 	    t = ReadReply(pcf, cmdi == 0 ? 1 : 0);
 
@@ -1668,6 +1694,7 @@ DoCmds(master, pports, cmdi)
 		    free(result);
 		if ((result = StrDup(t)) == (char *)0)
 		    OutOfMem();
+		/* strip off the goodbye from the tail of the result */
 		len = strlen(result);
 		if (len > 8 &&
 		    strcmp("goodbye\r\n", result + len - 9) == 0) {
@@ -1688,9 +1715,12 @@ DoCmds(master, pports, cmdi)
 		    }
 		} else if ((cmds[0][0] != 'b' && cmds[0][0] != 't') ||
 			   (result[0] != 'o' || result[1] != 'k')) {
-		    /* did a 'master' before this or doing a 'disconnect' */
+		    /* did a 'master' before this or doing a 'disconnect',
+		     * 'reconfig', 'newlogs', or 'up'
+		     */
 		    if ((cmds[1] != (char *)0 && cmds[1][0] == 'm') ||
-			cmds[0][0] == 'd') {
+			cmds[0][0] == 'd' || cmds[0][0] == 'r' ||
+			cmds[0][0] == 'n' || cmds[0][0] == 'u') {
 			FileWrite(cfstdout, FLAGTRUE, serverName, -1);
 			FileWrite(cfstdout, FLAGTRUE, ": ", 2);
 		    }
@@ -1702,7 +1732,7 @@ DoCmds(master, pports, cmdi)
 	FileClose(&pcf);
 
 	/* this would only be true if we got extra redirects (@... above) */
-	if (cmds[cmdi][0] == 'c')
+	if (cmds[cmdi][0] == 'c' && interact == FLAGTRUE)
 	    DoCmds(server, result, cmdi);
 	else if (cmdi > 0)
 	    DoCmds(server, result, cmdi - 1);
@@ -1739,7 +1769,8 @@ main(argc, argv)
     int opt;
     int fLocal;
     static STRING *acPorts = (STRING *)0;
-    static char acOpts[] = "7aAb:B:c:C:d:De:EfFhiIl:M:np:PqQrRsSt:uUvVwWx";
+    static char acOpts[] =
+	"7aAb:B:c:C:d:De:EfFhiIl:M:np:PqQrRsSt:uUvVwWxz:Z:";
     extern int optind;
     extern int optopt;
     extern char *optarg;
@@ -1748,6 +1779,23 @@ main(argc, argv)
     static STRING *consoleName = (STRING *)0;
     short readSystemConf = 1;
     char *userConf = (char *)0;
+    typedef struct zaps {
+	char *opt;
+	char *cmd;
+	char *desc;
+    } ZAPS;
+    ZAPS zap[] = {
+	{"bringup, SIGUSR1", "up", "bring up any consoles that are down"},
+	{"help", (char *)0, "this help message"},
+	{"pid", "pid", "display master process ids"},
+	{"quit, SIGTERM", "quit", "terminate the server"},
+	{"reconfig, SIGHUP", "reconfig",
+	 "reread configuration file, then do 'reopen' actions"},
+	{"reopen, SIGUSR2", "newlogs",
+	 "reopen all logfiles, then do 'bringup' actions"},
+	{"version", "version", "display version information"}
+    };
+    int isZap = 0;
 
     isMultiProc = 0;		/* make sure stuff DOESN'T have the pid */
 
@@ -1940,6 +1988,53 @@ main(argc, argv)
 		fVersion = 1;
 		break;
 
+	    case 'Z':		/* only send cmd this host          */
+		fLocal = 1;
+		/*fallthough */
+	    case 'z':		/* send a command to the server   */
+		pcCmd = (char *)0;
+		for (isZap = sizeof(zap) / sizeof(ZAPS) - 1; isZap >= 0;
+		     isZap--) {
+		    char *token = (char *)0;
+		    char *str = (char *)0;
+		    if (zap[isZap].cmd == (char *)0)	/* skip non-action ones */
+			continue;
+		    BuildTmpString((char *)0);
+		    str = BuildTmpString(zap[isZap].opt);
+		    for (token = strtok(str, ", "); token != (char *)0;
+			 token = strtok(NULL, ", ")) {
+			if (strcasecmp(optarg, token) == 0) {
+			    pcCmd = zap[isZap].cmd;
+			    isZap++;
+			    break;
+			}
+		    }
+		    if (pcCmd)
+			break;
+		}
+		if (isZap < 0) {
+		    if (strcasecmp(optarg, "help") == 0) {
+			STRING *help;
+			help = AllocString();
+			BuildString("available -z commands:\n\n", help);
+			for (isZap = 0; isZap < sizeof(zap) / sizeof(ZAPS);
+			     isZap++) {
+			    char *str;
+			    BuildTmpString((char *)0);
+			    str =
+				BuildTmpStringPrint("    %16s   %s\n",
+						    zap[isZap].opt,
+						    zap[isZap].desc);
+			    BuildString(str, help);
+			}
+			Error(help->string);
+		    } else
+			Error("invalid -z command: `%s' (try `help')",
+			      optarg);
+		    Bye(EX_UNAVAILABLE);
+		}
+		break;
+
 	    case 'h':		/* huh? */
 		Usage(1);
 		Bye(EX_OK);
@@ -2068,6 +2163,7 @@ main(argc, argv)
     }
 
     if (*pcCmd == 'a' || *pcCmd == 'f' || *pcCmd == 's') {
+	/* attach, force-attach, and spy */
 	if (optind >= argc) {
 	    Error("missing console name");
 	    Bye(EX_UNAVAILABLE);
@@ -2077,6 +2173,7 @@ main(argc, argv)
 	if ((cmdarg = StrDup(argv[optind++])) == (char *)0)
 	    OutOfMem();
     } else if (*pcCmd == 't') {
+	/* text message */
 	if (optind >= argc) {
 	    Error("missing message text");
 	    Bye(EX_UNAVAILABLE);
@@ -2085,6 +2182,15 @@ main(argc, argv)
 	    free(cmdarg);
 	if ((cmdarg = StrDup(argv[optind++])) == (char *)0)
 	    OutOfMem();
+    } else if (*pcCmd == 'i' || *pcCmd == 'e' || *pcCmd == 'h' ||
+	       *pcCmd == 'g') {
+	/* info, e(x)amine, hosts (u), groups (w) */
+	if (optind < argc) {
+	    if (cmdarg != (char *)0)
+		free(cmdarg);
+	    if ((cmdarg = StrDup(argv[optind++])) == (char *)0)
+		OutOfMem();
+	}
     }
 
     if (optind < argc) {
@@ -2156,11 +2262,17 @@ main(argc, argv)
     cmdi = -1;
     cmds[++cmdi] = pcCmd;
 
-    if (*pcCmd == 'q' || *pcCmd == 'v' || *pcCmd == 'p') {
+    if (*pcCmd == 'q' || *pcCmd == 'v' || *pcCmd == 'p' || *pcCmd == 'r' ||
+	isZap) {
 	if (!fLocal)
 	    cmds[++cmdi] = "master";
     } else if (*pcCmd == 'a' || *pcCmd == 'f' || *pcCmd == 's') {
 	ValidateEsc();
+	cmds[++cmdi] = "call";
+	interact = FLAGTRUE;
+    } else if (cmdarg != (char *)0 &&
+	       (*pcCmd == 'i' || *pcCmd == 'e' || *pcCmd == 'h' ||
+		*pcCmd == 'g')) {
 	cmds[++cmdi] = "call";
     } else {
 	cmds[++cmdi] = "groups";

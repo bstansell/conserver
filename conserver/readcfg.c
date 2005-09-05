@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.181 2004/10/25 07:18:19 bryan Exp $
+ *  $Id: readcfg.c,v 5.189 2005/09/05 21:55:49 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -25,6 +25,9 @@
 
 #include <compat.h>
 
+#include <pwd.h>
+#include <grp.h>
+
 #include <cutil.h>
 #include <consent.h>
 #include <client.h>
@@ -39,6 +42,7 @@ GRPENT *pGroups = (GRPENT *)0;
 REMOTE *pRCList = (REMOTE *)0;
 ACCESS *pACList = (ACCESS *)0;
 CONSENTUSERS *pADList = (CONSENTUSERS *)0;
+CONSENTUSERS *pLUList = (CONSENTUSERS *)0;
 REMOTE *pRCUniq = (REMOTE *)0;
 CONFIG *pConfig = (CONFIG *)0;
 BREAKS breakList[9] = {
@@ -242,7 +246,11 @@ BreakDestroy()
     {
 	int i;
 	for (i = 0; i < 9; i++) {
-	    Msg("Break[%d] = `%s', delay=%d", i, breakList[i].seq->string,
+	    Msg("Break[%d] = `%s', delay=%d", i,
+		breakList[i].seq ==
+		(STRING *)0 ? "(null)" : (breakList[i].seq->
+					  string ? breakList[i].seq->
+					  string : "(null)"),
 		breakList[i].delay);
 	}
     }
@@ -631,6 +639,14 @@ ApplyDefault(d, c)
 	c->idletimeout = d->idletimeout;
     if (d->logfilemax != 0)
 	c->logfilemax = d->logfilemax;
+    if (d->inituid != 0)
+	c->inituid = d->inituid;
+    if (d->initgid != 0)
+	c->initgid = d->initgid;
+    if (d->execuid != 0)
+	c->execuid = d->execuid;
+    if (d->execgid != 0)
+	c->execgid = d->execgid;
     if (d->raw != FLAGUNKNOWN)
 	c->raw = d->raw;
     if (d->port != 0)
@@ -933,7 +949,7 @@ DefaultItemDevice(id)
     ProcessDevice(parserDefaultTemp, id);
 }
 
-SUBST *substData = (SUBST *) 0;
+SUBST *substData = (SUBST *)0;
 
 int
 #if PROTOTYPES
@@ -947,9 +963,8 @@ SubstCallback(c, s, i)
 {
     int retval = 0;
 
-    if (substData == (SUBST *) 0) {
-	if ((substData =
-	     (SUBST *) calloc(1, sizeof(SUBST))) == (SUBST *) 0)
+    if (substData == (SUBST *)0) {
+	if ((substData = (SUBST *)calloc(1, sizeof(SUBST))) == (SUBST *)0)
 	    OutOfMem();
 	substData->callback = &SubstCallback;
 	substData->tokens['p'] = ISNUMBER;
@@ -1027,6 +1042,127 @@ DefaultItemInitsubst(id)
     CONDDEBUG((1, "DefaultItemInitsubst(%s) [%s:%d]", id, file, line));
     ProcessSubst(substData, (char **)0, &(parserDefaultTemp->initsubst),
 		 "initsubst", id);
+}
+
+void
+#if PROTOTYPES
+ProcessUidGid(uid_t * uid, gid_t * gid, char *id)
+#else
+ProcessUidGid(uid, gid, id)
+    uid_t *uid;
+    gid_t *gid;
+    char *id;
+#endif
+{
+    char *colon = (char *)0;
+    int i;
+
+    CONDDEBUG((1, "ProcessUidGid(%s) [%s:%d]", id, file, line));
+
+    *uid = *gid = 0;
+
+    if (id == (char *)0 || id[0] == '\000')
+	return;
+
+    /* hunt for colon */
+    if ((colon = strchr(id, ':')) != (char *)0)
+	*colon = '\000';
+
+    if (id[0] != '\000') {
+	/* Look for non-numeric characters */
+	for (i = 0; id[i] != '\000'; i++)
+	    if (!isdigit((int)id[i]))
+		break;
+	if (id[i] == '\000') {
+	    *uid = (uid_t) atoi(id);
+	} else {
+	    struct passwd *pwd = (struct passwd *)0;
+	    if ((pwd = getpwnam(id)) == (struct passwd *)0) {
+		CONDDEBUG((1, "ProcessUidGid(): getpwnam(%s): %s", id,
+			   strerror(errno)));
+		if (isMaster)
+		    Error("invalid user name `%s' [%s:%d]", id, file,
+			  line);
+	    } else {
+		*uid = pwd->pw_uid;
+	    }
+	}
+    }
+
+    if (colon != (char *)0) {
+	*colon = ':';
+	colon++;
+	if (*colon != '\000') {
+	    /* Look for non-numeric characters */
+	    for (i = 0; colon[i] != '\000'; i++)
+		if (!isdigit((int)colon[i]))
+		    break;
+	    if (colon[i] == '\000') {
+		*gid = (gid_t) atoi(colon);
+	    } else {
+		struct group *grp = (struct group *)0;
+		if ((grp = getgrnam(colon)) == (struct group *)0) {
+		    CONDDEBUG((1, "ProcessUidGid(): getgrnam(%s): %s",
+			       colon, strerror(errno)));
+		    if (isMaster)
+			Error("invalid group name `%s' [%s:%d]", colon,
+			      file, line);
+		} else {
+		    *gid = grp->gr_gid;
+		}
+	    }
+	}
+    }
+}
+
+void
+#if PROTOTYPES
+ProcessInitrunas(CONSENT *c, char *id)
+#else
+ProcessInitrunas(c, id)
+    CONSENT *c;
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ProcessInitrunas(%s) [%s:%d]", id, file, line));
+    ProcessUidGid(&(c->inituid), &(c->initgid), id);
+}
+
+void
+#if PROTOTYPES
+ProcessExecrunas(CONSENT *c, char *id)
+#else
+ProcessExecrunas(c, id)
+    CONSENT *c;
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ProcessExecrunas(%s) [%s:%d]", id, file, line));
+    ProcessUidGid(&(c->execuid), &(c->execgid), id);
+}
+
+void
+#if PROTOTYPES
+DefaultItemInitrunas(char *id)
+#else
+DefaultItemInitrunas(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemInitrunas(%s) [%s:%d]", id, file, line));
+    ProcessInitrunas(parserDefaultTemp, id);
+}
+
+void
+#if PROTOTYPES
+DefaultItemExecrunas(char *id)
+#else
+DefaultItemExecrunas(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemExecrunas(%s) [%s:%d]", id, file, line));
+    ProcessExecrunas(parserDefaultTemp, id);
 }
 
 void
@@ -2595,6 +2731,14 @@ ConsoleAdd(c)
 		    SwapStr(&pCEmatch->exec, &c->exec);
 		    closeMatch = 0;
 		}
+		if (pCEmatch->execuid != c->execuid) {
+		    pCEmatch->execuid = c->execuid;
+		    closeMatch = 0;
+		}
+		if (pCEmatch->execgid != c->execgid) {
+		    pCEmatch->execgid = c->execgid;
+		    closeMatch = 0;
+		}
 		if (pCEmatch->ixany != c->ixany) {
 		    pCEmatch->ixany = c->ixany;
 		    closeMatch = 0;
@@ -2711,6 +2855,8 @@ ConsoleAdd(c)
 	pCEmatch->reinitoncc = c->reinitoncc;
 	pCEmatch->autoreinit = c->autoreinit;
 	pCEmatch->unloved = c->unloved;
+	pCEmatch->inituid = c->inituid;
+	pCEmatch->initgid = c->initgid;
 	while (pCEmatch->aliases != (NAMES *)0) {
 	    NAMES *name;
 	    name = pCEmatch->aliases->next;
@@ -3168,6 +3314,30 @@ ConsoleItemInitsubst(id)
 
 void
 #if PROTOTYPES
+ConsoleItemInitrunas(char *id)
+#else
+ConsoleItemInitrunas(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemInitrunas(%s) [%s:%d]", id, file, line));
+    ProcessInitrunas(parserConsoleTemp, id);
+}
+
+void
+#if PROTOTYPES
+ConsoleItemExecrunas(char *id)
+#else
+ConsoleItemExecrunas(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemExecrunas(%s) [%s:%d]", id, file, line));
+    ProcessExecrunas(parserConsoleTemp, id);
+}
+
+void
+#if PROTOTYPES
 ConsoleItemExec(char *id)
 #else
 ConsoleItemExec(id)
@@ -3447,6 +3617,7 @@ typedef struct parserAccess {
     STRING *name;
     ACCESS *access;
     CONSENTUSERS *admin;
+    CONSENTUSERS *limited;
     struct parserAccess *next;
 } PARSERACCESS;
 
@@ -3496,6 +3667,7 @@ DestroyParserAccess(pa)
 	a = n;
     }
     DestroyConsentUsers(&(pa->admin));
+    DestroyConsentUsers(&(pa->limited));
     free(pa);
     CONDDEBUG((2, "DestroyParserAccess(): %s", m));
 }
@@ -3626,6 +3798,7 @@ AccessDestroy()
     PARSERACCESS *p;
     ACCESS **ppa;
     CONSENTUSERS **pad;
+    CONSENTUSERS **plu;
 
     CONDDEBUG((1, "AccessDestroy() [%s:%d]", file, line));
 
@@ -3638,10 +3811,13 @@ AccessDestroy()
     pACList = (ACCESS *)0;
 
     DestroyConsentUsers(&(pADList));
+    DestroyConsentUsers(&(pLUList));
     pADList = (CONSENTUSERS *)0;
+    pLUList = (CONSENTUSERS *)0;
 
     ppa = &(pACList);
     pad = &(pADList);
+    plu = &(pLUList);
 
     for (p = parserAccesses; p != (PARSERACCESS *)0; p = p->next) {
 #if DUMPDATA
@@ -3653,6 +3829,9 @@ AccessDestroy()
 	    CONSENTUSERS *u;
 	    for (u = p->admin; u != (CONSENTUSERS *)0; u = u->next) {
 		Msg("    Admin = %s", u->user->name);
+	    }
+	    for (u = p->limited; u != (CONSENTUSERS *)0; u = u->next) {
+		Msg("    Limited = %s", u->user->name);
 	    }
 	}
 #endif
@@ -3667,6 +3846,11 @@ AccessDestroy()
 		*pad = p->admin;
 		p->admin = (CONSENTUSERS *)0;
 	    }
+	    /* add any limited users to the list */
+	    if (p->limited != (CONSENTUSERS *)0) {
+		*plu = p->limited;
+		p->limited = (CONSENTUSERS *)0;
+	    }
 
 	    /* advance to the end of the list so we can append more 
 	     * this will potentially have duplicates in the access
@@ -3678,6 +3862,9 @@ AccessDestroy()
 	    }
 	    while (*pad != (CONSENTUSERS *)0) {
 		pad = &((*pad)->next);
+	    }
+	    while (*plu != (CONSENTUSERS *)0) {
+		plu = &((*plu)->next);
 	    }
 	}
     }
@@ -3698,6 +3885,18 @@ AccessItemAdmin(id)
 {
     CONDDEBUG((1, "AccessItemAdmin(%s) [%s:%d]", id, file, line));
     ProcessRoRw(&(parserAccessTemp->admin), id);
+}
+
+void
+#if PROTOTYPES
+AccessItemLimited(char *id)
+#else
+AccessItemLimited(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "AccessItemLimited(%s) [%s:%d]", id, file, line));
+    ProcessRoRw(&(parserAccessTemp->limited), id);
 }
 
 void
@@ -3729,6 +3928,9 @@ AccessItemInclude(id)
 	    }
 	    if (pa->admin != (CONSENTUSERS *)0)
 		CopyConsentUserList(pa->admin, &(parserAccessTemp->admin));
+	    if (pa->limited != (CONSENTUSERS *)0)
+		CopyConsentUserList(pa->limited,
+				    &(parserAccessTemp->limited));
 	}
     }
 }
@@ -4393,6 +4595,7 @@ ITEM keyDefault[] = {
     {"device", DefaultItemDevice},
     {"devicesubst", DefaultItemDevicesubst},
     {"exec", DefaultItemExec},
+    {"execrunas", DefaultItemExecrunas},
     {"execsubst", DefaultItemExecsubst},
 /*  {"flow", DefaultItemFlow}, */
     {"host", DefaultItemHost},
@@ -4400,6 +4603,7 @@ ITEM keyDefault[] = {
     {"idletimeout", DefaultItemIdletimeout},
     {"include", DefaultItemInclude},
     {"initcmd", DefaultItemInitcmd},
+    {"initrunas", DefaultItemInitrunas},
     {"initspinmax", DefaultItemInitspinmax},
     {"initspintimer", DefaultItemInitspintimer},
     {"initsubst", DefaultItemInitsubst},
@@ -4427,6 +4631,7 @@ ITEM keyConsole[] = {
     {"device", ConsoleItemDevice},
     {"devicesubst", ConsoleItemDevicesubst},
     {"exec", ConsoleItemExec},
+    {"execrunas", ConsoleItemExecrunas},
     {"execsubst", ConsoleItemExecsubst},
 /*  {"flow", ConsoleItemFlow}, */
     {"host", ConsoleItemHost},
@@ -4434,6 +4639,7 @@ ITEM keyConsole[] = {
     {"idletimeout", ConsoleItemIdletimeout},
     {"include", ConsoleItemInclude},
     {"initcmd", ConsoleItemInitcmd},
+    {"initrunas", ConsoleItemInitrunas},
     {"initspinmax", ConsoleItemInitspinmax},
     {"initspintimer", ConsoleItemInitspintimer},
     {"initsubst", ConsoleItemInitsubst},
@@ -4458,6 +4664,7 @@ ITEM keyAccess[] = {
     {"admin", AccessItemAdmin},
     {"allowed", AccessItemAllowed},
     {"include", AccessItemInclude},
+    {"limited", AccessItemLimited},
     {"rejected", AccessItemRejected},
     {"trusted", AccessItemTrusted},
     {(char *)0, (void *)0}
@@ -4555,10 +4762,11 @@ ReadCfg(filename, fp)
 
 void
 #if PROTOTYPES
-ReReadCfg(int fd)
+ReReadCfg(int fd, int msfd)
 #else
-ReReadCfg(fd)
+ReReadCfg(fd, msfd)
     int fd;
+    int msfd;
 #endif
 {
     FILE *fpConfig;
@@ -4587,7 +4795,7 @@ ReReadCfg(fd)
 	    kill(thepid, SIGTERM);	/* shoot myself in the head */
 	    return;
 	} else {
-	    Error("no consoles to manage after reconfiguration - exiting");
+	    Msg("no consoles to manage in child process after reconfiguration - child exiting");
 	    DeUtmp((GRPENT *)0, fd);
 	}
     }
@@ -4802,7 +5010,7 @@ ReReadCfg(fd)
 	    if (pGE->imembers == 0 || pGE->pid != -1)
 		continue;
 
-	    Spawn(pGE);
+	    Spawn(pGE, msfd);
 
 	    Verbose("group #%d pid %lu on port %hu", pGE->id,
 		    (unsigned long)pGE->pid, pGE->port);

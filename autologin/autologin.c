@@ -69,7 +69,7 @@
  */
 
 #ifndef	lint
-char	*rcsid = "$Id: autologin.c,v 1.23 2002/09/21 06:29:39 bryan Exp $";
+char	*rcsid = "$Id: autologin.c,v 1.24 2004/12/12 07:36:07 bryan Exp $";
 #endif	/* not lint */
 extern char	*progname;
 gid_t	 awGrps[NGROUPS_MAX];
@@ -126,7 +126,7 @@ Process()
 
 #if defined(HAVE_BSM_AUDIT_H) && defined(HAVE_LIBBSM)
 	if (0 != gethostname(my_hostname, sizeof(my_hostname))) {
-		(void) fprintf(stderr, "%s: gethostname: %s\n", strerror(errno));
+		(void) fprintf(stderr, "%s: gethostname: %s\n", progname, strerror(errno));
 		exit(1);
 		/* NOTREACHED */
 	}
