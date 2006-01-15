@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.318 2005/06/08 18:09:40 bryan Exp $
+ *  $Id: group.c,v 5.319 2005/11/28 20:46:08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -2519,6 +2519,16 @@ DoConsoleRead(pCEServing)
     }
     CONDDEBUG((1, "DoConsoleRead(): read %d bytes from fd %d", nr,
 	       cofile));
+
+    if (nr > 0) {
+	pCEServing->lastWrite = time((time_t *)0);
+	if (pCEServing->idletimeout != (time_t)0 &&
+	    (timers[T_CIDLE] == (time_t)0 ||
+	     timers[T_CIDLE] >
+	     pCEServing->lastWrite + pCEServing->idletimeout))
+	    timers[T_CIDLE] =
+		pCEServing->lastWrite + pCEServing->idletimeout;
+    }
 
     if (pCEServing->type == HOST && pCEServing->raw != FLAGTRUE) {
 	/* Do a little Telnet Protocol interpretation

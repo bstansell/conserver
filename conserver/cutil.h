@@ -1,5 +1,5 @@
 /*
- *  $Id: cutil.h,v 1.63 2004/05/25 00:38:15 bryan Exp $
+ *  $Id: cutil.h,v 1.64 2006/01/15 17:10:14 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -70,6 +70,7 @@ typedef struct consFile {
     int fd;
     int fdout;			/* only used when a simplePipe */
     STRING *wbuf;
+    FLAG errored;
     FLAG quoteiac;
     FLAG sawiac;
     FLAG sawiacsusp;

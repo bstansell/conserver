@@ -1,5 +1,5 @@
 .\" $Id: console.man,v 1.58 2005/09/05 22:17:33 bryan Exp $
-.TH CONSOLE 1 "2005/09/05" "conserver-8.1.12" "conserver"
+.TH CONSOLE 1 "2005/09/05" "conserver-8.1.13" "conserver"
 .SH NAME
 console \- console server client program
 .SH SYNOPSIS

@@ -1,6 +1,16 @@
 				CHANGES
 				=======
 
+version 8.1.13 (Jan 15, 2006):
+	- use SIOCGIFNUM for interface count (if available) and catch
+	  EINVAL on Solaris - patch by Peter Jeremy
+	  <peter.jeremy@alcatel.com.au>
+	- console output now resets idle timer - suggested by Peter
+	  Saunders <pajs@fodder.org.uk>
+	- bug fix for conserver process running out of control and using
+	  up cpu - debugged with Alexandra N. Kossovsky
+	  <Alexandra.Kossovsky@oktetlabs.ru>
+
 version 8.1.12 (Sep 5, 2005):
 	- printf() fix for autologin - patch by Menno Duursma
 	  <druiloor@zonnet.nl>
@@ -813,5 +823,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.210 2005/09/05 23:15:27 bryan Exp $
+#  $Id: CHANGES,v 1.212 2006/01/15 17:11:42 bryan Exp $
 #

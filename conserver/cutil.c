@@ -1,5 +1,5 @@
 /*
- *  $Id: cutil.c,v 1.122 2005/06/11 02:31:05 bryan Exp $
+ *  $Id: cutil.c,v 1.125 2006/01/15 17:10:14 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -1050,6 +1050,9 @@ FileRead(cfp, buf, len)
 {
     int retval = -1;
 
+    if (cfp->errored == FLAGTRUE)
+	return -1;
+
     switch (cfp->ftype) {
 	case simpleFile:
 	case simplePipe:
@@ -1148,6 +1151,10 @@ FileRead(cfp, buf, len)
 		   "FileRead(): failed attempted read of %d byte%s from fd %d",
 		   len, (len == 1) ? "" : "s", cfp->fd));
     }
+
+    if (retval < 0)
+	cfp->errored = FLAGTRUE;
+
     return retval;
 }
 
@@ -1168,13 +1175,20 @@ FileWrite(cfp, bufferonly, buf, len)
     int retval = 0;
     int fdout = 0;
 
-    if (len < 0 && buf != (char *)0)
-	len = strlen(buf);
-
     if (cfp->ftype == simplePipe)
 	fdout = cfp->fdout;
     else
 	fdout = cfp->fd;
+
+    if (cfp->errored == FLAGTRUE) {
+	if (cfp->wbuf->used > 1)
+	    BuildString((char *)0, cfp->wbuf);
+	FD_CLR(fdout, &winit);
+	return -1;
+    }
+
+    if (len < 0 && buf != (char *)0)
+	len = strlen(buf);
 
     if (fDebug && len > 0 && buf != (char *)0) {
 	static STRING *tmpString = (STRING *)0;
@@ -1316,22 +1330,29 @@ FileWrite(cfp, bufferonly, buf, len)
 	    break;
 #endif
 	default:
-	    len_out = -1;
+	    retval = -1;
 	    break;
     }
 
     /* so, if we saw an error, just bail...all is done anyway */
-    if (retval < 0)
-	len_out = retval;
-
-    if (len_out > 0) {
-	/* save the rest for later */
-	if (len > 0) {
-	    ShiftString(cfp->wbuf, len_out);
-	} else {
-	    BuildString((char *)0, cfp->wbuf);
+    if (retval >= 0) {
+	if (len_out > 0) {
+	    /* save the rest for later */
+	    if (len > 0) {
+		ShiftString(cfp->wbuf, len_out);
+	    } else {
+		BuildString((char *)0, cfp->wbuf);
+	    }
 	}
+	retval = len_out;
     }
+
+    if (retval < 0) {
+	if (cfp->wbuf->used > 1)
+	    BuildString((char *)0, cfp->wbuf);
+	cfp->errored = FLAGTRUE;
+    }
+
     if (cfp->wbuf->used <= 1)
 	FD_CLR(fdout, &winit);
     else {
@@ -1341,15 +1362,16 @@ FileWrite(cfp, bufferonly, buf, len)
 		   (cfp->wbuf->used <= 1) ? "" : "s", fdout));
     }
 
-    if (len_out >= 0) {
-	CONDDEBUG((2, "FileWrite(): wrote %d byte%s to fd %d", len_out,
-		   (len_out == 1) ? "" : "s", fdout));
+    if (retval >= 0) {
+	CONDDEBUG((2, "FileWrite(): wrote %d byte%s to fd %d", retval,
+		   (retval == 1) ? "" : "s", fdout));
     } else {
 	CONDDEBUG((2, "FileWrite(): write of %d byte%s to fd %d: %s",
-		   len_orig, (len_out == -1) ? "" : "s", fdout,
+		   len_orig, (retval == -1) ? "" : "s", fdout,
 		   strerror(errno)));
     }
-    return len_out;
+
+    return retval;
 }
 
 int
@@ -1743,6 +1765,9 @@ FileStat(cfp, buf)
 {
     int retval = 0;
 
+    if (cfp->errored == FLAGTRUE)
+	return -1;
+
     switch (cfp->ftype) {
 	case simpleFile:
 	    retval = fstat(cfp->fd, buf);
@@ -1762,6 +1787,9 @@ FileStat(cfp, buf)
 	    retval = -1;
 	    break;
     }
+
+    if (retval < 0)
+	cfp->errored = FLAGTRUE;
 
     return retval;
 }
@@ -1779,6 +1807,9 @@ FileSeek(cfp, offset, whence)
 {
     int retval = 0;
 
+    if (cfp->errored == FLAGTRUE)
+	return -1;
+
     switch (cfp->ftype) {
 	case simpleFile:
 	    retval = lseek(cfp->fd, offset, whence);
@@ -1798,6 +1829,9 @@ FileSeek(cfp, offset, whence)
 	    retval = -1;
 	    break;
     }
+
+    if (retval < 0)
+	cfp->errored = FLAGTRUE;
 
     return retval;
 }
@@ -2063,25 +2097,41 @@ FileSend(cfp, msg, len, flags)
 #endif
 {
     int retval = 0;
+    int fdout;
+
+    if (cfp->ftype == simplePipe)
+	fdout = cfp->fdout;
+    else
+	fdout = cfp->fd;
+
+    if (cfp->errored == FLAGTRUE) {
+	FD_CLR(fdout, &winit);
+	return -1;
+    }
 
     switch (cfp->ftype) {
 	case simpleFile:
-	    retval = send(cfp->fd, msg, len, flags);
+	    retval = send(fdout, msg, len, flags);
 	    break;
 	case simplePipe:
-	    retval = send(cfp->fdout, msg, len, flags);
+	    retval = send(fdout, msg, len, flags);
 	    break;
 	case simpleSocket:
-	    retval = send(cfp->fd, msg, len, flags);
+	    retval = send(fdout, msg, len, flags);
 	    break;
 #if HAVE_OPENSSL
 	case SSLSocket:
-	    retval = send(cfp->fd, msg, len, flags);
+	    retval = send(fdout, msg, len, flags);
 	    break;
 #endif
 	default:
 	    retval = -1;
 	    break;
+    }
+
+    if (retval < 0) {
+	cfp->errored = FLAGTRUE;
+	FD_CLR(fdout, &winit);
     }
 
     return retval;
@@ -2142,6 +2192,9 @@ ProbeInterfaces(bindAddr)
 #ifdef SIOCGIFFLAGS
     struct ifreq ifrcopy;
 #endif
+#ifdef SIOCGIFNUM
+    int nifr;
+#endif
     int sock;
     int r = 0, m = 0;
     int bufsize = 2048;
@@ -2165,13 +2218,17 @@ ProbeInterfaces(bindAddr)
 	Error("ProbeInterfaces(): socket(): %s", strerror(errno));
 	Bye(EX_OSERR);
     }
+#ifdef SIOCGIFNUM
+    if (ioctl(sock, SIOCGIFNUM, &nifr) == 0)
+	bufsize = nifr * sizeof(struct ifreq) + 512;
+#endif
 
     while (bufsize) {
 	ifc.ifc_len = bufsize;
 	ifc.ifc_req = (struct ifreq *)malloc(ifc.ifc_len);
 	if (ifc.ifc_req == (struct ifreq *)0)
 	    OutOfMem();
-	if (ioctl(sock, SIOCGIFCONF, &ifc) != 0) {
+	if (ioctl(sock, SIOCGIFCONF, &ifc) != 0 && errno != EINVAL) {
 	    free(ifc.ifc_req);
 	    close(sock);
 	    Error("ProbeInterfaces(): ioctl(SIOCGIFCONF): %s",
@@ -2187,6 +2244,8 @@ ProbeInterfaces(bindAddr)
 	 * in (==bufsize).  so, we'll assume a 512 byte gap would have
 	 * been big enough to put one more record and as long as we have
 	 * that "buffer zone", we should have all the interfaces.
+	 * so, solaris returns EINVAL if it's too small, so we catch that
+	 * above and since if_len is bufsize, it'll loop again.
 	 */
 	if (ifc.ifc_len + 512 < bufsize)
 	    break;
