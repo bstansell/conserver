@@ -1,5 +1,5 @@
 /*
- *  $Id: convert.c,v 1.10 2004/05/28 01:08:28 bryan Exp $
+ *  $Id: convert.c,v 1.12 2006/04/07 15:47:20 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -86,7 +86,7 @@ ReadLine2(fp, save, iLine)
 	   || peek) {
 	/* If we have a previously saved line, use it instead */
 	if (save->used) {
-	    strcpy(buf, save->string);
+	    StrCpy(buf, save->string, sizeof(buf));
 	    BuildString((char *)0, save);
 	}
 

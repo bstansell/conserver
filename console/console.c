@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.176 2005/09/05 22:34:39 bryan Exp $
+ *  $Id: console.c,v 5.179 2006/04/07 15:47:20 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -33,8 +33,8 @@
 
 #include <getpassword.h>
 #include <cutil.h>
-#include <version.h>
 #include <readconf.h>
+#include <version.h>
 #if HAVE_OPENSSL
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -58,6 +58,10 @@ char *prevName = (char *)0;
 CONFIG *optConf = (CONFIG *)0;
 CONFIG *config = (CONFIG *)0;
 FLAG interact = FLAGFALSE;
+unsigned int sversion = 0;
+#if defined(TIOCGWINSZ)
+struct winsize ws;
+#endif
 
 #if HAVE_OPENSSL
 SSL_CTX *ctx = (SSL_CTX *)0;
@@ -281,7 +285,7 @@ Version()
     if (acA2 == (STRING *)0)
 	acA2 = AllocString();
 
-    Msg("%s", THIS_VERSION);
+    Msg(MyVersion());
 #if USE_UNIX_DOMAIN_SOCKETS
     Msg("default socket directory `%s\'", UDSDIR);
 #else
@@ -473,7 +477,7 @@ GetPort(pcToHost, sPort)
 	Error("GetPort: path to socket too long: %s", portPath->string);
 	return (CONSFILE *)0;
     }
-    strcpy(port.sun_path, portPath->string);
+    StrCpy(port.sun_path, portPath->string, sizeof(port.sun_path));
 
     CONDDEBUG((1, "GetPort: socket=%s", port.sun_path));
 
@@ -624,11 +628,11 @@ DestroyDataStructures()
 
 char *
 #if PROTOTYPES
-ReadReply(CONSFILE *fd, int toEOF)
+ReadReply(CONSFILE *fd, FLAG toEOF)
 #else
-ReadReply(fd)
+ReadReply(fd, toEOF)
     CONSFILE *fd;
-    int toEOF;
+    FLAG toEOF;
 #endif
 {
     int nr;
@@ -646,7 +650,7 @@ ReadReply(fd)
 	    case 0:
 		/* fall through */
 	    case -1:
-		if (result->used > 1 || toEOF)
+		if (result->used > 1 || toEOF == FLAGTRUE)
 		    break;
 		C2Cooked();
 		Error("lost connection");
@@ -660,7 +664,7 @@ ReadReply(fd)
 		    MemMove(buf, buf + l, nr);
 		}
 		BuildStringN(buf, nr, result);
-		if (toEOF)	/* if toEOF, read until EOF */
+		if (toEOF == FLAGTRUE)	/* if toEOF, read until EOF */
 		    continue;
 		if ((result->used > 1) &&
 		    strchr(result->string, '\n') != (char *)0)
@@ -931,7 +935,7 @@ DoExec(pcf)
 	    FileSetQuoteIAC(pcf, FLAGFALSE);
 	    FilePrint(pcf, FLAGFALSE, "%c%c", OB_IAC, OB_EXEC);
 	    FileSetQuoteIAC(pcf, FLAGTRUE);
-	    r = ReadReply(pcf, 0);
+	    r = ReadReply(pcf, FLAGFALSE);
 	    /* now back to non-blocking, now that we've got reply */
 	    SetFlags(FileFDNum(pcf), O_NONBLOCK, 0);
 	    /* if we aren't still r/w, abort */
@@ -1390,7 +1394,7 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 	 */
 	FilePrint(pcf, FLAGFALSE, "%c%ce%c%c", DEFATTN, DEFESC, chAttn,
 		  chEsc);
-	r = ReadReply(pcf, 0);
+	r = ReadReply(pcf, FLAGFALSE);
 	if (strncmp(r, "[redef:", 7) != 0) {
 	    Error("protocol botch on redef of escape sequence");
 	    Bye(EX_UNAVAILABLE);
@@ -1399,9 +1403,15 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 
     /* try to grok the state of the console */
     FilePrint(pcf, FLAGFALSE, "%c%c=", chAttn, chEsc);
-    r = ReadReply(pcf, 0);
+    r = ReadReply(pcf, FLAGFALSE);
     if (strncmp(r, "[unknown", 8) != 0 && strncmp(r, "[up]", 4) != 0)
 	FileWrite(cfstdout, FLAGFALSE, r, -1);
+
+    /* try to grok the version of the server */
+    FilePrint(pcf, FLAGFALSE, "%c%c%c", chAttn, chEsc, 0xD6);
+    r = ReadReply(pcf, FLAGFALSE);
+    if (strncmp(r, "[unknown", 8) != 0)
+	sversion = AtoU(r + 1);
 
     printf("[Enter `");
     PutCtlc(chAttn, stdout);
@@ -1410,13 +1420,33 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 
     /* try and display the MOTD */
     FilePrint(pcf, FLAGFALSE, "%c%cm", chAttn, chEsc);
-    r = ReadReply(pcf, 0);
+    r = ReadReply(pcf, FLAGFALSE);
     if (strncmp(r, "[unknown", 8) != 0 &&
 	strncmp(r, "[-- MOTD --]", 12) != 0)
 	FileWrite(cfstdout, FLAGFALSE, r, -1);
 
+    if (sversion >= 8001014) {
+	if (config->playback) {
+	    FilePrint(pcf, FLAGFALSE, "%c%cP%hu\r", chAttn, chEsc,
+#if defined(TIOCGWINSZ)
+		      config->playback == 1 ? ws.ws_row :
+#endif
+		      config->playback - 1);
+	    r = ReadReply(pcf, FLAGFALSE);
+	}
+
+	if (config->replay) {
+	    FilePrint(pcf, FLAGFALSE, "%c%cR%hu\r", chAttn, chEsc,
+#if defined(TIOCGWINSZ)
+		      config->replay == 1 ? ws.ws_row :
+#endif
+		      config->replay - 1);
+	    r = ReadReply(pcf, FLAGFALSE);
+	}
+    }
+
     FilePrint(pcf, FLAGFALSE, "%c%c;", chAttn, chEsc);
-    r = ReadReply(pcf, 0);
+    r = ReadReply(pcf, FLAGFALSE);
     if (strncmp(r, "[unknown", 8) != 0 &&
 	strncmp(r, "[connected]", 11) != 0)
 	FileWrite(cfstdout, FLAGFALSE, r, -1);
@@ -1528,7 +1558,7 @@ DoCmds(master, pports, cmdi)
 
 	FileSetQuoteIAC(pcf, FLAGTRUE);
 
-	t = ReadReply(pcf, 0);
+	t = ReadReply(pcf, FLAGFALSE);
 	if (strcmp(t, "ok\r\n") != 0) {
 	    FileClose(&pcf);
 	    FilePrint(cfstdout, FLAGFALSE, "%s: %s", serverName, t);
@@ -1537,7 +1567,7 @@ DoCmds(master, pports, cmdi)
 #if HAVE_OPENSSL
 	if (config->sslenabled == FLAGTRUE) {
 	    FileWrite(pcf, FLAGFALSE, "ssl\r\n", 5);
-	    t = ReadReply(pcf, 0);
+	    t = ReadReply(pcf, FLAGFALSE);
 	    if (strcmp(t, "ok\r\n") == 0) {
 		AttemptSSL(pcf);
 		if (FileGetType(pcf) != SSLSocket) {
@@ -1557,7 +1587,7 @@ DoCmds(master, pports, cmdi)
 
 	FilePrint(pcf, FLAGFALSE, "login %s\r\n", config->username);
 
-	t = ReadReply(pcf, 0);
+	t = ReadReply(pcf, FLAGFALSE);
 	if (strncmp(t, "passwd?", 7) == 0) {
 	    static int count = 0;
 	    static STRING *tmpString = (STRING *)0;
@@ -1588,7 +1618,7 @@ DoCmds(master, pports, cmdi)
 	    }
 	    FileWrite(pcf, FLAGFALSE, tmpString->string,
 		      tmpString->used - 1);
-	    t = ReadReply(pcf, 0);
+	    t = ReadReply(pcf, FLAGFALSE);
 	    if (strcmp(t, "ok\r\n") != 0) {
 		FilePrint(cfstdout, FLAGFALSE, "%s: %s", serverName, t);
 		if (++count < 3) {
@@ -1621,7 +1651,7 @@ DoCmds(master, pports, cmdi)
 	 * that the ReadReply can stop once the socket closes.
 	 */
 	if (cmdi != 0) {
-	    t = ReadReply(pcf, 0);
+	    t = ReadReply(pcf, FLAGFALSE);
 	    /* save the result */
 	    if (result != (char *)0)
 		free(result);
@@ -1639,7 +1669,7 @@ DoCmds(master, pports, cmdi)
 		    Bye(EX_SOFTWARE);
 		}
 		FileWrite(pcf, FLAGFALSE, "exit\r\n", 6);
-		t = ReadReply(pcf, 1);
+		t = ReadReply(pcf, FLAGTRUE);
 	    } else {
 		/* if we're not trying to connect to a console */
 		if (interact == FLAGFALSE) {
@@ -1664,7 +1694,7 @@ DoCmds(master, pports, cmdi)
 	    }
 	} else if (cmds[cmdi][0] == 'q') {
 	    if (cmdi == 0) {
-		t = ReadReply(pcf, 0);
+		t = ReadReply(pcf, FLAGFALSE);
 		FilePrint(cfstdout, FLAGFALSE, "%s: %s", serverName, t);
 	    } else {
 		FilePrint(cfstdout, FLAGFALSE, "%s: %s", serverName,
@@ -1673,7 +1703,7 @@ DoCmds(master, pports, cmdi)
 	    /* only say 'exit' if 'quit' failed...since it's dying anyway */
 	    if (t[0] != 'o' || t[1] != 'k') {
 		FileWrite(pcf, FLAGFALSE, "exit\r\n", 6);
-		t = ReadReply(pcf, 1);
+		t = ReadReply(pcf, FLAGTRUE);
 	    }
 	} else {
 	    /* all done */
@@ -1685,7 +1715,7 @@ DoCmds(master, pports, cmdi)
 	     * like i said.  wacky.
 	     */
 	    FileWrite(pcf, FLAGFALSE, "exit\r\n", 6);
-	    t = ReadReply(pcf, cmdi == 0 ? 1 : 0);
+	    t = ReadReply(pcf, cmdi == 0 ? FLAGTRUE : FLAGFALSE);
 
 	    if (cmdi == 0) {
 		int len;
@@ -2132,6 +2162,20 @@ main(argc, argv)
     if (config->port == (char *)0)
 	OutOfMem();
 
+    if (optConf->replay != 0)
+	config->replay = optConf->replay;
+    else if (pConfig->replay != 0)
+	config->replay = pConfig->replay;
+    else
+	config->replay = 0;
+
+    if (optConf->playback != 0)
+	config->playback = optConf->playback;
+    else if (pConfig->playback != 0)
+	config->playback = pConfig->playback;
+    else
+	config->playback = 0;
+
 #if HAVE_OPENSSL
     if (optConf->sslcredentials != (char *)0 &&
 	optConf->sslcredentials[0] != '\000')
@@ -2214,7 +2258,7 @@ main(argc, argv)
 	    Error("getservbyname(%s) failed", config->port);
 	    Bye(EX_UNAVAILABLE);
 	} else {
-	    bindPort = ntohs((u_short) pSE->s_port);
+	    bindPort = ntohs((unsigned short)pSE->s_port);
 	}
     }
 #endif
@@ -2279,6 +2323,21 @@ main(argc, argv)
 	if (!fLocal)
 	    cmds[++cmdi] = "master";
     }
+
+#if defined(TIOCGWINSZ)
+    if (interact == FLAGTRUE) {
+	int fd;
+#if HAVE_MEMSET
+	memset((void *)(&ws), '\000', sizeof(ws));
+#else
+	bzero((char *)(&ws), sizeof(ws));
+#endif
+	if ((fd = open("/dev/tty", O_RDONLY)) != -1) {
+	    ioctl(fd, TIOCGWINSZ, &ws);
+	}
+	close(fd);
+    }
+#endif
 
     for (;;) {
 	if (gotoConsole == (CONSFILE *)0)

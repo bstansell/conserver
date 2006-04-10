@@ -8,9 +8,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <netinet/in.h>
-#if USE_UNIX_DOMAIN_SOCKETS
 #include <sys/un.h>
-#endif
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <ctype.h>
@@ -35,6 +33,17 @@
 #endif
 #if !defined(DEFESC)
 # define DEFESC		'c'
+#endif
+
+/* set the default length of the replay functions
+ * DEFREPLAY for 'r'
+ * DEFPLAYBACK for 'p'
+ */
+#if !defined(DEFREPLAY)
+# define DEFREPLAY	20
+#endif
+#if !defined(PLAYBACK)
+# define DEFPLAYBACK	60
 #endif
 
 /* For legacy compile-time setting of the port...
@@ -93,6 +102,18 @@ typedef long fd_set;
 #endif
 
 #include <termios.h>
+
+#ifndef TAB3
+# ifdef OXTABS
+#  define TAB3 OXTABS
+# else
+#  ifdef XTABS
+#   define TAB3 XTABS
+#  else
+#   define TAB3 0
+#  endif
+# endif
+#endif
 
 #ifdef HAVE_STROPTS_H
 # include <stropts.h>

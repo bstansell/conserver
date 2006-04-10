@@ -1,6 +1,36 @@
 				CHANGES
 				=======
 
+version 8.1.14 (Apr 9, 2006):
+	- fixed rpm conserver.spec file - based on patch by Martin Evans
+	  <m.d.t.evans@qmul.ac.uk>
+	- added 'uds' console type for unix domain socket connections -
+	  based on patch by DJ Gregor <dj@gregor.com>
+	- probing of interfaces under cygwin (and possibly others?) now
+	  skips unconfigured interfaces (even if flagged as up!) -
+	  reported by Chris Riddoch <chrisr@digeo.com>
+	- added the '!login' console option to prevent clients from
+	  connecting to a console - suggested by Greg Tillman
+	  <gregtillman@comcast.net>
+	- added a 'noop' console type for consoles you'd like to name,
+	  but have no connection to - suggested by Greg Tillman
+	  <gregtillman@comcast.net>
+	- deprecated escape commands removed from the code
+	- added '^EcP' and '^EcR' sequences to set the playback and
+	  replay line lengths
+	- new console config options 'playback' and 'replay' to let the
+	  client set prefered output lengths (with a special feature for
+	  a size of zero)
+	- prefer strlcpy() over strcpy() - based on patch by Peter
+	  Valchev <pvalchev@openbsd.org>
+	- fixed bug where '^Eco' by user on an 'exec' console with an
+	  'initcmd' causes input by user to be ignored (could be other
+	  console types as well) - reported by Mark Wedel
+	  <Mark.Wedel@sun.com>
+	- made POSIX termios code in autologin a requirement (since
+	  conserver requires it) and cleaned up a few other issues -
+	  based on reports by Arthur Clune <ajc22@york.ac.uk>
+
 version 8.1.13 (Jan 15, 2006):
 	- use SIOCGIFNUM for interface count (if available) and catch
 	  EINVAL on Solaris - patch by Peter Jeremy
@@ -823,5 +853,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.212 2006/01/15 17:11:42 bryan Exp $
+#  $Id: CHANGES,v 1.215 2006/04/10 02:07:13 bryan Exp $
 #

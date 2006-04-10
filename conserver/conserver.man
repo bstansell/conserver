@@ -1,6 +1,6 @@
 .\" @(#)conserver.8 01/06/91 OSU CIS; Thomas A. Fine
-.\" $Id: conserver.man,v 1.51 2005/04/02 09:59:48 bryan Exp $
-.TH CONSERVER 8 "2005/04/02" "conserver-8.1.13" "conserver"
+.\" $Id: conserver.man,v 1.53 2006/03/20 16:47:03 bryan Exp $
+.TH CONSERVER 8 "2006/03/20" "conserver-8.1.14" "conserver"
 .SH NAME
 conserver \- console server daemon
 .SH SYNOPSIS
@@ -380,13 +380,16 @@ The console aliases in a comma-separated list.
 .I type
 The type of console.
 Values will be a `/' for a local device, `|' for
-a command, or `!' for a remote port.
+a command, `!' for a remote port, `%' for a Unix domain socket,
+and `#' for a noop console.
 .TP
 .I details
 Multiple values are comma-separated and depend on the type of the console.
 Local devices will have the values of the device file and baud rate/parity.
 Commands will have string to invoke.
 Remote ports will have the values of the remote hostname and port number.
+Unix domain sockets will have the path to the socket.
+Noop consoles will have nothing.
 .RE
 .TP
 .B \-u

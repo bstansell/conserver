@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.196 2005/06/11 02:31:05 bryan Exp $
+ *  $Id: main.c,v 5.200 2006/04/03 13:32:08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -418,8 +418,8 @@ ReopenLogfile()
     close(2);
     dup(1);
     if (isMaster && tag) {
-	Msg("%s", THIS_VERSION);
-	Msg("%s", startedMsg->string);
+	Msg(MyVersion());
+	Msg(startedMsg->string);
     }
     tag = 0;
 }
@@ -619,7 +619,7 @@ Version()
 
     isMultiProc = 0;
 
-    Msg("%s", THIS_VERSION);
+    Msg(MyVersion());
     Msg("default access type `%c'", defConfig.defaultaccess);
     Msg("default escape sequence `%s%s'", FmtCtl(DEFATTN, acA1),
 	FmtCtl(DEFESC, acA2));
@@ -913,6 +913,18 @@ DumpDataStructures()
 			       EMPTYSTR(pCE->host), FLAGSTR(pCE->raw),
 			       pCE->netport, pCE->port, pCE->telnetState));
 		    break;
+		case NOOP:
+		    CONDDEBUG((1,
+			       "DumpDataStructures():  server=%s, type=NOOP",
+			       EMPTYSTR(pCE->server)));
+		    break;
+		case UDS:
+		    CONDDEBUG((1,
+			       "DumpDataStructures():  server=%s, type=UDS",
+			       EMPTYSTR(pCE->server)));
+		    CONDDEBUG((1, "DumpDataStructures():  uds=%s",
+			       EMPTYSTR(pCE->uds)));
+		    break;
 		case UNKNOWNTYPE:
 		    CONDDEBUG((1,
 			       "DumpDataStructures():  server=%s, type=UNKNOWNTYPE",
@@ -953,8 +965,8 @@ DumpDataStructures()
 	    CONDDEBUG((1,
 		       "DumpDataStructures():  reinitoncc=%s, striphigh=%s",
 		       FLAGSTR(pCE->reinitoncc), FLAGSTR(pCE->striphigh)));
-	    CONDDEBUG((1, "DumpDataStructures():  unloved=%s",
-		       FLAGSTR(pCE->unloved)));
+	    CONDDEBUG((1, "DumpDataStructures():  unloved=%s, login=%s",
+		       FLAGSTR(pCE->unloved), FLAGSTR(pCE->login)));
 	    CONDDEBUG((1,
 		       "DumpDataStructures():  initpid=%lu, initcmd=%s, initfile=%d",
 		       (unsigned long)pCE->initpid, EMPTYSTR(pCE->initcmd),
@@ -1272,7 +1284,7 @@ main(argc, argv)
 	Bye(EX_OK);
     }
 
-    Msg("%s", THIS_VERSION);
+    Msg(MyVersion());
 
 #if HAVE_GETLOGIN
     origuser = getlogin();

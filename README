@@ -21,6 +21,8 @@ Downloading
     Mirrors of the site are at:
 
 	Australia	http://planetmirror.com/pub/conserver/
+	Ireland		http://conserver.oss-mirror.org/
+	Germany		http://conserver.linux-mirror.org/
 	Russia		http://conserver.rinet.ru/
 
 
@@ -35,7 +37,9 @@ Systems Tested
 	Cygwin (w2k),gcc 2.95.3
 	DEC Tru64 4.0, gcc
 	DEC Tru64 4.0/5.1, native cc
-	FreeBSD 4.2/4.8/5.1 (x86), gcc
+	FreeBSD 4.x (i386) gcc
+	FreeBSD 5.x (i386/amd64/sparc64) gcc
+	FreeBSD 6.x/7.x (i386/amd64/sparc64/ia64) gcc
 	HP-UX 10.20, gcc
 	HP-UX 11.10 parisc and ia64, native cc
 	Irix 6.15, native cc
@@ -61,5 +65,5 @@ Contributions
     http://www.columbia.edu/acis/sy/unixdev/zinc
 
 #
-#  $Id: README,v 1.24 2005/09/05 21:46:43 bryan Exp $
+#  $Id: README,v 1.25 2006/03/20 16:48:37 bryan Exp $
 #

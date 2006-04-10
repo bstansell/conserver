@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.145 2005/06/08 18:09:40 bryan Exp $
+ *  $Id: consent.c,v 5.149 2006/04/07 15:47:20 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -275,6 +275,12 @@ StopInit(pCE)
 {
     if (pCE->initcmd == (char *)0)
 	return;
+
+    if (pCE->initpid != 0 || pCE->initfile != (CONSFILE *)0)
+	SendIWaitClientsMsg(pCE,
+			    (pCE->fup &&
+			     pCE->ioState ==
+			     ISNORMAL) ? "up]\r\n" : "down]\r\n");
 
     if (pCE->initpid != 0) {
 	kill(pCE->initpid, SIGHUP);
@@ -779,6 +785,10 @@ ConsInit(pCE)
     switch (pCE->type) {
 	case UNKNOWNTYPE:	/* shut up gcc */
 	    break;
+	case NOOP:
+	    pCE->fup = 1;
+	    pCE->ioState = ISNORMAL;
+	    break;
 	case EXEC:
 	    if ((cofile =
 		 FallBack(&pCE->execSlave, &pCE->execSlaveFD)) == -1) {
@@ -887,6 +897,74 @@ ConsInit(pCE)
 	    }
 	    pCE->fup = 1;
 	    break;
+	case UDS:
+	    {
+		struct sockaddr_un port;
+
+#if HAVE_MEMSET
+		memset((void *)&port, 0, sizeof(port));
+#else
+		bzero((char *)&port, sizeof(port));
+#endif
+
+		/* we ensure that pCE->uds exists and fits inside port.sun_path
+		 * in readcfg.c, so we can just defend ourselves here (which
+		 * should never trigger).
+		 */
+		if (strlen(pCE->uds) >= sizeof(port.sun_path)) {
+		    Error
+			("[%s] strlen(uds path) > sizeof(port.sun_path): forcing down",
+			 pCE->server);
+		    ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+		    return;
+		}
+		StrCpy(port.sun_path, pCE->uds, sizeof(port.sun_path));
+		port.sun_family = AF_UNIX;
+
+		if ((cofile = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
+		    Error
+			("[%s] socket(AF_UNIX,SOCK_STREAM): %s: forcing down",
+			 pCE->server, strerror(errno));
+		    ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+		    return;
+		}
+
+		if (!SetFlags(cofile, O_NONBLOCK, 0)) {
+		    ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+		    return;
+		}
+
+		if ((ret =
+		     connect(cofile, (struct sockaddr *)&port,
+			     sizeof(port))) < 0) {
+		    if (errno != EINPROGRESS) {
+			Error("[%s] connect(%u): %s: forcing down",
+			      pCE->server, cofile, strerror(errno));
+			ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+			return;
+		    }
+		}
+	    }
+	    if ((pCE->cofile =
+		 FileOpenFD(cofile, simpleSocket)) == (CONSFILE *)0) {
+		Error
+		    ("[%s] FileOpenFD(%d,simpleSocket) failed: forcing down",
+		     pCE->server, cofile);
+		ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+		return;
+	    }
+	    if (ret == 0) {
+		pCE->ioState = ISNORMAL;
+		pCE->stateTimer = 0;
+	    } else {
+		pCE->ioState = INCONNECT;
+		pCE->stateTimer = time((time_t *)0) + CONNECTTIMEOUT;
+		if (timers[T_STATE] == (time_t)0 ||
+		    timers[T_STATE] > pCE->stateTimer)
+		    timers[T_STATE] = pCE->stateTimer;
+	    }
+	    pCE->fup = 1;
+	    break;
 	case DEVICE:
 	    if (-1 ==
 		(cofile = open(pCE->device, O_RDWR | O_NONBLOCK, 0600))) {
@@ -925,21 +1003,29 @@ ConsInit(pCE)
 	    Verbose("[%s] port %hu on %s", pCE->server, pCE->netport,
 		    pCE->host);
 	    break;
+	case NOOP:
+	    Verbose("[%s] noop", pCE->server);
+	    break;
+	case UDS:
+	    Verbose("[%s] uds %s", pCE->server, pCE->uds);
+	    break;
 	case DEVICE:
 	    Verbose("[%s] at %s%c on %s", pCE->server, pCE->baud->acrate,
 		    pCE->parity->key[0], pCE->device);
 	    break;
     }
 
-    /* if we're waiting for connect() to finish, watch the
-     * write bit, otherwise watch for the read bit
-     */
-    if (pCE->ioState == INCONNECT)
-	FD_SET(cofile, &winit);
-    else
-	FD_SET(cofile, &rinit);
-    if (maxfd < cofile + 1)
-	maxfd = cofile + 1;
+    if (cofile != -1) {
+	/* if we're waiting for connect() to finish, watch the
+	 * write bit, otherwise watch for the read bit
+	 */
+	if (pCE->ioState == INCONNECT)
+	    FD_SET(cofile, &winit);
+	else
+	    FD_SET(cofile, &rinit);
+	if (maxfd < cofile + 1)
+	    maxfd = cofile + 1;
+    }
 
     tyme = time((time_t *)0);
 

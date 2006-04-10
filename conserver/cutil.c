@@ -1,5 +1,5 @@
 /*
- *  $Id: cutil.c,v 1.125 2006/01/15 17:10:14 bryan Exp $
+ *  $Id: cutil.c,v 1.130 2006/04/07 15:47:20 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -9,6 +9,7 @@
 #include <compat.h>
 
 #include <cutil.h>
+#include <version.h>
 
 #include <net/if.h>
 #if HAVE_SYS_SOCKIO_H
@@ -84,7 +85,7 @@ StrTime(ltime)
     time_t tyme;
 
     tyme = time((time_t *)0);
-    strcpy(curtime, ctime(&tyme));
+    StrCpy(curtime, ctime(&tyme), sizeof(curtime));
     curtime[24] = '\000';	/* might need to adjust this at some point */
     if (ltime != NULL)
 	*ltime = tyme;
@@ -424,7 +425,7 @@ ReadLine(fp, save, iLine)
 	   || peek) {
 	/* If we have a previously saved line, use it instead */
 	if (save->used) {
-	    strcpy(buf, save->string);
+	    StrCpy(buf, save->string, sizeof(buf));
 	    BuildString((char *)0, save);
 	}
 
@@ -2290,6 +2291,21 @@ ProbeInterfaces(bindAddr)
 
 	if (sa->sa_family == AF_INET) {
 	    struct sockaddr_in *sin = (struct sockaddr_in *)sa;
+
+	    /* make sure the address isn't 0.0.0.0, which is how we
+	     * signal the end of our list
+	     */
+	    if (
+#if HAVE_MEMCMP
+		   memcmp(&(myAddrs[m]), &(sin->sin_addr),
+			  sizeof(struct in_addr))
+#else
+		   bcmp(&(myAddrs[m]), &(sin->sin_addr),
+			sizeof(struct in_addr))
+#endif
+		   == 0)
+		continue;
+
 #ifdef SIOCGIFFLAGS
 	    /* make sure the interface is up */
 	    ifrcopy = *ifr;
@@ -2297,13 +2313,16 @@ ProbeInterfaces(bindAddr)
 		((ifrcopy.ifr_flags & IFF_UP) == 0))
 		continue;
 #endif
+
 	    CONDDEBUG((1, "ProbeInterfaces(): name=%s addr=%s",
 		       ifr->ifr_name, inet_ntoa(sin->sin_addr)));
+
 #if HAVE_MEMCPY
 	    memcpy(&myAddrs[m], &(sin->sin_addr), sizeof(struct in_addr));
 #else
 	    bcopy(&(sin->sin_addr), &myAddrs[m], sizeof(struct in_addr));
 #endif
+
 	    Verbose("interface address %s (%s)", inet_ntoa(myAddrs[m]),
 		    ifr->ifr_name);
 	    m++;
@@ -2508,10 +2527,10 @@ SetFlags(fd, s, c)
 
 char *
 #if PROTOTYPES
-StrDup(char *msg)
+StrDup(const char *msg)
 #else
 StrDup(msg)
-    char *msg;
+    const char *msg;
 #endif
 {
     int len;
@@ -3163,6 +3182,11 @@ ProcessSubst(s, repl, str, name, id)
 	REP_END
     } state;
 
+    if (s == (SUBST *)0) {
+	Error("ProcessSubst(): WTF? No substitute support structure?!?!");
+	Bye(EX_SOFTWARE);
+    }
+
     if (str != (char **)0) {
 	if (*str != (char *)0) {
 	    free(*str);
@@ -3204,7 +3228,7 @@ ProcessSubst(s, repl, str, name, id)
 		break;
 	    case REP_EQ:
 		repfmt[repnum] = p;
-		if (s->tokens[(unsigned)(*(repfmt[repnum]))] != ISNOTHING)
+		if (s->token(*(repfmt[repnum])) != ISNOTHING)
 		    state = REP_INT;
 		else
 		    goto subst_err;
@@ -3212,13 +3236,11 @@ ProcessSubst(s, repl, str, name, id)
 	    case REP_INT:
 		if (*p == 'd' || *p == 'x' || *p == 'X' || *p == 'a' ||
 		    *p == 'A') {
-		    if (s->tokens[(unsigned)(*(repfmt[repnum]))] !=
-			ISNUMBER)
+		    if (s->token(*(repfmt[repnum])) != ISNUMBER)
 			goto subst_err;
 		    state = REP_END;
 		} else if (*p == 's') {
-		    if (s->tokens[(unsigned)(*(repfmt[repnum]))] !=
-			ISSTRING)
+		    if (s->token(*(repfmt[repnum])) != ISSTRING)
 			goto subst_err;
 		    state = REP_END;
 		} else if (!isdigit((int)(*p)))
@@ -3246,7 +3268,7 @@ ProcessSubst(s, repl, str, name, id)
 	    OutOfMem();
     }
 
-    if (s != (SUBST *)0 && repl != (char **)0) {
+    if (s != (SUBST *)0 && repl != (char **)0 && *repl != (char *)0) {
 	static STRING *result = (STRING *)0;
 
 	if (result == (STRING *)0)
@@ -3260,13 +3282,13 @@ ProcessSubst(s, repl, str, name, id)
 		char *c = (char *)0;
 		int o = 0;
 
-		if (s->tokens[(unsigned)(*r)] == ISSTRING) {
+		if (s->token(*r) == ISSTRING) {
 		    /* check the pattern for a length */
 		    if (isdigit((int)(*(r + 1))))
 			plen = atoi(r + 1);
 
 		    /* this should never return zero, but just in case */
-		    if ((*s->callback) (*r, &c, (int *)0) == 0)
+		    if ((*s->value) (*r, &c, (int *)0) == 0)
 			c = "";
 		    plen -= strlen(c);
 
@@ -3288,7 +3310,7 @@ ProcessSubst(s, repl, str, name, id)
 		    BuildString((char *)0, num);
 
 		    /* this should never return zero, but just in case */
-		    if ((*s->callback) (*r, (char **)0, &i) == 0)
+		    if ((*s->value) (*r, (char **)0, &i) == 0)
 			port = 0;
 		    else
 			port = (unsigned short)i;
@@ -3364,4 +3386,55 @@ ProcessSubst(s, repl, str, name, id)
     }
 
     return;
+}
+
+char *
+#if PROTOTYPES
+MyVersion(void)
+#else
+MyVersion()
+#endif
+{
+    static STRING *version = (STRING *)0;
+    if (version != (STRING *)0)
+	return version->string;
+    version = AllocString();
+    BuildStringPrint(version, "%s %d.%d.%d", VERSION_TEXT, VERSION_MAJOR,
+		     VERSION_MINOR, VERSION_REV);
+    return version->string;
+}
+
+unsigned int
+#if PROTOTYPES
+AtoU(char *str)
+#else
+AtoU(c)
+    char *str;
+#endif
+{
+    unsigned int v;
+    int i;
+    v = 0;
+    for (i = 0; isdigit((int)str[i]); i++) {
+	v *= 10;
+	v += str[i] - '0';
+    }
+    return v;
+}
+
+void
+#if PROTOTYPES
+StrCpy(char *dst, const char *src, unsigned int size)
+#else
+StrCpy(dst, src, size)
+    char *dst;
+    const char *src;
+    unsigned int size;
+#endif
+{
+#ifdef HAVE_STRLCPY
+    strlcpy(dst, src, size);
+#else
+    strcpy(dst, src);
+#endif
 }

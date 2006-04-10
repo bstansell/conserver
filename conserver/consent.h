@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.63 2005/06/08 18:09:40 bryan Exp $
+ *  $Id: consent.h,v 5.66 2006/03/20 16:47:03 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -55,7 +55,9 @@ typedef enum consType {
     UNKNOWNTYPE = 0,
     DEVICE,
     EXEC,
-    HOST
+    HOST,
+    NOOP,
+    UDS
 } CONSTYPE;
 
 typedef struct names {
@@ -102,6 +104,9 @@ typedef struct consent {	/* console information                  */
     char *execsubst;		/* exec substitution pattern            */
     uid_t execuid;		/* user to run exec as                  */
     gid_t execgid;		/* group to run exec as                 */
+    /* type == UDS */
+    char *uds;			/* socket file                          */
+    char *udssubst;		/* socket file substitution pattern     */
     /* global stuff */
     char *master;		/* master hostname                      */
     unsigned short breakNum;	/* break type [1-9]                     */
@@ -127,6 +132,7 @@ typedef struct consent {	/* console information                  */
     FLAG striphigh;		/* strip high-bit of console data       */
     FLAG autoreinit;		/* auto-reinitialize if failed          */
     FLAG unloved;		/* copy "unloved" data to stdout        */
+    FLAG login;			/* allow logins to the console          */
 
     /*** runtime settings ***/
     CONSFILE *fdlog;		/* the local log file                   */

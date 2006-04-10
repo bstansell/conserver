@@ -4,7 +4,7 @@
 #
 
 %define pkg  conserver
-%define ver  8.1.13
+%define ver  8.1.14
 
 # define the name of the machine on which the main conserver
 # daemon will be running if you don't want to use the default
@@ -12,13 +12,13 @@
 %define master console
 
 # what red hat (or other distibution) version are you running?
-%define distver 6
+%define distver 1
 
 Summary: Serial console server daemon/client
 Name: %{pkg}
 Version: %{ver}
-Release: 1.%{distver}
-Copyright: distributable
+Release: %{distver}
+License: BSD
 Group: System Environment/Daemons
 URL: http://www.conserver.com/
 Source: http://www.conserver.com/%{pkg}-%{ver}.tar.gz
@@ -96,6 +96,7 @@ fi
 %config(noreplace) %{_sysconfdir}/conserver.passwd
 %attr(555,root,root) %{_initrddir}/conserver
 %{prefix}/bin/console
+%{prefix}/lib/conserver/convert
 %{prefix}/share/man/man1/console.1.gz
 %{prefix}/share/man/man8/conserver.8.gz
 %{prefix}/share/man/man5/conserver.cf.5.gz

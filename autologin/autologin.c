@@ -69,7 +69,7 @@
  */
 
 #ifndef	lint
-char	*rcsid = "$Id: autologin.c,v 1.24 2004/12/12 07:36:07 bryan Exp $";
+char	*rcsid = "$Id: autologin.c,v 1.25 2006/04/10 01:50:16 bryan Exp $";
 #endif	/* not lint */
 extern char	*progname;
 gid_t	 awGrps[NGROUPS_MAX];
@@ -88,37 +88,18 @@ void	usage();
 int
 Process()
 {
-	register int		 c;
 	int			 iErrs = 0;
 	int			 i, iNewGrp;
 	gid_t			 wGid;
 	uid_t			 wUid;
 	char			*pcCmd = (char *)0,
 				*pcDevTty = (char *)0;
-	char			*pcTmp;
 #ifdef	HAVE_GETUSERATTR
 	char			*pcGrps;
 #endif
 	struct	passwd		*pwd;
 	struct	stat		 st;
-#ifdef HAVE_TERMIOS_H
 	struct	termios		 n_tio;
-#else
-# ifdef TIOCNOTTY
-#  ifdef O_CBREAK
-	auto struct tc n_tchars;
-#  else
-	auto struct tchars n_tchars;
-#  endif
-#  ifdef TIOCGLTC
-	auto struct ltchars n_ltchars;
-#  endif
-# else
-#  ifdef TIOCGETP
-	auto struct sgttyb n_sty;
-#  endif
-# endif
-#endif
 #if defined(HAVE_BSM_AUDIT_H) && defined(HAVE_LIBBSM)
 	char			my_hostname[MAXHOSTNAMELEN];
 #endif
@@ -320,7 +301,7 @@ Process()
 # endif
 			(void)au_write(iAuditFile, ptAuditToken);
 			if(0 > au_close(iAuditFile, AU_TO_WRITE, AUE_autologin)) {
-				fprintf(stderr, "%s: audit write failed",
+				fprintf(stderr, "%s: audit write failed: %s",
 					progname,
 					strerror(errno));
 			}
@@ -372,54 +353,6 @@ Process()
 
 	/* put the tty in the correct mode
 	 */
-#ifndef HAVE_TERMIOS_H
-	if (0 != ioctl(0, TIOCGETP, (char *)&n_sty)) {
-		fprintf(stderr, "%s: iotcl: getp: %s\n", progname, strerror(errno));
-		exit(10);
-	}
-#ifdef O_CBREAK
-	n_sty.sg_flags &= ~(O_CBREAK);
-	n_sty.sg_flags |= (O_CRMOD|O_ECHO);
-#else
-	n_sty.sg_flags &= ~(CBREAK);
-	n_sty.sg_flags |= (CRMOD|ECHO);
-#endif
-	n_sty.sg_kill = '\025';             /* ^U   */
-	n_sty.sg_erase = '\010';            /* ^H   */
-	if (0 != ioctl(0, TIOCSETP, (char *)&n_sty)) {
-		fprintf(stderr, "%s: iotcl: setp: %s\n", progname, strerror(errno));
-		exit(10);
-	}
-
-	/* stty undef all tty chars
-	 */
-#if 0
-	if (-1 == ioctl(0, TIOCGETC, (char *)&n_tchars)) {
-		fprintf(stderr, "%s: ioctl: getc: %s\n", progname, strerror(errno));
-		return;
-	}
-	n_tchars.t_intrc = -1;
-	n_tchars.t_quitc = -1;
-	if (-1 == ioctl(0, TIOCSETC, (char *)&n_tchars)) {
-		fprintf(stderr, "%s: ioctl: setc: %s\n", progname, strerror(errno));
-		return;
-	}
-#endif
-#ifdef TIOCGLTC
-	if (-1 == ioctl(0, TIOCGLTC, (char *)&n_ltchars)) {
-		fprintf(stderr, "%s: ioctl: gltc: %s\n", progname, strerror(errno));
-		return;
-	}
-	n_ltchars.t_suspc = -1;
-	n_ltchars.t_dsuspc = -1;
-	n_ltchars.t_flushc = -1;
-	n_ltchars.t_lnextc = -1;
-	if (-1 == ioctl(0, TIOCSLTC, (char *)&n_ltchars)) {
-		fprintf(stderr, "%s: ioctl: sltc: %s\n", progname, strerror(errno));
-		return;
-	}
-#endif
-#else	/* not using ioctl, using POSIX or sun stuff */
 #ifdef HAVE_TCGETATTR
 	if (0 != tcgetattr(0, &n_tio)) {
 		(void) fprintf(stderr, "%s: tcgetattr: %s\n", progname, strerror(errno));
@@ -455,16 +388,7 @@ Process()
 		exit(1);
 		/* NOTREACHED */
 	}
-#else
-#ifndef HAVE_TERMIOS_H
-	if (0 != ioctl(0, TCSETS, &n_tio)) {
-		(void) fprintf(stderr, "%s: ioctl: TCSETS: %s\n", progname, strerror(errno));
-		exit(1);
-		/* NOTREACHED */
-	}
 #endif
-#endif
-#endif	/* setup tty */
 
 	if (fMakeUtmp) {
 		extern char *ttyname();
@@ -532,7 +456,7 @@ char	*pctty;
 	register int fdUtmp;
 	register char *pcDev;
 	register struct utmp *up;
-	auto struct utmp outmp, utmp;
+	auto struct utmp utmp;
 
 
 	if ((char *)0 == pctty) {

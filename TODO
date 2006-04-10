@@ -54,8 +54,6 @@ Bryan Stansell
 
 - cyclades ts1000/2000 port : "Moses, Joel" <jmoses@deloitte.com>
 
-- config file for client (list of masters, for example)
-
 - strftime() idea for logfile names : Lars Kellogg-Stedman <lars@larsshack.org>
 
 - 9600baud log replay?
@@ -86,9 +84,6 @@ Bryan Stansell
     - not even sure if this is possible w/o confusing the client,
       but maybe with the new 8.1.0 client-server protocol, we can!
 
-- allow for very long replays (hundres of lines) : John Stoffel
-  <stoffel@lucent.com>
-
 - log rotation by date : Tom Pachla <tom.pachla@nlc-bnc.ca>
 
 - strict file permission checks on conserver.passwd/conserver.cf : Erik
@@ -109,6 +104,9 @@ Bryan Stansell
 - reintroduce console grouping : Martin Turba
   <martin.turba@igd.fraunhofer.de>
 
+- quick-recheck of down consoles (for uds) and possibly only log state
+  changes (instead of each try) : DJ Gregor <dj@gregor.com>
+
 #
-#  $Id: TODO,v 1.55 2005/06/06 23:02:36 bryan Exp $
+#  $Id: TODO,v 1.56 2006/04/03 22:20:34 bryan Exp $
 #

@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.189 2005/09/05 21:55:49 bryan Exp $
+ *  $Id: readcfg.c,v 5.192 2006/03/20 16:47:03 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -567,6 +567,10 @@ DestroyParserDefaultOrConsole(c, ph, pt)
 	free(c->server);
     if (c->host != (char *)0)
 	free(c->host);
+    if (c->uds != (char *)0)
+	free(c->uds);
+    if (c->udssubst != (char *)0)
+	free(c->udssubst);
     if (c->master != (char *)0)
 	free(c->master);
     if (c->exec != (char *)0)
@@ -693,10 +697,24 @@ ApplyDefault(d, c)
 	c->autoreinit = d->autoreinit;
     if (d->unloved != FLAGUNKNOWN)
 	c->unloved = d->unloved;
+    if (d->login != FLAGUNKNOWN)
+	c->login = d->login;
     if (d->host != (char *)0) {
 	if (c->host != (char *)0)
 	    free(c->host);
 	if ((c->host = StrDup(d->host)) == (char *)0)
+	    OutOfMem();
+    }
+    if (d->uds != (char *)0) {
+	if (c->uds != (char *)0)
+	    free(c->uds);
+	if ((c->uds = StrDup(d->uds)) == (char *)0)
+	    OutOfMem();
+    }
+    if (d->udssubst != (char *)0) {
+	if (c->udssubst != (char *)0)
+	    free(c->udssubst);
+	if ((c->udssubst = StrDup(d->udssubst)) == (char *)0)
 	    OutOfMem();
     }
     if (d->master != (char *)0) {
@@ -953,25 +971,15 @@ SUBST *substData = (SUBST *)0;
 
 int
 #if PROTOTYPES
-SubstCallback(char c, char **s, int *i)
+SubstValue(char c, char **s, int *i)
 #else
-SubstCallback(c, s, i)
+SubstValue(c, s, i)
     char c;
     char **s;
     int *i;
 #endif
 {
     int retval = 0;
-
-    if (substData == (SUBST *)0) {
-	if ((substData = (SUBST *)calloc(1, sizeof(SUBST))) == (SUBST *)0)
-	    OutOfMem();
-	substData->callback = &SubstCallback;
-	substData->tokens['p'] = ISNUMBER;
-	substData->tokens['P'] = ISNUMBER;
-	substData->tokens['h'] = ISSTRING;
-	substData->tokens['c'] = ISSTRING;
-    }
 
     if (s != (char **)0) {
 	CONSENT *pCE;
@@ -1005,6 +1013,71 @@ SubstCallback(c, s, i)
     return retval;
 }
 
+int substTokenCount[255];
+
+int
+#if PROTOTYPES
+SubstTokenCount(char c)
+#else
+SubstTokenCount(c)
+    char c;
+#endif
+{
+    return substTokenCount[(unsigned)c];
+}
+
+void
+#if PROTOTYPES
+ZeroSubstTokenCount(void)
+#else
+ZeroSubstTokenCount()
+#endif
+{
+#if HAVE_MEMSET
+    memset((void *)&substTokenCount, 0, sizeof(substTokenCount));
+#else
+    bzero((char *)&substTokenCount, sizeof(substTokenCount));
+#endif
+}
+
+SUBSTTOKEN
+#if PROTOTYPES
+SubstToken(char c)
+#else
+SubstToken(c)
+    char c;
+#endif
+{
+    switch (c) {
+	case 'p':
+	case 'P':
+	    substTokenCount[(unsigned)c]++;
+	    return ISNUMBER;
+	case 'h':
+	case 'c':
+	    substTokenCount[(unsigned)c]++;
+	    return ISSTRING;
+	default:
+	    return ISNOTHING;
+    }
+}
+
+void
+#if PROTOTYPES
+InitSubstCallback(void)
+#else
+InitSubstCallback()
+#endif
+{
+    if (substData == (SUBST *)0) {
+	if ((substData = (SUBST *)calloc(1, sizeof(SUBST))) == (SUBST *)0)
+	    OutOfMem();
+	substData->value = &SubstValue;
+	substData->token = &SubstToken;
+	ZeroSubstTokenCount();
+    }
+}
+
 void
 #if PROTOTYPES
 DefaultItemDevicesubst(char *id)
@@ -1029,6 +1102,19 @@ DefaultItemExecsubst(id)
     CONDDEBUG((1, "DefaultItemExecsubst(%s) [%s:%d]", id, file, line));
     ProcessSubst(substData, (char **)0, &(parserDefaultTemp->execsubst),
 		 "execsubst", id);
+}
+
+void
+#if PROTOTYPES
+DefaultItemUdssubst(char *id)
+#else
+DefaultItemUdssubst(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemUdssubst(%s) [%s:%d]", id, file, line));
+    ProcessSubst(substData, (char **)0, &(parserDefaultTemp->udssubst),
+		 "udssubst", id);
 }
 
 void
@@ -1253,6 +1339,38 @@ DefaultItemHost(id)
 {
     CONDDEBUG((1, "DefaultItemHost(%s) [%s:%d]", id, file, line));
     ProcessHost(parserDefaultTemp, id);
+}
+
+void
+#if PROTOTYPES
+ProcessUds(CONSENT *c, char *id)
+#else
+ProcessUds(c, id)
+    CONSENT *c;
+    char *id;
+#endif
+{
+    if (c->uds != (char *)0) {
+	free(c->uds);
+	c->uds = (char *)0;
+    }
+    if ((id == (char *)0) || (*id == '\000'))
+	return;
+    if ((c->uds = StrDup(id))
+	== (char *)0)
+	OutOfMem();
+}
+
+void
+#if PROTOTYPES
+DefaultItemUds(char *id)
+#else
+DefaultItemUds(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemUds(%s) [%s:%d]", id, file, line));
+    ProcessUds(parserDefaultTemp, id);
 }
 
 void
@@ -1537,6 +1655,7 @@ ProcessOptions(c, id)
 	c->reinitoncc = FLAGUNKNOWN;
 	c->autoreinit = FLAGUNKNOWN;
 	c->unloved = FLAGUNKNOWN;
+	c->login = FLAGUNKNOWN;
 	return;
     }
 
@@ -1572,6 +1691,8 @@ ProcessOptions(c, id)
 	    c->autoreinit = negative ? FLAGFALSE : FLAGTRUE;
 	else if (strcasecmp("unloved", token) == 0)
 	    c->unloved = negative ? FLAGFALSE : FLAGTRUE;
+	else if (strcasecmp("login", token) == 0)
+	    c->login = negative ? FLAGFALSE : FLAGTRUE;
 	else if (isMaster)
 	    Error("invalid option `%s' [%s:%d]", token, file, line);
     }
@@ -2164,6 +2285,10 @@ ProcessType(c, id)
 	t = EXEC;
     else if (strcasecmp("host", id) == 0)
 	t = HOST;
+    else if (strcasecmp("noop", id) == 0)
+	t = NOOP;
+    else if (strcasecmp("uds", id) == 0)
+	t = UDS;
     if (t == UNKNOWNTYPE) {
 	if (isMaster)
 	    Error("invalid console type `%s' [%s:%d]", id, file, line);
@@ -2222,6 +2347,40 @@ ConsoleBegin(id)
 	OutOfMem();
 }
 
+/* returns 1 if there's an error, otherwise 0 */
+int
+#if PROTOTYPES
+CheckSubst(char *label, char *subst)
+#else
+CheckSubst(label, subst)
+    char *label;
+    char *subst;
+#endif
+{
+    int invalid = 0;
+
+    ZeroSubstTokenCount();
+    ProcessSubst(substData, (char **)0, (char **)0, label, subst);
+
+    if (SubstTokenCount('p') && parserConsoleTemp->port == 0) {
+	if (isMaster)
+	    Error
+		("[%s] console references 'port' in '%s' without defining 'port' attribute (ignoring %s) [%s:%d]",
+		 parserConsoleTemp->server, label, label, file, line);
+	invalid = 1;
+    }
+
+    if (SubstTokenCount('h') && parserConsoleTemp->host == (char *)0) {
+	if (isMaster)
+	    Error
+		("[%s] console references 'host' in '%s' without defining 'host' attribute (ignoring %s) [%s:%d]",
+		 parserConsoleTemp->server, label, label, file, line);
+	invalid = 1;
+    }
+
+    return invalid;
+}
+
 void
 #if PROTOTYPES
 ConsoleEnd(void)
@@ -2245,20 +2404,7 @@ ConsoleEnd()
     switch (parserConsoleTemp->type) {
 	case EXEC:
 	    if (parserConsoleTemp->execsubst != (char *)0) {
-		if (parserConsoleTemp->port == 0 ||
-		    parserConsoleTemp->host == (char *)0) {
-		    if (parserConsoleTemp->port == 0) {
-			if (isMaster)
-			    Error
-				("[%s] console has 'execsubst' attribute without 'port' attribute (ignoring) [%s:%d]",
-				 parserConsoleTemp->server, file, line);
-		    }
-		    if (parserConsoleTemp->host == (char *)0) {
-			if (isMaster)
-			    Error
-				("[%s] console has 'execsubst' attribute without 'host' attribute (ignoring) [%s:%d]",
-				 parserConsoleTemp->server, file, line);
-		    }
+		if (CheckSubst("execsubst", parserConsoleTemp->execsubst)) {
 		    free(parserConsoleTemp->execsubst);
 		    parserConsoleTemp->execsubst = (char *)0;
 		}
@@ -2272,25 +2418,6 @@ ConsoleEnd()
 			 parserConsoleTemp->server, file, line);
 		invalid = 1;
 	    }
-	    if (parserConsoleTemp->devicesubst != (char *)0) {
-		if (parserConsoleTemp->port == 0 ||
-		    parserConsoleTemp->host == (char *)0) {
-		    if (parserConsoleTemp->port == 0) {
-			if (isMaster)
-			    Error
-				("[%s] console has 'devicesubst' attribute without 'port' attribute (ignoring) [%s:%d]",
-				 parserConsoleTemp->server, file, line);
-		    }
-		    if (parserConsoleTemp->host == (char *)0) {
-			if (isMaster)
-			    Error
-				("[%s] console has 'devicesubst' attribute without 'host' attribute (ignoring) [%s:%d]",
-				 parserConsoleTemp->server, file, line);
-		    }
-		    free(parserConsoleTemp->devicesubst);
-		    parserConsoleTemp->devicesubst = (char *)0;
-		}
-	    }
 	    if (parserConsoleTemp->baud == (BAUD *)0) {
 		if (isMaster)
 		    Error("[%s] console missing 'baud' attribute [%s:%d]",
@@ -2303,6 +2430,13 @@ ConsoleEnd()
 			("[%s] console missing 'parity' attribute [%s:%d]",
 			 parserConsoleTemp->server, file, line);
 		invalid = 1;
+	    }
+	    if (parserConsoleTemp->devicesubst != (char *)0) {
+		if (CheckSubst
+		    ("devicesubst", parserConsoleTemp->devicesubst)) {
+		    free(parserConsoleTemp->devicesubst);
+		    parserConsoleTemp->devicesubst = (char *)0;
+		}
 	    }
 	    break;
 	case HOST:
@@ -2319,6 +2453,22 @@ ConsoleEnd()
 		invalid = 1;
 	    }
 	    break;
+	case NOOP:
+	    break;
+	case UDS:
+	    if (parserConsoleTemp->uds == (char *)0) {
+		if (isMaster)
+		    Error("[%s] console missing 'uds' attribute [%s:%d]",
+			  parserConsoleTemp->server, file, line);
+		invalid = 1;
+	    }
+	    if (parserConsoleTemp->udssubst != (char *)0) {
+		if (CheckSubst("udssubst", parserConsoleTemp->udssubst)) {
+		    free(parserConsoleTemp->udssubst);
+		    parserConsoleTemp->udssubst = (char *)0;
+		}
+	    }
+	    break;
 	case UNKNOWNTYPE:
 	    if (isMaster)
 		Error("[%s] console type unknown [%s:%d]",
@@ -2328,20 +2478,7 @@ ConsoleEnd()
     }
     if (parserConsoleTemp->initsubst != (char *)0 &&
 	parserConsoleTemp->initcmd != (char *)0) {
-	if (parserConsoleTemp->port == 0 ||
-	    parserConsoleTemp->host == (char *)0) {
-	    if (parserConsoleTemp->port == 0) {
-		if (isMaster)
-		    Error
-			("[%s] console has 'initsubst' attribute without 'port' attribute (ignoring) [%s:%d]",
-			 parserConsoleTemp->server, file, line);
-	    }
-	    if (parserConsoleTemp->host == (char *)0) {
-		if (isMaster)
-		    Error
-			("[%s] console has 'initsubst' attribute without 'host' attribute (ignoring) [%s:%d]",
-			 parserConsoleTemp->server, file, line);
-	    }
+	if (CheckSubst("initsubst", parserConsoleTemp->initsubst)) {
 	    free(parserConsoleTemp->initsubst);
 	    parserConsoleTemp->initsubst = (char *)0;
 	}
@@ -2821,6 +2958,20 @@ ConsoleAdd(c)
 		    closeMatch = 0;
 		}
 		break;
+	    case NOOP:
+		break;
+	    case UDS:
+		if (pCEmatch->uds != (char *)0 && c->uds != (char *)0) {
+		    if (strcasecmp(pCEmatch->uds, c->uds) != 0) {
+			SwapStr(&pCEmatch->uds, &c->uds);
+			closeMatch = 0;
+		    }
+		} else if (pCEmatch->uds != (char *)0 ||
+			   c->uds != (char *)0) {
+		    SwapStr(&pCEmatch->uds, &c->uds);
+		    closeMatch = 0;
+		}
+		break;
 	    case UNKNOWNTYPE:
 		break;
 	}
@@ -2855,6 +3006,7 @@ ConsoleAdd(c)
 	pCEmatch->reinitoncc = c->reinitoncc;
 	pCEmatch->autoreinit = c->autoreinit;
 	pCEmatch->unloved = c->unloved;
+	pCEmatch->login = c->login;
 	pCEmatch->inituid = c->inituid;
 	pCEmatch->initgid = c->initgid;
 	while (pCEmatch->aliases != (NAMES *)0) {
@@ -2969,7 +3121,9 @@ ConsoleDestroy()
 	 */
 	c->netport = c->portbase + c->portinc * c->port;
 
+	/* prepare for substitutions */
 	substData->data = (void *)c;
+
 	/* check for substitutions */
 	if (c->type == DEVICE && c->devicesubst != (char *)0)
 	    ProcessSubst(substData, &(c->device), (char **)0, (char *)0,
@@ -2978,6 +3132,10 @@ ConsoleDestroy()
 	if (c->type == EXEC && c->execsubst != (char *)0)
 	    ProcessSubst(substData, &(c->exec), (char **)0, (char *)0,
 			 c->execsubst);
+
+	if (c->type == UDS && c->udssubst != (char *)0)
+	    ProcessSubst(substData, &(c->uds), (char **)0, (char *)0,
+			 c->udssubst);
 
 	if (c->initcmd != (char *)0 && c->initsubst != (char *)0)
 	    ProcessSubst(substData, &(c->initcmd), (char **)0, (char *)0,
@@ -3033,6 +3191,14 @@ ConsoleDestroy()
 	    c->striphigh = FLAGFALSE;
 	if (c->unloved == FLAGUNKNOWN)
 	    c->unloved = FLAGFALSE;
+	if (c->login == FLAGUNKNOWN)
+	    c->login = FLAGTRUE;
+
+	/* set some forced options, based on situations */
+	if (c->type == NOOP) {
+	    c->login = FLAGFALSE;
+	    ProcessLogfile(c, (char *)0);
+	}
 
 	/* now let command-line args override things */
 	if (fNoautoreup)
@@ -3048,6 +3214,23 @@ ConsoleDestroy()
 
 	/* now remember where we're headed and do the dirty work */
 	cNext = c->pCEnext;
+
+	/* perform all post-processing checks */
+	if (c->type == UDS) {
+	    struct sockaddr_un port;
+	    int limit, len;
+
+	    limit = sizeof(port.sun_path);
+	    len = strlen(c->uds);
+
+	    if (len >= limit) {
+		if (isMaster)
+		    Error("[%s] 'uds' path too large (%d >= %d) [%s:%d]",
+			  c->server, len, limit, file, line);
+		continue;
+	    }
+	}
+
 	if (fSyntaxOnly > 1) {
 	    static STRING *s = (STRING *)0;
 
@@ -3076,6 +3259,12 @@ ConsoleDestroy()
 		case HOST:
 		    BuildString(BuildTmpStringPrint
 				("!:%s,%hu", c->host, c->netport), s);
+		    break;
+		case NOOP:
+		    BuildString("#:", s);
+		    break;
+		case UDS:
+		    BuildString(BuildTmpStringPrint("%%:%s", c->uds), s);
 		    break;
 		case DEVICE:
 		    BuildString(BuildTmpStringPrint
@@ -3301,6 +3490,19 @@ ConsoleItemExecsubst(id)
 
 void
 #if PROTOTYPES
+ConsoleItemUdssubst(char *id)
+#else
+ConsoleItemUdssubst(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemUdssubst(%s) [%s:%d]", id, file, line));
+    ProcessSubst(substData, (char **)0, &(parserConsoleTemp->udssubst),
+		 "udssubst", id);
+}
+
+void
+#if PROTOTYPES
 ConsoleItemInitsubst(char *id)
 #else
 ConsoleItemInitsubst(id)
@@ -3370,6 +3572,18 @@ ConsoleItemHost(id)
 {
     CONDDEBUG((1, "ConsoleItemHost(%s) [%s:%d]", id, file, line));
     ProcessHost(parserConsoleTemp, id);
+}
+
+void
+#if PROTOTYPES
+ConsoleItemUds(char *id)
+#else
+ConsoleItemUds(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemUds(%s) [%s:%d]", id, file, line));
+    ProcessUds(parserConsoleTemp, id);
 }
 
 void
@@ -4621,6 +4835,8 @@ ITEM keyDefault[] = {
     {"rw", DefaultItemRw},
     {"timestamp", DefaultItemTimestamp},
     {"type", DefaultItemType},
+    {"uds", DefaultItemUds},
+    {"udssubst", DefaultItemUdssubst},
     {(char *)0, (void *)0}
 };
 
@@ -4657,6 +4873,8 @@ ITEM keyConsole[] = {
     {"rw", ConsoleItemRw},
     {"timestamp", ConsoleItemTimestamp},
     {"type", ConsoleItemType},
+    {"uds", ConsoleItemUds},
+    {"udssubst", ConsoleItemUdssubst},
     {(char *)0, (void *)0}
 };
 
@@ -4749,7 +4967,7 @@ ReadCfg(filename, fp)
 	OutOfMem();
 
     /* initialize the substition bits */
-    SubstCallback('\000', (char **)0, (int *)0);
+    InitSubstCallback();
 
     /* ready to read in the data */
     ParseFile(filename, fp, 0);

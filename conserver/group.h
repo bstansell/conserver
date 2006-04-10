@@ -1,5 +1,5 @@
 /*
- *  $Id: group.h,v 5.48 2005/05/21 17:56:14 bryan Exp $
+ *  $Id: group.h,v 5.49 2006/04/07 15:36:09 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -82,6 +82,7 @@ extern void DestroyClient PARAMS((CONSCLIENT *));
 extern int CheckPasswd PARAMS((CONSCLIENT *, char *));
 extern void DeUtmp PARAMS((GRPENT *, int));
 extern void ClientWantsWrite PARAMS((CONSCLIENT *));
+extern void SendIWaitClientsMsg PARAMS((CONSENT *, char *));
 #if HAVE_OPENSSL
 extern int AttemptSSL PARAMS((CONSCLIENT *));
 #endif

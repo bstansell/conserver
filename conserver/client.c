@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.89 2005/09/04 00:28:58 bryan Exp $
+ *  $Id: client.c,v 5.90 2006/04/03 13:32:08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -107,174 +107,134 @@ BumpClient(pCE, message)
     pCE->pCLwr = (CONSCLIENT *)0;
 }
 
-/* replay last iBack lines of the log file upon connect to console	(ksb)
+/* replay last 'back' lines of the log file upon connect to console	(ksb)
  *
  * NB: we know the console might be spewing when the replay happens,
  * we want to just output what is in the log file and get out,
  * so we don't drop chars...
  */
+#define REPLAYBUFFER 4096
+
 void
 #if PROTOTYPES
-Replay(CONSENT *pCE, CONSFILE *fdOut, int iBack)
+Replay(CONSENT *pCE, CONSFILE *fdOut, unsigned short back)
 #else
-Replay(pCE, fdOut, iBack)
+Replay(pCE, fdOut, back)
     CONSENT *pCE;
     CONSFILE *fdOut;
-    int iBack;
+    unsigned short back;
 #endif
 {
     CONSFILE *fdLog = (CONSFILE *)0;
+    STRING *line = (STRING *)0;
     off_t file_pos;
     off_t buf_pos;
     char *buf;
     char *bp = (char *)0;
-    char *s;
-    int r;
     int ch;
     struct stat stLog;
-    struct lines {
-	int is_mark;
-	STRING *line;
-	STRING *mark_end;
-    } *lines;
-    int n_lines;
     int ln;
-    int i;
-    int j;
-    int u;
-    int is_mark;
-    char dummy[4];
+    int was_mark = 0;
 #if HAVE_DMALLOC && DMALLOC_MARK_REPLAY
     unsigned long dmallocMarkReplay = 0;
 #endif
 
-    if (pCE != (CONSENT *)0) {
-	fdLog = pCE->fdlog;
-
-	/* no logfile and down and logfile defined?  try and open it */
-	if (fdLog == (CONSFILE *)0 && !pCE->fup &&
-	    pCE->logfile != (char *)0)
-	    fdLog = FileOpen(pCE->logfile, O_RDONLY, 0644);
-    }
+    if (pCE != (CONSENT *)0 && pCE->logfile != (char *)0)
+	fdLog = FileOpen(pCE->logfile, O_RDONLY, 0644);
 
     if (fdLog == (CONSFILE *)0) {
 	FileWrite(fdOut, FLAGFALSE, "[no log file on this console]\r\n",
 		  -1);
 	return;
     }
-
-    /* find the size of the file
-     */
-    if (0 != FileStat(fdLog, &stLog)) {
-	return;
-    }
 #if HAVE_DMALLOC && DMALLOC_MARK_REPLAY
     dmallocMarkReplay = dmalloc_mark();
 #endif
 
-    file_pos = stLog.st_size - 1;
+    /* find the size of the file
+     */
+    if (0 != FileStat(fdLog, &stLog))
+	goto common_exit;
+
+    file_pos = stLog.st_size - 1;	/* point at last byte */
     buf_pos = file_pos + 1;
 
-    /* get space for the line information and initialize it
-     *
-     * we allocate room for one more line than requested to be able to
-     * do the mark ranges
-     */
-    if ((char *)0 == (buf = malloc(BUFSIZ))) {
+    if ((char *)0 == (buf = malloc(REPLAYBUFFER)))
 	OutOfMem();
-    }
-    n_lines = iBack + 1;
-    lines = (struct lines *)calloc(n_lines, sizeof(*lines));
-    if ((struct lines *)0 == lines) {
-	OutOfMem();
-    }
-    for (i = 0; i < n_lines; i++) {
-	lines[i].mark_end = AllocString();
-	lines[i].line = AllocString();
-    }
-    ln = -1;
+    bp = buf + 1;		/* just give it something - it resets below */
+
+    line = AllocString();
 
     /* loop as long as there is data in the file or we have not found
      * the requested number of lines
      */
-    while (file_pos >= 0) {
+    ln = -1;
+    for (; file_pos >= 0; file_pos--, bp--) {
 	if (file_pos < buf_pos) {
+	    int r;
 
 	    /* read one buffer worth of data a buffer boundary
 	     *
 	     * the first read will probably not get a full buffer but
 	     * the rest (as we work our way back in the file) should be
 	     */
-	    buf_pos = (file_pos / BUFSIZ) * BUFSIZ;
+	    buf_pos = (file_pos / REPLAYBUFFER) * REPLAYBUFFER;
 	    if (FileSeek(fdLog, buf_pos, SEEK_SET) < 0) {
 		goto common_exit;
 	    }
-	    if ((r = FileRead(fdLog, buf, BUFSIZ)) < 0) {
+	    if ((r = FileRead(fdLog, buf, REPLAYBUFFER)) < 0) {
 		goto common_exit;
 	    }
-	    bp = buf + r;
+	    bp = buf + r - 1;
 	}
 
 	/* process the next character
 	 */
-	--file_pos;
-	if ((ch = *--bp) == '\n') {
+	if ((ch = *bp) == '\n') {
 	    if (ln >= 0) {
+		int i;
+		int u;
+		int is_mark = 0;
 
 		/* reverse the text to put it in forward order
 		 */
-		u = lines[ln].line->used - 1;
+		u = line->used - 1;
 		for (i = 0; i < u / 2; i++) {
 		    int temp;
 
-		    temp = lines[ln].line->string[i];
-		    lines[ln].line->string[i]
-			= lines[ln].line->string[u - i - 1];
-		    lines[ln].line->string[u - i - 1] = temp;
+		    temp = line->string[i];
+		    line->string[i] = line->string[u - i - 1];
+		    line->string[u - i - 1] = temp;
 		}
 
 		/* see if this line is a MARK
 		 */
-		if (lines[ln].line->used > 0 &&
-		    lines[ln].line->string[0] == '[') {
-		    i = sscanf(lines[ln].line->string + 1,
+		if (line->used > 0 && line->string[0] == '[') {
+		    char dummy[4];
+		    int j;
+		    i = sscanf(line->string + 1,
 			       "-- MARK -- %3c %3c %d %d:%d:%d %d]\r\n",
 			       dummy, dummy, &j, &j, &j, &j, &j);
 		    is_mark = (i == 7);
-		} else {
-		    is_mark = 0;
 		}
 
 		/* process this line
 		 */
-		if (is_mark && ln > 0 && lines[ln - 1].is_mark) {
+		if (is_mark && was_mark) {
 		    /* this is a mark and the previous line is also
-		     * a mark, so make (or continue) that range
+		     * a mark, so reduce the line count 'cause it'll
+		     * go up by one and we're joining them on output.
 		     */
-		    if (0 == lines[ln - 1].mark_end->used) {
-			/* this is a new range - shuffle pointers
-			 *
-			 * remember that we are moving backward
-			 */
-			BuildStringN(lines[ln - 1].line->string,
-				     lines[ln - 1].line->used - 1,
-				     lines[ln - 1].mark_end);
-			BuildString((char *)0, lines[ln - 1].line);
-		    }
-		    BuildString((char *)0, lines[ln - 1].line);
-		    BuildStringN(lines[ln].line->string,
-				 lines[ln].line->used - 1,
-				 lines[ln - 1].line);
-		    BuildString((char *)0, lines[ln].line);
 		    ln--;
 		}
-		lines[ln].is_mark = is_mark;
+		was_mark = is_mark;
 	    }
 
 	    /* advance to the next line and break if we have enough
 	     */
 	    ln++;
-	    if (ln >= n_lines - 1) {
+	    BuildString((char *)0, line);
+	    if (ln >= back) {
 		break;
 	    }
 	}
@@ -285,90 +245,122 @@ Replay(pCE, fdOut, iBack)
 	if (ln < 0) {
 	    ln = 0;
 	}
-	BuildStringChar(ch, lines[ln].line);
+	BuildStringChar(ch, line);
 
 	/* if we've processed "a lot" of data for a line, then bail
 	 * why?  there must be some very long non-newline terminated
 	 * strings and if we just keep going back, we could spew lots
 	 * of data and chew up lots of memory
 	 */
-	if (lines[ln].line->used > MAXREPLAYLINELEN) {
+	if (line->used > MAXREPLAYLINELEN) {
 	    break;
 	}
     }
-    free(buf);
-    buf = (char *)0;
 
-    /* if we got back to beginning of file but saw some data, include it
+    /* move forward.  either we hit the beginning of the file and we
+     * move to the first byte, or we hit a \n and we move past it
      */
-    if (ln >= 0 && lines[ln].line->used > 0) {
+    file_pos++;
 
-	/* reverse the text to put it in forward order
-	 */
-	u = lines[ln].line->used - 1;
-	for (i = 0; i < u / 2; i++) {
-	    int temp;
+    /* Now output the lines, starting from where we stopped */
+    if (FileSeek(fdLog, file_pos, SEEK_SET) >= 0) {
+	int eof = 0;
+	int i = 0;
+	int r = 0;
+	STRING *mark_beg = (STRING *)0;
+	STRING *mark_end = (STRING *)0;
 
-	    temp = lines[ln].line->string[i];
-	    lines[ln].line->string[i]
-		= lines[ln].line->string[u - i - 1];
-	    lines[ln].line->string[u - i - 1] = temp;
+	mark_beg = AllocString();
+	mark_end = AllocString();
+
+	ln = 0;			/* number of lines output */
+	BuildString((char *)0, line);
+
+	while (ln < back && !eof) {
+	    if (r <= 0) {
+		if ((r = FileRead(fdLog, buf, REPLAYBUFFER)) < 0)
+		    eof = 1;
+		i = 0;
+	    }
+
+	    if (!eof)
+		BuildStringChar(buf[i], line);
+
+	    if (buf[i] == '\n' || eof) {
+		int is_mark = 0;
+		if (line->used > 0 && line->string[0] == '[') {
+		    char dummy[4];
+		    int j;
+		    int i;
+		    i = sscanf(line->string + 1,
+			       "-- MARK -- %3c %3c %d %d:%d:%d %d]\r\n",
+			       dummy, dummy, &j, &j, &j, &j, &j);
+		    is_mark = (i == 7);
+		}
+		if (is_mark) {
+		    if (mark_beg->used > 1) {
+			BuildString((char *)0, mark_end);
+			BuildString(line->string, mark_end);
+		    } else
+			BuildString(line->string, mark_beg);
+		} else {
+		    if (mark_beg->used > 1) {
+			if (mark_end->used > 1) {
+			    char *s;
+
+			    /* output the start of the range, stopping at the ']' */
+			    s = strrchr(mark_beg->string, ']');
+			    if ((char *)0 != s)
+				*s = '\000';
+			    FileWrite(fdOut, FLAGTRUE, mark_beg->string,
+				      -1);
+			    FileWrite(fdOut, FLAGTRUE, " .. ", 4);
+
+			    /* build the end string by removing the leading "[-- MARK -- "
+			     * and replacing "]\r\n" on the end with " -- MARK --]\r\n"
+			     */
+			    s = strrchr(mark_end->string, ']');
+			    if ((char *)0 != s)
+				*s = '\000';
+			    FileWrite(fdOut, FLAGTRUE,
+				      mark_end->string +
+				      sizeof("[-- MARK -- ") - 1, -1);
+			    FileWrite(fdOut, FLAGFALSE, " -- MARK --]\r\n",
+				      -1);
+			} else {
+			    FileWrite(fdOut, FLAGFALSE, mark_beg->string,
+				      mark_beg->used - 1);
+			}
+			BuildString((char *)0, mark_beg);
+			BuildString((char *)0, mark_end);
+			ln++;
+			if (ln >= back)
+			    break;
+		    }
+		    FileWrite(fdOut, FLAGFALSE, line->string,
+			      line->used - 1);
+		    ln++;
+		}
+		BuildString((char *)0, line);
+	    }
+
+	    /* move the counters */
+	    i++;
+	    r--;
 	}
-	ln++;
-    }
-
-    /* copy the lines into the buffer and put them in order
-     */
-    for (i = ln - 1; i >= 0; i--) {
-	if (lines[i].is_mark && 0 != lines[i].mark_end->used) {
-	    int mark_len;
-
-	    /* output the start of the range, stopping at the ']'
-	     */
-	    s = strrchr(lines[i].line->string, ']');
-	    if ((char *)0 != s) {
-		*s = '\000';
-	    }
-	    FileWrite(fdOut, FLAGTRUE, lines[i].line->string, -1);
-	    FileWrite(fdOut, FLAGTRUE, " .. ", 4);
-
-	    /* build the end string by removing the leading "[-- MARK -- "
-	     * and replacing "]\r\n" on the end with " -- MARK --]\r\n"
-	     */
-	    mark_len = sizeof("[-- MARK -- ") - 1;
-
-	    s = strrchr(lines[i].mark_end->string + mark_len, ']');
-	    if ((char *)0 != s) {
-		*s = '\000';
-	    }
-	    FileWrite(fdOut, FLAGTRUE,
-		      lines[i].mark_end->string + mark_len, -1);
-	    FileWrite(fdOut, FLAGFALSE, " -- MARK --]\r\n", -1);
-	    u = lines[i].mark_end->used;
-	    s = lines[i].mark_end->string;
-	} else
-	    FileWrite(fdOut, FLAGFALSE, lines[i].line->string,
-		      lines[i].line->used - 1);
+	DestroyString(mark_end);
+	DestroyString(mark_beg);
     }
 
   common_exit:
 
-    /* if we opened the logfile, close it */
-    if (fdLog != pCE->fdlog)
+    if (line != (STRING *)0)
+	DestroyString(line);
+    if (buf != (char *)0)
+	free(buf);
+    if (fdLog != (CONSFILE *)0)
 	FileClose(&fdLog);
 
-    if ((struct lines *)0 != lines) {
-	for (i = 0; i < n_lines; i++) {
-	    DestroyString(lines[i].mark_end);
-	    DestroyString(lines[i].line);
-	}
-	free(lines);
-	lines = (struct lines *)0;
-    }
-    if ((char *)0 != buf) {
-	free(buf);
-	buf = (char *)0;
-    }
 #if HAVE_DMALLOC && DMALLOC_MARK_REPLAY
     CONDDEBUG((1, "Replay(): dmalloc / MarkReplay"));
     dmalloc_log_changed(dmallocMarkReplay, 1, 0, 1);
@@ -408,9 +400,11 @@ static HELP aHLTable[] = {
     {WHEN_ATTACH, "l1-9 send specific break sequence"},
     {WHEN_ALWAYS, "m    display the message of the day"},
     {WHEN_ALWAYS, "o    (re)open the tty and log file"},
-    {WHEN_ALWAYS, "p    replay the last 60 lines"},
-    {WHEN_ALWAYS, "r    replay the last 20 lines"},
-    {WHEN_ATTACH, "s    spy read only"},
+    {WHEN_ALWAYS, "p    playback the last %hu lines"},
+    {WHEN_ALWAYS, "P    set number of playback lines"},
+    {WHEN_ALWAYS, "r    replay the last %hu lines"},
+    {WHEN_ALWAYS, "R    set number of replay lines"},
+    {WHEN_ATTACH, "s    spy mode (read only)"},
     {WHEN_ALWAYS, "u    show host status"},
     {WHEN_ALWAYS, "v    show version info"},
     {WHEN_ALWAYS, "w    who is on this console"},
@@ -454,6 +448,8 @@ HelpUser(pCL, pCE)
 
     BuildString((char *)0, acLine);
     for (i = 0; i < sizeof(aHLTable) / sizeof(HELP); ++i) {
+	char *text;
+
 	if (aHLTable[i].iwhen & IS_LIMITED &&
 	    ConsentUserOk(pLUList, pCL->username->string) == 1)
 	    continue;
@@ -461,12 +457,21 @@ HelpUser(pCL, pCE)
 	if (0 == (aHLTable[i].iwhen & iCmp))
 	    continue;
 
+	text = aHLTable[i].actext;
+	if (text[0] == 'p') {
+	    BuildTmpString((char *)0);
+	    text = BuildTmpStringPrint(text, pCL->playback);
+	} else if (text[0] == 'r') {
+	    BuildTmpString((char *)0);
+	    text = BuildTmpStringPrint(text, pCL->replay);
+	}
+
 	if (acLine->used != 0) {	/* second part of line */
-	    if (strlen(aHLTable[i].actext) < HALFLINE) {
+	    if (strlen(text) < HALFLINE) {
 		for (j = acLine->used; j <= HALFLINE; ++j) {
 		    BuildStringChar(' ', acLine);
 		}
-		BuildString(aHLTable[i].actext, acLine);
+		BuildString(text, acLine);
 		BuildString(acEoln, acLine);
 		FileWrite(pCL->fd, FLAGTRUE, acLine->string,
 			  acLine->used - 1);
@@ -481,7 +486,7 @@ HelpUser(pCL, pCE)
 	}
 	if (acLine->used == 0) {	/* at new line */
 	    BuildStringChar(' ', acLine);
-	    BuildString(aHLTable[i].actext, acLine);
+	    BuildString(text, acLine);
 	    if (acLine->used > HALFLINE) {
 		BuildString(acEoln, acLine);
 		FileWrite(pCL->fd, FLAGTRUE, acLine->string,

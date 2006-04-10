@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.319 2005/11/28 20:46:08 bryan Exp $
+ *  $Id: group.c,v 5.325 2006/04/07 15:47:20 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -68,10 +68,10 @@
 #include <client.h>
 #include <access.h>
 #include <group.h>
-#include <version.h>
 #include <readcfg.h>
 #include <master.h>
 #include <main.h>
+#include <version.h>
 
 #if HAVE_PAM
 #include <security/pam_appl.h>
@@ -419,8 +419,6 @@ DestroyClient(pCL)
 	DestroyString(pCL->peername);
     if (pCL->accmd != (STRING *)0)
 	DestroyString(pCL->accmd);
-    if (pCL->msg != (STRING *)0)
-	DestroyString(pCL->msg);
     if (pCL->username != (STRING *)0)
 	DestroyString(pCL->username);
     FileClose(&pCL->fd);
@@ -2085,6 +2083,16 @@ CommandExamine(pGE, pCLServing, pCEServing, tyme, args)
 		b = "Netwk";
 		p = ' ';
 		break;
+	    case NOOP:
+		d = "NOOP";
+		b = "NOOP";
+		p = ' ';
+		break;
+	    case UDS:
+		d = pCE->uds;
+		b = "UDS";
+		p = ' ';
+		break;
 	    case UNKNOWNTYPE:	/* shut up gcc */
 		break;
 	}
@@ -2259,26 +2267,34 @@ CommandInfo(pGE, pCLServing, pCEServing, tyme, args)
 		  myHostname, (unsigned long)thepid, pGE->port);
 	switch (pCE->type) {
 	    case EXEC:
-		FilePrint(pCLServing->fd, FLAGTRUE, "|:%s,%lu,%s",
+		FilePrint(pCLServing->fd, FLAGTRUE, "|:%s,%lu,%s,%d:",
 			  (pCE->exec != (char *)0 ? pCE->exec : "/bin/sh"),
-			  (unsigned long)pCE->ipid, pCE->execSlave);
+			  (unsigned long)pCE->ipid, pCE->execSlave,
+			  FileFDNum(pCE->cofile));
 		break;
 	    case HOST:
-		FilePrint(pCLServing->fd, FLAGTRUE, "!:%s,%hu,%s",
+		FilePrint(pCLServing->fd, FLAGTRUE, "!:%s,%hu,%s,%d:",
 			  pCE->host, pCE->netport,
-			  (pCE->raw == FLAGTRUE ? "raw" : "telnet"));
+			  (pCE->raw == FLAGTRUE ? "raw" : "telnet"),
+			  FileFDNum(pCE->cofile));
+		break;
+	    case NOOP:
+		FileWrite(pCLServing->fd, FLAGTRUE, "#::", 3);
+		break;
+	    case UDS:
+		FilePrint(pCLServing->fd, FLAGTRUE, "%%:%s,%d:", pCE->uds,
+			  FileFDNum(pCE->cofile));
 		break;
 	    case DEVICE:
-		FilePrint(pCLServing->fd, FLAGTRUE, "/:%s,%s%c",
+		FilePrint(pCLServing->fd, FLAGTRUE, "/:%s,%s%c,%d:",
 			  pCE->device,
 			  (pCE->baud ? pCE->baud->acrate : ""),
-			  (pCE->parity ? pCE->parity->key[0] : ' '));
+			  (pCE->parity ? pCE->parity->key[0] : ' '),
+			  FileFDNum(pCE->cofile));
 		break;
 	    case UNKNOWNTYPE:	/* shut up gcc */
 		break;
 	}
-	FilePrint(pCLServing->fd, FLAGTRUE, ",%d:",
-		  FileFDNum(pCE->cofile));
 	if (pCE->pCLwr) {
 	    FilePrint(pCLServing->fd, FLAGTRUE, "w@%s@%ld",
 		      pCE->pCLwr->acid->string,
@@ -2351,6 +2367,8 @@ CommandInfo(pGE, pCLServing, pCEServing, tyme, args)
 	    s = BuildTmpString(",autoreinit");
 	if (pCE->unloved == FLAGTRUE)
 	    s = BuildTmpString(",unloved");
+	if (pCE->login == FLAGTRUE)
+	    s = BuildTmpString(",login");
 	FilePrint(pCLServing->fd, FLAGFALSE, ":%s:%s:%d:%s\r\n",
 		  (s == (char *)0 ? "" : s + 1),
 		  (pCE->initcmd == (char *)0 ? "" : pCE->initcmd),
@@ -2797,6 +2815,52 @@ Challenge()
     return n[cnt];
 }
 
+
+/* This routine is used to gather input from the
+ * client and save it in the accmd string.
+ * GatherLine returns 0 until the user signals
+ * they're "done" (a \r), then it returns 1.
+ */
+typedef enum gatherType {
+    G_INT,
+    G_TEXT
+} GATHERTYPE;
+
+int
+#if PROTOTYPES
+GatherLine(char c, int limit, GATHERTYPE g, CONSCLIENT *pCL)
+#else
+GatherLine(c, pCL)
+    char c;
+    GATHERTYPE g;
+    CONSCLIENT *pCL;
+#endif
+{
+    if (c == '\r')
+	return 1;
+
+    if ((limit <= 0 || pCL->accmd->used - 1 < limit) &&
+	((g == G_TEXT && (c == '\a' || (c >= ' ' && c <= '~'))) ||
+	 (g == G_INT && isdigit((int)c)))) {
+	BuildStringChar(c, pCL->accmd);
+	FileWrite(pCL->fd, FLAGFALSE, (char *)&c, 1);
+    } else if ((c == '\b' || c == 0x7f)
+	       && pCL->accmd->used > 1) {
+	if (pCL->accmd->string[pCL->accmd->used - 2] != '\a')
+	    FileWrite(pCL->fd, FLAGFALSE, "\b \b", 3);
+	pCL->accmd->string[pCL->accmd->used - 2] = '\000';
+	pCL->accmd->used--;
+    } else if ((c == 0x15) && pCL->accmd->used > 1) {
+	while (pCL->accmd->used > 1) {
+	    if (pCL->accmd->string[pCL->accmd->used - 2] != '\a')
+		FileWrite(pCL->fd, FLAGFALSE, "\b \b", 3);
+	    pCL->accmd->string[pCL->accmd->used - 2] = '\000';
+	    pCL->accmd->used--;
+	}
+    }
+    return 0;
+}
+
 void
 #if PROTOTYPES
 DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
@@ -3027,6 +3091,21 @@ DoClientRead(pGE, pCLServing)
 			    return;
 			}
 
+			if (pCEwant->login != FLAGTRUE) {
+			    if (pCEwant->motd == (char *)0) {
+				FilePrint(pCLServing->fd, FLAGFALSE,
+					  "%s: no logins allowed at this time\r\n",
+					  pcArgs);
+			    } else {
+				FilePrint(pCLServing->fd, FLAGFALSE,
+					  "%s: %s\r\n", pcArgs,
+					  pCEwant->motd);
+			    }
+			    DisconnectClient(pGE, pCLServing, (char *)0,
+					     FLAGFALSE);
+			    return;
+			}
+
 			/* remove from current host */
 			if ((CONSCLIENT *)0 != pCLServing->pCLnext) {
 			    pCLServing->pCLnext->ppCLbnext =
@@ -3188,55 +3267,67 @@ DoClientRead(pGE, pCLServing)
 		    case S_PASSWD:
 			/* these are not used in this mode */
 			break;
-		    case S_BCAST:
-			/* gather message */
-			if ('\r' != acIn[i]) {
-			    if (acIn[i] == '\a' ||
-				(acIn[i] >= ' ' && acIn[i] <= '~')) {
-				BuildStringChar(acIn[i], pCLServing->msg);
-				if (pGE->pCEctl != pCEServing)
-				    FileWrite(pCLServing->fd, FLAGFALSE,
-					      (char *)&acIn[i], 1);
-			    } else if ((acIn[i] == '\b' || acIn[i] == 0x7f)
-				       && pCLServing->msg->used > 1) {
-				if (pCLServing->msg->
-				    string[pCLServing->msg->used - 2] !=
-				    '\a' && pGE->pCEctl != pCEServing) {
-				    FileWrite(pCLServing->fd, FLAGFALSE,
-					      "\b \b", 3);
-				}
-				pCLServing->msg->string[pCLServing->msg->
-							used - 2] = '\000';
-				pCLServing->msg->used--;
-			    } else if ((acIn[i] == 0x15) &&
-				       pCLServing->msg->used > 1) {
-				while (pCLServing->msg->used > 1) {
-				    if (pCLServing->msg->
-					string[pCLServing->msg->used -
-					       2] != '\a' &&
-					pGE->pCEctl != pCEServing) {
-					FileWrite(pCLServing->fd,
-						  FLAGFALSE, "\b \b", 3);
-				    }
-				    pCLServing->msg->string[pCLServing->
-							    msg->used -
-							    2] = '\000';
-				    pCLServing->msg->used--;
-				}
-			    }
-			    continue;
-			}
-			FileWrite(pCLServing->fd, FLAGFALSE, "]\r\n", 3);
-			BuildString((char *)0, bcast);
-			BuildStringChar('[', bcast);
-			BuildString(pCLServing->acid->string, bcast);
-			BuildString(": ", bcast);
-			BuildString(pCLServing->msg->string, bcast);
-			BuildString("]\r\n", bcast);
-			SendClientsMsg(pCEServing, bcast->string);
 
-			BuildString((char *)0, pCLServing->msg);
-			pCLServing->iState = S_NORMAL;
+		    case S_BCAST:
+			if (GatherLine(acIn[i], 0, G_TEXT, pCLServing)) {
+			    FileWrite(pCLServing->fd, FLAGFALSE, "]\r\n",
+				      3);
+			    BuildString((char *)0, bcast);
+			    BuildStringChar('[', bcast);
+			    BuildString(pCLServing->acid->string, bcast);
+			    BuildString(": ", bcast);
+			    BuildString(pCLServing->accmd->string, bcast);
+			    BuildString("]\r\n", bcast);
+			    SendClientsMsg(pCEServing, bcast->string);
+
+			    BuildString((char *)0, pCLServing->accmd);
+			    pCLServing->iState = S_NORMAL;
+			}
+			continue;
+
+		    case S_REPLAY:
+		    case S_PLAYBACK:
+			if (GatherLine(acIn[i], 4, G_INT, pCLServing)) {
+			    unsigned short *s;
+
+			    if (pCLServing->iState == S_REPLAY)
+				s = &(pCLServing->replay);
+			    else
+				s = &(pCLServing->playback);
+
+			    if (pCLServing->accmd->used > 1) {
+				unsigned short u;
+				u = (unsigned short)atoi(pCLServing->
+							 accmd->string);
+				/* i'm limiting the value here to 10000 for a couple
+				 * of reasons:
+				 *
+				 * 1. this process could be busy parsing a file for 
+				 *    a long time if the logfile and replay are big.
+				 * 2. who needs more than 10000 lines of replay?  if
+				 *    you need that much, go find the raw logfile.
+				 *    and if you don't have access, find someone who
+				 *    does.
+				 *
+				 * change this to something bigger if you want, but
+				 * it would scare me...even 10000 seems a bit large,
+				 * but no one *has* to set the value so large.
+				 * and watch out...it's an unsigned short, so you
+				 * can't go really huge.
+				 */
+				if (u > 10000)
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					      " <value too large>", 18);
+				else
+				    *s = u;
+			    } else
+				FilePrint(pCLServing->fd, FLAGFALSE, "%u",
+					  *s);
+
+			    FileWrite(pCLServing->fd, FLAGFALSE, "]\r\n",
+				      3);
+			    pCLServing->iState = S_NORMAL;
+			}
 			continue;
 
 		    case S_QUOTE:	/* send octal code              */
@@ -3486,53 +3577,39 @@ DoClientRead(pGE, pCLServing)
 					      "no drop line]\r\n", -1);
 				break;
 
-#define DEPRECATED FileWrite(pCLServing->fd, FLAGFALSE, "<use of DEPRECATED (and undocumented) key> ", -1)
-			    case 'B':
-				DEPRECATED;
-			    case 'b':	/* broadcast message */
-				FileWrite(pCLServing->fd, FLAGFALSE,
-					  "Enter message: ", -1);
-				pCLServing->iState = S_BCAST;
-				break;
-
-			    case 'A':
-				DEPRECATED;
 			    case 'a':	/* attach */
 				CommandAttach(pGE, pCLServing, pCEServing,
 					      tyme);
 				break;
 
-			    case 'C':
-				DEPRECATED;
+			    case 'b':	/* broadcast message */
+				FileWrite(pCLServing->fd, FLAGFALSE,
+					  "Enter message: ", -1);
+				BuildString((char *)0, pCLServing->accmd);
+				pCLServing->iState = S_BCAST;
+				break;
+
 			    case 'c':
 				CommandChangeFlow(pGE, pCLServing,
 						  pCEServing, tyme);
 				break;
 
-			    case 'D':
-				DEPRECATED;
 			    case 'd':	/* down a console       */
 				CommandDown(pGE, pCLServing, pCEServing,
 					    tyme);
 				break;
 
-			    case 'E':
-				DEPRECATED;
 			    case 'e':	/* redefine escape keys */
 				pCLServing->iState = S_CATTN;
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "redef: ", -1);
 				break;
 
-			    case 'F':
-				DEPRECATED;
 			    case 'f':	/* force attach */
 				CommandForce(pGE, pCLServing, pCEServing,
 					     tyme);
 				break;
 
-			    case 'G':
-				DEPRECATED;
 			    case 'g':	/* group info */
 				FilePrint(pCLServing->fd, FLAGFALSE,
 					  "group %s]\r\n",
@@ -3541,16 +3618,11 @@ DoClientRead(pGE, pCLServing)
 					     tyme, (char *)0);
 				break;
 
-			    case 'H':
-			    case 'P':	/* DEC vt100 pf1 */
-				DEPRECATED;
 			    case 'h':	/* help                 */
 			    case '?':
 				HelpUser(pCLServing);
 				break;
 
-			    case 'I':
-				DEPRECATED;
 			    case 'i':
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "info]\r\n", -1);
@@ -3585,11 +3657,24 @@ DoClientRead(pGE, pCLServing)
 					      pCEServing->motd);
 				break;
 
-			    case 'O':
-				DEPRECATED;
 			    case 'o':	/* close and re-open line */
 				CommandOpen(pGE, pCLServing, pCEServing,
 					    tyme);
+				break;
+
+			    case 'P':	/* broadcast message */
+				FilePrint(pCLServing->fd, FLAGFALSE,
+					  "set playback (%d): ",
+					  pCLServing->playback);
+				BuildString((char *)0, pCLServing->accmd);
+				pCLServing->iState = S_PLAYBACK;
+				break;
+
+			    case 'p':	/* replay lines (longer, in theory) */
+				FileWrite(pCLServing->fd, FLAGFALSE,
+					  "playback]\r\n", -1);
+				Replay(pCEServing, pCLServing->fd,
+				       pCLServing->playback);
 				break;
 
 			    case '\022':	/* ^R */
@@ -3598,22 +3683,21 @@ DoClientRead(pGE, pCLServing)
 				Replay(pCEServing, pCLServing->fd, 1);
 				break;
 
-			    case 'R':	/* DEC vt100 pf3 */
-				DEPRECATED;
-			    case 'r':	/* replay 20 lines */
+			    case 'R':	/* broadcast message */
+				FilePrint(pCLServing->fd, FLAGFALSE,
+					  "set replay (%d): ",
+					  pCLServing->replay);
+				BuildString((char *)0, pCLServing->accmd);
+				pCLServing->iState = S_REPLAY;
+				break;
+
+			    case 'r':	/* replay lines */
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "replay]\r\n", -1);
-				Replay(pCEServing, pCLServing->fd, 20);
+				Replay(pCEServing, pCLServing->fd,
+				       pCLServing->replay);
 				break;
 
-			    case 'p':	/* replay 60 lines */
-				FileWrite(pCLServing->fd, FLAGFALSE,
-					  "long replay]\r\n", -1);
-				Replay(pCEServing, pCLServing->fd, 60);
-				break;
-
-			    case 'S':	/* DEC vt100 pf4 */
-				DEPRECATED;
 			    case 's':	/* spy mode */
 				pCLServing->fwantwr = 0;
 				if (!pCLServing->fwr) {
@@ -3629,8 +3713,6 @@ DoClientRead(pGE, pCLServing)
 					  "spying]\r\n", -1);
 				break;
 
-			    case 'U':
-				DEPRECATED;
 			    case 'u':	/* hosts on server this */
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "hosts]\r\n", -1);
@@ -3638,16 +3720,12 @@ DoClientRead(pGE, pCLServing)
 					     tyme, (char *)0);
 				break;
 
-			    case 'V':
-				DEPRECATED;
 			    case 'v':	/* version */
 				FilePrint(pCLServing->fd, FLAGFALSE,
 					  "version `%s']\r\n",
-					  THIS_VERSION);
+					  MyVersion());
 				break;
 
-			    case 'W':
-				DEPRECATED;
 			    case 'w':	/* who */
 				FilePrint(pCLServing->fd, FLAGFALSE,
 					  "who %s]\r\n",
@@ -3656,8 +3734,6 @@ DoClientRead(pGE, pCLServing)
 					   tyme);
 				break;
 
-			    case 'X':
-				DEPRECATED;
 			    case 'x':
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "examine]\r\n", -1);
@@ -3665,27 +3741,6 @@ DoClientRead(pGE, pCLServing)
 					       tyme, (char *)0);
 				break;
 
-			    case '|':	/* wait for client */
-				if (ConsentUserOk
-				    (pLUList,
-				     pCLServing->username->string) == 1)
-				    goto unknownchar;
-				if (!pCLServing->fwr) {
-				    FileWrite(pCLServing->fd, FLAGFALSE,
-					      "attach to run local command]\r\n",
-					      -1);
-				    continue;
-				}
-				FileSetQuoteIAC(pCLServing->fd, FLAGFALSE);
-				FilePrint(pCLServing->fd, FLAGFALSE,
-					  "%c%c", OB_IAC, OB_EXEC);
-				FileSetQuoteIAC(pCLServing->fd, FLAGTRUE);
-				pCLServing->fcon = 0;
-				pCLServing->iState = S_CWAIT;
-				break;
-
-			    case 'Z':
-				DEPRECATED;
 			    case 'z':	/* suspend the client */
 			    case '\032':
 				if (ConsentUserOk
@@ -3709,6 +3764,25 @@ DoClientRead(pGE, pCLServing)
 				}
 				break;
 
+			    case '|':	/* wait for client */
+				if (ConsentUserOk
+				    (pLUList,
+				     pCLServing->username->string) == 1)
+				    goto unknownchar;
+				if (!pCLServing->fwr) {
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					      "attach to run local command]\r\n",
+					      -1);
+				    continue;
+				}
+				FileSetQuoteIAC(pCLServing->fd, FLAGFALSE);
+				FilePrint(pCLServing->fd, FLAGFALSE,
+					  "%c%c", OB_IAC, OB_EXEC);
+				FileSetQuoteIAC(pCLServing->fd, FLAGTRUE);
+				pCLServing->fcon = 0;
+				pCLServing->iState = S_CWAIT;
+				break;
+
 			    case '\t':	/* toggle tab expand    */
 				if (!pCLServing->fwr) {
 				    FileWrite(pCLServing->fd, FLAGFALSE,
@@ -3730,15 +3804,12 @@ DoClientRead(pGE, pCLServing)
 					      "failed]\r\n", -1);
 				    continue;
 				}
-#  if !defined(XTABS)		/* XXX hack */
-#   define XTABS   TAB3
-#  endif
-				if (XTABS == (TABDLY & sbuf.c_oflag)) {
+				if (TAB3 == (TABDLY & sbuf.c_oflag)) {
 				    sbuf.c_oflag &= ~TABDLY;
 				    sbuf.c_oflag |= TAB0;
 				} else {
 				    sbuf.c_oflag &= ~TABDLY;
-				    sbuf.c_oflag |= XTABS;
+				    sbuf.c_oflag |= TAB3;
 				}
 				if (-1 ==
 				    tcsetattr(FileFDNum
@@ -3748,7 +3819,7 @@ DoClientRead(pGE, pCLServing)
 					      "failed]\r\n", -1);
 				    continue;
 				}
-				if (XTABS == (TABDLY & sbuf.c_oflag))
+				if (TAB3 == (TABDLY & sbuf.c_oflag))
 				    FileWrite(pCLServing->fd, FLAGFALSE,
 					      "tabs OFF]\r\n", -1);
 				else
@@ -3756,8 +3827,6 @@ DoClientRead(pGE, pCLServing)
 					      "tabs ON]\r\n", -1);
 				break;
 
-			    case 'Q':	/* DEC vt100 PF2 */
-				DEPRECATED;
 			    case '.':	/* disconnect */
 			    case '\004':
 			    case '\003':
@@ -3791,6 +3860,17 @@ DoClientRead(pGE, pCLServing)
 				pCLServing->iState = S_QUOTE;
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "quote \\", -1);
+				break;
+
+			    case 0xD6:	/* 'v' with high bit set */
+				/* this is really just used "behind the scenes",
+				 * but of someone wants to type it, fine...we
+				 * just need a way to query the server for what
+				 * version it is so the client can determine
+				 * functionality
+				 */
+				FilePrint(pCLServing->fd, FLAGFALSE,
+					  "%u]\r\n", VERSION_UINT);
 				break;
 
 			    default:	/* unknown sequence */
@@ -4190,7 +4270,6 @@ Kiddie(pGE, sfd)
     pGE->pCLfree->username = AllocString();
     pGE->pCLfree->peername = AllocString();
     pGE->pCLfree->accmd = AllocString();
-    pGE->pCLfree->msg = AllocString();
 
     /* on a SIGHUP we should close and reopen our log files and
      * reread the config file
@@ -4385,7 +4464,7 @@ Kiddie(pGE, sfd)
 	/* anything on a console? */
 	for (pCEServing = pGE->pCElist; pCEServing != (CONSENT *)0;
 	     pCEServing = pCEServing->pCEnext) {
-	    if (!pCEServing->fup)
+	    if (!pCEServing->fup || pCEServing->type == NOOP)
 		continue;
 	    switch (pCEServing->ioState) {
 		case INCONNECT:
@@ -4630,7 +4709,7 @@ Kiddie(pGE, sfd)
 	BuildString("<unknown>@", pCL->acid);
 	BuildString((char *)0, pCL->username);
 	BuildString("<unknown>", pCL->username);
-	strcpy(pCL->actym, StrTime(&(pCL->tym)));
+	StrCpy(pCL->actym, StrTime(&(pCL->tym)), sizeof(pCL->actym));
 	pCL->typetym = pCL->tym;
 
 	/* link into the control list for the dummy console
@@ -4662,6 +4741,8 @@ Kiddie(pGE, sfd)
 	pCL->iState = S_IDENT;
 	pCL->ic[0] = DEFATTN;
 	pCL->ic[1] = DEFESC;
+	pCL->replay = DEFREPLAY;
+	pCL->playback = DEFPLAYBACK;
 	BuildString((char *)0, pCL->accmd);
 
 	/* mark as stopped (no output from console)
@@ -4683,7 +4764,6 @@ Kiddie(pGE, sfd)
 	    pGE->pCLfree->username = AllocString();
 	    pGE->pCLfree->peername = AllocString();
 	    pGE->pCLfree->accmd = AllocString();
-	    pGE->pCLfree->msg = AllocString();
 	}
 
 	if (ClientAccessOk(pCL)) {
@@ -4741,7 +4821,8 @@ Spawn(pGE, msfd)
 	Error("Spawn(): path to socket too long: %s", portPath->string);
 	Bye(EX_OSERR);
     }
-    strcpy(lstn_port.sun_path, portPath->string);
+    StrCpy(lstn_port.sun_path, portPath->string,
+	   sizeof(lstn_port.sun_path));
 
     /* create a socket to listen on
      * (prepared by master so he can see the port number of the kid)

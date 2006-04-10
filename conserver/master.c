@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.132 2005/09/05 22:22:53 bryan Exp $
+ *  $Id: master.c,v 5.135 2006/04/07 15:47:20 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -36,7 +36,6 @@
 #include <access.h>
 #include <master.h>
 #include <readcfg.h>
-#include <version.h>
 #include <main.h>
 
 
@@ -615,7 +614,7 @@ DoNormalRead(pCLServing)
 	    } else if (pCLServing->iState == S_NORMAL &&
 		       strcmp(pcCmd, "version") == 0) {
 		FilePrint(pCLServing->fd, FLAGFALSE, "version `%s'\r\n",
-			  THIS_VERSION);
+			  MyVersion());
 	    } else if (pCLServing->iState == S_NORMAL &&
 		       strcmp(pcCmd, "quit") == 0) {
 		if (ConsentUserOk(pADList, pCLServing->username->string) ==
@@ -784,7 +783,8 @@ Master()
 	Error("Master(): path to socket too long: %s", portPath->string);
 	return;
     }
-    strcpy(master_port.sun_path, portPath->string);
+    StrCpy(master_port.sun_path, portPath->string,
+	   sizeof(master_port.sun_path));
 
     if ((msfd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
 	Error("Master(): socket(AF_UNIX,SOCK_STREAM): %s",

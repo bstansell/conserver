@@ -1,5 +1,5 @@
 /*
- *  $Id: cutil.h,v 1.64 2006/01/15 17:10:14 bryan Exp $
+ *  $Id: cutil.h,v 1.68 2006/04/07 15:47:20 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -111,14 +111,16 @@ typedef enum substToken {
 } SUBSTTOKEN;
 
 typedef struct subst {
-    SUBSTTOKEN tokens[255];
+    /* function to retrieve a token type based on a character
+     */
+    SUBSTTOKEN (*token) PARAMS((char));
     /* data for callback function
      */
     void *data;
     /* function to retrieve a value (as a char* or int or both) for
      * a substitution
      */
-    int (*callback) PARAMS((char, char **, int *));
+    int (*value) PARAMS((char, char **, int *));
 } SUBST;
 
 extern int isMultiProc, fDebug, fVerbose, fErrorPrinted;
@@ -189,7 +191,7 @@ extern int FileCanRead PARAMS((CONSFILE *, fd_set *, fd_set *));
 extern int FileCanWrite PARAMS((CONSFILE *, fd_set *, fd_set *));
 extern int FileBufEmpty PARAMS((CONSFILE *));
 extern int SetFlags PARAMS((int, int, int));
-extern char *StrDup PARAMS((char *));
+extern char *StrDup PARAMS((const char *));
 extern int ParseIACBuf PARAMS((CONSFILE *, void *, int *));
 extern void *MemMove PARAMS((void *, void *, size_t));
 extern char *StringChar PARAMS((STRING *, int, char));
@@ -197,6 +199,9 @@ extern void ParseFile PARAMS((char *, FILE *, int));
 extern void ProbeInterfaces PARAMS((in_addr_t));
 extern void ProcessSubst
 PARAMS((SUBST *, char **, char **, char *, char *));
+extern char *MyVersion PARAMS((void));
+extern unsigned int AtoU PARAMS((char *));
+extern void StrCpy PARAMS((char *, const char *, unsigned int));
 #if HAVE_OPENSSL
 extern SSL *FileGetSSL PARAMS((CONSFILE *));
 extern void FileSetSSL PARAMS((CONSFILE *, SSL *));

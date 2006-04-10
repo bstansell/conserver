@@ -3770,7 +3770,8 @@ fi
 
 
 
-for ac_header in unistd.h getopt.h sys/vlimit.h sys/resource.h ttyent.h sys/ttold.h sys/uio.h sys/ioctl_compat.h usersec.h sys/select.h stropts.h sys/audit.h shadow.h sys/time.h crypt.h sysexits.h types.h sys/sockio.h sys/param.h
+
+for ac_header in unistd.h getopt.h sys/vlimit.h sys/resource.h ttyent.h sys/ttold.h sys/uio.h sys/ioctl_compat.h usersec.h sys/select.h stropts.h sys/audit.h shadow.h sys/time.h crypt.h sysexits.h types.h sys/sockio.h sys/param.h sys/un.h
 do
 as_ac_Header=`echo "ac_cv_header_$ac_header" | $as_tr_sh`
 if eval "test \"\${$as_ac_Header+set}\" = set"; then
@@ -6955,7 +6956,8 @@ done
 
 
 
-for ac_func in getopt strerror getrlimit getsid setsid getuserattr setgroups tcgetpgrp tcsetpgrp tcgetattr tcsetattr tcsendbreak setpgrp getutent setttyent getspnam setlinebuf setvbuf ptsname grantpt unlockpt sigaction setsockopt getdtablesize putenv memset memcpy memcmp memmove sysconf getlogin inet_aton setproctitle gettimeofday
+
+for ac_func in getopt strerror getrlimit getsid setsid getuserattr setgroups tcgetpgrp tcsetpgrp tcgetattr tcsetattr tcsendbreak setpgrp getutent setttyent getspnam setlinebuf setvbuf ptsname grantpt unlockpt sigaction setsockopt getdtablesize putenv memset memcpy memcmp memmove sysconf getlogin inet_aton setproctitle gettimeofday strlcpy
 do
 as_ac_var=`echo "ac_cv_func_$ac_func" | $as_tr_sh`
 echo "$as_me:$LINENO: checking for $ac_func" >&5

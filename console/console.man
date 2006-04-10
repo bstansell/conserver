@@ -1,5 +1,5 @@
-.\" $Id: console.man,v 1.58 2005/09/05 22:17:33 bryan Exp $
-.TH CONSOLE 1 "2005/09/05" "conserver-8.1.13" "conserver"
+.\" $Id: console.man,v 1.61 2006/04/03 13:32:12 bryan Exp $
+.TH CONSOLE 1 "2006/04/03" "conserver-8.1.14" "conserver"
 .SH NAME
 console \- console server client program
 .SH SYNOPSIS
@@ -426,7 +426,8 @@ the console.
 .I type
 The type of console.
 Values will be a `/' for a local device, `|' for
-a command, or `!' for a remote port.
+a command, `!' for a remote port, `%' for a Unix domain socket,
+and `#' for a noop console.
 .TP
 .I console-details
 The details regarding the console.
@@ -437,6 +438,9 @@ Commands will have values of the command, the command's pid, the
 pseudo-tty, and file descriptor for the pseudo-tty.
 Remote ports will have values of the remote hostname, remote port number,
 ``raw'' or ``telnet'' protocol, and file descriptor for the socket connection.
+Unix domain sockets will have the path to the socket and the file
+descriptor for the socket connection.
+Noop consoles will have nothing.
 .TP
 .I users-list
 The details of each user connected to the console.
@@ -530,6 +534,17 @@ Set the default master to
 .B \-M
 command-line flag).
 .TP
+\f3playback\fP \f2num\fP|\f3""\fP
+.br
+Override the playback length for the
+.B p
+escape command to
+.I num
+lines (if the server supports it).
+Using the special value of ``0'' will cause the client to use the number
+of lines of the current terminal (if that can be determined).
+If the null string (``""'') is used, the playback length will not be overridden.
+.TP
 \f3port\fP \f2port\fP
 .br
 Set the default port to
@@ -537,6 +552,17 @@ Set the default port to
 (see the
 .B \-p
 command-line flag).
+.TP
+\f3replay\fP \f2num\fP|\f3""\fP
+.br
+Override the replay length for the
+.B r
+escape command to
+.I num
+lines (if the server supports it).
+Using the special value of ``0'' will cause the client to use the number
+of lines of the current terminal (if that can be determined).
+If the null string (``""'') is used, the replay length will not be overridden.
 .TP
 \f3sslcredentials\fP \f2filename\fP
 .br
@@ -830,10 +856,16 @@ close (if open) and reopen the line (to clear errors (silo overflows))
 and the log file
 .TP
 .B p
-replay the last 60 lines of output
+playback the last 60 lines of output
+.TP
+.B P
+set number of playback lines
 .TP
 .B r
 replay the last 20 lines of output
+.TP
+.B R
+set number of replay lines
 .TP
 .B s
 switch to spy mode (read-only)

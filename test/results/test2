@@ -8,8 +8,9 @@
  L    toggle logging on/off             l?   break sequence list
  l0   send break per config file        l1-9 send specific break sequence
  m    display the message of the day    o    (re)open the tty and log file
- p    replay the last 60 lines          r    replay the last 20 lines
- s    spy read only                     u    show host status
+ p    playback the last 60 lines        P    set number of playback lines
+ r    replay the last 20 lines          R    set number of replay lines
+ s    spy mode (read only)              u    show host status
  v    show version info                 w    who is on this console
  x    show console baud info            z    suspend the connection
  |    attach local command              ?    print this message

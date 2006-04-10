@@ -1,5 +1,5 @@
 /*
- *  $Id: readconf.c,v 5.3 2005/06/11 02:32:21 bryan Exp $
+ *  $Id: readconf.c,v 5.5 2006/04/03 13:32:12 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -81,6 +81,10 @@ ApplyConfigDefault(c)
     }
     if (parserConfigDefault->striphigh != FLAGUNKNOWN)
 	c->striphigh = parserConfigDefault->striphigh;
+    if (parserConfigDefault->replay != FLAGUNKNOWN)
+	c->replay = parserConfigDefault->replay;
+    if (parserConfigDefault->playback != FLAGUNKNOWN)
+	c->playback = parserConfigDefault->playback;
 #if HAVE_OPENSSL
     if (parserConfigDefault->sslcredentials != (char *)0) {
 	if (c->sslcredentials != (char *)0)
@@ -397,6 +401,35 @@ ConfigItemMaster(id)
 
 void
 #if PROTOTYPES
+ConfigItemPlayback(char *id)
+#else
+ConfigItemPlayback(id)
+    char *id;
+#endif
+{
+    int i;
+
+    CONDDEBUG((1, "ConfigItemPlayback(%s) [%s:%d]", id, file, line));
+
+    if ((id == (char *)0) || (*id == '\000')) {
+	parserConfigTemp->playback = 0;
+	return;
+    }
+    for (i = 0; id[i] != '\000'; i++) {
+	if (!isdigit((int)id[i])) {
+	    Error("invalid playback value [%s:%d]", file, line);
+	    return;
+	}
+    }
+    if (i > 4) {
+	Error("playback value too large [%s:%d]", file, line);
+	return;
+    }
+    parserConfigTemp->playback = (unsigned short)atoi(id) + 1;
+}
+
+void
+#if PROTOTYPES
 ConfigItemPort(char *id)
 #else
 ConfigItemPort(id)
@@ -414,6 +447,35 @@ ConfigItemPort(id)
     }
     if ((parserConfigTemp->port = StrDup(id)) == (char *)0)
 	OutOfMem();
+}
+
+void
+#if PROTOTYPES
+ConfigItemReplay(char *id)
+#else
+ConfigItemReplay(id)
+    char *id;
+#endif
+{
+    int i;
+
+    CONDDEBUG((1, "ConfigItemReplay(%s) [%s:%d]", id, file, line));
+
+    if ((id == (char *)0) || (*id == '\000')) {
+	parserConfigTemp->replay = 0;
+	return;
+    }
+    for (i = 0; id[i] != '\000'; i++) {
+	if (!isdigit((int)id[i])) {
+	    Error("invalid replay value [%s:%d]", file, line);
+	    return;
+	}
+    }
+    if (i > 4) {
+	Error("replay value too large [%s:%d]", file, line);
+	return;
+    }
+    parserConfigTemp->replay = (unsigned short)atoi(id) + 1;
 }
 
 void
@@ -512,25 +574,34 @@ ConfigItemUsername(id)
 
 SUBST *substData = (SUBST *)0;
 
+SUBSTTOKEN
+#if PROTOTYPES
+SubstToken(char c)
+#else
+SubstToken(c)
+    char c;
+#endif
+{
+    switch (c) {
+	case 'u':
+	case 'c':
+	    return ISSTRING;
+	default:
+	    return ISNOTHING;
+    }
+}
+
 int
 #if PROTOTYPES
-SubstCallback(char c, char **s, int *i)
+SubstValue(char c, char **s, int *i)
 #else
-SubstCallback(c, s, i)
+SubstValue(c, s, i)
     char c;
     char **s;
     int *i;
 #endif
 {
     int retval = 0;
-
-    if (substData == (SUBST *)0) {
-	if ((substData = (SUBST *)calloc(1, sizeof(SUBST))) == (SUBST *)0)
-	    OutOfMem();
-	substData->callback = &SubstCallback;
-	substData->tokens['u'] = ISSTRING;
-	substData->tokens['c'] = ISSTRING;
-    }
 
     if (s != (char **)0) {
 	CONFIG *pc;
@@ -549,6 +620,22 @@ SubstCallback(c, s, i)
 
     return retval;
 }
+
+void
+#if PROTOTYPES
+InitSubstCallback(void)
+#else
+InitSubstCallback()
+#endif
+{
+    if (substData == (SUBST *)0) {
+	if ((substData = (SUBST *)calloc(1, sizeof(SUBST))) == (SUBST *)0)
+	    OutOfMem();
+	substData->value = &SubstValue;
+	substData->token = &SubstToken;
+    }
+}
+
 
 void
 #if PROTOTYPES
@@ -621,7 +708,9 @@ TerminalItemDetachsubst(id)
 ITEM keyConfig[] = {
     {"escape", ConfigItemEscape},
     {"master", ConfigItemMaster},
+    {"playback", ConfigItemPlayback},
     {"port", ConfigItemPort},
+    {"replay", ConfigItemReplay},
     {"sslcredentials", ConfigItemSslcredentials},
     {"sslrequired", ConfigItemSslrequired},
     {"sslenabled", ConfigItemSslenabled},
@@ -664,7 +753,7 @@ ReadConf(filename, verbose)
     }
 
     /* initialize the substition bits */
-    SubstCallback('\000', (char **)0, (int *)0);
+    InitSubstCallback();
 
     parserConfigDefault = pConfig;
     pConfig = (CONFIG *)0;
@@ -699,6 +788,8 @@ ReadConf(filename, verbose)
 	CONDDEBUG((1, "pConfig->escape = %s", EMPTYSTR(pConfig->escape)));
 	CONDDEBUG((1, "pConfig->striphigh = %s",
 		   FLAGSTR(pConfig->striphigh)));
+	CONDDEBUG((1, "pConfig->replay = %hu", pConfig->replay));
+	CONDDEBUG((1, "pConfig->playback = %hu", pConfig->playback));
 #if HAVE_OPENSSL
 	CONDDEBUG((1, "pConfig->sslcredentials = %s",
 		   EMPTYSTR(pConfig->sslcredentials)));

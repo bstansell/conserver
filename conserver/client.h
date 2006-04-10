@@ -1,5 +1,5 @@
 /*
- *  $Id: client.h,v 5.40 2005/06/07 19:55:51 bryan Exp $
+ *  $Id: client.h,v 5.41 2006/04/03 13:32:08 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -48,7 +48,9 @@ typedef enum clientState {
     S_QUOTE,			/* send any character we can spell         */
     S_BCAST,			/* send a broadcast message to all clients */
     S_CWAIT,			/* wait for client                         */
-    S_CEXEC			/* client execing a program                */
+    S_CEXEC,			/* client execing a program                */
+    S_REPLAY,			/* set replay length for 'r'               */
+    S_PLAYBACK			/* set replay length for 'p'               */
 } CLIENTSTATE;
 
 typedef struct client {		/* Connection Information:              */
@@ -75,17 +77,18 @@ typedef struct client {		/* Connection Information:              */
      *pCLnext;			/* next person on this list             */
     /* next lists link clients on a console */
     char ic[2];			/* two character escape sequence        */
+    unsigned short replay;	/* lines to replay for 'r'              */
+    unsigned short playback;	/* lines to replay for 'p'              */
     CLIENTSTATE iState;		/* state for fsm in server              */
     char caccess;		/* did we trust the remote machine      */
     IOSTATE ioState;		/* state of the socket                  */
     time_t stateTimer;		/* timer for various ioState states */
     STRING *accmd;		/* the command the user issued          */
-    STRING *msg;		/* the broadcast message                */
     struct sockaddr_in
       cnct_port;		/* where from                           */
 } CONSCLIENT;
 
-extern void Replay PARAMS((CONSENT *, CONSFILE *, int));
+extern void Replay PARAMS((CONSENT *, CONSFILE *, unsigned short));
 extern void HelpUser PARAMS((CONSCLIENT *));
 extern void FindWrite PARAMS((CONSENT *));
 extern int ClientAccessOk PARAMS((CONSCLIENT *));

@@ -1,5 +1,5 @@
-.\" $Id: conserver.cf.man,v 1.73 2005/06/09 07:09:31 bryan Exp $
-.TH CONSERVER.CF 5 "2005/06/09" "conserver-8.1.13" "conserver"
+.\" $Id: conserver.cf.man,v 1.76 2006/03/20 16:47:03 bryan Exp $
+.TH CONSERVER.CF 5 "2006/03/20" "conserver-8.1.14" "conserver"
 .SH NAME
 conserver.cf \- console configuration file for
 .BR conserver (8)
@@ -465,7 +465,7 @@ the ``^Ecl0'' client escape sequence.
 .br
 Assign the serial device
 .I filename
-as the access to the console.
+as the path to the console.
 Only consoles of type ``device'' will use this value.
 .TP
 \f3devicesubst\fP \f2c\fP\f3=\fP\f2t\fP[\f2n\fP]\f2f\fP[\f3,\fP...]|\f3""\fP
@@ -885,6 +885,16 @@ The conserver option
 will set this flag for all consoles.
 Default is
 .BR !unloved .
+.TP
+.B login
+Allow users to log into this console.
+If logins are not allowed, conserver will send a generic message to the
+client saying so and terminate the connection.
+You can override the generic message by setting the
+.B motd
+message.
+Default is
+.BR login .
 .PD
 .RE
 .TP
@@ -1046,25 +1056,58 @@ A
 .RB ` b '
 can be specified to add logging of break sequences sent to the console.
 .TP
-\f3type\fP \f3device\fP|\f3exec\fP|\f3host\fP
+\f3type\fP \f3device\fP|\f3exec\fP|\f3host\fP|\f3noop\fP|\f3uds\fP
 .br
 Set the type of console.
-The type
+A type of
 .RB `` device ''
 should be used for local serial ports (also set the
 .B device
-option), the type
+value).
+A type of
 .RB `` exec ''
 should be used for command invocations (perhaps also set the
 .B exec
-option), and the type
+value).
+A type of
 .RB `` host ''
-should be used for terminal servers and other socket-based
+should be used for terminal servers and other TCP socket-based
 interaction (also set the
 .B host
 and
 .B port
-options).
+values).
+A type of
+.RB `` noop ''
+should be used as a placeholder - it does nothing, ignores any
+.B logfile
+value and forces the
+.B !nologin
+option (so you might want to set the
+.B motd
+value).
+A type of
+.RB `` uds ''
+should be used for Unix domain sockets (also set the
+.B uds
+option).
+.TP
+\f3uds\fP \f2filename\fP
+.br
+Assign the Unix domain socket
+.I filename
+as the path to the console.
+Only consoles of type ``uds'' will use this value.
+.TP
+\f3udssubst\fP \f2c\fP\f3=\fP\f2t\fP[\f2n\fP]\f2f\fP[\f3,\fP...]|\f3""\fP
+.br
+Perform character substitutions on the
+.B uds
+value.
+See the
+.B devicesubst
+option for an explanation of the format string.
+If the null string (``\f3""\fP'') is used, no replacements will be done.
 .RE
 .TP
 \f3group\fP \f2name\fP
