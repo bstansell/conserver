@@ -1,5 +1,5 @@
 /*
- *  $Id: cutil.c,v 1.130 2006/04/07 15:47:20 bryan Exp $
+ *  $Id: cutil.c,v 1.131 2006/12/26 07:27:34 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -2636,19 +2636,12 @@ ParseIACBuf(cfp, msg, len)
 	if (b[l] == OB_IAC) {
 	    if (l + 1 == *len)
 		return l;
-	    else if (b[l + 1] == OB_SUSP)
-		return l;
-	    else if (b[l + 1] == OB_EXEC)
-		return l;
-	    else if (b[l + 1] == OB_ABRT)
-		return l;
-	    else {
-		if (b[l + 1] != OB_IAC)
-		    Error
-			("ParseIACBuf(): fd %d: unrecognized quoted-OB_IAC char",
-			 cfp->fd, strerror(errno));
+
+	    if (b[l + 1] == OB_IAC) {
 		--(*len);
 		MemMove(b + l, b + l + 1, *len - l);
+	    } else {
+		return l;
 	    }
 	}
     }

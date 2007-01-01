@@ -18,6 +18,9 @@
 /* Socket used to communicate */
 #undef DEFPORT
 
+/* Defined if building for a Cyclades TS */
+#undef FOR_CYCLADES_TS
+
 /* Define to 1 if you have the `bigcrypt' function. */
 #undef HAVE_BIGCRYPT
 
@@ -324,7 +327,7 @@
 /* Define as the return type of signal handlers (`int' or `void'). */
 #undef RETSIGTYPE
 
-/* Define to 1 if the `setpgrp' function takes no argument. */
+/* Define if setpgrp is POSIX */
 #undef SETPGRP_VOID
 
 /* Define to 1 if you have the ANSI C header files. */

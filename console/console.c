@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.179 2006/04/07 15:47:20 bryan Exp $
+ *  $Id: console.c,v 5.182 2006/06/15 03:01:05 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -1205,7 +1205,11 @@ Interact(pcf, pcMach)
 #if defined(SIGSTOP)
 			    FileWrite(cfstdout, FLAGFALSE, "stop]", 5);
 			    C2Cooked();
+			    PrintSubst(cfstdout, pcMach, pTerm->detach,
+				       pTerm->detachsubst);
 			    kill(thepid, SIGSTOP);
+			    PrintSubst(cfstdout, pcMach, pTerm->attach,
+				       pTerm->attachsubst);
 			    C2Raw();
 			    FileWrite(cfstdout, FLAGFALSE,
 				      "[press any character to continue",
@@ -1477,6 +1481,17 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
 /* shouldn't need more than 3 levels of commands (but alloc 4 just 'cause)
  * worst case so far: master, groups, broadcast
  *   (cmdarg == broadcast msg)
+ *
+ * some sample "stacks" of commands:
+ *
+ * console -q:     master, quit
+ * console -Q:     quit
+ * console foo:    call, attach            (interact==FLAGTRUE)
+ * console -f foo: call, force             (interact==FLAGTRUE)
+ * console -w:     master, groups, group
+ * console -I:     groups, info
+ * console -i foo: call, info              (interact==FLAGFALSE)
+ *
  */
 char *cmds[4] = { (char *)0, (char *)0, (char *)0, (char *)0 };
 char *cmdarg = (char *)0;
@@ -1679,9 +1694,21 @@ DoCmds(master, pports, cmdi)
 		    continue;
 		}
 		if (result[0] != '[') {	/* did we not get a connection? */
+		    int len;
+
 		    limit = 0;
 		    FilePrint(cfstdout, FLAGFALSE, "%s: %s", serverName,
 			      result);
+		    FileWrite(pcf, FLAGFALSE, "exit\r\n", 6);
+		    t = ReadReply(pcf, FLAGTRUE);
+
+		    /* strip off the goodbye from the tail of the result */
+		    len = strlen(t);
+		    if (len > 8 && strcmp("goodbye\r\n", t + len - 9) == 0) {
+			*(t + len - 9) = '\000';
+		    }
+
+		    FileWrite(cfstdout, FLAGFALSE, t, -1);
 		    FileClose(&pcf);
 		    continue;
 		} else {
@@ -2338,6 +2365,13 @@ main(argc, argv)
 	close(fd);
     }
 #endif
+
+    if (fDebug) {
+	int i;
+	for (i=cmdi;i>=0;i--) {
+	    CONDDEBUG((1, "cmds[%d] = %s", i, cmds[i]));
+	}
+    }
 
     for (;;) {
 	if (gotoConsole == (CONSFILE *)0)

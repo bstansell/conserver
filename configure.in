@@ -20,6 +20,7 @@ AH_TEMPLATE([TRUST_REVERSE_DNS],[Defined if we trust reverse DNS])
 AH_TEMPLATE([USE_EXTENDED_MESSAGES],[Defined if we produce extended messages])
 AH_TEMPLATE([USE_UNIX_DOMAIN_SOCKETS],[Defined if we use Unix domain sockets])
 AH_TEMPLATE([UDSDIR], [Directory for Unix domain sockets])
+AH_TEMPLATE([FOR_CYCLADES_TS], [Defined if building for a Cyclades TS])
 
 dnl ### Normal initialization. ######################################
 AC_INIT
@@ -296,6 +297,20 @@ AC_ARG_WITH(rpath,
 		;;
 	esac],
 	[AC_MSG_RESULT(no)])
+
+AC_MSG_CHECKING(whether we are building for a Cyclades TS)
+AC_ARG_WITH(cycladests,
+	AS_HELP_STRING([--with-cycladests],[Build for a Cyclades TS]),
+	[case "$withval" in
+	    yes)
+		AC_DEFINE(FOR_CYCLADES_TS)
+		AC_MSG_RESULT(yes)
+		;;
+	    *)
+		AC_MSG_RESULT(no)
+		;;
+	esac],[AC_MSG_RESULT(no)])
+
 
 dnl ### Check for compiler et al. ###################################
 AC_PROG_CC
@@ -611,7 +626,13 @@ AC_CHECK_LIB(util, openpty)
 AC_CHECK_FUNCS(openpty)
 
 AC_CHECK_FUNCS(getopt strerror getrlimit getsid setsid getuserattr setgroups tcgetpgrp tcsetpgrp tcgetattr tcsetattr tcsendbreak setpgrp getutent setttyent getspnam setlinebuf setvbuf ptsname grantpt unlockpt sigaction setsockopt getdtablesize putenv memset memcpy memcmp memmove sysconf getlogin inet_aton setproctitle gettimeofday strlcpy)
-AC_FUNC_SETPGRP
+if test "$with_cycladests" != "yes"; then
+	AC_FUNC_SETPGRP
+else
+	AC_DEFINE(SETPGRP_VOID, 1, [Define if setpgrp is POSIX])
+	AC_MSG_NOTICE([Building for a Cyclades-TS: setting SETPGRP_VOID because we cannot test this in cross-compilation])
+
+fi
 AC_CHECK_FUNC(strcasecmp,
 	[AC_DEFINE(HAVE_STRCASECMP, 1, [Define if strcasecmp is available])],
 	[AC_CHECK_FUNC(stricmp,

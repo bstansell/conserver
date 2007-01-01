@@ -1,6 +1,18 @@
 				CHANGES
 				=======
 
+version 8.1.15 (Dec 31, 2006):
+	- protection again telnet option negotation loops - patch by
+	  Robby Griffin <rmg@yakshavers.com>
+	- console now prints the attach/detach sequences when suspended
+	- added --with-cycladests configure option to allow
+	  cross-compiling on a cyclades ts - patch by Matt Johnson
+	  <mwj@doc.ic.ac.uk>
+	- added master conserver host to 'console -x' output for
+	  'device' consoles - patch by Matt Johnson <mwj@doc.ic.ac.uk>
+	- fixed parsing error when dealing with encapsulated
+	  client/server options
+
 version 8.1.14 (Apr 9, 2006):
 	- fixed rpm conserver.spec file - based on patch by Martin Evans
 	  <m.d.t.evans@qmul.ac.uk>
@@ -853,5 +865,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.215 2006/04/10 02:07:13 bryan Exp $
+#  $Id: CHANGES,v 1.217 2006/12/31 02:04:11 bryan Exp $
 #

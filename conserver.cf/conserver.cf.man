@@ -1,5 +1,5 @@
-.\" $Id: conserver.cf.man,v 1.76 2006/03/20 16:47:03 bryan Exp $
-.TH CONSERVER.CF 5 "2006/03/20" "conserver-8.1.14" "conserver"
+.\" $Id: conserver.cf.man,v 1.77 2006/12/31 02:03:03 bryan Exp $
+.TH CONSERVER.CF 5 "2006/12/31" "conserver-8.1.15" "conserver"
 .SH NAME
 conserver.cf \- console configuration file for
 .BR conserver (8)
@@ -757,7 +757,7 @@ logfile is read from the end of the file.
 All data past the first newline is moved (not copied) to the new logfile
 so that a replay of the console works and starts on a line boundary.
 .TP
-\f3master\fP \f2hostname\fP|\f3ipaddr\fP
+\f3master\fP \f2hostname\fP|\f2ipaddr\fP
 .br
 Define which conserver host manages the console.
 The host may be specified by

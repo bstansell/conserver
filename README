@@ -50,6 +50,7 @@ Systems Tested
 	MacOS X, native gcc
 	Solaris 2.5.1 thru 9 (sparc/x86), gcc
 	Solaris 7/8, native cc
+	Solaris 10 and Solaris Express (build 33) (x86), gcc and native cc
 
 
 Contributions
@@ -65,5 +66,5 @@ Contributions
     http://www.columbia.edu/acis/sy/unixdev/zinc
 
 #
-#  $Id: README,v 1.25 2006/03/20 16:48:37 bryan Exp $
+#  $Id: README,v 1.26 2006/04/16 17:45:08 bryan Exp $
 #

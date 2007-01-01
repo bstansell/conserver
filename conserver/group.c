@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.325 2006/04/07 15:47:20 bryan Exp $
+ *  $Id: group.c,v 5.327 2006/06/17 02:02:00 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -2073,12 +2073,11 @@ CommandExamine(pGE, pCLServing, pCEServing, tyme, args)
 		p = ' ';
 		break;
 	    case DEVICE:
-		d = pCE->device;
+		d = BuildTmpStringPrint("%s@%s", pCE->device, pCE->master);
 		b = pCE->baud->acrate;
 		p = pCE->parity->key[0];
 		break;
 	    case HOST:
-		BuildTmpString((char *)0);
 		d = BuildTmpStringPrint("%s/%hu", pCE->host, pCE->netport);
 		b = "Netwk";
 		p = ' ';
@@ -2600,14 +2599,21 @@ DoConsoleRead(pCEServing)
 		CONDDEBUG((1,
 			   "DoConsoleRead(): [%s] got telnet option `%s'",
 			   pCEServing->server, TelOpt(acInOrig[i])));
-		if (acInOrig[i] == TELOPT_ECHO ||
-		    acInOrig[i] == TELOPT_SGA) {
+		if ((acInOrig[i] == TELOPT_ECHO &&
+		     pCEServing->sentDoEcho != FLAGTRUE) ||
+		    (acInOrig[i] == TELOPT_SGA &&
+		     pCEServing->sentDoSGA != FLAGTRUE)) {
 		    PutConsole(pCEServing, IAC, 2);
 		    PutConsole(pCEServing, DO, 2);
 		    PutConsole(pCEServing, acInOrig[i], 2);
 		    CONDDEBUG((1,
 			       "DoConsoleRead(): [%s] sent telnet DO `%s'",
 			       pCEServing->server, TelOpt(acInOrig[i])));
+		    if (acInOrig[i] == TELOPT_ECHO) {
+			pCEServing->sentDoEcho = FLAGTRUE;
+		    } else {
+			pCEServing->sentDoSGA = FLAGTRUE;
+		    }
 		}
 		state = 0;
 	    } else if (state == 4) {

@@ -863,6 +863,7 @@ Optional Packages:
                           Use Unix domain sockets for client/server
                           communication [/tmp/conserver]
   --with-rpath            Use -R as well as -L for libraries
+  --with-cycladests       Build for a Cyclades TS
   --with-libwrap[=PATH]
                           Compile in libwrap (tcp_wrappers) support
   --with-openssl[=PATH]
@@ -1812,6 +1813,32 @@ else
   echo "$as_me:$LINENO: result: no" >&5
 echo "${ECHO_T}no" >&6
 fi;
+
+echo "$as_me:$LINENO: checking whether we are building for a Cyclades TS" >&5
+echo $ECHO_N "checking whether we are building for a Cyclades TS... $ECHO_C" >&6
+
+# Check whether --with-cycladests or --without-cycladests was given.
+if test "${with_cycladests+set}" = set; then
+  withval="$with_cycladests"
+  case "$withval" in
+	    yes)
+		cat >>confdefs.h <<\_ACEOF
+#define FOR_CYCLADES_TS 1
+_ACEOF
+
+		echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6
+		;;
+	    *)
+		echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+		;;
+	esac
+else
+  echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+fi;
+
 
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
@@ -7058,7 +7085,8 @@ _ACEOF
 fi
 done
 
-echo "$as_me:$LINENO: checking whether setpgrp takes no argument" >&5
+if test "$with_cycladests" != "yes"; then
+	echo "$as_me:$LINENO: checking whether setpgrp takes no argument" >&5
 echo $ECHO_N "checking whether setpgrp takes no argument... $ECHO_C" >&6
 if test "${ac_cv_func_setpgrp_void+set}" = set; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
@@ -7122,6 +7150,16 @@ _ACEOF
 
 fi
 
+else
+
+cat >>confdefs.h <<\_ACEOF
+#define SETPGRP_VOID 1
+_ACEOF
+
+	{ echo "$as_me:$LINENO: Building for a Cyclades-TS: setting SETPGRP_VOID because we cannot test this in cross-compilation" >&5
+echo "$as_me: Building for a Cyclades-TS: setting SETPGRP_VOID because we cannot test this in cross-compilation" >&6;}
+
+fi
 echo "$as_me:$LINENO: checking for strcasecmp" >&5
 echo $ECHO_N "checking for strcasecmp... $ECHO_C" >&6
 if test "${ac_cv_func_strcasecmp+set}" = set; then

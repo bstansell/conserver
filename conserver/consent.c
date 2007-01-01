@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.149 2006/04/07 15:47:20 bryan Exp $
+ *  $Id: consent.c,v 5.150 2006/06/17 02:03:15 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -52,6 +52,42 @@
 
 
 BAUD baud[] = {
+#if defined(FOR_CYCLADES_TS)
+    {"0", 0},
+    {"50", 1},
+    {"75", 2},
+    {"110", 3},
+    {"134", 4},
+    {"150", 5},
+    {"200", 6},
+    {"300", 7},
+    {"600", 8},
+    {"1200", 9},
+    {"1800", 10},
+    {"2400", 11},
+    {"4800", 12},
+    {"9600", 13},
+    {"14400", 14},
+    {"19200", 15},
+    {"28800", 16},
+    {"38400", 17},
+    {"57600", 18},
+    {"76800", 19},
+    {"115200", 20},
+    {"230400", 21},
+    {"460800", 22},
+    {"500000", 23},
+    {"576000", 24},
+    {"921600", 25},
+    {"1000000", 26},
+    {"1152000", 27},
+    {"1500000", 28},
+    {"2000000", 29},
+    {"2500000", 30},
+    {"3000000", 31},
+    {"3500000", 32},
+    {"4000000", 33},
+#else /* FOR_CYCLADES_TS */
 #if defined(B115200)
     {"115200", B115200},
 #endif
@@ -83,6 +119,7 @@ BAUD baud[] = {
 #if defined(B300)
     {"300", B300},
 #endif
+#endif /* FOR_CYCLADES_TS */
 };
 
 
@@ -701,6 +738,9 @@ ConsDown(pCE, downHard, force)
     pCE->autoReUp = 0;
     pCE->downHard = downHard;
     pCE->ioState = ISDISCONNECTED;
+    pCE->telnetState = 0;
+    pCE->sentDoEcho = FLAGFALSE;
+    pCE->sentDoSGA = FLAGFALSE;
 }
 
 /* set up a console the way it should be for use to work with it	(ksb)

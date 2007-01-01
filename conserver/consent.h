@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.66 2006/03/20 16:47:03 bryan Exp $
+ *  $Id: consent.h,v 5.67 2006/05/28 17:27:14 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -158,6 +158,8 @@ typedef struct consent {	/* console information                  */
     char acline[132 * 2 + 2];	/* max chars we will call a line        */
     int iend;			/* length of data stored in acline      */
     int telnetState;		/* state for telnet negotiations        */
+    FLAG sentDoEcho;		/* have we sent telnet DO ECHO cmd?     */
+    FLAG sentDoSGA;		/* have we sent telnet DO SGA cmd?      */
     unsigned short autoReUp;	/* is it coming back up automatically?  */
     FLAG downHard;		/* did it go down unexpectedly?         */
     unsigned short nolog;	/* don't log output                     */
