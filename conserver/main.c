@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.200 2006/04/03 13:32:08 bryan Exp $
+ *  $Id: main.c,v 5.201 2007/04/02 17:59:16 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -783,6 +783,8 @@ SummarizeDataStructures()
 		size += strlen(pCE->motd);
 	    if (pCE->idlestring != (char *)0)
 		size += strlen(pCE->idlestring);
+	    if (pCE->replstring != (char *)0)
+		size += strlen(pCE->replstring);
 	    if (pCE->fdlog != (CONSFILE *)0)
 		size += sizeof(CONSFILE);
 	    if (pCE->cofile != (CONSFILE *)0)
@@ -974,9 +976,10 @@ DumpDataStructures()
 	    CONDDEBUG((1, "DumpDataStructures():  inituid=%d, initgid=%d",
 		       pCE->inituid, pCE->initgid));
 	    CONDDEBUG((1,
-		       "DumpDataStructures():  motd=%s, idletimeout=%d, idlestring=%s",
+		       "DumpDataStructures():  motd=%s, idletimeout=%d, idlestring=%s, replstring=%s",
 		       EMPTYSTR(pCE->motd), pCE->idletimeout,
-		       EMPTYSTR(pCE->idlestring)));
+		       EMPTYSTR(pCE->idlestring),
+		       EMPTYSTR(pCE->replstring)));
 	    if (pCE->ro) {
 		CONSENTUSERS *u;
 		for (u = pCE->ro; u != (CONSENTUSERS *)0; u = u->next) {

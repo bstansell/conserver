@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.90 2006/04/03 13:32:08 bryan Exp $
+ *  $Id: client.c,v 5.91 2007/04/02 18:18:58 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -399,6 +399,7 @@ static HELP aHLTable[] = {
     {WHEN_ATTACH, "l0   send break per config file"},
     {WHEN_ATTACH, "l1-9 send specific break sequence"},
     {WHEN_ALWAYS, "m    display the message of the day"},
+    {WHEN_ALWAYS, "n    write a note to the logfile"},
     {WHEN_ALWAYS, "o    (re)open the tty and log file"},
     {WHEN_ALWAYS, "p    playback the last %hu lines"},
     {WHEN_ALWAYS, "P    set number of playback lines"},

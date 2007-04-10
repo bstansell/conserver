@@ -1,5 +1,5 @@
-.\" $Id: conserver.cf.man,v 1.77 2006/12/31 02:03:03 bryan Exp $
-.TH CONSERVER.CF 5 "2006/12/31" "conserver-8.1.15" "conserver"
+.\" $Id: conserver.cf.man,v 1.78 2007/04/02 17:59:16 bryan Exp $
+.TH CONSERVER.CF 5 "2007/04/02" "conserver-8.1.16" "conserver"
 .SH NAME
 conserver.cf \- console configuration file for
 .BR conserver (8)
@@ -500,12 +500,16 @@ fields.
 .TP
 String Replacement
 .TP
+.B c
+console name
+.TP
 .B h
 .B host
 value
 .TP
-.B c
-console name
+.B r
+.B replstring
+value
 .sp
 .PP
 Numeric Replacement
@@ -978,6 +982,15 @@ The
 .B striphigh
 console option still applies when data is read by the server, and if enabled,
 can impact the encapsulation process.
+.TP
+\f3replstring\fP \f2string\fP
+.br
+A generic replacement string that can be used by the
+.BR devicesubst ,
+.BR execsubst ,
+and
+.B initsubst
+keywords.
 .TP
 \f3ro\fP [\f3!\fP]\f2username\fP[\f3,\fP...]|\f3""\fP
 .br

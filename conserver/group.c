@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.327 2006/06/17 02:02:00 bryan Exp $
+ *  $Id: group.c,v 5.329 2007/04/02 18:18:59 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -622,6 +622,8 @@ DestroyConsent(pGE, pCE)
 	free(pCE->motd);
     if (pCE->idlestring != (char *)0)
 	free(pCE->idlestring);
+    if (pCE->replstring != (char *)0)
+	free(pCE->replstring);
     if (pCE->execSlave != (char *)0)
 	free(pCE->execSlave);
     while (pCE->aliases != (NAMES *)0) {
@@ -3274,6 +3276,21 @@ DoClientRead(pGE, pCLServing)
 			/* these are not used in this mode */
 			break;
 
+		    case S_NOTE:
+			if (GatherLine(acIn[i], 0, G_TEXT, pCLServing)) {
+			    FileWrite(pCLServing->fd, FLAGFALSE, "]\r\n",
+				    3);
+			    BuildString((char *)0, bcast);
+			    BuildString("NOTE -- ", bcast);
+			    BuildString(pCLServing->acid->string, bcast);
+			    BuildString(": ", bcast);
+			    BuildString(pCLServing->accmd->string, bcast);
+			    TagLogfile(pCEServing, bcast->string);
+			    BuildString((char *)0, pCLServing->accmd);
+			    pCLServing->iState = S_NORMAL;
+			}
+			continue;
+
 		    case S_BCAST:
 			if (GatherLine(acIn[i], 0, G_TEXT, pCLServing)) {
 			    FileWrite(pCLServing->fd, FLAGFALSE, "]\r\n",
@@ -3661,6 +3678,18 @@ DoClientRead(pGE, pCLServing)
 				    FilePrint(pCLServing->fd, FLAGFALSE,
 					      "-- MOTD -- %s]\r\n",
 					      pCEServing->motd);
+				break;
+
+			    case 'n':   /* note message to log file */
+				if (pCEServing->fdlog == (CONSFILE *)0) {
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					    "no log file on this console]\r\n", -1);
+				} else {
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					    "Enter note: ", -1);
+				    BuildString((char *)0, pCLServing->accmd);
+				    pCLServing->iState = S_NOTE;
+				}
 				break;
 
 			    case 'o':	/* close and re-open line */

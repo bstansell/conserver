@@ -1,5 +1,5 @@
 /*
- *  $Id: client.h,v 5.41 2006/04/03 13:32:08 bryan Exp $
+ *  $Id: client.h,v 5.42 2007/04/02 18:18:59 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -50,7 +50,8 @@ typedef enum clientState {
     S_CWAIT,			/* wait for client                         */
     S_CEXEC,			/* client execing a program                */
     S_REPLAY,			/* set replay length for 'r'               */
-    S_PLAYBACK			/* set replay length for 'p'               */
+    S_PLAYBACK,			/* set replay length for 'p'               */
+    S_NOTE			/* send a note to the logfile              */
 } CLIENTSTATE;
 
 typedef struct client {		/* Connection Information:              */

@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.192 2006/03/20 16:47:03 bryan Exp $
+ *  $Id: readcfg.c,v 5.193 2007/04/02 17:59:16 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -591,6 +591,8 @@ DestroyParserDefaultOrConsole(c, ph, pt)
 	free(c->motd);
     if (c->idlestring != (char *)0)
 	free(c->idlestring);
+    if (c->replstring != (char *)0)
+	free(c->replstring);
     if (c->execSlave != (char *)0)
 	free(c->execSlave);
     while (c->aliases != (NAMES *)0) {
@@ -775,6 +777,12 @@ ApplyDefault(d, c)
 	if (c->idlestring != (char *)0)
 	    free(c->idlestring);
 	if ((c->idlestring = StrDup(d->idlestring)) == (char *)0)
+	    OutOfMem();
+    }
+    if (d->replstring != (char *)0) {
+	if (c->replstring != (char *)0)
+	    free(c->replstring);
+	if ((c->replstring = StrDup(d->replstring)) == (char *)0)
 	    OutOfMem();
     }
     CopyConsentUserList(d->ro, &(c->ro));
@@ -980,27 +988,31 @@ SubstValue(c, s, i)
 #endif
 {
     int retval = 0;
+    CONSENT *pCE;
+    static char *empty = "";
+
+    if (substData->data == (void *)0)
+	return 0;
+    pCE = (CONSENT *)(substData->data);
 
     if (s != (char **)0) {
-	CONSENT *pCE;
-	if (substData->data == (void *)0)
-	    return 0;
-
-	pCE = (CONSENT *)(substData->data);
 	if (c == 'h') {
 	    (*s) = pCE->host;
 	    retval = 1;
 	} else if (c == 'c') {
 	    (*s) = pCE->server;
 	    retval = 1;
+	} else if (c == 'r') {
+	    if (pCE->replstring == (char *)0) {
+		(*s) = empty;
+	    } else {
+		(*s) = pCE->replstring;
+	    }
+	    retval = 1;
 	}
     }
 
     if (i != (int *)0) {
-	CONSENT *pCE;
-	if (substData->data == (void *)0)
-	    return 0;
-	pCE = (CONSENT *)(substData->data);
 	if (c == 'p') {
 	    (*i) = pCE->port;
 	    retval = 1;
@@ -1055,6 +1067,7 @@ SubstToken(c)
 	    return ISNUMBER;
 	case 'h':
 	case 'c':
+	case 'r':
 	    substTokenCount[(unsigned)c]++;
 	    return ISSTRING;
 	default:
@@ -2009,6 +2022,38 @@ DefaultItemProtocol(id)
 {
     CONDDEBUG((1, "DefaultItemProtocol(%s) [%s:%d]", id, file, line));
     ProcessProtocol(parserDefaultTemp, id);
+}
+
+void
+#if PROTOTYPES
+ProcessReplstring(CONSENT *c, char *id)
+#else
+ProcessReplstring(c, id)
+    CONSENT *c;
+    char *id;
+#endif
+{
+    if (c->replstring != (char *)0) {
+	free(c->replstring);
+	c->replstring = (char *)0;
+    }
+    if ((id == (char *)0) || (*id == '\000'))
+	return;
+    if ((c->replstring = StrDup(id))
+	== (char *)0)
+	OutOfMem();
+}
+
+void
+#if PROTOTYPES
+DefaultItemReplstring(char *id)
+#else
+DefaultItemReplstring(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemReplstring(%s) [%s:%d]", id, file, line));
+    ProcessReplstring(parserDefaultTemp, id);
 }
 
 void
@@ -2991,6 +3036,7 @@ ConsoleAdd(c)
 
 	SwapStr(&pCEmatch->motd, &c->motd);
 	SwapStr(&pCEmatch->idlestring, &c->idlestring);
+	SwapStr(&pCEmatch->replstring, &c->replstring);
 	pCEmatch->portinc = c->portinc;
 	pCEmatch->portbase = c->portbase;
 	pCEmatch->spinmax = c->spinmax;
@@ -3764,6 +3810,18 @@ ConsoleItemProtocol(id)
 {
     CONDDEBUG((1, "ConsoleItemProtocol(%s) [%s:%d]", id, file, line));
     ProcessProtocol(parserConsoleTemp, id);
+}
+
+void
+#if PROTOTYPES
+ConsoleItemReplstring(char *id)
+#else
+ConsoleItemReplstring(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemReplstring(%s) [%s:%d]", id, file, line));
+    ProcessReplstring(parserConsoleTemp, id);
 }
 
 void
@@ -4831,6 +4889,7 @@ ITEM keyDefault[] = {
     {"portbase", DefaultItemPortbase},
     {"portinc", DefaultItemPortinc},
     {"protocol", DefaultItemProtocol},
+    {"replstring", DefaultItemReplstring},
     {"ro", DefaultItemRo},
     {"rw", DefaultItemRw},
     {"timestamp", DefaultItemTimestamp},
@@ -4869,6 +4928,7 @@ ITEM keyConsole[] = {
     {"portbase", ConsoleItemPortbase},
     {"portinc", ConsoleItemPortinc},
     {"protocol", ConsoleItemProtocol},
+    {"replstring", ConsoleItemReplstring},
     {"ro", ConsoleItemRo},
     {"rw", ConsoleItemRw},
     {"timestamp", ConsoleItemTimestamp},

@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.150 2006/06/17 02:03:15 bryan Exp $
+ *  $Id: consent.c,v 5.151 2007/04/09 15:52:28 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -896,12 +896,14 @@ ConsInit(pCE)
 			("[%s] setsockopt(%u,SO_KEEPALIVE): %s: forcing down",
 			 pCE->server, cofile, strerror(errno));
 		    ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+		    close(cofile);
 		    return;
 		}
 #endif
 
 		if (!SetFlags(cofile, O_NONBLOCK, 0)) {
 		    ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+		    close(cofile);
 		    return;
 		}
 
@@ -913,6 +915,7 @@ ConsInit(pCE)
 			Error("[%s] connect(%u): %s: forcing down",
 			      pCE->server, cofile, strerror(errno));
 			ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+			close(cofile);
 			return;
 		    }
 		}
@@ -923,6 +926,7 @@ ConsInit(pCE)
 		    ("[%s] FileOpenFD(%d,simpleSocket) failed: forcing down",
 		     pCE->server, cofile);
 		ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+		close(cofile);
 		return;
 	    }
 	    if (ret == 0) {
@@ -971,6 +975,7 @@ ConsInit(pCE)
 
 		if (!SetFlags(cofile, O_NONBLOCK, 0)) {
 		    ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+		    close(cofile);
 		    return;
 		}
 
@@ -981,6 +986,7 @@ ConsInit(pCE)
 			Error("[%s] connect(%u): %s: forcing down",
 			      pCE->server, cofile, strerror(errno));
 			ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+			close(cofile);
 			return;
 		    }
 		}
@@ -991,6 +997,7 @@ ConsInit(pCE)
 		    ("[%s] FileOpenFD(%d,simpleSocket) failed: forcing down",
 		     pCE->server, cofile);
 		ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+		close(cofile);
 		return;
 	    }
 	    if (ret == 0) {

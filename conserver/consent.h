@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.67 2006/05/28 17:27:14 bryan Exp $
+ *  $Id: consent.h,v 5.68 2007/04/02 17:59:16 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -121,6 +121,7 @@ typedef struct consent {	/* console information                  */
     char *idlestring;		/* string to print when idle            */
     unsigned short spinmax;	/* initialization spin maximum          */
     unsigned short spintimer;	/* initialization spin timer            */
+    char *replstring;		/* generic string for replacements      */
     /* timestamp stuff */
     int mark;			/* Mark (chime) interval                */
     long nextMark;		/* Next mark (chime) time               */
