@@ -14,6 +14,8 @@ AH_TEMPLATE([USE_LIBWRAP], [use tcp_wrappers libwrap])
 dnl AH_TEMPLATE([HAVE_POSIX_REGCOMP], [have POSIX regcomp])
 AH_TEMPLATE([HAVE_PAM], [have PAM support])
 AH_TEMPLATE([HAVE_OPENSSL], [have openssl support])
+AH_TEMPLATE([HAVE_GSSAPI], [have gss-api support])
+AH_TEMPLATE([STRIP_REALM], [retry username without @REALM with gss-api authentication])
 AH_TEMPLATE([HAVE_DMALLOC], [have dmalloc support])
 AH_TEMPLATE([HAVE_SA_LEN],[Defined if sa_len member exists in struct sockaddr])
 AH_TEMPLATE([TRUST_REVERSE_DNS],[Defined if we trust reverse DNS])
@@ -499,6 +501,83 @@ AC_ARG_WITH(openssl,
     fi]
 )
 
+cons_with_gssapi="NO"
+cons_strip_realm="NO"
+AC_ARG_WITH(gssapi,
+    AS_HELP_STRING([--with-gssapi@<:@=PATH@:>@],
+	[Compile in GSS-API support]),
+    [if test "$withval" != "no"; then
+	if test "$withval" != "yes"; then
+	    GSSAPICPPFLAGS="-I$withval/include"
+	    if test "$use_dash_r" != "yes"; then
+		GSSAPILDFLAGS="-L$withval/lib"
+	    else
+		GSSAPILDFLAGS="-L$withval/lib -R$withval/lib"
+	    fi
+	else
+	    GSSAPICPPFLAGS=""
+	    GSSAPILDFLAGS=""
+	fi
+
+	oCPPFLAGS="$CPPFLAGS"
+	oLDFLAGS="$LDFLAGS"
+	oLIBS="$LIBS"
+	have_gssapi=no
+
+	CPPFLAGS="$CPPFLAGS $GSSAPICPPFLAGS"
+	LDFLAGS="$LDFLAGS $GSSAPILDFLAGS"
+
+	AC_CHECK_HEADER([gssapi/gssapi.h],
+	    [LIBS="$oLIBS -lgssapi"
+	    AC_MSG_CHECKING(for gssapi library -lgssapi)
+	    AC_TRY_LINK([#include <gssapi/gssapi.h>
+		],[gss_create_empty_oid_set(NULL, NULL)],
+		[AC_MSG_RESULT(yes)
+		cons_with_gssapi="YES"
+		AC_DEFINE(HAVE_GSSAPI)
+		have_gssapi=yes],
+		[AC_MSG_RESULT(no)
+		LIBS="$oLIBS -lgssglue"
+		AC_MSG_CHECKING(for gssapi library -lgssglue)
+		AC_TRY_LINK([#include <gssapi/gssapi.h>
+		    ],[gss_create_empty_oid_set(NULL, NULL)],
+		    [AC_MSG_RESULT(yes)
+		    cons_with_gssapi="YES"
+		    AC_DEFINE(HAVE_GSSAPI)
+		    have_gssapi=yes],
+		    [AC_MSG_RESULT(no)
+		    LIBS="$oLIBS -lgss"
+		    AC_MSG_CHECKING(for gssapi library -lgss)
+		    AC_TRY_LINK([#include <gssapi/gssapi.h>
+			],[gss_create_empty_oid_set(NULL, NULL)],
+			[AC_MSG_RESULT(yes)
+			cons_with_gssapi="YES"
+			AC_DEFINE(HAVE_GSSAPI)
+			have_gssapi=yes],
+			[AC_MSG_RESULT(no)])])])],)
+
+	if test $have_gssapi = no; then
+	    LIBS="$oLIBS"
+	    CPPFLAGS="$oCPPFLAGS"
+	    LDFLAGS="$oLDFLAGS"
+	else
+	    AC_MSG_CHECKING(whether to fallback to username without @REALM)
+	    AC_ARG_WITH(striprealm,
+		    AS_HELP_STRING([--with-striprealm],[retry username without @REALM with gss-api authentication]),
+		    [case "$withval" in
+			yes)
+			    AC_DEFINE(STRIP_REALM)
+			    AC_MSG_RESULT(yes)
+			    cons_strip_realm="YES"
+			    ;;
+			*)
+			    AC_MSG_RESULT(no)
+			    ;;
+		    esac],[AC_MSG_RESULT(no)])
+	fi
+    fi]
+)
+
 cons_with_dmalloc="NO"
 AC_ARG_WITH(dmalloc,
     AS_HELP_STRING([--with-dmalloc@<:@=PATH@:>@],
@@ -654,11 +733,15 @@ AC_OUTPUT
 echo "=============================================================="
 echo "                      Feature Summary"
 echo ""
-echo "  Unix domain sockets (--with-uds)    : $cons_with_uds"
-echo "         TCP wrappers (--with-libwrap): $cons_with_libwrap"
-echo "              OpenSSL (--with-openssl): $cons_with_openssl"
-echo "              dmalloc (--with-dmalloc): $cons_with_dmalloc"
-echo "          PAM support (--with-pam)    : $cons_with_pam"
+echo "  Unix domain sockets (--with-uds)       : $cons_with_uds"
+echo "         TCP wrappers (--with-libwrap)   : $cons_with_libwrap"
+echo "              OpenSSL (--with-openssl)   : $cons_with_openssl"
+echo "              GSS-API (--with-gssapi)    : $cons_with_gssapi"
+if [ $cons_with_gssapi = "YES" ]; then
+echo "         strip @REALM (--with-striprealm): $cons_strip_realm"
+fi
+echo "              dmalloc (--with-dmalloc)   : $cons_with_dmalloc"
+echo "          PAM support (--with-pam)       : $cons_with_pam"
 echo ""
 echo "=============================================================="
 ]

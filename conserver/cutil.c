@@ -1,5 +1,5 @@
 /*
- *  $Id: cutil.c,v 1.131 2006/12/26 07:27:34 bryan Exp $
+ *  $Id: cutil.c,v 1.133 2009/09/26 09:20:29 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -2283,7 +2283,7 @@ ProbeInterfaces(bindAddr)
 	if ((ifc.ifc_len - r) < sizeof(*ifr))
 	    break;
 #ifdef HAVE_SA_LEN
-	if (sa->sa_len > sizeof(ifr->ifr_addr))
+	if (sa->sa_len > sizeof(ifr->ifr_irfu))
 	    r += sizeof(ifr->ifr_name) + sa->sa_len;
 	else
 #endif
@@ -2745,11 +2745,7 @@ GetWord(fp, line, spaceok, word)
 		    if (c == '\n') {
 			if (fname->used > 0) {
 			    while (fname->used > 1 && isspace((int)
-							      (fname->
-							       string
-							       [fname->
-								used -
-								2])))
+							      (fname->string[fname->used - 2])))
 				fname->used--;
 			    if (fname->used > 0)
 				fname->string[fname->used - 1] = '\000';
@@ -3039,8 +3035,8 @@ ParseFile(filename, fp, level)
 		case VALUE:
 		    switch (token) {
 			case WORD:
-			    (*sections[secIndex].items[keyIndex].
-			     reg) (word->string);
+			    (*sections[secIndex].
+			     items[keyIndex].reg) (word->string);
 			    state = SEMI;
 			    break;
 			case SEMICOLON:

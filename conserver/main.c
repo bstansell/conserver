@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.201 2007/04/02 17:59:16 bryan Exp $
+ *  $Id: main.c,v 5.202 2009/09/26 09:23:04 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -43,6 +43,9 @@
 #include <dirent.h>
 #if HAVE_OPENSSL
 # include <openssl/opensslv.h>
+#endif
+#if HAVE_GSSAPI
+# include <gssapi/gssapi.h>
 #endif
 
 
@@ -375,6 +378,42 @@ SetupSSL()
 	 */
 	SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_OFF);
     }
+}
+#endif
+
+#if HAVE_GSSAPI
+gss_name_t gss_myname = GSS_C_NO_NAME;
+gss_cred_id_t gss_mycreds = GSS_C_NO_CREDENTIAL;
+
+void
+#if PROTOTYPES
+SetupGSSAPI(void)
+#else
+SetupGSSAPI()
+#endif
+{
+    OM_uint32 stmaj, stmin;
+    char namestr[128];
+    gss_buffer_desc namebuf;
+
+    snprintf(namestr, 128, "host@%s", myHostname);
+    namebuf.value = namestr;
+    namebuf.length = strlen(namestr) + 1;
+    stmaj =
+	gss_import_name(&stmin, &namebuf, GSS_C_NT_HOSTBASED_SERVICE,
+			&gss_myname);
+    /* XXX: handle error */
+    if (stmaj != GSS_S_COMPLETE) {
+	Error("gss_import_name failed");
+    }
+    /* Get some initial credentials */
+    stmaj =
+	gss_acquire_cred(&stmin, gss_myname, 0, GSS_C_NULL_OID_SET,
+			 GSS_C_ACCEPT, &gss_mycreds, NULL, NULL);
+    if (stmaj != GSS_S_COMPLETE) {
+	Error("Could not acquire GSS-API credentials");
+    }
+
 }
 #endif
 
@@ -1562,6 +1601,9 @@ main(argc, argv)
 #if HAVE_OPENSSL
 	/* Prep the SSL layer */
 	SetupSSL();
+#endif
+#if HAVE_GSSAPI
+	SetupGSSAPI();
 #endif
 
 	if (config->daemonmode == FLAGTRUE)

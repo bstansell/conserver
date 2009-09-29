@@ -1,5 +1,5 @@
 /*
- *  $Id: main.h,v 5.53 2004/05/21 04:15:17 bryan Exp $
+ *  $Id: main.h,v 5.54 2009/09/26 09:23:04 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -53,6 +53,10 @@ extern char *interface;
 #endif
 #if HAVE_OPENSSL
 extern SSL_CTX *ctx;
+#endif
+#if HAVE_GSSAPI
+extern gss_name_t gss_myname;
+extern gss_cred_id_t gss_mycreds;
 #endif
 extern void ReopenLogfile PARAMS((void));
 extern void ReopenUnifiedlog PARAMS((void));

@@ -1,0 +1,5 @@
+# server options
+#OPTIONS="-p 33000 -d"
+# run as different user that root
+#RUNAS=conservr
+

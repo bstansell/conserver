@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.91 2007/04/02 18:18:58 bryan Exp $
+ *  $Id: client.c,v 5.93 2009/09/26 09:20:15 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -61,30 +61,32 @@ FindWrite(pCE)
     CONSENT *pCE;
 #endif
 {
+    CONSCLIENT *pCLfound = (CONSCLIENT *)0;
     CONSCLIENT *pCL;
 
-    /* make the first guy to have the `want write' bit set the writer
-     * (tell him of the promotion, too)  we could look for the
-     * most recent or some such... I guess it doesn't matter that
-     * much.
+    /* make the first guy (last on the list) to have the `want write' bit set
+     * the writer (tell him of the promotion, too)  we could look for the most
+     * recent or some such... I guess it doesn't matter that much.
      */
     if (pCE->pCLwr != (CONSCLIENT *)0 || pCE->fronly)
 	return;
 
     for (pCL = pCE->pCLon; (CONSCLIENT *)0 != pCL; pCL = pCL->pCLnext) {
-	if (!pCL->fwantwr || pCL->fro)
-	    continue;
-	pCL->fwantwr = 0;
-	pCL->fwr = 1;
+	if (pCL->fwantwr && !pCL->fro)
+	    pCLfound = pCL;
+    }
+
+    if (pCLfound != (CONSCLIENT *)0) {
+	pCLfound->fwantwr = 0;
+	pCLfound->fwr = 1;
 	if (pCE->nolog) {
-	    FileWrite(pCL->fd, FLAGFALSE, "\r\n[attached (nologging)]\r\n",
-		      -1);
+	    FileWrite(pCLfound->fd, FLAGFALSE,
+		      "\r\n[attached (nologging)]\r\n", -1);
 	} else {
-	    FileWrite(pCL->fd, FLAGFALSE, "\r\n[attached]\r\n", -1);
+	    FileWrite(pCLfound->fd, FLAGFALSE, "\r\n[attached]\r\n", -1);
 	}
-	TagLogfileAct(pCE, "%s attached", pCL->acid->string);
-	pCE->pCLwr = pCL;
-	return;
+	TagLogfileAct(pCE, "%s attached", pCLfound->acid->string);
+	pCE->pCLwr = pCLfound;
     }
 }
 

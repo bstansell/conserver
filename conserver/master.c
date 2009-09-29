@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.135 2006/04/07 15:47:20 bryan Exp $
+ *  $Id: master.c,v 5.136 2009/09/26 09:23:04 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -494,6 +494,9 @@ DoNormalRead(pCLServing)
 #if HAVE_OPENSSL
 		    "ssl    start ssl session\r\n",
 #endif
+#if HAVE_GSSAPI
+		    "gssapi log in with gssapi\r\n",
+#endif
 		    (char *)0
 		};
 		static char *apcHelp2[] = {
@@ -531,6 +534,14 @@ DoNormalRead(pCLServing)
 		    DropMasterClient(pCLServing, FLAGFALSE);
 		    return;
 		}
+#endif
+#if HAVE_GSSAPI
+	    } else if (pCLServing->iState == S_IDENT &&
+		       strcmp(pcCmd, "gssapi") == 0) {
+		FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", -1);
+		/* Change the I/O mode right away, we'll do the read
+		 * and accept when the select gets back to us */
+		pCLServing->ioState = INGSSACCEPT;
 #endif
 	    } else if (pCLServing->iState == S_IDENT &&
 		       strcmp(pcCmd, "login") == 0) {
@@ -915,6 +926,17 @@ Master()
 		    if (FileCanSSLAccept(pCLServing->fd, &rmask, &wmask)) {
 			int r;
 			if ((r = FileSSLAccept(pCLServing->fd)) < 0)
+			    DropMasterClient(pCLServing, FLAGFALSE);
+			else if (r == 1)
+			    pCLServing->ioState = ISNORMAL;
+		    }
+		    break;
+#endif
+#if HAVE_GSSAPI
+		case INGSSACCEPT:
+		    {
+			int r;
+			if ((r = AttemptGSSAPI(pCLServing)) < 0)
 			    DropMasterClient(pCLServing, FLAGFALSE);
 			else if (r == 1)
 			    pCLServing->ioState = ISNORMAL;

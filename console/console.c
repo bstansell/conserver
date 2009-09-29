@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.182 2006/06/15 03:01:05 bryan Exp $
+ *  $Id: console.c,v 5.184 2009/09/27 22:32:03 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -39,6 +39,9 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <openssl/opensslv.h>
+#endif
+#if HAVE_GSSAPI
+#include <gssapi/gssapi.h>
 #endif
 
 
@@ -149,6 +152,87 @@ AttemptSSL(pcf)
     FileSetType(pcf, SSLSocket);
     CONDDEBUG((1, "SSL Connection: %s :: %s", SSL_get_cipher_version(ssl),
 	       SSL_get_cipher_name(ssl)));
+}
+#endif
+
+#if HAVE_GSSAPI
+gss_name_t gss_server_name = GSS_C_NO_NAME;
+gss_ctx_id_t secctx = GSS_C_NO_CONTEXT;
+gss_buffer_desc mytok = GSS_C_EMPTY_BUFFER;
+
+int
+#if PROTOTYPES
+CanGetGSSContext(const char *servername)
+#else
+CanGetGSSContext(servername)
+    const char *servername;
+#endif
+{
+    char namestr[128];
+    gss_buffer_desc namebuf, dbuf;
+    OM_uint32 stmaj, stmin, mctx, dmin;
+
+    snprintf(namestr, 128, "host@%s", servername);
+    namebuf.value = namestr;
+    namebuf.length = strlen(namestr) + 1;
+    stmaj =
+	gss_import_name(&stmin, &namebuf, GSS_C_NT_HOSTBASED_SERVICE,
+			&gss_server_name);
+    /* XXX: handle error */
+    if (stmaj != GSS_S_COMPLETE) {
+	Error("gss_import_name failed");
+	return 0;
+    }
+    secctx = GSS_C_NO_CONTEXT;
+    mytok.length = 0;
+    mytok.value = NULL;
+
+    stmaj =
+	gss_init_sec_context(&stmin, GSS_C_NO_CREDENTIAL, &secctx,
+			     gss_server_name, GSS_C_NULL_OID,
+			     GSS_C_MUTUAL_FLAG, 0,
+			     GSS_C_NO_CHANNEL_BINDINGS, NULL, NULL, &mytok,
+			     NULL, NULL);
+
+    if (stmaj != GSS_S_COMPLETE && stmaj != GSS_S_CONTINUE_NEEDED) {
+	gss_release_name(&stmin, &gss_server_name);
+	return 0;
+    }
+    return mytok.length;
+}
+
+int
+#if PROTOTYPES
+AttemptGSSAPI(CONSFILE *pcf)
+#else
+AttemptGSSAPI(pcf)
+    CONSFILE *pcf;
+#endif
+{
+    OM_uint32 stmaj, stmin;
+    gss_buffer_desc servertok;
+    char buf[1024];
+    int nr;
+    int ret;
+
+    FileSetQuoteIAC(pcf, FLAGFALSE);
+    FileWrite(pcf, FLAGFALSE, mytok.value, mytok.length);
+    FileSetQuoteIAC(pcf, FLAGTRUE);
+    nr = FileRead(pcf, buf, sizeof(buf));
+    servertok.length = nr;
+    servertok.value = buf;
+
+    stmaj =
+	gss_init_sec_context(&stmin, GSS_C_NO_CREDENTIAL, &secctx,
+			     gss_server_name, GSS_C_NULL_OID,
+			     GSS_C_MUTUAL_FLAG, 0,
+			     GSS_C_NO_CHANNEL_BINDINGS, &servertok, NULL,
+			     &mytok, NULL, NULL);
+    gss_release_buffer(NULL, &mytok);
+
+    ret = (stmaj == GSS_S_COMPLETE);
+    gss_release_name(&stmin, &gss_server_name);
+    return ret;
 }
 #endif
 
@@ -270,6 +354,9 @@ Version()
 #endif
 #if HAVE_OPENSSL
 	"openssl",
+#endif
+#if HAVE_GSSAPI
+	"gssapi",
 #endif
 #if HAVE_PAM
 	"pam",
@@ -1261,7 +1348,7 @@ Interact(pcf, pcMach)
 
 	/* anything from stdin? */
 	if (FD_ISSET(0, &rmask)) {
-	    if ((nc = read(0, acMesg, sizeof(acMesg))) == 0) {
+	    if ((nc = read(0, acMesg, sizeof(acMesg))) <= 0) {
 		if (screwy)
 		    break;
 		else {
@@ -1494,6 +1581,7 @@ CallUp(pcf, pcMaster, pcMach, pcHow, result)
  *
  */
 char *cmds[4] = { (char *)0, (char *)0, (char *)0, (char *)0 };
+
 char *cmdarg = (char *)0;
 
 /* call a machine master for group master ports and machine master ports
@@ -1522,6 +1610,9 @@ DoCmds(master, pports, cmdi)
     char *ports;
     char *pcopy;
     char *serverName;
+#if HAVE_GSSAPI
+    int toksize;
+#endif
 
     if ((pcopy = ports = StrDup(pports)) == (char *)0)
 	OutOfMem();
@@ -1599,6 +1690,17 @@ DoCmds(master, pports, cmdi)
 	    }
 	}
 #endif
+#if HAVE_GSSAPI
+	if ((toksize = CanGetGSSContext(server)) > 0) {
+	    FilePrint(pcf, FLAGFALSE, "gssapi %d\r\n", toksize);
+	    t = ReadReply(pcf, FLAGFALSE);
+	    if (strcmp(t, "ok\r\n") == 0) {
+		if (AttemptGSSAPI(pcf)) {
+		    goto gssapi_logged_me_in;
+		}
+	    }
+	}
+#endif
 
 	FilePrint(pcf, FLAGFALSE, "login %s\r\n", config->username);
 
@@ -1651,6 +1753,9 @@ DoCmds(master, pports, cmdi)
 	    FilePrint(cfstdout, FLAGFALSE, "%s: %s", serverName, t);
 	    continue;
 	}
+#if HAVE_GSSAPI
+      gssapi_logged_me_in:
+#endif
 
 	/* now that we're logged in, we can do something */
 	/* if we're on the last cmd or the command is 'call' and we
@@ -2368,7 +2473,7 @@ main(argc, argv)
 
     if (fDebug) {
 	int i;
-	for (i=cmdi;i>=0;i--) {
+	for (i = cmdi; i >= 0; i--) {
 	    CONDDEBUG((1, "cmds[%d] = %s", i, cmds[i]));
 	}
     }

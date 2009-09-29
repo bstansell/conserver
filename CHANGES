@@ -1,6 +1,26 @@
 				CHANGES
 				=======
 
+version 8.1.17 (Sep 29, 2009):
+	- fix for interface detection when HAVE_SA_LEN is defined - first
+	  detected on NetBSD 5.0 and patched by Chris Ross
+	  <cross+conserver@distal.com>
+	- first person to connect to a console wanting read/write now gets it
+	  once the active user drops read/write - suggested by Thomas Gardner
+	  <tmg@pobox.com>
+	- fix typo when setting nonblocking socket for client connections,
+	  fixing stall issues - patch by Eric Biederman
+	  <ebiederm@aristanetworks.com>   
+	- GSS-API patch (--with-gssapi) to help with Kerberos tokens - patch by
+	  Nate Straz <nstraz@redhat.com>
+	- authenticate username without @REALM when using GSS-API
+	  (--with-striprealm) - based on patch by Andras Horvath
+	  <Andras.Horvath@cern.ch>
+	- various contrib/redhat-rpm fixes - patch by Fabien Wernli
+	  <wernli@in2p3.fr>
+	- fix handling of read(stdin) returning -1 in console client - patch by
+	  Ed Swierk <eswierk@arastra.com>
+
 version 8.1.16 (Apr 10, 2007):
 	- added 'replstring' substitution option - inspired by
 	  conversation with Owen DeLong <owen@c2company.com>
@@ -874,5 +894,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.218 2007/04/10 21:35:45 bryan Exp $
+#  $Id: CHANGES,v 1.222 2009/09/29 06:24:53 bryan Exp $
 #

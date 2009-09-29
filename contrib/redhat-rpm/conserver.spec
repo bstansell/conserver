@@ -4,7 +4,7 @@
 #
 
 %define pkg  conserver
-%define ver  8.1.16
+%define ver  8.1.17
 
 # define the name of the machine on which the main conserver
 # daemon will be running if you don't want to use the default
@@ -13,6 +13,16 @@
 
 # what red hat (or other distibution) version are you running?
 %define distver 1
+
+# compile arguments. defaults to 0
+# example: rpmbuild -bb conserver.spec --with openssl
+%define with_openssl %{?_with_openssl: 1} %{?!_with_openssl: 0}
+%define with_libwrap %{?_with_libwrap: 1} %{?!_with_libwrap: 0}
+%define with_pam     %{?_with_pam:     1} %{?!_with_pam:     0}
+%define with_dmalloc %{?_with_dmalloc: 1} %{?!_with_dmalloc: 0}
+
+# additionally you can use macros logfile pidfile
+# example: rpmbuild -bb conserver.spec --define "pidfile /var/run/conserver/pid"
 
 Summary: Serial console server daemon/client
 Name: %{pkg}
@@ -23,6 +33,19 @@ Group: System Environment/Daemons
 URL: http://www.conserver.com/
 Source: http://www.conserver.com/%{pkg}-%{ver}.tar.gz
 BuildRoot: %{_tmppath}/%{pkg}-buildroot
+%if %{with_openssl}
+BuildRequires: openssl-devel
+%endif
+%if %{with_pam}
+BuildRequires: pam-devel
+%endif
+%if %{with_libwrap}
+Requires: tcp_wrappers
+%endif
+%if %{with_dmalloc}
+Requires: dmalloc
+BuildRequires: dmalloc
+%endif
 Prefix: %{_prefix}
 
 
@@ -44,7 +67,8 @@ f="conserver/Makefile.in"
 %{__mv} $f $f.orig
 %{__sed} -e 's/^.*conserver\.rc.*$//' < $f.orig > $f
 
-%configure --with-master=%{master}
+%configure %{?_with_openssl} %{?_with_libwrap} %{?_with_dmalloc} %{?_with_pam} %{?logfile: --with-logfile=%{logfile}} %{?pidfile: --with-pidfile=%{pidfile}} %{?master: --with-master=%{master}}
+
 make
 
 
@@ -65,6 +89,9 @@ make
 %{__mkdir_p} %{buildroot}/%{_initrddir}
 %{__cp} contrib/redhat-rpm/conserver.init %{buildroot}/%{_initrddir}/conserver
 
+# install copy of init script defaults
+%{__mkdir_p} %{buildroot}/%{_sysconfdir}/default
+%{__cp} contrib/redhat-rpm/conserver.defaults %{buildroot}/%{_sysconfdir}/default/conserver
 
 %clean
 %{__rm} -rf %{buildroot}
@@ -94,13 +121,23 @@ fi
 %doc CHANGES FAQ INSTALL README conserver.cf
 %config(noreplace) %{_sysconfdir}/conserver.cf
 %config(noreplace) %{_sysconfdir}/conserver.passwd
+%config(noreplace) %{_sysconfdir}/default/conserver
 %attr(555,root,root) %{_initrddir}/conserver
-%{prefix}/bin/console
-%{prefix}/lib/conserver/convert
-%{prefix}/share/man/man1/console.1.gz
-%{prefix}/share/man/man8/conserver.8.gz
-%{prefix}/share/man/man5/conserver.cf.5.gz
-%{prefix}/share/man/man5/conserver.passwd.5.gz
-%{prefix}/share/examples/conserver/conserver.cf
-%{prefix}/share/examples/conserver/conserver.passwd
-%{prefix}/sbin/conserver
+%{_bindir}/console
+%{_libdir}/conserver/convert
+%{_mandir}/man1/console.1.gz
+%{_mandir}/man8/conserver.8.gz
+%{_mandir}/man5/conserver.cf.5.gz
+%{_mandir}/man5/conserver.passwd.5.gz
+%{_datadir}/examples/conserver/conserver.cf
+%{_datadir}/examples/conserver/conserver.passwd
+%{_sbindir}/conserver
+
+%changelog
+* Wed Sep 25 2009 Fabien Wernli
+  - added configure prerequisites
+* Thu Sep 24 2009 Fabien Wernli
+  - added prefix to configure
+  - changed some hardcoded values to proper macros:
+    didn't work on x64 lib -> lib64
+

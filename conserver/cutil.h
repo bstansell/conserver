@@ -1,5 +1,5 @@
 /*
- *  $Id: cutil.h,v 1.68 2006/04/07 15:47:20 bryan Exp $
+ *  $Id: cutil.h,v 1.69 2009/09/26 09:23:04 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -14,6 +14,9 @@
 #if HAVE_OPENSSL
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#endif
+#if HAVE_GSSAPI
+#include <gssapi/gssapi.h>
 #endif
 
 /* communication constants
@@ -45,6 +48,9 @@ typedef enum IOState {
 #if HAVE_OPENSSL
     INSSLACCEPT,
     INSSLSHUTDOWN,
+#endif
+#if HAVE_GSSAPI
+    INGSSACCEPT,
 #endif
     ISFLUSHING
 } IOSTATE;

@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.329 2007/04/02 18:18:59 bryan Exp $
+ *  $Id: group.c,v 5.332 2009/09/26 09:58:05 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -151,7 +151,7 @@ SendCertainClientsMsg(pGE, who, message)
 	return;
     }
 
-    if ((console = strchr(who, '@')) != (char *)0) {
+    if ((console = strrchr(who, '@')) != (char *)0) {
 	*console++ = '\000';
 	if (*console == '\000')
 	    console = (char *)0;
@@ -352,7 +352,7 @@ DisconnectCertainClients(pGE, admin, who)
 	return 0;
     }
 
-    if ((console = strchr(who, '@')) != (char *)0) {
+    if ((console = strrchr(who, '@')) != (char *)0) {
 	*console++ = '\000';
 	if (*console == '\000')
 	    console = (char *)0;
@@ -519,10 +519,39 @@ ClientAccess(pCE, user)
     char *user;
 #endif
 {
+    CONDDEBUG((1, "ClientAccess(): Authenticating user %s", user));
+
     if (ConsentUserOk(pCE->rw, user) == 1)
 	return 0;
     if (ConsentUserOk(pCE->ro, user) == 1)
 	return 1;
+#if STRIP_REALM
+    {
+	/* try the username without @REALM against the ACL
+	 * this allows for falling back to PAM from kerberos5/gssapi
+	 * as the latter uses 'user@REALM' and the former only 'user'
+	 */
+	char *at;
+	char *shortname;
+	int ret = -1;
+
+	if ((at = strrchr(user, '@')) != (char *)0) {
+	    shortname = StrDup(user);
+	    *(shortname + (at - user)) = '\000';
+
+	    CONDDEBUG((1,
+		       "ClientAccess(): Shortname computed from %s is %s",
+		       user, shortname));
+	    if (ConsentUserOk(pCE->rw, shortname) == 1) {
+		ret = 0;
+	    } else if (ConsentUserOk(pCE->ro, shortname) == 1) {
+		ret = 1;
+	    }
+	    free(shortname);
+	    return ret;
+	}
+    }
+#endif
     return -1;
 }
 
@@ -1869,6 +1898,65 @@ AttemptSSL(pCL)
 }
 #endif
 
+#if HAVE_GSSAPI
+int
+#if PROTOTYPES
+AttemptGSSAPI(CONSCLIENT *pCL)
+#else
+AttemptGSSAPI(pCL)
+    CONSCLIENT *pCL;
+#endif
+{
+    int nr, ret = 0;
+    char buf[1024];
+    gss_buffer_desc sendtok, recvtok, dbuf;
+    gss_ctx_id_t gssctx = GSS_C_NO_CONTEXT;
+    OM_uint32 stmaj, stmin, mctx, dmin;
+    gss_name_t user = 0;
+
+    if ((nr = FileRead(pCL->fd, buf, sizeof(buf))) <= 0) {
+	return nr;
+    }
+    recvtok.value = buf;
+    recvtok.length = nr;
+
+    stmaj =
+	gss_accept_sec_context(&stmin, &gssctx, gss_mycreds, &recvtok,
+			       NULL, &user, NULL, &sendtok, NULL, NULL,
+			       NULL);
+    switch (stmaj) {
+	case GSS_S_COMPLETE:
+	    FileSetQuoteIAC(pCL->fd, FLAGFALSE);
+	    FileWrite(pCL->fd, FLAGFALSE, sendtok.value, sendtok.length);
+	    FileSetQuoteIAC(pCL->fd, FLAGTRUE);
+	    pCL->iState = S_NORMAL;
+	    gss_release_buffer(NULL, &sendtok);
+	    BuildString((char *)0, pCL->username);
+	    BuildString((char *)0, pCL->acid);
+	    stmaj = gss_display_name(&stmin, user, &dbuf, NULL);
+
+	    BuildStringN(dbuf.value, dbuf.length, pCL->username);
+	    BuildStringN(dbuf.value, dbuf.length, pCL->acid);
+	    BuildStringChar('@', pCL->acid);
+	    BuildString(pCL->peername->string, pCL->acid);
+	    gss_release_name(&stmin, &user);
+	    gss_release_buffer(NULL, &dbuf);
+	    ret = 1;
+	    break;
+	case GSS_S_CREDENTIALS_EXPIRED:
+	    /* reacquire creds and try again */
+	    Error("Credentials expired");
+	    break;
+	default:
+	    gss_display_status(&dmin, stmaj, GSS_C_GSS_CODE,
+			       GSS_C_NULL_OID, &mctx, &dbuf);
+	    Error("GSSAPI didn't work, %*s", dbuf.length, dbuf.value);
+	    ret = -1;
+    }
+    return ret;
+}
+#endif
+
 CONSENT *
 #if PROTOTYPES
 HuntForConsole(GRPENT *pGE, char *name)
@@ -2226,15 +2314,11 @@ CommandHosts(pGE, pCLServing, pCEServing, tyme, args)
 	FilePrint(pCLServing->fd, FLAGFALSE,
 		  " %-24.24s %c %-4.4s %-.40s\r\n", pCE->server,
 		  pCE == pCEServing ? '*' : ' ', (pCE->fup &&
-						  pCE->ioState ==
-						  ISNORMAL) ? (pCE->
-							       initfile ==
-							       (CONSFILE *)
-							       0 ? "up" :
-							       "init") :
-		  "down",
-		  pCE->pCLwr ? pCE->pCLwr->acid->string : pCE->
-		  pCLon ? "<spies>" : "<none>");
+						  pCE->ioState == ISNORMAL)
+		  ? (pCE->initfile == (CONSFILE *)
+		     0 ? "up" : "init") : "down",
+		  pCE->pCLwr ? pCE->pCLwr->acid->
+		  string : pCE->pCLon ? "<spies>" : "<none>");
 	if (args != (char *)0)
 	    break;
     }
@@ -2945,6 +3029,7 @@ DoClientRead(pGE, pCLServing)
 		static char *pcArgs;
 		static char *pcCmd;
 
+		CONDDEBUG((1, "state = %d", pCLServing->iState));
 		if ('\n' != acIn[i]) {
 		    BuildStringChar(acIn[i], pCLServing->accmd);
 		    continue;
@@ -2993,6 +3078,9 @@ DoClientRead(pGE, pCLServing)
 #if HAVE_OPENSSL
 			"ssl    start ssl session\r\n",
 #endif
+#if HAVE_GSSAPI
+			"gssapi log in with gssapi\r\n",
+#endif
 			(char *)0
 		    };
 		    static char *apcHelp2[] = {
@@ -3032,6 +3120,14 @@ DoClientRead(pGE, pCLServing)
 					 FLAGFALSE);
 			return;
 		    }
+#endif
+#if HAVE_GSSAPI
+		} else if (pCLServing->iState == S_IDENT &&
+			   strcmp(pcCmd, "gssapi") == 0) {
+		    FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", -1);
+		    /* Change the I/O mode right away, we'll do the read
+		     * and accept when the select gets back to us */
+		    pCLServing->ioState = INGSSACCEPT;
 #endif
 		} else if (pCLServing->iState == S_IDENT &&
 			   strcmp(pcCmd, "login") == 0) {
@@ -3252,8 +3348,9 @@ DoClientRead(pGE, pCLServing)
 				    pcArgs, pCLServing->acid->string);
 			    num =
 				DisconnectCertainClients(pGE,
-							 pCLServing->acid->
-							 string, pcArgs);
+							 pCLServing->
+							 acid->string,
+							 pcArgs);
 			    /* client expects this string to be formatted
 			     * in this way only.
 			     */
@@ -3267,6 +3364,8 @@ DoClientRead(pGE, pCLServing)
 		} else {
 		    FileWrite(pCLServing->fd, FLAGFALSE,
 			      "unknown command\r\n", -1);
+		    CONDDEBUG((1, "command %s state %d", pcCmd,
+			       pCLServing->iState));
 		}
 		BuildString((char *)0, pCLServing->accmd);
 	    } else
@@ -3279,7 +3378,7 @@ DoClientRead(pGE, pCLServing)
 		    case S_NOTE:
 			if (GatherLine(acIn[i], 0, G_TEXT, pCLServing)) {
 			    FileWrite(pCLServing->fd, FLAGFALSE, "]\r\n",
-				    3);
+				      3);
 			    BuildString((char *)0, bcast);
 			    BuildString("NOTE -- ", bcast);
 			    BuildString(pCLServing->acid->string, bcast);
@@ -3320,8 +3419,8 @@ DoClientRead(pGE, pCLServing)
 
 			    if (pCLServing->accmd->used > 1) {
 				unsigned short u;
-				u = (unsigned short)atoi(pCLServing->
-							 accmd->string);
+				u = (unsigned short)
+				    atoi(pCLServing->accmd->string);
 				/* i'm limiting the value here to 10000 for a couple
 				 * of reasons:
 				 *
@@ -3680,14 +3779,16 @@ DoClientRead(pGE, pCLServing)
 					      pCEServing->motd);
 				break;
 
-			    case 'n':   /* note message to log file */
+			    case 'n':	/* note message to log file */
 				if (pCEServing->fdlog == (CONSFILE *)0) {
 				    FileWrite(pCLServing->fd, FLAGFALSE,
-					    "no log file on this console]\r\n", -1);
+					      "no log file on this console]\r\n",
+					      -1);
 				} else {
 				    FileWrite(pCLServing->fd, FLAGFALSE,
-					    "Enter note: ", -1);
-				    BuildString((char *)0, pCLServing->accmd);
+					      "Enter note: ", -1);
+				    BuildString((char *)0,
+						pCLServing->accmd);
 				    pCLServing->iState = S_NOTE;
 				}
 				break;
@@ -3793,8 +3894,8 @@ DoClientRead(pGE, pCLServing)
 				    BumpClient(pCEServing, (char *)0);
 				    TagLogfileAct(pCEServing,
 						  "%s detached",
-						  pCLServing->acid->
-						  string);
+						  pCLServing->
+						  acid->string);
 				    FindWrite(pCEServing);
 				}
 				break;
@@ -4651,6 +4752,18 @@ Kiddie(pGE, sfd)
 		    }
 		    break;
 #endif
+#if HAVE_GSSAPI
+		case INGSSACCEPT:
+		    {
+			int r;
+			if ((r = AttemptGSSAPI(pCLServing)) < 0)
+			    DisconnectClient(pGE, pCLServing, (char *)0,
+					     FLAGFALSE);
+			else if (r == 1)
+			    pCLServing->ioState = ISNORMAL;
+		    }
+		    break;
+#endif
 		case ISNORMAL:
 		    if (FileCanRead(pCLServing->fd, &rmask, &wmask))
 			DoClientRead(pGE, pCLServing);
@@ -4688,7 +4801,7 @@ Kiddie(pGE, sfd)
 	 * send more than 1-byte payloads, if we get more than 1-byte
 	 * of data from a client connection.  here we flush that buffer,
 	 * possibly putting it into the write buffer (but we don't really
-	 * need to worry about that here.
+	 * need to worry about that here).
 	 */
 	for (pCEServing = pGE->pCElist; pCEServing != (CONSENT *)0;
 	     pCEServing = pCEServing->pCEnext)
@@ -4716,7 +4829,7 @@ Kiddie(pGE, sfd)
 	    continue;
 	}
 
-	if (SetFlags(sfd, O_NONBLOCK, 0)) {
+	if (SetFlags(fd, O_NONBLOCK, 0)) {
 	    pGE->pCLfree->fd = FileOpenFD(fd, simpleSocket);
 	    FileSetQuoteIAC(pGE->pCLfree->fd, FLAGTRUE);
 	} else

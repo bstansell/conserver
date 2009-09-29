@@ -7,24 +7,29 @@
 # config: /etc/conserver.cf
 #
 
+DAEMON=/usr/sbin/conserver
+
 # Source function library.
 . /etc/rc.d/init.d/functions
 
 # Source networking configuration.
 . /etc/sysconfig/network
 
+# Source defaults
+. /etc/default/conserver
+
 # Check that networking is up.
 [  ${NETWORKING} = "no" ] && exit 0
 
 # make sure conserver is installed and executable
-[ -x /usr/sbin/conserver  ] || exit 1
+[ -x $DAEMON  ] || exit 1
 
 
 # See how we were called.
 case "$1" in
   start)
     echo -n "Starting conserver: "
-    daemon conserver -d
+    daemon --user "${RUNAS-}" $DAEMON ${OPTIONS--d}
     echo
     touch /var/lock/subsys/conserver
     ;;

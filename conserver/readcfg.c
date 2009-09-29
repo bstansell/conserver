@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.193 2007/04/02 17:59:16 bryan Exp $
+ *  $Id: readcfg.c,v 5.194 2009/09/26 09:20:47 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -248,9 +248,9 @@ BreakDestroy()
 	for (i = 0; i < 9; i++) {
 	    Msg("Break[%d] = `%s', delay=%d", i,
 		breakList[i].seq ==
-		(STRING *)0 ? "(null)" : (breakList[i].seq->
-					  string ? breakList[i].seq->
-					  string : "(null)"),
+		(STRING *)0 ? "(null)" : (breakList[i].
+					  seq->string ? breakList[i].
+					  seq->string : "(null)"),
 		breakList[i].delay);
 	}
     }
