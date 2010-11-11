@@ -1,5 +1,5 @@
 /*
- *  $Id: cutil.c,v 1.133 2009/09/26 09:20:29 bryan Exp $
+ *  $Id: cutil.c,v 1.134 2010/11/02 03:42:57 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -2283,7 +2283,7 @@ ProbeInterfaces(bindAddr)
 	if ((ifc.ifc_len - r) < sizeof(*ifr))
 	    break;
 #ifdef HAVE_SA_LEN
-	if (sa->sa_len > sizeof(ifr->ifr_irfu))
+	if (sa->sa_len > sizeof(ifr->ifr_ifru))
 	    r += sizeof(ifr->ifr_name) + sa->sa_len;
 	else
 #endif

@@ -4,7 +4,7 @@
 #
 
 %define pkg  conserver
-%define ver  8.1.17
+%define ver  8.1.18
 
 # define the name of the machine on which the main conserver
 # daemon will be running if you don't want to use the default
@@ -24,11 +24,11 @@
 # additionally you can use macros logfile pidfile
 # example: rpmbuild -bb conserver.spec --define "pidfile /var/run/conserver/pid"
 
-Summary: Serial console server daemon/client
 Name: %{pkg}
 Version: %{ver}
 Release: %{distver}
 License: BSD
+Summary: Serial console server daemon/client
 Group: System Environment/Daemons
 URL: http://www.conserver.com/
 Source: http://www.conserver.com/%{pkg}-%{ver}.tar.gz
@@ -48,13 +48,29 @@ BuildRequires: dmalloc
 %endif
 Prefix: %{_prefix}
 
+%package server
+Summary: Serial console server daemon
+Group: System Environment/Daemons
+
+%package client
+Summary: Serial console server client
+Group: Applications/Internet
 
 %description
-Conserver is an application that allows multiple users to watch a
+Conserver is a daemon that allows multiple users to watch a
 serial console at the same time.  It can log the data, allows users to
 take write-access of a console (one at a time), and has a variety of
 bells and whistles to accentuate that basic functionality.
 
+%description server
+conserver-server is a daemon that allows multiple users to watch a
+serial console at the same time.  It can log the data, allows users to
+take write-access of a console (one at a time), and has a variety of
+bells and whistles to accentuate that basic functionality.
+
+%description client
+conserver-client to connect to conserver-server using a tcp port.
+Allows multiple users to watch a serial console at the same time.
 
 %prep
 %{__rm} -rf %{buildroot}
@@ -97,7 +113,7 @@ make
 %{__rm} -rf %{buildroot}
 
 
-%post
+%post server
 if [ -x %{_initrddir}/conserver ]; then
   /sbin/chkconfig --add conserver
 fi
@@ -107,7 +123,7 @@ if ! egrep '\<conserver\>' /etc/services > /dev/null 2>&1 ; then
 fi
 
 
-%preun
+%preun server
 if [ "$1" = 0 ]; then
   if [ -x %{_initrddir}/conserver ]; then
     %{_initrddir}/conserver stop
@@ -115,17 +131,17 @@ if [ "$1" = 0 ]; then
   fi
 fi
 
+# we need this even if empty
+#%files
 
-%files
+%files server
 %defattr(-,root,root)
 %doc CHANGES FAQ INSTALL README conserver.cf
 %config(noreplace) %{_sysconfdir}/conserver.cf
 %config(noreplace) %{_sysconfdir}/conserver.passwd
 %config(noreplace) %{_sysconfdir}/default/conserver
 %attr(555,root,root) %{_initrddir}/conserver
-%{_bindir}/console
 %{_libdir}/conserver/convert
-%{_mandir}/man1/console.1.gz
 %{_mandir}/man8/conserver.8.gz
 %{_mandir}/man5/conserver.cf.5.gz
 %{_mandir}/man5/conserver.passwd.5.gz
@@ -133,11 +149,19 @@ fi
 %{_datadir}/examples/conserver/conserver.passwd
 %{_sbindir}/conserver
 
+%files client
+%defattr(-,root,root)
+%doc CHANGES FAQ INSTALL README
+%{_bindir}/console
+%{_mandir}/man1/console.1.gz
+
 %changelog
+* Wed Oct 14 2009 Jodok Ole Muellers <muellejo@aschendorff.de>
+  - Changed the conserver.spec file to create separate subpackages
+    for client and server by using the %package directive.
 * Wed Sep 25 2009 Fabien Wernli
   - added configure prerequisites
 * Thu Sep 24 2009 Fabien Wernli
   - added prefix to configure
   - changed some hardcoded values to proper macros:
     didn't work on x64 lib -> lib64
-

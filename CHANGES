@@ -1,6 +1,14 @@
 				CHANGES
 				=======
 
+version 8.1.18 (Nov 11, 2010):
+	- install man pages read-only and improved the contributed redhat init
+	  script - patches by Eric Biederman <ebiederm@aristanetworks.com>
+	- spec file improvements in contrib/redhat-rpm - patch by Jodok Ole
+	  Muellers <jodok.muellers@aschendorff.de>
+	- GSS-API patch for client code - patch by Andras Horvath
+	  <Andras.Horvath@cern.ch> 
+
 version 8.1.17 (Sep 29, 2009):
 	- fix for interface detection when HAVE_SA_LEN is defined - first
 	  detected on NetBSD 5.0 and patched by Chris Ross
@@ -894,5 +902,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.222 2009/09/29 06:24:53 bryan Exp $
+#  $Id: CHANGES,v 1.225 2010/11/11 22:43:17 bryan Exp $
 #

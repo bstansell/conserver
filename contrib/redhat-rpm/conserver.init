@@ -25,31 +25,48 @@ DAEMON=/usr/sbin/conserver
 [ -x $DAEMON  ] || exit 1
 
 
+start()
+{
+	echo -n "Starting conserver: "
+	daemon --user "${RUNAS-}" $DAEMON ${OPTIONS--d}
+	RETVAL=$?
+	[ "$RETVAL" = 0 ] && touch /var/lock/subsys/conserver
+	echo
+}
+
+stop()
+{
+	echo -n "Shutting down conserver: "
+	killproc conserver
+	RETVAL=$?
+	[ "$RETVAL" = 0 ] && rm -f /var/lock/subsys/conserver
+	echo
+}
+  
 # See how we were called.
 case "$1" in
   start)
-    echo -n "Starting conserver: "
-    daemon --user "${RUNAS-}" $DAEMON ${OPTIONS--d}
-    echo
-    touch /var/lock/subsys/conserver
+    start
     ;;
   stop)
-    echo -n "Shutting down conserver: "
-    killproc conserver
-    echo
-    rm -f /var/lock/subsys/conserver
+    stop
     ;;
   status)
     status conserver
     ;;
   restart)
-    echo -n "Restarting conserver: "
+    stop
+    start
+    ;;
+  reload)
+    echo -n "Reloading conserver: "
     killproc conserver -HUP
+    RETVAL=$?
     echo
     ;;
   *)
-    echo "Usage: conserver {start|stop|restart|status}"
-    exit 1
+    echo "Usage: conserver {start|stop|restart|reload|status}"
+    RETVAL=1
 esac
 
-exit 0
+exit $RETVAL

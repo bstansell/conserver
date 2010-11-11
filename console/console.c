@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.184 2009/09/27 22:32:03 bryan Exp $
+ *  $Id: console.c,v 5.185 2009/10/19 06:44:06 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -228,7 +228,7 @@ AttemptGSSAPI(pcf)
 			     GSS_C_MUTUAL_FLAG, 0,
 			     GSS_C_NO_CHANNEL_BINDINGS, &servertok, NULL,
 			     &mytok, NULL, NULL);
-    gss_release_buffer(NULL, &mytok);
+    gss_release_buffer(&stmin, &mytok);
 
     ret = (stmaj == GSS_S_COMPLETE);
     gss_release_name(&stmin, &gss_server_name);
