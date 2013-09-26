@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.202 2009/09/26 09:23:04 bryan Exp $
+ *  $Id: main.c,v 5.208 2013/09/25 22:10:29 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -69,7 +69,7 @@ CONFIG defConfig =
 	, FLAGFALSE
 #endif
 #if HAVE_OPENSSL
-	, (char *)0, FLAGTRUE
+	, (char *)0, FLAGTRUE, FLAGFALSE, (char *)0
 #endif
 };
 
@@ -327,6 +327,7 @@ SetupSSL()
 {
     if (ctx == (SSL_CTX *)0) {
 	char *ciphers;
+	int verifymode;
 	SSL_load_error_strings();
 	if (!SSL_library_init()) {
 	    Error("SetupSSL(): SSL_library_init() failed");
@@ -360,7 +361,31 @@ SetupSSL()
 	} else {
 	    ciphers = "ALL:!LOW:!EXP:!MD5:@STRENGTH";
 	}
-	SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, SSLVerifyCallback);
+	if (config->sslcacertificatefile != (char *)0) {
+	    STACK_OF(X509_NAME) * cert_names;
+
+	    cert_names =
+		SSL_load_client_CA_file(config->sslcacertificatefile);
+	    if (cert_names != NULL) {
+		SSL_CTX_set_client_CA_list(ctx, cert_names);
+		if (SSL_CTX_load_verify_locations
+		    (ctx, config->sslcacertificatefile, NULL) != 1) {
+		    Error("Could not setup CA certificate file to '%s'",
+			  config->sslcacertificatefile);
+		    Bye(EX_UNAVAILABLE);
+		}
+	    } else {
+		Error
+		    ("SetupSSL(): could not load SSL client CA list from `%s'",
+		     config->sslcacertificatefile);
+		Bye(EX_SOFTWARE);
+	    }
+	}
+
+	verifymode = SSL_VERIFY_PEER;
+	if (config->sslreqclientcert == FLAGTRUE)
+	    verifymode |= SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+	SSL_CTX_set_verify(ctx, verifymode, SSLVerifyCallback);
 	SSL_CTX_set_options(ctx,
 			    SSL_OP_ALL | SSL_OP_NO_SSLv2 |
 			    SSL_OP_SINGLE_DH_USE);
@@ -765,6 +790,7 @@ DestroyDataStructures()
 	free(myAddrs);
 
     DestroyBreakList();
+    DestroyTaskList();
     DestroyStrings();
     DestroyUserList();
     if (substData != (SUBST *)0)
@@ -824,11 +850,17 @@ SummarizeDataStructures()
 		size += strlen(pCE->idlestring);
 	    if (pCE->replstring != (char *)0)
 		size += strlen(pCE->replstring);
+	    if (pCE->tasklist != (char *)0)
+		size += strlen(pCE->tasklist);
+	    if (pCE->breaklist != (char *)0)
+		size += strlen(pCE->breaklist);
 	    if (pCE->fdlog != (CONSFILE *)0)
 		size += sizeof(CONSFILE);
 	    if (pCE->cofile != (CONSFILE *)0)
 		size += sizeof(CONSFILE);
 	    if (pCE->initfile != (CONSFILE *)0)
+		size += sizeof(CONSFILE);
+	    if (pCE->taskfile != (CONSFILE *)0)
 		size += sizeof(CONSFILE);
 	    if (pCE->aliases != (NAMES *)0) {
 		NAMES *n;
@@ -902,6 +934,8 @@ DumpDataStructures()
     GRPENT *pGE;
     CONSENT *pCE;
     REMOTE *pRC;
+    int i;
+    TASKS *t;
 
 #if HAVE_DMALLOC && DMALLOC_MARK_MAIN
     CONDDEBUG((1, "DumpDataStructures(): dmalloc / MarkMain"));
@@ -992,9 +1026,9 @@ DumpDataStructures()
 		       pCE->nolog, FileFDNum(pCE->cofile),
 		       FLAGSTR(pCE->activitylog), FLAGSTR(pCE->breaklog)));
 	    CONDDEBUG((1,
-		       "DumpDataStructures():  ixon=%s, ixany=%s, ixoff=%s",
-		       FLAGSTR(pCE->ixon), FLAGSTR(pCE->ixany),
-		       FLAGSTR(pCE->ixoff)));
+		       "DumpDataStructures():  tasklog=%s, ixon=%s, ixany=%s, ixoff=%s",
+		       FLAGSTR(pCE->tasklog), FLAGSTR(pCE->ixon),
+		       FLAGSTR(pCE->ixany), FLAGSTR(pCE->ixoff)));
 	    CONDDEBUG((1,
 		       "DumpDataStructures():  autoreinit=%s, hupcl=%s, cstopb=%s, ondemand=%s",
 		       FLAGSTR(pCE->autoreinit), FLAGSTR(pCE->hupcl),
@@ -1019,6 +1053,11 @@ DumpDataStructures()
 		       EMPTYSTR(pCE->motd), pCE->idletimeout,
 		       EMPTYSTR(pCE->idlestring),
 		       EMPTYSTR(pCE->replstring)));
+	    CONDDEBUG((1,
+		       "DumpDataStructures():  tasklist=%s, breaklist=%s, taskpid=%lu, taskfile=%d",
+		       EMPTYSTR(pCE->tasklist), EMPTYSTR(pCE->breaklist),
+		       (unsigned long)pCE->taskpid,
+		       FileFDNum(pCE->taskfile)));
 	    if (pCE->ro) {
 		CONSENTUSERS *u;
 		for (u = pCE->ro; u != (CONSENTUSERS *)0; u = u->next) {
@@ -1045,6 +1084,19 @@ DumpDataStructures()
 		CONDDEBUG((1, "DumpDataStructures():  alias=%s", n->name));
 	    }
 	}
+    }
+    for (i = 0; i < 9; i++) {
+	CONDDEBUG((1,
+		   "DumpDataStructures(): break: string=%s, delay=%d, confirm=%s",
+		   EMPTYSTR(breakList[i].seq->string), breakList[i].delay,
+		   FLAGSTR(breakList[i].confirm)));
+    }
+    for (t = taskList; t != (TASKS *)0; t = t->next) {
+	CONDDEBUG((1,
+		   "DumpDataStructures(): task: id=%c, cmd=%s, descr=%s, uid=%d, gid=%d, subst=%s, confirm=%s",
+		   t->id, EMPTYSTR(t->cmd->string),
+		   EMPTYSTR(t->descr->string), t->uid, t->gid,
+		   EMPTYSTR(t->subst), FLAGSTR(t->confirm)));
     }
 }
 
@@ -1568,12 +1620,29 @@ main(argc, argv)
     else
 	config->sslrequired = defConfig.sslrequired;
 
+    if (optConf->sslreqclientcert != FLAGUNKNOWN)
+	config->sslreqclientcert = optConf->sslreqclientcert;
+    else if (pConfig->sslreqclientcert != FLAGUNKNOWN)
+	config->sslreqclientcert = pConfig->sslreqclientcert;
+    else
+	config->sslreqclientcert = defConfig.sslreqclientcert;
+
     if (optConf->sslcredentials != (char *)0)
 	config->sslcredentials = StrDup(optConf->sslcredentials);
     else if (pConfig->sslcredentials != (char *)0)
 	config->sslcredentials = StrDup(pConfig->sslcredentials);
     else
 	config->sslcredentials = StrDup(defConfig.sslcredentials);
+
+    if (optConf->sslcacertificatefile != (char *)0)
+	config->sslcacertificatefile =
+	    StrDup(optConf->sslcacertificatefile);
+    else if (pConfig->sslcacertificatefile != (char *)0)
+	config->sslcacertificatefile =
+	    StrDup(pConfig->sslcacertificatefile);
+    else
+	config->sslcacertificatefile =
+	    StrDup(defConfig.sslcacertificatefile);
 #endif
 
 #if HAVE_SETPROCTITLE

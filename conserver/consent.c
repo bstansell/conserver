@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.151 2007/04/09 15:52:28 bryan Exp $
+ *  $Id: consent.c,v 5.153 2013/09/26 17:32:54 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -459,7 +459,7 @@ StartInit(pCE)
 
     if (dup(pout[0]) != 0 || dup(pin[1]) != 1) {
 	Error("[%s] StartInit(): fd sync error", pCE->server);
-	Bye(EX_OSERR);
+	exit(EX_OSERR);
     }
     close(pout[0]);
     close(pin[1]);
@@ -480,8 +480,60 @@ StartInit(pCE)
 
     execve(apcArgv[0], apcArgv, environ);
     Error("[%s] execve(%s): %s", pCE->server, apcArgv[2], strerror(errno));
-    Bye(EX_OSERR);
+    exit(EX_OSERR);
     return;
+}
+
+/* We exit() here, so only call this in a child process before an exec() */
+void
+#if PROTOTYPES
+SetupTty(CONSENT *pCE, int fd)
+#else
+SetupTty(pCE, fd)
+    CONSENT *pCE;
+    int fd;
+#endif
+{
+    struct termios n_tio;
+
+# if HAVE_STROPTS_H  && !defined(_AIX)
+    /* SYSVr4 semantics for opening stream ptys                     (gregf)
+     * under PTX (others?) we have to push the compatibility
+     * streams modules `ptem', `ld', and `ttcompat'
+     */
+    ioctl(1, I_PUSH, "ptem");
+    ioctl(1, I_PUSH, "ldterm");
+    ioctl(1, I_PUSH, "ttcompat");
+# endif
+
+    if (0 != tcgetattr(1, &n_tio)) {
+	exit(EX_OSERR);
+    }
+    n_tio.c_iflag &= ~(IGNCR | IUCLC);
+    n_tio.c_iflag |= ICRNL;
+    if (pCE->ixon == FLAGTRUE)
+	n_tio.c_iflag |= IXON;
+    if (pCE->ixany == FLAGTRUE)
+	n_tio.c_iflag |= IXANY;
+    if (pCE->ixoff == FLAGTRUE)
+	n_tio.c_iflag |= IXOFF;
+    n_tio.c_oflag &=
+	~(OLCUC | ONOCR | ONLRET | OFILL | NLDLY | CRDLY | TABDLY | BSDLY);
+    n_tio.c_oflag |= OPOST | ONLCR;
+    n_tio.c_lflag &= ~(XCASE | NOFLSH | ECHOK | ECHONL);
+    n_tio.c_lflag |= ISIG | ICANON | ECHO;
+    n_tio.c_cc[VEOF] = '\004';
+    n_tio.c_cc[VEOL] = '\000';
+    n_tio.c_cc[VERASE] = '\010';
+    n_tio.c_cc[VINTR] = '\003';
+    n_tio.c_cc[VKILL] = '@';
+    /* MIN */
+    n_tio.c_cc[VQUIT] = '\034';
+    n_tio.c_cc[VSTART] = '\021';
+    n_tio.c_cc[VSTOP] = '\023';
+    n_tio.c_cc[VSUSP] = '\032';
+    if (0 != tcsetattr(1, TCSANOW, &n_tio))
+	exit(EX_OSERR);
 }
 
 /* setup a virtual device						(ksb)
@@ -494,7 +546,6 @@ VirtDev(pCE)
     CONSENT *pCE;
 #endif
 {
-    static struct termios n_tio;
     int i;
     pid_t iNewGrp;
     extern char **environ;
@@ -558,7 +609,7 @@ VirtDev(pCE)
 
     if (dup(pCE->execSlaveFD) != 0 || dup(pCE->execSlaveFD) != 1) {
 	Error("[%s] fd sync error", pCE->server);
-	Bye(EX_OSERR);
+	exit(EX_OSERR);
     }
 
     if (geteuid() == 0) {
@@ -569,52 +620,8 @@ VirtDev(pCE)
 	    setuid(pCE->execuid);
 	}
     }
-# if HAVE_STROPTS_H  && !defined(_AIX)
-    /* SYSVr4 semantics for opening stream ptys                     (gregf)
-     * under PTX (others?) we have to push the compatibility
-     * streams modules `ptem', `ld', and `ttcompat'
-     */
-    CONDDEBUG((1, "VirtDev(): pushing ptemp onto pseudo-terminal"));
-    ioctl(0, I_PUSH, "ptem");
-    CONDDEBUG((1, "VirtDev(): pushing ldterm onto pseudo-terminal"));
-    ioctl(0, I_PUSH, "ldterm");
-    CONDDEBUG((1, "VirtDev(): pushing ttcompat onto pseudo-terminal"));
-    ioctl(0, I_PUSH, "ttcompat");
-    CONDDEBUG((1, "VirtDev(): done pushing modules onto pseudo-terminal"));
-# endif
 
-    if (0 != tcgetattr(0, &n_tio)) {
-	Error("[%s] tcgetattr(0): %s", pCE->server, strerror(errno));
-	Bye(EX_OSERR);
-    }
-    n_tio.c_iflag &= ~(IGNCR | IUCLC);
-    n_tio.c_iflag |= ICRNL;
-    if (pCE->ixon == FLAGTRUE)
-	n_tio.c_iflag |= IXON;
-    if (pCE->ixany == FLAGTRUE)
-	n_tio.c_iflag |= IXANY;
-    if (pCE->ixoff == FLAGTRUE)
-	n_tio.c_iflag |= IXOFF;
-    n_tio.c_oflag &=
-	~(OLCUC | ONOCR | ONLRET | OFILL | NLDLY | CRDLY | TABDLY | BSDLY);
-    n_tio.c_oflag |= OPOST | ONLCR;
-    n_tio.c_lflag &= ~(XCASE | NOFLSH | ECHOK | ECHONL);
-    n_tio.c_lflag |= ISIG | ICANON | ECHO;
-    n_tio.c_cc[VEOF] = '\004';
-    n_tio.c_cc[VEOL] = '\000';
-    n_tio.c_cc[VERASE] = '\010';
-    n_tio.c_cc[VINTR] = '\003';
-    n_tio.c_cc[VKILL] = '@';
-    /* MIN */
-    n_tio.c_cc[VQUIT] = '\034';
-    n_tio.c_cc[VSTART] = '\021';
-    n_tio.c_cc[VSTOP] = '\023';
-    n_tio.c_cc[VSUSP] = '\032';
-    if (0 != tcsetattr(0, TCSANOW, &n_tio)) {
-	Error("[%s] tcsetattr(0,TCSANOW): %s", pCE->server,
-	      strerror(errno));
-	Bye(EX_OSERR);
-    }
+    SetupTty(pCE, 0);
 
     tcsetpgrp(0, iNewGrp);
 
@@ -647,7 +654,7 @@ VirtDev(pCE)
 
     execve(pcShell, ppcArgv, environ);
     Error("[%s] execve(): %s", pCE->server, strerror(errno));
-    Bye(EX_OSERR);
+    exit(EX_OSERR);
     return -1;
 }
 

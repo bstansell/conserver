@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.93 2009/09/26 09:20:15 bryan Exp $
+ *  $Id: client.c,v 5.95 2013/09/25 22:10:29 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -413,13 +413,12 @@ static HELP aHLTable[] = {
     {WHEN_ALWAYS, "w    who is on this console"},
     {WHEN_ALWAYS, "x    show console baud info"},
     {WHEN_ALWAYS | IS_LIMITED, "z    suspend the connection"},
+    {WHEN_ATTACH, "!    invoke task"},
     {WHEN_ATTACH | IS_LIMITED, "|    attach local command"},
     {WHEN_ALWAYS, "?    print this message"},
     {WHEN_ALWAYS, "<cr> ignore/abort command"},
     {WHEN_ALWAYS, "^R   replay the last line"},
     {WHEN_ATTACH, "\\ooo send character by octal code"},
-    {WHEN_EXPERT, "^I   toggle tab expansion"},
-    {WHEN_EXPERT, "+(-) do (not) drop line"},
 };
 
 /* list the commands we know for the user				(ksb)

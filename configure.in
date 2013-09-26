@@ -23,6 +23,7 @@ AH_TEMPLATE([USE_EXTENDED_MESSAGES],[Defined if we produce extended messages])
 AH_TEMPLATE([USE_UNIX_DOMAIN_SOCKETS],[Defined if we use Unix domain sockets])
 AH_TEMPLATE([UDSDIR], [Directory for Unix domain sockets])
 AH_TEMPLATE([FOR_CYCLADES_TS], [Defined if building for a Cyclades TS])
+AH_TEMPLATE([REQ_SERVER_CERT], [Defined if client requires server SSL certificate])
 
 dnl ### Normal initialization. ######################################
 AC_INIT
@@ -498,6 +499,19 @@ AC_ARG_WITH(openssl,
 	    CPPFLAGS="$oCPPFLAGS"
 	    LDFLAGS="$oLDFLAGS"
 	fi
+
+	AC_MSG_CHECKING(whether to require server cert)
+	AC_ARG_WITH(req-server-cert,
+		AS_HELP_STRING([--with-req-server-cert],[Require server SSL certificate by client]),
+		[case "$withval" in
+		    yes)
+			AC_DEFINE(REQ_SERVER_CERT)
+			AC_MSG_RESULT(yes)
+			;;
+		    *)
+			AC_MSG_RESULT(no)
+			;;
+		esac],[AC_MSG_RESULT(no)])
     fi]
 )
 
@@ -705,13 +719,6 @@ AC_CHECK_LIB(util, openpty)
 AC_CHECK_FUNCS(openpty)
 
 AC_CHECK_FUNCS(getopt strerror getrlimit getsid setsid getuserattr setgroups tcgetpgrp tcsetpgrp tcgetattr tcsetattr tcsendbreak setpgrp getutent setttyent getspnam setlinebuf setvbuf ptsname grantpt unlockpt sigaction setsockopt getdtablesize putenv memset memcpy memcmp memmove sysconf getlogin inet_aton setproctitle gettimeofday strlcpy)
-if test "$with_cycladests" != "yes"; then
-	AC_FUNC_SETPGRP
-else
-	AC_DEFINE(SETPGRP_VOID, 1, [Define if setpgrp is POSIX])
-	AC_MSG_NOTICE([Building for a Cyclades-TS: setting SETPGRP_VOID because we cannot test this in cross-compilation])
-
-fi
 AC_CHECK_FUNC(strcasecmp,
 	[AC_DEFINE(HAVE_STRCASECMP, 1, [Define if strcasecmp is available])],
 	[AC_CHECK_FUNC(stricmp,

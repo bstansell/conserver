@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.68 2007/04/02 17:59:16 bryan Exp $
+ *  $Id: consent.h,v 5.72 2013/09/26 17:32:55 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -122,11 +122,14 @@ typedef struct consent {	/* console information                  */
     unsigned short spinmax;	/* initialization spin maximum          */
     unsigned short spintimer;	/* initialization spin timer            */
     char *replstring;		/* generic string for replacements      */
+    char *tasklist;		/* list of valid tasks                  */
+    char *breaklist;		/* list of valid break sequences        */
     /* timestamp stuff */
     int mark;			/* Mark (chime) interval                */
     long nextMark;		/* Next mark (chime) time               */
     FLAG activitylog;		/* log attach/detach/bump               */
     FLAG breaklog;		/* log breaks sent                      */
+    FLAG tasklog;		/* log tasks invoked                    */
     /* options */
     FLAG ondemand;		/* bring up on-demand                   */
     FLAG reinitoncc;		/* open if down on client connect       */
@@ -143,6 +146,8 @@ typedef struct consent {	/* console information                  */
     pid_t ipid;			/* pid of virtual command               */
     pid_t initpid;		/* pid of initcmd command               */
     CONSFILE *initfile;		/* the command run on init              */
+    pid_t taskpid;		/* pid of task running                  */
+    CONSFILE *taskfile;		/* the output from the task (read-only) */
     STRING *wbuf;		/* write() buffer                       */
     int wbufIAC;		/* next IAC location in wbuf            */
     IOSTATE ioState;		/* state of the socket                  */
@@ -192,3 +197,4 @@ extern void DestroyRemoteConsole PARAMS((REMOTE *));
 extern void StartInit PARAMS((CONSENT *));
 extern void StopInit PARAMS((CONSENT *));
 extern char *ConsState PARAMS((CONSENT *));
+extern void SetupTty PARAMS((CONSENT *, int));

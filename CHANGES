@@ -1,6 +1,36 @@
 				CHANGES
 				=======
 
+version 8.1.19 (Sep 26, 2013):
+	- prevent select/read loop when EOF on non-pty input (console) -
+	  reported by Chris Marget <chris@marget.com>
+	- "!" syntax prefixing use of group names not honored - reported by
+	  Zonker <consoleteam@gmail.com>
+	- fixed memory leak using timestamps - patch by Karvendhan M.
+	  <Karvendhan.M@netapp.com>
+	- deprecated --with-cycladests (noop now) - cross-compilation should
+	  work without it as autologin now expects setpgrp() to take two
+	  arugments instead of testing for it
+	- no automatic checks for an empty password when using PAM
+	  authentication - based on discussion with Ryan Kirkpatrick
+	  <linux@rkirkpat.net>
+	- added 'sslcacertificatefile' and 'sslcacertificatepath' client
+	  configuration options - based on patch by Aki Tuomi <cmouse@cmouse.fi>
+	- added 'sslcacertificatefile' and 'sslreqclientcert' server
+	  configuration options
+	- added --with-req-server-cert to force clients to require a certificate
+	  from the server when using SSL - based on emails with Thor Simon
+	  <tls@coyotepoint.com>
+	- added server-side tasks (see conserver.cf man page) that are invoked
+	  by the client (useful for things like IPMI-based power control of
+	  servers, invoking resets of terminal server ports, or anything else
+	  that requires scripting) - ideas from patch by Anton Lundin
+	  <glance@acc.umu.se> and discussion on mailing list (2011)
+	- added 'confirm' option to break sequences
+	- added 'breaklist' option to limit exposure of break sequences to
+	  consoles
+	- sending of break signals is now announced to all attached clients
+
 version 8.1.18 (Nov 11, 2010):
 	- install man pages read-only and improved the contributed redhat init
 	  script - patches by Eric Biederman <ebiederm@aristanetworks.com>
@@ -902,5 +932,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.225 2010/11/11 22:43:17 bryan Exp $
+#  $Id: CHANGES,v 1.238 2013/09/26 17:57:44 bryan Exp $
 #

@@ -6,12 +6,13 @@
 # outside of my own purposes.  If this helps, cool.  In the end I put the
 # rootcert.pem file in my global certs directory (OPENSSL_ROOT/ssl/certs),
 # point the server to server.pem and point the client at client.pem.  I
-# then run the c_rehash command (I supposed it helps or is important).
-# When it asks for a passphrase, use 'pass', otherwise this script won't
-# work.  Ugly, yeah, but it's an ok test.
+# then run the c_rehash command.
+#
+# You can also use the sslcacertificatefile options to point the client/server
+# at rootcert.pem instead of populating the global repository
 #
 
-[ -f rootreq.pem -a -f rootkey.pem ] || cat <<EOD | openssl req -newkey rsa:1024 -sha1 -keyout rootkey.pem -out rootreq.pem -passin pass:pass -passout pass:pass
+[ -f rootreq.pem -a -f rootkey.pem ] || cat <<EOD | openssl req -newkey rsa:1024 -sha1 -keyout rootkey.pem -out rootreq.pem -nodes
 US
 California
 Folsom
@@ -25,7 +26,7 @@ EOD
 [ -f rootcert.pem ] || openssl x509 -req -in rootreq.pem -sha1 -extensions v3_ca -signkey rootkey.pem -out rootcert.pem
 [ -f root.pem ] || cat rootcert.pem rootkey.pem > root.pem
 
-[ -f serverreq.pem -a -f serverkey.pem ] || cat <<EOD | openssl req -newkey rsa:1024 -sha1 -keyout serverkey.pem -out serverreq.pem -passin pass:pass -passout pass:pass
+[ -f serverreq.pem -a -f serverkey.pem ] || cat <<EOD | openssl req -newkey rsa:1024 -sha1 -keyout serverkey.pem -out serverreq.pem -nodes
 US
 California
 Folsom
@@ -39,7 +40,7 @@ EOD
 [ -f servercert.pem ] || openssl x509 -req -in serverreq.pem -sha1 -extensions usr_cert -CA root.pem -CAkey root.pem -CAcreateserial -out servercert.pem
 [ -f server.pem ] || cat servercert.pem serverkey.pem rootcert.pem > server.pem
 
-[ -f clientreq.pem -a -f clientkey.pem ] || cat <<EOD | openssl req -newkey rsa:1024 -sha1 -keyout clientkey.pem -out clientreq.pem -passin pass:pass -passout pass:pass
+[ -f clientreq.pem -a -f clientkey.pem ] || cat <<EOD | openssl req -newkey rsa:1024 -sha1 -keyout clientkey.pem -out clientreq.pem -nodes
 US
 California
 Folsom

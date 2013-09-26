@@ -12,4 +12,3 @@ extern char *pcCommand, *pcGroup, *pcLogin, *pcTty;
 /* from std_help.m */
 /* from std_version.m */
 /* from autologin.m */
-

@@ -1,5 +1,5 @@
 /*
- *  $Id: readconf.c,v 5.5 2006/04/03 13:32:12 bryan Exp $
+ *  $Id: readconf.c,v 5.7 2013/09/18 14:31:39 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -39,6 +39,10 @@ DestroyConfig(c)
 #if HAVE_OPENSSL
     if (c->sslcredentials != (char *)0)
 	free(c->sslcredentials);
+    if (c->sslcacertificatefile != (char *)0)
+	free(c->sslcacertificatefile);
+    if (c->sslcacertificatepath != (char *)0)
+	free(c->sslcacertificatepath);
 #endif
     free(c);
 }
@@ -91,6 +95,22 @@ ApplyConfigDefault(c)
 	    free(c->sslcredentials);
 	if ((c->sslcredentials =
 	     StrDup(parserConfigDefault->sslcredentials)) == (char *)0)
+	    OutOfMem();
+    }
+    if (parserConfigDefault->sslcacertificatefile != (char *)0) {
+	if (c->sslcacertificatefile != (char *)0)
+	    free(c->sslcacertificatefile);
+	if ((c->sslcacertificatefile =
+	     StrDup(parserConfigDefault->sslcacertificatefile)) ==
+	    (char *)0)
+	    OutOfMem();
+    }
+    if (parserConfigDefault->sslcacertificatepath != (char *)0) {
+	if (c->sslcacertificatepath != (char *)0)
+	    free(c->sslcacertificatepath);
+	if ((c->sslcacertificatepath =
+	     StrDup(parserConfigDefault->sslcacertificatepath)) ==
+	    (char *)0)
 	    OutOfMem();
     }
     if (parserConfigDefault->sslrequired != FLAGUNKNOWN)
@@ -506,6 +526,60 @@ ConfigItemSslcredentials(id)
 
 void
 #if PROTOTYPES
+ConfigItemSslcacertificatefile(char *id)
+#else
+ConfigItemSslcacertificatefile(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConfigItemSslcacertificatefile(%s) [%s:%d]", id, file,
+	       line));
+#if HAVE_OPENSSL
+    if (parserConfigTemp->sslcacertificatefile != (char *)0)
+	free(parserConfigTemp->sslcacertificatefile);
+
+    if ((id == (char *)0) || (*id == '\000')) {
+	parserConfigTemp->sslcacertificatefile = (char *)0;
+	return;
+    }
+    if ((parserConfigTemp->sslcacertificatefile = StrDup(id)) == (char *)0)
+	OutOfMem();
+#else
+    Error
+	("sslcacertificatefile ignored - encryption not compiled into code [%s:%d]",
+	 file, line);
+#endif
+}
+
+void
+#if PROTOTYPES
+ConfigItemSslcacertificatepath(char *id)
+#else
+ConfigItemSslcacertificatepath(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConfigItemSslcacertificatepath(%s) [%s:%d]", id, file,
+	       line));
+#if HAVE_OPENSSL
+    if (parserConfigTemp->sslcacertificatepath != (char *)0)
+	free(parserConfigTemp->sslcacertificatepath);
+
+    if ((id == (char *)0) || (*id == '\000')) {
+	parserConfigTemp->sslcacertificatepath = (char *)0;
+	return;
+    }
+    if ((parserConfigTemp->sslcacertificatepath = StrDup(id)) == (char *)0)
+	OutOfMem();
+#else
+    Error
+	("sslcacertificatepath ignored - encryption not compiled into code [%s:%d]",
+	 file, line);
+#endif
+}
+
+void
+#if PROTOTYPES
 ConfigItemSslrequired(char *id)
 #else
 ConfigItemSslrequired(id)
@@ -712,6 +786,8 @@ ITEM keyConfig[] = {
     {"port", ConfigItemPort},
     {"replay", ConfigItemReplay},
     {"sslcredentials", ConfigItemSslcredentials},
+    {"sslcacertificatefile", ConfigItemSslcacertificatefile},
+    {"sslcacertificatepath", ConfigItemSslcacertificatepath},
     {"sslrequired", ConfigItemSslrequired},
     {"sslenabled", ConfigItemSslenabled},
     {"striphigh", ConfigItemStriphigh},
@@ -793,6 +869,10 @@ ReadConf(filename, verbose)
 #if HAVE_OPENSSL
 	CONDDEBUG((1, "pConfig->sslcredentials = %s",
 		   EMPTYSTR(pConfig->sslcredentials)));
+	CONDDEBUG((1, "pConfig->sslcacertificatefile = %s",
+		   EMPTYSTR(pConfig->sslcacertificatefile)));
+	CONDDEBUG((1, "pConfig->sslcacertificatepath = %s",
+		   EMPTYSTR(pConfig->sslcacertificatepath)));
 	CONDDEBUG((1, "pConfig->sslrequired = %s",
 		   FLAGSTR(pConfig->sslrequired)));
 	CONDDEBUG((1, "pConfig->sslenabled = %s",

@@ -1,5 +1,5 @@
 /*
- *  $Id: cutil.c,v 1.134 2010/11/02 03:42:57 bryan Exp $
+ *  $Id: cutil.c,v 1.138 2013/09/26 17:50:24 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -1397,7 +1397,8 @@ FileCanRead(cfp, prfd, pwfd)
 
     return ((FD_ISSET(cfp->fd, prfd)
 #if HAVE_OPENSSL
-	     && cfp->waitForRead != FLAGTRUE) || (FD_ISSET(fdout, pwfd)
+	     && cfp->waitForRead != FLAGTRUE) || (fdout >= 0 &&
+						  FD_ISSET(fdout, pwfd)
 						  && cfp->waitForWrite ==
 						  FLAGTRUE
 #endif

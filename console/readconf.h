@@ -1,5 +1,5 @@
 /*
- *  $Id: readconf.h,v 5.4 2006/04/03 13:32:12 bryan Exp $
+ *  $Id: readconf.h,v 5.6 2013/09/18 14:31:39 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -18,6 +18,8 @@ typedef struct config {
     unsigned short playback;
 #if HAVE_OPENSSL
     char *sslcredentials;
+    char *sslcacertificatefile;
+    char *sslcacertificatepath;
     FLAG sslrequired;
     FLAG sslenabled;
 #endif

@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.185 2009/10/19 06:44:06 bryan Exp $
+ *  $Id: console.c,v 5.188 2013/09/18 14:31:39 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -91,6 +91,20 @@ SetupSSL()
 	    Error("Could not load SSL default CA file and/or directory");
 	    Bye(EX_UNAVAILABLE);
 	}
+	if (config->sslcacertificatefile != (char *)0 ||
+	    config->sslcacertificatepath != (char *)0) {
+	    if (SSL_CTX_load_verify_locations
+		(ctx, config->sslcacertificatefile,
+		 config->sslcacertificatepath) != 1) {
+		if (config->sslcacertificatefile != (char *)0)
+		    Error("Could not setup ca certificate file to '%s'",
+			  config->sslcacertificatefile);
+		if (config->sslcacertificatepath != (char *)0)
+		    Error("Could not setup ca certificate path to '%s'",
+			  config->sslcacertificatepath);
+		Bye(EX_UNAVAILABLE);
+	    }
+	}
 	if (config->sslcredentials != (char *)0) {
 	    if (SSL_CTX_use_certificate_chain_file
 		(ctx, config->sslcredentials) != 1) {
@@ -106,7 +120,11 @@ SetupSSL()
 	    }
 	    ciphers = "ALL:!LOW:!EXP:!MD5:!aNULL:@STRENGTH";
 	} else {
+#if defined(REQ_SERVER_CERT)
+	    ciphers = "ALL:!LOW:!EXP:!MD5:!aNULL:@STRENGTH";
+#else
 	    ciphers = "ALL:!LOW:!EXP:!MD5:@STRENGTH";
+#endif
 	}
 	SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, SSLVerifyCallback);
 	SSL_CTX_set_options(ctx,
@@ -1352,7 +1370,7 @@ Interact(pcf, pcMach)
 		if (screwy)
 		    break;
 		else {
-		    FD_SET(0, &rinit);
+		    FD_CLR(0, &rinit);
 		    continue;
 		}
 	    }
@@ -2317,7 +2335,18 @@ main(argc, argv)
 	config->sslcredentials = StrDup(pConfig->sslcredentials);
     else
 	config->sslcredentials = (char *)0;
-
+    if (pConfig->sslcacertificatefile != (char *)0 &&
+	pConfig->sslcacertificatefile[0] != '\000')
+	config->sslcacertificatefile =
+	    StrDup(pConfig->sslcacertificatefile);
+    else
+	config->sslcacertificatefile = (char *)0;
+    if (pConfig->sslcacertificatepath != (char *)0 &&
+	pConfig->sslcacertificatepath[0] != '\000')
+	config->sslcacertificatepath =
+	    StrDup(pConfig->sslcacertificatepath);
+    else
+	config->sslcacertificatepath = (char *)0;
     if (optConf->sslenabled != FLAGUNKNOWN)
 	config->sslenabled = optConf->sslenabled;
     else if (pConfig->sslenabled != FLAGUNKNOWN)

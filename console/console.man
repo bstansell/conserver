@@ -1,5 +1,5 @@
-.\" $Id: console.man,v 1.61 2006/04/03 13:32:12 bryan Exp $
-.TH CONSOLE 1 "2006/04/03" "conserver-8.1.18" "conserver"
+.\" $Id: console.man,v 1.65 2013/09/25 22:10:30 bryan Exp $
+.TH CONSOLE 1 "2013/09/25" "conserver-8.1.19" "conserver"
 .SH NAME
 console \- console server client program
 .SH SYNOPSIS
@@ -564,6 +564,18 @@ Using the special value of ``0'' will cause the client to use the number
 of lines of the current terminal (if that can be determined).
 If the null string (``""'') is used, the replay length will not be overridden.
 .TP
+\f3sslcacertificatefile\fP \f2filename\fP
+.br
+Load the valid CA certificates for the
+.SM SSL
+connection from the PEM encoded file.
+.TP
+\f3sslcacertificatepath\fP \f2directory\fP
+.br
+Load the valid CA certificates for the
+.SM SSL
+connection from the PEM encoded files in the directory.
+.TP
 \f3sslcredentials\fP \f2filename\fP
 .br
 Set the
@@ -868,7 +880,7 @@ replay the last 20 lines of output
 set number of replay lines
 .TP
 .B s
-switch to spy mode (read-only)
+switch to spy mode (read only)
 .TP
 .B u
 show status of hosts/users in this group
@@ -884,6 +896,9 @@ examine this group's devices and modes
 .TP
 .B z
 suspend this connection
+.TP
+.B !
+invoke task
 .TP
 .B |
 attach a local command to the console

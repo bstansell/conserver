@@ -1,4 +1,5 @@
 ### Path settings
+datarootdir = @datarootdir@
 srcdir = @srcdir@
 prefix = @prefix@
 mandir = @mandir@

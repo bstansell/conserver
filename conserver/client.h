@@ -1,5 +1,5 @@
 /*
- *  $Id: client.h,v 5.42 2007/04/02 18:18:59 bryan Exp $
+ *  $Id: client.h,v 5.44 2013/09/23 22:58:21 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -51,7 +51,9 @@ typedef enum clientState {
     S_CEXEC,			/* client execing a program                */
     S_REPLAY,			/* set replay length for 'r'               */
     S_PLAYBACK,			/* set replay length for 'p'               */
-    S_NOTE			/* send a note to the logfile              */
+    S_NOTE,			/* send a note to the logfile              */
+    S_TASK,			/* invoke a task on the server side        */
+    S_CONFIRM			/* confirm input                           */
 } CLIENTSTATE;
 
 typedef struct client {		/* Connection Information:              */
@@ -87,6 +89,9 @@ typedef struct client {		/* Connection Information:              */
     STRING *accmd;		/* the command the user issued          */
     struct sockaddr_in
       cnct_port;		/* where from                           */
+    FLAG confirmed;		/* confirm state                        */
+    CLIENTSTATE cState;		/* state needing confirmation           */
+    char cOption;		/* option initiating the confirmation   */
 } CONSCLIENT;
 
 extern void Replay PARAMS((CONSENT *, CONSFILE *, unsigned short));

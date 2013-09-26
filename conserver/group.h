@@ -1,5 +1,5 @@
 /*
- *  $Id: group.h,v 5.49 2006/04/07 15:36:09 bryan Exp $
+ *  $Id: group.h,v 5.51 2013/09/23 23:17:42 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -65,7 +65,7 @@ typedef struct grpent {		/* group info                           */
 extern time_t timers[];
 
 extern void Spawn PARAMS((GRPENT *, int));
-extern int CheckPass PARAMS((char *, char *));
+extern int CheckPass PARAMS((char *, char *, FLAG));
 extern void TagLogfile PARAMS((const CONSENT *, char *, ...));
 extern void TagLogfileAct PARAMS((const CONSENT *, char *, ...));
 extern void DestroyGroup PARAMS((GRPENT *));
@@ -79,7 +79,7 @@ extern void DisconnectClient
 PARAMS((GRPENT *, CONSCLIENT *, char *, FLAG));
 extern int ClientAccess PARAMS((CONSENT *, char *));
 extern void DestroyClient PARAMS((CONSCLIENT *));
-extern int CheckPasswd PARAMS((CONSCLIENT *, char *));
+extern int CheckPasswd PARAMS((CONSCLIENT *, char *, FLAG));
 extern void DeUtmp PARAMS((GRPENT *, int));
 extern void ClientWantsWrite PARAMS((CONSCLIENT *));
 extern void SendIWaitClientsMsg PARAMS((CONSENT *, char *));

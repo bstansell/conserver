@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.136 2009/09/26 09:23:04 bryan Exp $
+ *  $Id: master.c,v 5.139 2013/09/23 23:17:42 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -461,8 +461,9 @@ DoNormalRead(pCLServing)
 
 	    /* process password here...before we corrupt accmd */
 	    if (pCLServing->iState == S_PASSWD) {
-		if (CheckPasswd(pCLServing, pCLServing->accmd->string) !=
-		    AUTH_SUCCESS) {
+		if (CheckPasswd
+		    (pCLServing, pCLServing->accmd->string, FLAGFALSE)
+		    != AUTH_SUCCESS) {
 		    FileWrite(pCLServing->fd, FLAGFALSE,
 			      "invalid password\r\n", -1);
 		    BuildString((char *)0, pCLServing->accmd);
@@ -564,7 +565,8 @@ DoNormalRead(pCLServing)
 			BuildString(pCLServing->peername->string,
 				    pCLServing->acid);
 			if (pCLServing->caccess == 't' ||
-			    CheckPasswd(pCLServing, "") == AUTH_SUCCESS) {
+			    CheckPasswd(pCLServing, "",
+					FLAGTRUE) == AUTH_SUCCESS) {
 			    pCLServing->iState = S_NORMAL;
 			    Verbose("<master> login %s",
 				    pCLServing->acid->string);

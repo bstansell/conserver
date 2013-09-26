@@ -13,7 +13,7 @@
 
 #ifndef HAVE_GETOPT
 static int
-	optopt;			/* character checked for validity	*/
+  optopt;			/* character checked for validity       */
 
 /* get option letter from argument vector, also does -number correctly
  * for nice, xargs, and stuff (these extras by ksb)
@@ -21,166 +21,168 @@ static int
  */
 static int
 getopt(nargc, nargv, ostr)
-int nargc;
-char **nargv, *ostr;
+    int nargc;
+    char **nargv, *ostr;
 {
-	register char	*oli;		/* option letter list index	*/
-	static char	EMSG[] = "";	/* just a null place		*/
-	static char	*place = EMSG;	/* option letter processing	*/
+    register char *oli;		/* option letter list index     */
+    static char EMSG[] = "";	/* just a null place            */
+    static char *place = EMSG;	/* option letter processing     */
 
-	if ('\000' == *place) {		/* update scanning pointer */
-		if (optind >= nargc)
-			return EOF;
-		if (nargv[optind][0] != '-') {
-			register int iLen;
-			return EOF;
-		}
-		place = nargv[optind];
-		if ('\000' == *++place)	/* "-" (stdin)		*/
-			return EOF;
-		if (*place == '-' && '\000' == place[1]) {
-			/* found "--"		*/
-			++optind;
-			return EOF;
-		}
-	}				/* option letter okay? */
-	/* if we find the letter, (not a `:')
-	 * or a digit to match a # in the list
-	 */
-	if ((optopt = *place++) == ':' ||
-	 ((char *)0 == (oli = strchr(ostr,optopt)) &&
-	  (!(isdigit(optopt)||'-'==optopt) || (char *)0 == (oli = strchr(ostr, '#'))))) {
-		if(!*place) ++optind;
-		return('?');
+    if ('\000' == *place) {	/* update scanning pointer */
+	if (optind >= nargc)
+	    return EOF;
+	if (nargv[optind][0] != '-') {
+	    register int iLen;
+	    return EOF;
 	}
-	if ('#' == *oli) {		/* accept as -digits */
-		optarg = place -1;
-		++optind;
-		place = EMSG;
-		return '#';
+	place = nargv[optind];
+	if ('\000' == *++place)	/* "-" (stdin)              */
+	    return EOF;
+	if (*place == '-' && '\000' == place[1]) {
+	    /* found "--"           */
+	    ++optind;
+	    return EOF;
 	}
-	if (*++oli != ':') {		/* don't need argument */
-		optarg = NULL;
-		if ('\000' == *place)
-			++optind;
-	} else {				/* need an argument */
-		if (*place) {			/* no white space */
-			optarg = place;
-		} else if (nargc <= ++optind) {	/* no arg!! */
-			place = EMSG;
-			return '*';
-		} else {
-			optarg = nargv[optind];	/* white space */
-		}
-		place = EMSG;
-		++optind;
+    }
+    /* option letter okay? */
+    /* if we find the letter, (not a `:')
+     * or a digit to match a # in the list
+     */
+    if ((optopt = *place++) == ':' ||
+	((char *)0 == (oli = strchr(ostr, optopt)) &&
+	 (!(isdigit(optopt) || '-' == optopt) ||
+	  (char *)0 == (oli = strchr(ostr, '#'))))) {
+	if (!*place)
+	    ++optind;
+	return ('?');
+    }
+    if ('#' == *oli) {		/* accept as -digits */
+	optarg = place - 1;
+	++optind;
+	place = EMSG;
+	return '#';
+    }
+    if (*++oli != ':') {	/* don't need argument */
+	optarg = NULL;
+	if ('\000' == *place)
+	    ++optind;
+    } else {			/* need an argument */
+	if (*place) {		/* no white space */
+	    optarg = place;
+	} else if (nargc <= ++optind) {	/* no arg!! */
+	    place = EMSG;
+	    return '*';
+	} else {
+	    optarg = nargv[optind];	/* white space */
 	}
-	return optopt;			/* dump back option letter */
+	place = EMSG;
+	++optind;
+    }
+    return optopt;		/* dump back option letter */
 }
 #endif /* ! HAVE_GETOPT */
 
 char
-	*progname = "$Id: main.c,v 1.1 2003/11/04 02:36:24 bryan Exp $",
-	*au_terse[] = {
-		" [-u] [-c cmd] [-e env=value] [-g group] [-l login] [-t tty]",
-		" -h",
-		" -V",
-		(char *)0
-	},
-	*u_help[] = {
-		"c cmd       command to run",
-		"e env=value environment variable to set",
-		"g group     initial group",
-		"h           print this help message",
-		"l login     login name",
-		"t tty       attach to this terminal",
-		"u           do no make utmp entry",
-		"V           show version information",
-		(char *)0
-	},
-	*pcCommand = (char *)0,
-	*pcGroup = (char *)0,
-	*pcLogin = (char *)0,
-	*pcTty = (char *)0;
+ *progname =
+    "$Id: main.c,v 1.2 2013/09/20 21:15:13 bryan Exp $", *au_terse[] = {
+    " [-u] [-c cmd] [-e env=value] [-g group] [-l login] [-t tty]",
+    " -h",
+    " -V",
+    (char *)0
+}, *u_help[] = {
+"c cmd       command to run",
+	"e env=value environment variable to set",
+	"g group     initial group",
+	"h           print this help message",
+	"l login     login name",
+	"t tty       attach to this terminal",
+	"u           do no make utmp entry",
+	"V           show version information", (char *)0}, *pcCommand =
+    (char *)0, *pcGroup = (char *)0, *pcLogin = (char *)0, *pcTty =
+    (char *)0;
 int
-	fMakeUtmp = 1,
-	iErrs = 0;
+  fMakeUtmp = 1, iErrs = 0;
 
 #ifndef u_terse
 #define u_terse	(au_terse[0])
 #endif
 
-static char *rcsid =
-        "$Id: main.c,v 1.1 2003/11/04 02:36:24 bryan Exp $";
+static char *rcsid = "$Id: main.c,v 1.2 2013/09/20 21:15:13 bryan Exp $";
 
 /*
  * parser
  */
 int
 main(argc, argv)
-int argc;
-char **argv;
+    int argc;
+    char **argv;
 {
-	static char
-		sbOpt[] = "c:e:g:hl:t:uV",
-		*u_pch = (char *)0;
-	static int
-		u_loop = 0;
-	register int u_curopt;
-	extern int atoi();
+    static char
+      sbOpt[] = "c:e:g:hl:t:uV", *u_pch = (char *)0;
+    static int
+      u_loop = 0;
+    register int u_curopt;
+    extern int atoi();
 
-	progname = strrchr(argv[0], '/');
-	if ((char *)0 == progname)
-		progname = argv[0];
-	else
-		++progname;
-	while (EOF != (u_curopt = getopt(argc, argv, sbOpt))) {
-		switch (u_curopt) {
-		case '*':
-			fprintf(stderr, "%s: option `-%c\' needs a parameter\n", progname, optopt);
-			exit(1);
-		case '?':
-			fprintf(stderr, "%s: unknown option `-%c\', use `-h\' for help\n", progname, optopt);
-			exit(1);
-		case 'c':
-			pcCommand = optarg;
-			continue;
-		case 'e':
-			if (putenv(optarg) != 0) {
-				 (void) fprintf(stderr, "%s: putenv(\"%s\"): failed\n", progname, optarg);
-				exit(1);
-			}
-			continue;
-		case 'g':
-			pcGroup = optarg;
-			continue;
-		case 'h':
-			for (u_loop = 0; (char *)0 != (u_pch = au_terse[u_loop]); ++u_loop) {
-				if ('\000' == *u_pch) {
-					fprintf(stdout, "%s: with no parameters\n", progname);
-					continue;
-				}
-				fprintf(stdout, "%s: usage%s\n", progname, u_pch);
-			}
-			for (u_loop = 0; (char *)0 != (u_pch = u_help[u_loop]); ++u_loop) {
-				fprintf(stdout, "%s\n", u_pch);
-			}
-			exit(0);
-		case 'l':
-			pcLogin = optarg;
-			continue;
-		case 't':
-			pcTty = optarg;
-			continue;
-		case 'u':
-			fMakeUtmp = 0;
-			continue;
-		case 'V':
-			printf("%s: %s\n", progname, rcsid);
-			exit(0);
+    progname = strrchr(argv[0], '/');
+    if ((char *)0 == progname)
+	progname = argv[0];
+    else
+	++progname;
+    while (EOF != (u_curopt = getopt(argc, argv, sbOpt))) {
+	switch (u_curopt) {
+	    case '*':
+		fprintf(stderr, "%s: option `-%c\' needs a parameter\n",
+			progname, optopt);
+		exit(1);
+	    case '?':
+		fprintf(stderr,
+			"%s: unknown option `-%c\', use `-h\' for help\n",
+			progname, optopt);
+		exit(1);
+	    case 'c':
+		pcCommand = optarg;
+		continue;
+	    case 'e':
+		if (putenv(optarg) != 0) {
+		    (void)fprintf(stderr, "%s: putenv(\"%s\"): failed\n",
+				  progname, optarg);
+		    exit(1);
 		}
-		break;
+		continue;
+	    case 'g':
+		pcGroup = optarg;
+		continue;
+	    case 'h':
+		for (u_loop = 0; (char *)0 != (u_pch = au_terse[u_loop]);
+		     ++u_loop) {
+		    if ('\000' == *u_pch) {
+			fprintf(stdout, "%s: with no parameters\n",
+				progname);
+			continue;
+		    }
+		    fprintf(stdout, "%s: usage%s\n", progname, u_pch);
+		}
+		for (u_loop = 0; (char *)0 != (u_pch = u_help[u_loop]);
+		     ++u_loop) {
+		    fprintf(stdout, "%s\n", u_pch);
+		}
+		exit(0);
+	    case 'l':
+		pcLogin = optarg;
+		continue;
+	    case 't':
+		pcTty = optarg;
+		continue;
+	    case 'u':
+		fMakeUtmp = 0;
+		continue;
+	    case 'V':
+		printf("%s: %s\n", progname, rcsid);
+		exit(0);
 	}
-	Process();
-	exit(iErrs);
+	break;
+    }
+    Process();
+    exit(iErrs);
 }

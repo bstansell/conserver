@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.332 2009/09/26 09:58:05 bryan Exp $
+ *  $Id: group.c,v 5.344 2013/09/26 17:50:24 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -204,6 +204,28 @@ AbortAnyClientExec(pCL)
 	FileSetQuoteIAC(pCL->fd, FLAGTRUE);
 	pCL->fcon = 1;
 	pCL->iState = S_NORMAL;
+    }
+}
+
+static int
+#if PROTOTYPES
+StopTask(CONSENT *pCE)
+#else
+StopTask(pCE)
+    CONSENT *pCE;
+#endif
+{
+    if (pCE->taskpid != 0) {
+	kill(pCE->taskpid, SIGHUP);
+	CONDDEBUG((1, "StopTask(): sending task pid %lu signal %d",
+		   (unsigned long)pCE->taskpid, SIGHUP));
+    }
+
+    if (pCE->taskfile != (CONSFILE *)0) {
+	int taskfile = FileFDNum(pCE->taskfile);
+	FD_CLR(taskfile, &rinit);
+	FileClose(&pCE->taskfile);
+	pCE->taskfile = (CONSFILE *)0;
     }
 }
 
@@ -614,6 +636,7 @@ DestroyConsent(pGE, pCE)
 	pGE->pCLfree = pCL;
     }
 
+    StopTask(pCE);
     ConsDown(pCE, FLAGFALSE, FLAGTRUE);
 
     for (ppCE = &(pGE->pCElist); *ppCE != (CONSENT *)0;
@@ -653,6 +676,10 @@ DestroyConsent(pGE, pCE)
 	free(pCE->idlestring);
     if (pCE->replstring != (char *)0)
 	free(pCE->replstring);
+    if (pCE->tasklist != (char *)0)
+	free(pCE->tasklist);
+    if (pCE->breaklist != (char *)0)
+	free(pCE->breaklist);
     if (pCE->execSlave != (char *)0)
 	free(pCE->execSlave);
     while (pCE->aliases != (NAMES *)0) {
@@ -780,14 +807,20 @@ QuietConv(num_msg, msg, resp, appdata_ptr)
  */
 int
 #if PROTOTYPES
-CheckPass(char *pcUser, char *pcWord)
+CheckPass(char *pcUser, char *pcWord, FLAG empty_check)
 #else
-CheckPass(pcUser, pcWord)
+CheckPass(pcUser, pcWord, empty_check)
     char *pcUser;
     char *pcWord;
+    FLAG empty_check;
 #endif
 {
+    if (pcWord == (char *)0) {
+	pcWord = "";
+    }
 #if HAVE_PAM
+    if (empty_check == FLAGTRUE)
+	return AUTH_INVALID;
     int pam_error;
     char *appdata[2];
     static pam_handle_t *pamh = (pam_handle_t *)0;
@@ -839,9 +872,6 @@ CheckPass(pcUser, pcWord)
     struct spwd *spwd;
 #endif
 
-    if (pcWord == (char *)0) {
-	pcWord = "";
-    }
     if ((pwd = getpwnam(pcUser)) == (struct passwd *)0) {
 	CONDDEBUG((1, "CheckPass(): getpwnam(%s): %s", pcUser,
 		   strerror(errno)));
@@ -1381,7 +1411,7 @@ WriteLog(pCE, s, len)
 {
     int i = 0;
     int j;
-    STRING *buf = (STRING *)0;
+    static STRING *buf = (STRING *)0;
 
     if ((CONSFILE *)0 == pCE->fdlog) {
 	return;
@@ -1552,6 +1582,46 @@ ReapVirt(pGE)
 		StopInit(pCE);
 		break;
 	    }
+	    if (pid == pCE->taskpid) {
+		CONSCLIENT *pCL;
+		if (WIFEXITED(UWbuf)) {
+		    Msg("[%s] task terminated: pid %lu: exit(%d)",
+			pCE->server, pid, WEXITSTATUS(UWbuf));
+		    if (pCE->tasklog == FLAGTRUE)
+			TagLogfile(pCE,
+				   "task terminated: pid %lu: exit(%d)",
+				   pid, WEXITSTATUS(UWbuf));
+		    /* tell all how it ended */
+		    for (pCL = pCE->pCLon; (CONSCLIENT *)0 != pCL;
+			 pCL = pCL->pCLnext) {
+			if (pCL->fcon) {
+			    FilePrint(pCL->fd, FLAGFALSE,
+				      "[task terminated: exit(%d)]\r\n",
+				      WEXITSTATUS(UWbuf));
+			}
+		    }
+		}
+		if (WIFSIGNALED(UWbuf)) {
+		    Msg("[%s] task terminated: pid %lu: signal(%d)",
+			pCE->server, pid, WTERMSIG(UWbuf));
+		    if (pCE->tasklog == FLAGTRUE)
+			TagLogfile(pCE,
+				   "task terminated: pid %lu: signal(%d)",
+				   pid, WTERMSIG(UWbuf));
+		    /* tell all how it ended */
+		    for (pCL = pCE->pCLon; (CONSCLIENT *)0 != pCL;
+			 pCL = pCL->pCLnext) {
+			if (pCL->fcon) {
+			    FilePrint(pCL->fd, FLAGFALSE,
+				      "[task terminated: signal(%d)]\r\n",
+				      WTERMSIG(UWbuf));
+			}
+		    }
+		}
+		pCE->taskpid = 0;
+		StopTask(pCE);
+		break;
+	    }
 
 	    if (pid != pCE->ipid)
 		continue;
@@ -1580,11 +1650,12 @@ ReapVirt(pGE)
 
 int
 #if PROTOTYPES
-CheckPasswd(CONSCLIENT *pCL, char *pw_string)
+CheckPasswd(CONSCLIENT *pCL, char *pw_string, FLAG empty_check)
 #else
-CheckPasswd(pCL, pw_string)
+CheckPasswd(pCL, pw_string, empty_check)
     CONSCLIENT *pCL;
     char *pw_string;
+    FLAG empty_check;
 #endif
 {
     FILE *fp;
@@ -1592,7 +1663,8 @@ CheckPasswd(pCL, pw_string)
     char *this_pw, *user;
 
     if ((fp = fopen(config->passwdfile, "r")) == (FILE *)0) {
-	if (CheckPass(pCL->username->string, pw_string) == AUTH_SUCCESS) {
+	if (CheckPass(pCL->username->string, pw_string, empty_check) ==
+	    AUTH_SUCCESS) {
 	    Verbose("user %s authenticated", pCL->acid->string);
 	    return AUTH_SUCCESS;
 	}
@@ -1631,8 +1703,8 @@ CheckPasswd(pCL, pw_string)
 
 	    if ((*this_pw == '\000' && *pw_string == '\000') ||
 		((strcmp(this_pw, "*passwd*") ==
-		  0) ? (CheckPass(pCL->username->string,
-				  pw_string) ==
+		  0) ? (CheckPass(pCL->username->string, pw_string,
+				  empty_check) ==
 			AUTH_SUCCESS) : (strcmp(this_pw,
 						crypt(pw_string,
 						      this_pw)) == 0))) {
@@ -1835,6 +1907,8 @@ SendBreak(pCLServing, pCEServing, bt)
     short bt;
 #endif
 {
+    CONSCLIENT *pCL;
+
     short waszero = 0;
     if (bt < 0 || bt > 9) {
 	FileWrite(pCLServing->fd, FLAGFALSE, "aborted]\r\n", -1);
@@ -1849,9 +1923,41 @@ SendBreak(pCLServing, pCEServing, bt)
 	return;
     }
 
+    if (breakList[bt - 1].confirm == FLAGTRUE) {
+	switch (pCLServing->confirmed) {
+	    case FLAGUNKNOWN:
+		FileWrite(pCLServing->fd, FLAGFALSE, "confirm? [y/N] ",
+			  -1);
+		pCLServing->confirmed = FLAGFALSE;
+		pCLServing->cState = S_HALT1;
+		pCLServing->iState = S_CONFIRM;
+		pCLServing->cOption = '0' + bt;
+		return;
+	    case FLAGFALSE:
+		FileWrite(pCLServing->fd, FLAGFALSE, "aborted]\r\n", -1);
+		pCLServing->confirmed = FLAGUNKNOWN;
+		return;
+	    case FLAGTRUE:
+		pCLServing->confirmed = FLAGUNKNOWN;
+	}
+    }
+
+
     ExpandString(breakList[bt - 1].seq->string, pCEServing, bt);
 
     FileWrite(pCLServing->fd, FLAGFALSE, "sent]\r\n", -1);
+
+    /* tell all who sent it */
+    for (pCL = pCEServing->pCLon; (CONSCLIENT *)0 != pCL;
+	 pCL = pCL->pCLnext) {
+	if (pCL == pCLServing)
+	    continue;
+	if (pCL->fcon) {
+	    FilePrint(pCL->fd, FLAGFALSE, "[break sent by %s]\r\n",
+		      pCLServing->acid->string);
+	}
+    }
+
     if (pCEServing->breaklog == FLAGTRUE) {
 	if (waszero) {
 	    TagLogfile(pCEServing, "break #0(%d) sent -- `%s'", bt,
@@ -1861,6 +1967,205 @@ SendBreak(pCLServing, pCEServing, bt)
 		       breakList[bt - 1].seq->string);
 	}
     }
+}
+
+static int
+#if PROTOTYPES
+StartTask(CONSENT *pCE, char *cmd, uid_t uid, gid_t gid)
+#else
+StartTask(pCE, cmd, uid, gid)
+    CONSENT *pCE;
+    char *cmd;
+    uid_t uid;
+    gid_t gid;
+#endif
+{
+    int i;
+    extern char **environ;
+    char *pcShell, **ppcArgv;
+    extern int FallBack PARAMS((char **, int *));
+    char *execSlave;		/* pseudo-device slave side             */
+    int execSlaveFD;		/* fd of slave side                     */
+    int cofile;
+
+    if ((cofile = FallBack(&execSlave, &execSlaveFD)) == -1) {
+	Error("[%s] StartTask(): failed to allocate pseudo-tty: %s",
+	      pCE->server, strerror(errno));
+	return -1;
+    }
+    if (execSlave != (char *)0)
+	free(execSlave);
+
+    fflush(stdout);
+    fflush(stderr);
+
+    switch (pCE->taskpid = fork()) {
+	case -1:
+	    pCE->taskpid = 0;
+	    return -1;
+	case 0:
+	    break;
+	default:		/* server */
+	    close(execSlaveFD);
+	    if ((pCE->taskfile =
+		 FileOpenFD(cofile, simpleFile)) == (CONSFILE *)0) {
+		close(cofile);
+		Error("[%s] FileOpenFD(%d,simpleFile) failed", pCE->server,
+		      cofile);
+		return -1;
+	    }
+	    Msg("[%s] task started: pid %lu", pCE->server,
+		(unsigned long)pCE->taskpid);
+	    FD_SET(cofile, &rinit);
+	    if (maxfd < cofile + 1)
+		maxfd = cofile + 1;
+	    fflush(stderr);
+	    return 0;
+    }
+
+    close(cofile);
+
+#if HAVE_SETSID
+    setsid();
+#else
+    tcsetpgrp(0, getpid());
+#endif
+
+    close(1);
+    if (dup(execSlaveFD) != 1) {
+	Error("[%s] StartTask(): fd 1 sync error", pCE->server);
+	exit(EX_OSERR);
+    }
+    close(2);
+    if (dup(execSlaveFD) != 2) {
+	exit(EX_OSERR);
+    }
+    /* no stdin */
+    close(0);
+    close(execSlaveFD);
+
+    /* setup new process with clean file descriptors
+     */
+    i = GetMaxFiles();
+    for ( /* i above */ ; --i > 2;) {
+	close(i);
+    }
+
+    if (geteuid() == 0) {
+	if (gid != 0)
+	    setgid(gid);
+	if (uid != 0)
+	    setuid(uid);
+    }
+
+    SetupTty(pCE, 1);
+
+    pcShell = "/bin/sh";
+    static char *apcArgv[] = {
+	"/bin/sh", "-ce", (char *)0, (char *)0
+    };
+
+    apcArgv[2] = cmd;
+    ppcArgv = apcArgv;
+
+    execve(pcShell, ppcArgv, environ);
+    Error("[%s] execve(): %s", pCE->server, strerror(errno));
+    exit(EX_OSERR);
+    return -1;
+}
+
+void
+#if PROTOTYPES
+InvokeTask(CONSCLIENT *pCLServing, CONSENT *pCEServing, char id)
+#else
+InvokeTask(pCLServing, pCEServing, id)
+    CONSCLIENT *pCLServing;
+    CONSENT *pCEServing;
+    char id;
+#endif
+{
+    TASKS *t = (TASKS *)0;
+    int ret;
+    char *cmd;
+
+    if ((id < '0' || id > '9') && (id < 'a' || id > 'z')) {
+	FileWrite(pCLServing->fd, FLAGFALSE, "aborted]\r\n", -1);
+	return;
+    }
+
+    if (pCEServing->taskpid != 0) {
+	FileWrite(pCLServing->fd, FLAGFALSE, "aborted - task running]\r\n",
+		  -1);
+	return;
+    }
+
+    if ((char *)0 != strchr(pCEServing->tasklist, id) ||
+	(char *)0 != strchr(pCEServing->tasklist, '*')) {
+	for (t = taskList; t != (TASKS *)0; t = t->next) {
+	    if (t->id == id)
+		break;
+	}
+    }
+
+    if (t == (TASKS *)0) {
+	FileWrite(pCLServing->fd, FLAGFALSE, "undefined]\r\n", -1);
+	return;
+    }
+
+    if (t->confirm == FLAGTRUE) {
+	switch (pCLServing->confirmed) {
+	    case FLAGUNKNOWN:
+		FileWrite(pCLServing->fd, FLAGFALSE, "confirm? [y/N] ",
+			  -1);
+		pCLServing->confirmed = FLAGFALSE;
+		pCLServing->cState = S_TASK;
+		pCLServing->iState = S_CONFIRM;
+		pCLServing->cOption = id;
+		return;
+	    case FLAGFALSE:
+		FileWrite(pCLServing->fd, FLAGFALSE, "aborted]\r\n", -1);
+		pCLServing->confirmed = FLAGUNKNOWN;
+		return;
+	    case FLAGTRUE:
+		pCLServing->confirmed = FLAGUNKNOWN;
+	}
+    }
+
+    if ((cmd = StrDup(t->cmd->string)) == (char *)0)
+	OutOfMem();
+
+    if (t->subst != (char *)0) {
+	substData->data = (void *)pCEServing;
+	ProcessSubst(substData, &cmd, (char **)0, (char *)0, t->subst);
+    }
+
+    if (StartTask(pCEServing, cmd, t->uid, t->gid) == 0) {
+	CONSCLIENT *pCL;
+	char *detail;
+
+	FilePrint(pCLServing->fd, FLAGFALSE, "`%c' started]\r\n", id);
+	detail = t->descr->used > 1 ? t->descr->string : cmd;
+
+	/* tell all who started it */
+	for (pCL = pCEServing->pCLon; (CONSCLIENT *)0 != pCL;
+	     pCL = pCL->pCLnext) {
+	    if (pCL == pCLServing)
+		continue;
+	    if (pCL->fcon) {
+		FilePrint(pCL->fd, FLAGFALSE,
+			  "[task `%s' started by %s]\r\n", detail,
+			  pCLServing->acid->string);
+	    }
+	}
+
+	if (pCEServing->tasklog == FLAGTRUE) {
+	    TagLogfile(pCEServing, "task started: pid %lu -- `%s'",
+		       pCEServing->taskpid, cmd);
+	}
+    } else {
+	FileWrite(pCLServing->fd, FLAGFALSE, "failure]\r\n", -1);
+    }
+    free(cmd);
 }
 
 #if HAVE_OPENSSL
@@ -2317,8 +2622,8 @@ CommandHosts(pGE, pCLServing, pCEServing, tyme, args)
 						  pCE->ioState == ISNORMAL)
 		  ? (pCE->initfile == (CONSFILE *)
 		     0 ? "up" : "init") : "down",
-		  pCE->pCLwr ? pCE->pCLwr->acid->
-		  string : pCE->pCLon ? "<spies>" : "<none>");
+		  pCE->pCLwr ? pCE->pCLwr->acid->string : pCE->
+		  pCLon ? "<spies>" : "<none>");
 	if (args != (char *)0)
 	    break;
     }
@@ -2404,7 +2709,7 @@ CommandInfo(pGE, pCLServing, pCEServing, tyme, args)
 	}
 
 	FilePrint(pCLServing->fd, FLAGTRUE,
-		  ":%s:%s:%s,%s,%s,%s,%d,%d:%d:%s:",
+		  ":%s:%s:%s,%s,%s,%s,%s,%d,%d:%d:%s:",
 		  ((pCE->fup &&
 		    pCE->ioState == ISNORMAL) ? (pCE->initfile ==
 						 (CONSFILE *)0 ? "up" :
@@ -2413,9 +2718,10 @@ CommandInfo(pGE, pCLServing, pCEServing, tyme, args)
 		  (pCE->logfile == (char *)0 ? "" : pCE->logfile),
 		  (pCE->nolog ? "nolog" : "log"),
 		  (pCE->activitylog == FLAGTRUE ? "act" : "noact"),
-		  (pCE->breaklog == FLAGTRUE ? "brk" : "nobrk"), pCE->mark,
-		  (pCE->fdlog ? pCE->fdlog->fd : -1), pCE->breakNum,
-		  (pCE->autoReUp ? "autoup" : "noautoup"));
+		  (pCE->breaklog == FLAGTRUE ? "brk" : "nobrk"),
+		  (pCE->tasklog == FLAGTRUE ? "task" : "notask"),
+		  pCE->mark, (pCE->fdlog ? pCE->fdlog->fd : -1),
+		  pCE->breakNum, (pCE->autoReUp ? "autoup" : "noautoup"));
 	if (pCE->aliases != (NAMES *)0) {
 	    NAMES *n;
 	    comma = 0;
@@ -2808,6 +3114,41 @@ DoConsoleRead(pCEServing)
 
 void
 #if PROTOTYPES
+DoTaskRead(CONSENT *pCEServing)
+#else
+DoTaskRead(pCEServing)
+    CONSENT *pCEServing;
+#endif
+{
+    unsigned char acInOrig[BUFSIZ];
+    int nr, i, fd;
+    CONSCLIENT *pCL;
+
+    if (pCEServing->taskfile == (CONSFILE *)0)
+	return;
+
+    fd = FileFDNum(pCEServing->taskfile);
+
+    /* read from task */
+    if ((nr =
+	 FileRead(pCEServing->taskfile, acInOrig, sizeof(acInOrig))) < 0) {
+	CONDDEBUG((1, "DoTaskRead(): got %d bytes from fd %d", nr, fd));
+	StopTask(pCEServing);
+	return;
+    }
+    CONDDEBUG((1, "DoTaskRead(): read %d bytes from fd %d", nr, fd));
+
+    /* write console info to clients (not suspended)
+     */
+    for (pCL = pCEServing->pCLon; (CONSCLIENT *)0 != pCL;
+	 pCL = pCL->pCLnext) {
+	if (pCL->fcon)
+	    FileWrite(pCL->fd, FLAGFALSE, (char *)acInOrig, nr);
+    }
+}
+
+void
+#if PROTOTYPES
 DoCommandRead(CONSENT *pCEServing)
 #else
 DoCommandRead(pCEServing)
@@ -3045,7 +3386,8 @@ DoClientRead(pGE, pCLServing)
 
 		/* process password here...before we corrupt accmd */
 		if (pCLServing->iState == S_PASSWD) {
-		    if (CheckPasswd(pCLServing, pCLServing->accmd->string)
+		    if (CheckPasswd
+			(pCLServing, pCLServing->accmd->string, FLAGFALSE)
 			!= AUTH_SUCCESS) {
 			FileWrite(pCLServing->fd, FLAGFALSE,
 				  "invalid password\r\n", -1);
@@ -3150,8 +3492,8 @@ DoClientRead(pGE, pCLServing)
 			    BuildString(pCLServing->peername->string,
 					pCLServing->acid);
 			    if (pCLServing->caccess == 't' ||
-				CheckPasswd(pCLServing,
-					    "") == AUTH_SUCCESS) {
+				CheckPasswd(pCLServing, "",
+					    FLAGTRUE) == AUTH_SUCCESS) {
 				pCLServing->iState = S_NORMAL;
 				Verbose("<group> login %s",
 					pCLServing->acid->string);
@@ -3348,9 +3690,8 @@ DoClientRead(pGE, pCLServing)
 				    pcArgs, pCLServing->acid->string);
 			    num =
 				DisconnectCertainClients(pGE,
-							 pCLServing->
-							 acid->string,
-							 pcArgs);
+							 pCLServing->acid->
+							 string, pcArgs);
 			    /* client expects this string to be formatted
 			     * in this way only.
 			     */
@@ -3369,6 +3710,7 @@ DoClientRead(pGE, pCLServing)
 		}
 		BuildString((char *)0, pCLServing->accmd);
 	    } else
+	      statestart:
 		switch (pCLServing->iState) {
 		    case S_IDENT:
 		    case S_PASSWD:
@@ -3564,7 +3906,12 @@ DoClientRead(pGE, pCLServing)
 			    FileWrite(pCLServing->fd, FLAGFALSE,
 				      "list]\r\n", -1);
 			    i = pCEServing->breakNum;
-			    if (i == 0 || breakList[i - 1].seq->used <= 1)
+			    if (i == 0 || breakList[i - 1].seq->used <= 1
+				|| pCEServing->breaklist == (char *)0 ||
+				((char *)0 ==
+				 strchr(pCEServing->breaklist, '1' + i)
+				 && (char *)0 ==
+				 strchr(pCEServing->breaklist, '*')))
 				FileWrite(pCLServing->fd, FLAGTRUE,
 					  " 0 -   0ms, <undefined>\r\n",
 					  -1);
@@ -3577,15 +3924,24 @@ DoClientRead(pGE, pCLServing)
 					  breakList[i - 1].delay,
 					  acA1->string);
 			    }
-			    for (i = 0; i < 9; i++) {
-				if (breakList[i].seq->used > 1) {
-				    FmtCtlStr(breakList[i].seq->string,
-					      breakList[i].seq->used - 1,
-					      acA1);
-				    FilePrint(pCLServing->fd, FLAGTRUE,
-					      " %d - %3dms, `%s'\r\n",
-					      i + 1, breakList[i].delay,
-					      acA1->string);
+			    if (pCEServing->breaklist != (char *)0) {
+				for (i = 0; i < 9; i++) {
+				    if ((char *)0 ==
+					strchr(pCEServing->breaklist,
+					       '1' + i)
+					&& (char *)0 ==
+					strchr(pCEServing->breaklist, '*'))
+					continue;
+				    if (breakList[i].seq->used > 1) {
+					FmtCtlStr(breakList[i].seq->string,
+						  breakList[i].seq->used -
+						  1, acA1);
+					FilePrint(pCLServing->fd, FLAGTRUE,
+						  " %d - %3dms, `%s'\r\n",
+						  i + 1,
+						  breakList[i].delay,
+						  acA1->string);
+				    }
 				}
 			    }
 			    FileWrite(pCLServing->fd, FLAGFALSE, (char *)0,
@@ -3599,6 +3955,94 @@ DoClientRead(pGE, pCLServing)
 					  "attach to send break]\r\n", -1);
 			}
 			continue;
+
+		    case S_TASK:	/* task invocation */
+			pCLServing->iState = S_NORMAL;
+			if (pCEServing->taskpid != 0 && acIn[i] == '.') {
+			    FileWrite(pCLServing->fd, FLAGFALSE,
+				      "terminate]\r\n", -1);
+			    StopTask(pCEServing);
+			    continue;
+			}
+			if (acIn[i] != '?' &&
+			    ((acIn[i] < '0' || acIn[i] > '9') &&
+			     (acIn[i] < 'a' || acIn[i] > 'z'))) {
+			    FileWrite(pCLServing->fd, FLAGFALSE,
+				      "aborted]\r\n", -1);
+			    continue;
+			}
+
+			if (acIn[i] == '?') {
+			    TASKS *t;
+			    int saw = 0;
+			    if (pCEServing->taskpid != 0) {
+				STRING *acA1 = AllocString();
+				STRING *acA2 = AllocString();
+				FilePrint(pCLServing->fd, FLAGFALSE,
+					  "running - pid %lu - use `%s%s!.' to terminate]\r\n",
+					  (unsigned long)pGE->pid,
+					  FmtCtl(pCLServing->ic[0], acA1),
+					  FmtCtl(pCLServing->ic[1], acA2));
+				DestroyString(acA1);
+				DestroyString(acA2);
+				return;
+			    } else {
+				FileWrite(pCLServing->fd, FLAGFALSE,
+					  "list]\r\n", -1);
+				if (pCEServing->tasklist != (char *)0) {
+				    for (t = taskList; t != (TASKS *)0;
+					 t = t->next) {
+					if ((char *)0 ==
+					    strchr(pCEServing->tasklist,
+						   t->id)
+					    && (char *)0 ==
+					    strchr(pCEServing->tasklist,
+						   '*'))
+					    continue;
+
+					if (t->descr->used > 1) {
+					    FilePrint(pCLServing->fd,
+						      FLAGTRUE,
+						      " %c - `%s'\r\n",
+						      t->id,
+						      t->descr->string);
+					} else if (t->cmd->used > 1) {
+					    FilePrint(pCLServing->fd,
+						      FLAGTRUE,
+						      " %c - `%s'\r\n",
+						      t->id,
+						      t->cmd->string);
+					}
+					saw++;
+				    }
+				}
+				if (saw == 0)
+				    FileWrite(pCLServing->fd, FLAGTRUE,
+					      " <undefined>\r\n", -1);
+				FileWrite(pCLServing->fd, FLAGFALSE,
+					  (char *)0, 0);
+			    }
+			} else {
+			    if (pCLServing->fwr) {
+				InvokeTask(pCLServing, pCEServing,
+					   acIn[i]);
+			    } else
+				FileWrite(pCLServing->fd, FLAGFALSE,
+					  "attach to invoke task]\r\n",
+					  -1);
+			}
+			continue;
+
+		    case S_CONFIRM:
+			if (acIn[i] == 'y' || acIn[i] == 'Y') {
+			    pCLServing->confirmed = FLAGTRUE;
+			    FileWrite(pCLServing->fd, FLAGFALSE, "y ", -1);
+			} else {
+			    FileWrite(pCLServing->fd, FLAGFALSE, "n ", -1);
+			}
+			pCLServing->iState = pCLServing->cState;
+			acIn[i] = pCLServing->cOption;
+			goto statestart;
 
 		    case S_CATTN:	/* redef escape sequence? */
 			pCLServing->ic[0] = acInOrig[i];
@@ -3688,16 +4132,6 @@ DoClientRead(pGE, pCLServing)
 				    pCLServing->fcon = 1;
 				}
 				break;
-			    case '+':
-			    case '-':
-				if (0 !=
-				    (pCLServing->fecho = '+' == acIn[i]))
-				    FileWrite(pCLServing->fd, FLAGFALSE,
-					      "drop line]\r\n", -1);
-				else
-				    FileWrite(pCLServing->fd, FLAGFALSE,
-					      "no drop line]\r\n", -1);
-				break;
 
 			    case 'a':	/* attach */
 				CommandAttach(pGE, pCLServing, pCEServing,
@@ -3712,11 +4146,17 @@ DoClientRead(pGE, pCLServing)
 				break;
 
 			    case 'c':
+				if (!pCLServing->fwr) {
+				    goto unknownchar;
+				}
 				CommandChangeFlow(pGE, pCLServing,
 						  pCEServing, tyme);
 				break;
 
 			    case 'd':	/* down a console       */
+				if (!pCLServing->fwr) {
+				    goto unknownchar;
+				}
 				CommandDown(pGE, pCLServing, pCEServing,
 					    tyme);
 				break;
@@ -3753,11 +4193,17 @@ DoClientRead(pGE, pCLServing)
 				break;
 
 			    case 'L':
+				if (!pCLServing->fwr) {
+				    goto unknownchar;
+				}
 				CommandLogging(pGE, pCLServing, pCEServing,
 					       tyme);
 				break;
 
 			    case 'l':	/* halt character 1     */
+				if (!pCLServing->fwr) {
+				    goto unknownchar;
+				}
 				if (pCEServing->fronly) {
 				    FileWrite(pCLServing->fd, FLAGFALSE,
 					      "can't halt read-only console]\r\n",
@@ -3835,12 +4281,10 @@ DoClientRead(pGE, pCLServing)
 				break;
 
 			    case 's':	/* spy mode */
-				pCLServing->fwantwr = 0;
 				if (!pCLServing->fwr) {
-				    FileWrite(pCLServing->fd, FLAGFALSE,
-					      "ok]\r\n", -1);
-				    break;
+				    goto unknownchar;
 				}
+				pCLServing->fwantwr = 0;
 				BumpClient(pCEServing, (char *)0);
 				TagLogfileAct(pCEServing, "%s detached",
 					      pCLServing->acid->string);
@@ -3894,73 +4338,33 @@ DoClientRead(pGE, pCLServing)
 				    BumpClient(pCEServing, (char *)0);
 				    TagLogfileAct(pCEServing,
 						  "%s detached",
-						  pCLServing->
-						  acid->string);
+						  pCLServing->acid->
+						  string);
 				    FindWrite(pCEServing);
 				}
 				break;
 
-			    case '|':	/* wait for client */
-				if (ConsentUserOk
-				    (pLUList,
-				     pCLServing->username->string) == 1)
-				    goto unknownchar;
+			    case '!':	/* invoke a task */
 				if (!pCLServing->fwr) {
-				    FileWrite(pCLServing->fd, FLAGFALSE,
-					      "attach to run local command]\r\n",
-					      -1);
-				    continue;
+				    goto unknownchar;
 				}
+				pCLServing->iState = S_TASK;
+				FileWrite(pCLServing->fd, FLAGFALSE,
+					  "task ", -1);
+				break;
+
+			    case '|':	/* wait for client */
+				if (!pCLServing->fwr ||
+				    ConsentUserOk(pLUList,
+						  pCLServing->username->
+						  string) == 1)
+				    goto unknownchar;
 				FileSetQuoteIAC(pCLServing->fd, FLAGFALSE);
 				FilePrint(pCLServing->fd, FLAGFALSE,
 					  "%c%c", OB_IAC, OB_EXEC);
 				FileSetQuoteIAC(pCLServing->fd, FLAGTRUE);
 				pCLServing->fcon = 0;
 				pCLServing->iState = S_CWAIT;
-				break;
-
-			    case '\t':	/* toggle tab expand    */
-				if (!pCLServing->fwr) {
-				    FileWrite(pCLServing->fd, FLAGFALSE,
-					      "attach to toggle tabs]\r\n",
-					      -1);
-				    continue;
-				}
-				if (pCEServing->type != DEVICE &&
-				    pCEServing->type != EXEC) {
-				    FileWrite(pCLServing->fd, FLAGFALSE,
-					      "ok]\r\n", -1);
-				    continue;
-				}
-				if (-1 ==
-				    tcgetattr(FileFDNum
-					      (pCEServing->cofile),
-					      &sbuf)) {
-				    FileWrite(pCLServing->fd, FLAGFALSE,
-					      "failed]\r\n", -1);
-				    continue;
-				}
-				if (TAB3 == (TABDLY & sbuf.c_oflag)) {
-				    sbuf.c_oflag &= ~TABDLY;
-				    sbuf.c_oflag |= TAB0;
-				} else {
-				    sbuf.c_oflag &= ~TABDLY;
-				    sbuf.c_oflag |= TAB3;
-				}
-				if (-1 ==
-				    tcsetattr(FileFDNum
-					      (pCEServing->cofile),
-					      TCSANOW, &sbuf)) {
-				    FileWrite(pCLServing->fd, FLAGFALSE,
-					      "failed]\r\n", -1);
-				    continue;
-				}
-				if (TAB3 == (TABDLY & sbuf.c_oflag))
-				    FileWrite(pCLServing->fd, FLAGFALSE,
-					      "tabs OFF]\r\n", -1);
-				else
-				    FileWrite(pCLServing->fd, FLAGFALSE,
-					      "tabs ON]\r\n", -1);
 				break;
 
 			    case '.':	/* disconnect */
@@ -4672,6 +5076,8 @@ Kiddie(pGE, sfd)
 			DoConsoleRead(pCEServing);
 		    if (FileCanRead(pCEServing->initfile, &rmask, &wmask))
 			DoCommandRead(pCEServing);
+		    if (FileCanRead(pCEServing->taskfile, &rmask, &wmask))
+			DoTaskRead(pCEServing);
 		    /* fall through to ISFLUSHING for buffered data */
 		case ISFLUSHING:
 		    /* write cofile data */

@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.h,v 5.45 2005/06/07 19:55:51 bryan Exp $
+ *  $Id: readcfg.h,v 5.49 2013/09/23 22:58:21 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -28,13 +28,27 @@ typedef struct config {
 #if HAVE_OPENSSL
     char *sslcredentials;
     FLAG sslrequired;
+    FLAG sslreqclientcert;
+    char *sslcacertificatefile;
 #endif
 } CONFIG;
 
 typedef struct breaks {
     STRING *seq;
     int delay;
+    FLAG confirm;
 } BREAKS;
+
+typedef struct tasks {
+    char id;
+    STRING *cmd;
+    STRING *descr;
+    uid_t uid;
+    gid_t gid;
+    char *subst;
+    FLAG confirm;
+    struct tasks *next;
+} TASKS;
 
 extern NAMES *userList;		/* user list */
 extern GRPENT *pGroups;		/* group info */
@@ -44,12 +58,15 @@ extern ACCESS *pACList;		/* `who do you love' (or trust) */
 extern CONSENTUSERS *pADList;	/* list of admin users */
 extern CONSENTUSERS *pLUList;	/* list of limited users */
 extern BREAKS breakList[9];	/* list of break sequences */
+extern TASKS *taskList;		/* list of tasks */
+extern SUBST *taskSubst;	/* substitution function data for tasks */
 extern CONFIG *pConfig;		/* settings seen by config parser */
 extern SUBST *substData;	/* substitution function data */
 
 extern void ReadCfg PARAMS((char *, FILE *));
 extern void ReReadCfg PARAMS((int, int));
 extern void DestroyBreakList PARAMS((void));
+extern void DestroyTaskList PARAMS((void));
 extern void DestroyUserList PARAMS((void));
 extern void DestroyConfig PARAMS((CONFIG *));
 extern NAMES *FindUserList PARAMS((char *));

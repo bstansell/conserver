@@ -1,5 +1,5 @@
 /*
- *  $Id: version.h,v 1.77 2010/11/11 22:44:10 bryan Exp $
+ *  $Id: version.h,v 1.78 2013/09/13 20:54:09 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -16,6 +16,6 @@ All rights reserved.\n"
 
 #define VERSION_MAJOR	8
 #define VERSION_MINOR	1
-#define VERSION_REV	18
+#define VERSION_REV	19
 #define VERSION_TEXT	"conserver.com version"
 #define VERSION_UINT	(VERSION_MAJOR * 1000000 + VERSION_MINOR * 1000 + VERSION_REV)

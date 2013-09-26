@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.194 2009/09/26 09:20:47 bryan Exp $
+ *  $Id: readcfg.c,v 5.202 2013/09/26 17:50:24 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -50,6 +50,81 @@ BREAKS breakList[9] = {
     {(STRING *)0, 0}, {(STRING *)0, 0}, {(STRING *)0, 0},
     {(STRING *)0, 0}, {(STRING *)0, 0}, {(STRING *)0, 0}
 };
+
+TASKS *taskList = (TASKS *)0;
+SUBST *taskSubst = (SUBST *)0;
+
+/***** internal things *****/
+#define ALLWORDSEP ", \f\v\t\n\r"
+
+int isStartup = 0;
+GRPENT *pGroupsOld = (GRPENT *)0;
+GRPENT *pGEstage = (GRPENT *)0;
+GRPENT *pGE = (GRPENT *)0;
+static unsigned int groupID = 1;
+REMOTE **ppRC = (REMOTE **)0;
+
+/* 'task' handling (plus) */
+void
+#if PROTOTYPES
+ProcessYesNo(char *id, FLAG *flag)
+#else
+ProcessYesNo(id, flag)
+    char *id;
+    FLAG *flag;
+#endif
+{
+    if (id == (char *)0 || id[0] == '\000')
+	*flag = FLAGFALSE;
+    else if (strcasecmp("yes", id) == 0 || strcasecmp("true", id) == 0 ||
+	     strcasecmp("on", id) == 0)
+	*flag = FLAGTRUE;
+    else if (strcasecmp("no", id) == 0 || strcasecmp("false", id) == 0 ||
+	     strcasecmp("off", id) == 0)
+	*flag = FLAGFALSE;
+    else if (isMaster)
+	Error("invalid boolean entry `%s' [%s:%d]", id, file, line);
+}
+
+void
+#if PROTOTYPES
+DestroyTask(TASKS *task)
+#else
+DestroyTask(task)
+    TASKS *task;
+#endif
+{
+    if (task->cmd != (STRING *)0) {
+	DestroyString(task->cmd);
+	task->cmd = (STRING *)0;
+    }
+    if (task->descr != (STRING *)0) {
+	DestroyString(task->descr);
+	task->descr = (STRING *)0;
+    }
+    if (task->subst != (char *)0)
+	free(task->subst);
+    free(task);
+}
+
+void
+#if PROTOTYPES
+DestroyTaskList(void)
+#else
+DestroyTaskList()
+#endif
+{
+    TASKS *n;
+    while (taskList != (TASKS *)0) {
+	n = taskList->next;
+	DestroyTask(taskList);
+	taskList = n;
+    }
+    if (taskSubst != (SUBST *)0) {
+	free(taskSubst);
+	taskSubst = (SUBST *)0;
+    }
+}
 
 void
 #if PROTOTYPES
@@ -124,20 +199,11 @@ AddUserList(id)
     return u;
 }
 
-/***** internal things *****/
-#define ALLWORDSEP ", \f\v\t\n\r"
-
-int isStartup = 0;
-GRPENT *pGroupsOld = (GRPENT *)0;
-GRPENT *pGEstage = (GRPENT *)0;
-GRPENT *pGE = (GRPENT *)0;
-static unsigned int groupID = 1;
-REMOTE **ppRC = (REMOTE **)0;
-
 /* 'break' handling */
 STRING *parserBreak = (STRING *)0;
 int parserBreakDelay = 0;
 int parserBreakNum = 0;
+FLAG parserBreakConfirm = FLAGFALSE;
 
 CONSENTUSERS *
 #if PROTOTYPES
@@ -198,6 +264,7 @@ BreakBegin(id)
 	else
 	    BuildString((char *)0, parserBreak);
 	parserBreakDelay = BREAKDELAYDEFAULT;
+	parserBreakConfirm = FLAGFALSE;
     }
 }
 
@@ -216,6 +283,7 @@ BreakEnd()
     BuildString((char *)0, breakList[parserBreakNum - 1].seq);
     BuildString(parserBreak->string, breakList[parserBreakNum - 1].seq);
     breakList[parserBreakNum - 1].delay = parserBreakDelay;
+    breakList[parserBreakNum - 1].confirm = parserBreakConfirm;
     parserBreakNum = 0;
 }
 
@@ -248,9 +316,9 @@ BreakDestroy()
 	for (i = 0; i < 9; i++) {
 	    Msg("Break[%d] = `%s', delay=%d", i,
 		breakList[i].seq ==
-		(STRING *)0 ? "(null)" : (breakList[i].
-					  seq->string ? breakList[i].
-					  seq->string : "(null)"),
+		(STRING *)0 ? "(null)" : (breakList[i].seq->
+					  string ? breakList[i].seq->
+					  string : "(null)"),
 		breakList[i].delay);
 	}
     }
@@ -300,6 +368,18 @@ BreakItemDelay(id)
 	return;
     }
     parserBreakDelay = delay;
+}
+
+void
+#if PROTOTYPES
+BreakItemConfirm(char *id)
+#else
+BreakItemConfirm(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "BreakItemConfirm(%s) [%s:%d]", id, file, line));
+    ProcessYesNo(id, &(parserBreakConfirm));
 }
 
 /* 'group' handling */
@@ -471,20 +551,21 @@ GroupAddUser(pg, id, not)
 
 void
 #if PROTOTYPES
-CopyConsentUserList(CONSENTUSERS *s, CONSENTUSERS **d)
+CopyConsentUserList(CONSENTUSERS *s, CONSENTUSERS **d, short not)
 #else
-CopyConsentUserList(CONSENTUSERS *s, CONSENTUSERS **d)
+CopyConsentUserList(s, d, not)
     CONSENTUSERS *s;
     CONSENTUSERS **d;
+    short not;
 #endif
 {
     /* we have to add things backwards, since it's an ordered list */
     if (s == (CONSENTUSERS *)0 || d == (CONSENTUSERS **)0)
 	return;
 
-    CopyConsentUserList(s->next, d);
+    CopyConsentUserList(s->next, d, not);
 
-    ConsentAddUser(d, s->user->name, s->not);
+    ConsentAddUser(d, s->user->name, not ? !s->not : s->not);
 }
 
 
@@ -517,7 +598,7 @@ GroupItemUsers(id)
 	if ((pg = GroupFind(token)) == (PARSERGROUP *)0)
 	    GroupAddUser(parserGroupTemp, token, not);
 	else
-	    CopyConsentUserList(pg->users, &(parserGroupTemp->users));
+	    CopyConsentUserList(pg->users, &(parserGroupTemp->users), not);
     }
 }
 
@@ -593,6 +674,10 @@ DestroyParserDefaultOrConsole(c, ph, pt)
 	free(c->idlestring);
     if (c->replstring != (char *)0)
 	free(c->replstring);
+    if (c->tasklist != (char *)0)
+	free(c->tasklist);
+    if (c->breaklist != (char *)0)
+	free(c->breaklist);
     if (c->execSlave != (char *)0)
 	free(c->execSlave);
     while (c->aliases != (NAMES *)0) {
@@ -675,6 +760,8 @@ ApplyDefault(d, c)
 	c->activitylog = d->activitylog;
     if (d->breaklog != FLAGUNKNOWN)
 	c->breaklog = d->breaklog;
+    if (d->tasklog != FLAGUNKNOWN)
+	c->tasklog = d->tasklog;
     if (d->hupcl != FLAGUNKNOWN)
 	c->hupcl = d->hupcl;
     if (d->cstopb != FLAGUNKNOWN)
@@ -785,8 +872,20 @@ ApplyDefault(d, c)
 	if ((c->replstring = StrDup(d->replstring)) == (char *)0)
 	    OutOfMem();
     }
-    CopyConsentUserList(d->ro, &(c->ro));
-    CopyConsentUserList(d->rw, &(c->rw));
+    if (d->tasklist != (char *)0) {
+	if (c->tasklist != (char *)0)
+	    free(c->tasklist);
+	if ((c->tasklist = StrDup(d->tasklist)) == (char *)0)
+	    OutOfMem();
+    }
+    if (d->breaklist != (char *)0) {
+	if (c->breaklist != (char *)0)
+	    free(c->breaklist);
+	if ((c->breaklist = StrDup(d->breaklist)) == (char *)0)
+	    OutOfMem();
+    }
+    CopyConsentUserList(d->ro, &(c->ro), 0);
+    CopyConsentUserList(d->rw, &(c->rw), 0);
 }
 
 void
@@ -975,56 +1074,8 @@ DefaultItemDevice(id)
     ProcessDevice(parserDefaultTemp, id);
 }
 
+/* substitution support */
 SUBST *substData = (SUBST *)0;
-
-int
-#if PROTOTYPES
-SubstValue(char c, char **s, int *i)
-#else
-SubstValue(c, s, i)
-    char c;
-    char **s;
-    int *i;
-#endif
-{
-    int retval = 0;
-    CONSENT *pCE;
-    static char *empty = "";
-
-    if (substData->data == (void *)0)
-	return 0;
-    pCE = (CONSENT *)(substData->data);
-
-    if (s != (char **)0) {
-	if (c == 'h') {
-	    (*s) = pCE->host;
-	    retval = 1;
-	} else if (c == 'c') {
-	    (*s) = pCE->server;
-	    retval = 1;
-	} else if (c == 'r') {
-	    if (pCE->replstring == (char *)0) {
-		(*s) = empty;
-	    } else {
-		(*s) = pCE->replstring;
-	    }
-	    retval = 1;
-	}
-    }
-
-    if (i != (int *)0) {
-	if (c == 'p') {
-	    (*i) = pCE->port;
-	    retval = 1;
-	} else if (c == 'P') {
-	    (*i) = pCE->netport;
-	    retval = 1;
-	}
-    }
-
-    return retval;
-}
-
 int substTokenCount[255];
 
 int
@@ -1050,6 +1101,63 @@ ZeroSubstTokenCount()
 #else
     bzero((char *)&substTokenCount, sizeof(substTokenCount));
 #endif
+}
+
+
+int
+#if PROTOTYPES
+SubstValue(char c, char **s, int *i)
+#else
+SubstValue(c, s, i)
+    char c;
+    char **s;
+    int *i;
+#endif
+{
+    int retval = 0;
+    CONSENT *pCE;
+    static char *empty = "";
+
+    if (substData->data == (void *)0)
+	return 0;
+    pCE = (CONSENT *)(substData->data);
+
+    if (s != (char **)0) {
+	if (c == 'h') {
+	    if (pCE->host == (char *)0) {
+		(*s) = empty;
+	    } else {
+		(*s) = pCE->host;
+	    }
+	    retval = 1;
+	} else if (c == 'c') {
+	    if (pCE->server == (char *)0) {
+		(*s) = empty;
+	    } else {
+		(*s) = pCE->server;
+	    }
+	    retval = 1;
+	} else if (c == 'r') {
+	    if (pCE->replstring == (char *)0) {
+		(*s) = empty;
+	    } else {
+		(*s) = pCE->replstring;
+	    }
+	    retval = 1;
+	}
+    }
+
+    if (i != (int *)0) {
+	if (c == 'p') {
+	    (*i) = pCE->port;
+	    retval = 1;
+	} else if (c == 'P') {
+	    (*i) = pCE->netport;
+	    retval = 1;
+	}
+    }
+
+    return retval;
 }
 
 SUBSTTOKEN
@@ -2058,6 +2166,111 @@ DefaultItemReplstring(id)
 
 void
 #if PROTOTYPES
+ProcessTasklist(CONSENT *c, char *id)
+#else
+ProcessTasklist(c, id)
+    CONSENT *c;
+    char *id;
+#endif
+{
+    char *token = (char *)0;
+    char *list = (char *)0;
+
+    CONDDEBUG((1, "ProcessTasklist(%s) [%s:%d]", id, file, line));
+
+    if (c->tasklist != (char *)0) {
+	free(c->tasklist);
+	c->tasklist = (char *)0;
+    }
+    if ((id == (char *)0) || (*id == '\000'))
+	return;
+
+    list = BuildTmpString((char *)0);
+    for (token = strtok(id, ALLWORDSEP); token != (char *)0;
+	 token = strtok(NULL, ALLWORDSEP)) {
+	if (token[1] != '\000' ||
+	    ((token[0] < '0' || token[0] > '9') &&
+	     (token[0] < 'a' || token[0] > 'z') && token[0] != '*')) {
+	    if (isMaster)
+		Error("invalid tasklist reference `%s' [%s:%d]", token,
+		      file, line);
+	    continue;
+	}
+	list = BuildTmpStringChar(token[0]);
+    }
+    if (list == (char *)0 || *list == '\000')
+	return;
+
+    if ((c->tasklist = StrDup(list)) == (char *)0)
+	OutOfMem();
+}
+
+void
+#if PROTOTYPES
+DefaultItemTasklist(char *id)
+#else
+DefaultItemTasklist(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemTasklist(%s) [%s:%d]", id, file, line));
+    ProcessTasklist(parserDefaultTemp, id);
+}
+
+void
+#if PROTOTYPES
+ProcessBreaklist(CONSENT *c, char *id)
+#else
+ProcessBreaklist(c, id)
+    CONSENT *c;
+    char *id;
+#endif
+{
+    char *token = (char *)0;
+    char *list = (char *)0;
+
+    CONDDEBUG((1, "ProcessBreaklist(%s) [%s:%d]", id, file, line));
+
+    if (c->breaklist != (char *)0) {
+	free(c->breaklist);
+	c->breaklist = (char *)0;
+    }
+    if ((id == (char *)0) || (*id == '\000'))
+	return;
+
+    list = BuildTmpString((char *)0);
+    for (token = strtok(id, ALLWORDSEP); token != (char *)0;
+	 token = strtok(NULL, ALLWORDSEP)) {
+	if (token[1] != '\000' ||
+	    ((token[0] < '0' || token[0] > '9') && token[0] != '*')) {
+	    if (isMaster)
+		Error("invalid breaklist reference `%s' [%s:%d]", token,
+		      file, line);
+	    continue;
+	}
+	list = BuildTmpStringChar(token[0]);
+    }
+    if (list == (char *)0 || *list == '\000')
+	return;
+
+    if ((c->breaklist = StrDup(list)) == (char *)0)
+	OutOfMem();
+}
+
+void
+#if PROTOTYPES
+DefaultItemBreaklist(char *id)
+#else
+DefaultItemBreaklist(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemBreaklist(%s) [%s:%d]", id, file, line));
+    ProcessBreaklist(parserDefaultTemp, id);
+}
+
+void
+#if PROTOTYPES
 ProcessIdletimeout(CONSENT *c, char *id)
 #else
 ProcessIdletimeout(c, id)
@@ -2133,7 +2346,7 @@ ProcessRoRw(ppCU, id)
 	if ((pg = GroupFind(token)) == (PARSERGROUP *)0)
 	    ConsentAddUser(ppCU, token, not);
 	else
-	    CopyConsentUserList(pg->users, ppCU);
+	    CopyConsentUserList(pg->users, ppCU, not);
     }
 }
 
@@ -2172,12 +2385,14 @@ ProcessTimestamp(c, id)
 {
     time_t tyme;
     char *p = (char *)0, *n = (char *)0;
-    FLAG activity = FLAGFALSE, bactivity = FLAGFALSE;
+    FLAG activity = FLAGFALSE, bactivity = FLAGFALSE, tactivity =
+	FLAGFALSE;
     int factor = 0, pfactor = 0;
     int value = 0, pvalue = 0;
 
     if ((id == (char *)0) || (*id == '\000')) {
 	c->breaklog = FLAGFALSE;
+	c->tasklog = FLAGFALSE;
 	c->activitylog = FLAGFALSE;
 	c->nextMark = 0;
 	c->mark = 0;
@@ -2204,6 +2419,14 @@ ProcessTimestamp(c, id)
 			 id, file, line);
 	    }
 	    bactivity = FLAGTRUE;
+	} else if (*p == 't' || *p == 'T') {
+	    if (n != (char *)0) {
+		if (isMaster)
+		    Error
+			("invalid timestamp specification `%s': numeral before `t' (ignoring numeral) [%s:%d]",
+			 id, file, line);
+	    }
+	    tactivity = FLAGTRUE;
 	} else if (*p == 'm' || *p == 'M') {
 	    pfactor = 60;
 	} else if (*p == 'h' || *p == 'H') {
@@ -2264,11 +2487,12 @@ ProcessTimestamp(c, id)
     }
 
     CONDDEBUG((1,
-	       "ProcessTimestamp(): mark spec of `%s' parsed: factor=%d, value=%d, activity=%d, bactivity=%d",
-	       id, factor, value, activity, bactivity));
+	       "ProcessTimestamp(): mark spec of `%s' parsed: factor=%d, value=%d, activity=%d, bactivity=%d, tactivity=%d",
+	       id, factor, value, activity, bactivity, tactivity));
 
     c->activitylog = activity;
     c->breaklog = bactivity;
+    c->tasklog = tactivity;
     if (factor && value) {
 	c->mark = value;
 	if (factor > 0) {
@@ -2379,6 +2603,11 @@ ConsoleBegin(id)
 				      (CONSENT ***)0);
     if ((parserConsoleTemp = (CONSENT *)calloc(1, sizeof(CONSENT)))
 	== (CONSENT *)0)
+	OutOfMem();
+
+    if ((parserConsoleTemp->breaklist = StrDup("*")) == (char *)0)
+	OutOfMem();
+    if ((parserConsoleTemp->tasklist = StrDup("*")) == (char *)0)
 	OutOfMem();
 
     /* prime the pump with a default of "*" */
@@ -2867,6 +3096,12 @@ ConsoleAdd(c)
 	    if (!FileBufEmpty(pCEmatch->initfile))
 		FD_SET(FileFDOutNum(pCEmatch->initfile), &winit);
 	}
+	if (pCEmatch->taskfile != (CONSFILE *)0) {
+	    int taskfile = FileFDNum(pCEmatch->taskfile);
+	    FD_SET(taskfile, &rinit);
+	    if (maxfd < taskfile + 1)
+		maxfd = taskfile + 1;
+	}
 
 	/* now check for any changes between pCEmatch & c.
 	 * we can munch the pCEmatch structure 'cause ConsDown()
@@ -3036,13 +3271,16 @@ ConsoleAdd(c)
 
 	SwapStr(&pCEmatch->motd, &c->motd);
 	SwapStr(&pCEmatch->idlestring, &c->idlestring);
-	SwapStr(&pCEmatch->replstring, &c->replstring);
+	SwapStr(&pCEmatch->replstring, &c->breaklist);
+	SwapStr(&pCEmatch->tasklist, &c->tasklist);
+	SwapStr(&pCEmatch->breaklist, &c->tasklist);
 	pCEmatch->portinc = c->portinc;
 	pCEmatch->portbase = c->portbase;
 	pCEmatch->spinmax = c->spinmax;
 	pCEmatch->spintimer = c->spintimer;
 	pCEmatch->activitylog = c->activitylog;
 	pCEmatch->breaklog = c->breaklog;
+	pCEmatch->tasklog = c->tasklog;
 	pCEmatch->raw = c->raw;
 	pCEmatch->mark = c->mark;
 	pCEmatch->nextMark = c->nextMark;
@@ -3071,8 +3309,8 @@ ConsoleAdd(c)
 	DestroyConsentUsers(&(pCEmatch->ro));
 	DestroyConsentUsers(&(pCEmatch->rw));
 	/* now copy over the new stuff */
-	CopyConsentUserList(c->ro, &(pCEmatch->ro));
-	CopyConsentUserList(c->rw, &(pCEmatch->rw));
+	CopyConsentUserList(c->ro, &(pCEmatch->ro), 0);
+	CopyConsentUserList(c->rw, &(pCEmatch->rw), 0);
 
 	/* the code above shouldn't touch any of the "runtime" members
 	 * 'cause the ConsDown() code needs to be able to rely on those
@@ -3219,6 +3457,8 @@ ConsoleDestroy()
 	    c->raw = FLAGFALSE;
 	if (c->breaklog == FLAGUNKNOWN)
 	    c->breaklog = FLAGFALSE;
+	if (c->tasklog == FLAGUNKNOWN)
+	    c->tasklog = FLAGFALSE;
 	if (c->hupcl == FLAGUNKNOWN)
 	    c->hupcl = FLAGFALSE;
 	if (c->ixany == FLAGUNKNOWN)
@@ -3826,6 +4066,30 @@ ConsoleItemReplstring(id)
 
 void
 #if PROTOTYPES
+ConsoleItemTasklist(char *id)
+#else
+ConsoleItemTasklist(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemTasklist(%s) [%s:%d]", id, file, line));
+    ProcessTasklist(parserConsoleTemp, id);
+}
+
+void
+#if PROTOTYPES
+ConsoleItemBreaklist(char *id)
+#else
+ConsoleItemBreaklist(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemBreaklist(%s) [%s:%d]", id, file, line));
+    ProcessBreaklist(parserConsoleTemp, id);
+}
+
+void
+#if PROTOTYPES
 ConsoleItemIdletimeout(char *id)
 #else
 ConsoleItemIdletimeout(id)
@@ -4199,10 +4463,11 @@ AccessItemInclude(id)
 		AccessAddACL(parserAccessTemp, a);
 	    }
 	    if (pa->admin != (CONSENTUSERS *)0)
-		CopyConsentUserList(pa->admin, &(parserAccessTemp->admin));
+		CopyConsentUserList(pa->admin, &(parserAccessTemp->admin),
+				    0);
 	    if (pa->limited != (CONSENTUSERS *)0)
 		CopyConsentUserList(pa->limited,
-				    &(parserAccessTemp->limited));
+				    &(parserAccessTemp->limited), 0);
 	}
     }
 }
@@ -4385,6 +4650,8 @@ DestroyConfig(c)
 #if HAVE_OPENSSL
     if (c->sslcredentials != (char *)0)
 	free(c->sslcredentials);
+    if (c->sslcacertificatefile != (char *)0)
+	free(c->sslcacertificatefile);
 #endif
     free(c);
 }
@@ -4480,8 +4747,18 @@ ConfigEnd()
 		pConfig->sslcredentials = parserConfigTemp->sslcredentials;
 		parserConfigTemp->sslcredentials = (char *)0;
 	    }
+	    if (parserConfigTemp->sslcacertificatefile != (char *)0) {
+		if (pConfig->sslcacertificatefile != (char *)0)
+		    free(pConfig->sslcacertificatefile);
+		pConfig->sslcacertificatefile =
+		    parserConfigTemp->sslcacertificatefile;
+		parserConfigTemp->sslcacertificatefile = (char *)0;
+	    }
 	    if (parserConfigTemp->sslrequired != FLAGUNKNOWN)
 		pConfig->sslrequired = parserConfigTemp->sslrequired;
+	    if (parserConfigTemp->sslreqclientcert != FLAGUNKNOWN)
+		pConfig->sslreqclientcert =
+		    parserConfigTemp->sslreqclientcert;
 #endif
 #if HAVE_SETPROCTITLE
 	    if (parserConfigTemp->setproctitle != FLAGUNKNOWN)
@@ -4548,25 +4825,6 @@ ConfigItemDefaultaccess(id)
 	if (isMaster)
 	    Error("invalid access type `%s' [%s:%d]", id, file, line);
     }
-}
-
-void
-#if PROTOTYPES
-ProcessYesNo(char *id, FLAG *flag)
-#else
-ProcessYesNo(id, flag)
-    char *id;
-    FLAG *flag;
-#endif
-{
-    if (id == (char *)0 || id[0] == '\000')
-	*flag = FLAGFALSE;
-    else if (strcasecmp("yes", id) == 0 || strcasecmp("true", id) == 0 ||
-	     strcasecmp("on", id) == 0)
-	*flag = FLAGTRUE;
-    else if (strcasecmp("no", id) == 0 || strcasecmp("false", id) == 0 ||
-	     strcasecmp("off", id) == 0)
-	*flag = FLAGFALSE;
 }
 
 void
@@ -4813,6 +5071,34 @@ ConfigItemSslcredentials(id)
 
 void
 #if PROTOTYPES
+ConfigItemSslcacertificatefile(char *id)
+#else
+ConfigItemSslcacertificatefile(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConfigItemSslcacertificatefile(%s) [%s:%d]", id, file,
+	       line));
+#if HAVE_OPENSSL
+    if (parserConfigTemp->sslcacertificatefile != (char *)0)
+	free(parserConfigTemp->sslcacertificatefile);
+
+    if ((id == (char *)0) || (*id == '\000')) {
+	parserConfigTemp->sslcacertificatefile = (char *)0;
+	return;
+    }
+    if ((parserConfigTemp->sslcacertificatefile = StrDup(id)) == (char *)0)
+	OutOfMem();
+#else
+    if (isMaster)
+	Error
+	    ("sslcacertificatefile ignored - encryption not compiled into code [%s:%d]",
+	     file, line);
+#endif
+}
+
+void
+#if PROTOTYPES
 ConfigItemSslrequired(char *id)
 #else
 ConfigItemSslrequired(id)
@@ -4826,6 +5112,26 @@ ConfigItemSslrequired(id)
     if (isMaster)
 	Error
 	    ("sslrequired ignored - encryption not compiled into code [%s:%d]",
+	     file, line);
+#endif
+}
+
+void
+#if PROTOTYPES
+ConfigItemSslreqclientcert(char *id)
+#else
+ConfigItemSslreqclientcert(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConfigItemSslreqclientcert(%s) [%s:%d]", id, file,
+	       line));
+#if HAVE_OPENSSL
+    ProcessYesNo(id, &(parserConfigTemp->sslreqclientcert));
+#else
+    if (isMaster)
+	Error
+	    ("sslreqclientcert ignored - encryption not compiled into code [%s:%d]",
 	     file, line);
 #endif
 }
@@ -4849,10 +5155,194 @@ ConfigItemSetproctitle(id)
 #endif
 }
 
+/* task parsing */
+TASKS *parserTask;
+
+void
+#if PROTOTYPES
+TaskBegin(char *id)
+#else
+TaskBegin(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "TaskBegin(%s) [%s:%d]", id, file, line));
+    if (id == (char *)0 || id[0] == '\000' || id[1] != '\000' ||
+	((id[0] < '0' || id[0] > '9') && (id[0] < 'a' || id[0] > 'z'))) {
+	if (isMaster)
+	    Error("invalid task id `%s' [%s:%d]", id, file, line);
+    } else {
+	if (parserTask == (TASKS *)0) {
+	    if ((parserTask =
+		 (TASKS *)calloc(1, sizeof(TASKS))) == (TASKS *)0)
+		OutOfMem();
+	    parserTask->cmd = AllocString();
+	    parserTask->descr = AllocString();
+	}
+	if (taskSubst == (SUBST *)0) {
+	    if ((taskSubst =
+		 (SUBST *)calloc(1, sizeof(SUBST))) == (SUBST *)0)
+		OutOfMem();
+	    taskSubst->value = &SubstValue;
+	    taskSubst->token = &SubstToken;
+	}
+
+	BuildString((char *)0, parserTask->cmd);
+	BuildString((char *)0, parserTask->descr);
+	parserTask->confirm = FLAGFALSE;
+	parserTask->id = id[0];
+    }
+}
+
+void
+#if PROTOTYPES
+TaskEnd(void)
+#else
+TaskEnd()
+#endif
+{
+    TASKS *t;
+    TASKS **prev;
+    CONDDEBUG((1, "TaskEnd() [%s:%d]", file, line));
+
+    /* skip this if we've marked it that way or if there is no command to run */
+    if (parserTask == (TASKS *)0 || parserTask->id == ' ' ||
+	parserTask->cmd->used <= 1)
+	return;
+
+    /* create an ordered list */
+    prev = &taskList;
+    t = taskList;
+    while (t != (TASKS *)0 && t->id < parserTask->id) {
+	prev = &(t->next);
+	t = t->next;
+    }
+    *prev = parserTask;
+    if (t != (TASKS *)0 && parserTask->id == t->id) {
+	parserTask->next = t->next;
+	DestroyTask(t);
+    } else {
+	parserTask->next = t;
+    }
+    parserTask = (TASKS *)0;
+}
+
+void
+#if PROTOTYPES
+TaskAbort(void)
+#else
+TaskAbort()
+#endif
+{
+    CONDDEBUG((1, "TaskAbort() [%s:%d]", file, line));
+    if (parserTask == (TASKS *)0 || parserTask->id == ' ')
+	return;
+
+    parserTask->id = ' ';
+}
+
+void
+#if PROTOTYPES
+TaskDestroy(void)
+#else
+TaskDestroy()
+#endif
+{
+    CONDDEBUG((1, "TaskDestroy() [%s:%d]", file, line));
+    if (parserTask != (TASKS *)0) {
+	DestroyTask(parserTask);
+	parserTask = (TASKS *)0;
+    }
+}
+
+void
+#if PROTOTYPES
+TaskItemRunas(char *id)
+#else
+TaskItemRunas(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "TaskItemRunas(%s) [%s:%d]", id, file, line));
+    if (parserTask == (TASKS *)0 || parserTask->id == ' ')
+	return;
+    ProcessUidGid(&(parserTask->uid), &(parserTask->gid), id);
+}
+
+void
+#if PROTOTYPES
+TaskItemSubst(char *id)
+#else
+TaskItemSubst(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "TaskItemSubst(%s) [%s:%d]", id, file, line));
+    if (parserTask == (TASKS *)0 || parserTask->id == ' ')
+	return;
+    ProcessSubst(taskSubst, (char **)0, &(parserTask->subst), "subst", id);
+}
+
+void
+#if PROTOTYPES
+TaskItemCmd(char *id)
+#else
+TaskItemCmd(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "TaskItemCmd(%s) [%s:%d]", id, file, line));
+    if (parserTask == (TASKS *)0 || parserTask->id == ' ')
+	return;
+    BuildString((char *)0, parserTask->cmd);
+    if ((id == (char *)0) || (*id == '\000'))
+	return;
+    BuildString(id, parserTask->cmd);
+}
+
+void
+#if PROTOTYPES
+TaskItemDescr(char *id)
+#else
+TaskItemDescr(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "TaskItemDescr(%s) [%s:%d]", id, file, line));
+    if (parserTask == (TASKS *)0 || parserTask->id == ' ')
+	return;
+    BuildString((char *)0, parserTask->descr);
+    if ((id == (char *)0) || (*id == '\000'))
+	return;
+    BuildString(id, parserTask->descr);
+}
+
+void
+#if PROTOTYPES
+TaskItemConfirm(char *id)
+#else
+TaskItemConfirm(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "TaskItemConfirm(%s) [%s:%d]", id, file, line));
+    ProcessYesNo(id, &(parserTask->confirm));
+}
+
 /* now all the real nitty-gritty bits for making things work */
+ITEM keyTask[] = {
+    {"cmd", TaskItemCmd},
+    {"confirm", TaskItemConfirm},
+    {"description", TaskItemDescr},
+    {"runas", TaskItemRunas},
+    {"subst", TaskItemSubst},
+    {(char *)0, (void *)0}
+};
+
 ITEM keyBreak[] = {
-    {"string", BreakItemString},
+    {"confirm", BreakItemConfirm},
     {"delay", BreakItemDelay},
+    {"string", BreakItemString},
     {(char *)0, (void *)0}
 };
 
@@ -4864,6 +5354,7 @@ ITEM keyGroup[] = {
 ITEM keyDefault[] = {
     {"baud", DefaultItemBaud},
     {"break", DefaultItemBreak},
+    {"breaklist", DefaultItemBreaklist},
     {"device", DefaultItemDevice},
     {"devicesubst", DefaultItemDevicesubst},
     {"exec", DefaultItemExec},
@@ -4892,6 +5383,7 @@ ITEM keyDefault[] = {
     {"replstring", DefaultItemReplstring},
     {"ro", DefaultItemRo},
     {"rw", DefaultItemRw},
+    {"tasklist", DefaultItemTasklist},
     {"timestamp", DefaultItemTimestamp},
     {"type", DefaultItemType},
     {"uds", DefaultItemUds},
@@ -4903,6 +5395,7 @@ ITEM keyConsole[] = {
     {"aliases", ConsoleItemAliases},
     {"baud", ConsoleItemBaud},
     {"break", ConsoleItemBreak},
+    {"breaklist", ConsoleItemBreaklist},
     {"device", ConsoleItemDevice},
     {"devicesubst", ConsoleItemDevicesubst},
     {"exec", ConsoleItemExec},
@@ -4931,6 +5424,7 @@ ITEM keyConsole[] = {
     {"replstring", ConsoleItemReplstring},
     {"ro", ConsoleItemRo},
     {"rw", ConsoleItemRw},
+    {"tasklist", ConsoleItemTasklist},
     {"timestamp", ConsoleItemTimestamp},
     {"type", ConsoleItemType},
     {"uds", ConsoleItemUds},
@@ -4962,12 +5456,15 @@ ITEM keyConfig[] = {
     {"secondaryport", ConfigItemSecondaryport},
     {"setproctitle", ConfigItemSetproctitle},
     {"sslcredentials", ConfigItemSslcredentials},
+    {"sslcacertificatefile", ConfigItemSslcacertificatefile},
     {"sslrequired", ConfigItemSslrequired},
+    {"sslreqclientcert", ConfigItemSslreqclientcert},
     {"unifiedlog", ConfigItemUnifiedlog},
     {(char *)0, (void *)0}
 };
 
 SECTION sections[] = {
+    {"task", TaskBegin, TaskEnd, TaskAbort, TaskDestroy, keyTask},
     {"break", BreakBegin, BreakEnd, BreakAbort, BreakDestroy, keyBreak},
     {"group", GroupBegin, GroupEnd, GroupAbort, GroupDestroy, keyGroup},
     {"default", DefaultBegin, DefaultEnd, DefaultAbort, DefaultDestroy,
@@ -5008,6 +5505,7 @@ ReadCfg(filename, fp)
 	    BuildString((char *)0, breakList[i].seq);
 	}
 	breakList[i].delay = BREAKDELAYDEFAULT;
+	breakList[i].confirm = FLAGFALSE;
     }
     BuildString("\\z", breakList[0].seq);
     BuildString("\\r~^b", breakList[1].seq);
@@ -5017,6 +5515,9 @@ ReadCfg(filename, fp)
 
     /* initialize the user list */
     DestroyUserList();
+
+    /* initialize the task list */
+    DestroyTaskList();
 
     /* initialize the config set */
     if (pConfig != (CONFIG *)0) {
@@ -5269,6 +5770,39 @@ ReReadCfg(fd, msfd)
 			OutOfMem();
 		    Msg("warning: `sslcredentials' config option changed - you must restart for it to take effect");
 		}
+	    }
+	}
+	if (optConf->sslcacertificatefile == (char *)0) {
+	    if (pConfig->sslcacertificatefile == (char *)0) {
+		if (config->sslcacertificatefile != (char *)0) {
+		    free(config->sslcacertificatefile);
+		    config->sslcacertificatefile = (char *)0;
+		    Msg("warning: `sslcacertificatefile' config option changed - you must restart for it to take effect");
+		}
+	    } else {
+		if (config->sslcacertificatefile == (char *)0 ||
+		    strcmp(pConfig->sslcacertificatefile,
+			   config->sslcacertificatefile) != 0) {
+		    if (config->sslcacertificatefile != (char *)0)
+			free(config->sslcacertificatefile);
+		    if ((config->sslcacertificatefile =
+			 StrDup(pConfig->sslcacertificatefile))
+			== (char *)0)
+			OutOfMem();
+		    Msg("warning: `sslcacertificatefile' config option changed - you must restart for it to take effect");
+		}
+	    }
+	}
+	if (optConf->sslreqclientcert == FLAGUNKNOWN) {
+	    if (pConfig->sslreqclientcert == FLAGUNKNOWN) {
+		if (config->sslreqclientcert != defConfig.sslreqclientcert) {
+		    Msg("warning: `sslreqclientcert' config option changed - you must restart for it to take effect");
+		    config->sslreqclientcert = defConfig.sslreqclientcert;
+		}
+	    } else if (config->sslreqclientcert !=
+		       pConfig->sslreqclientcert) {
+		Msg("warning: `sslreqclientcert' config option changed - you must restart for it to take effect");
+		config->sslreqclientcert = pConfig->sslreqclientcert;
 	    }
 	}
 #endif

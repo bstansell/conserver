@@ -1,5 +1,5 @@
-.\" $Id: conserver.cf.man,v 1.78 2007/04/02 17:59:16 bryan Exp $
-.TH CONSERVER.CF 5 "2007/04/02" "conserver-8.1.18" "conserver"
+.\" $Id: conserver.cf.man,v 1.84 2013/09/25 22:10:29 bryan Exp $
+.TH CONSERVER.CF 5 "2013/09/25" "conserver-8.1.19" "conserver"
 .SH NAME
 conserver.cf \- console configuration file for
 .BR conserver (8)
@@ -220,6 +220,12 @@ Break sequences are accessed via the
 client escape sequence.
 .RS
 .TP
+\f3confirm\fP \f3yes\fP|\f3true\fP|\f3on\fP|\f3no\fP|\f3false\fP|\f3off\fP
+.br
+Set whether or not to ask the client for confirmation before sending the
+break sequence.
+The default is ``no''.
+.TP
 \f3delay\fP \f2n\fP
 .br
 Set the time delay for the
@@ -308,7 +314,7 @@ If the value of ``*'' is used, the configuration block will be applied to
 all conserver hosts.
 .RS
 .TP
-\f3autocomplete\fP \f3yes\fP|\f3true\fP|\f3on\fP|\f3no\fP|\f3false\fP|\f3off
+\f3autocomplete\fP \f3yes\fP|\f3true\fP|\f3on\fP|\f3no\fP|\f3false\fP|\f3off\fP
 .br
 Turn the console name autocompletion feature on or off.
 If autocompletion is on, a client can use any unique leading portion of a
@@ -322,7 +328,7 @@ an access list (see the
 .B \-a
 command-line flag).
 .TP
-\f3daemonmode\fP \f3yes\fP|\f3true\fP|\f3on\fP|\f3no\fP|\f3false\fP|\f3off
+\f3daemonmode\fP \f3yes\fP|\f3true\fP|\f3on\fP|\f3no\fP|\f3false\fP|\f3off\fP
 .br
 Set whether or not to become a daemon when run (see the
 .B \-d
@@ -372,7 +378,7 @@ Set the port used by the master conserver process (see the
 .B \-p
 command-line flag).
 .TP
-\f3redirect\fP \f3yes\fP|\f3true\fP|\f3on\fP|\f3no\fP|\f3false\fP|\f3off
+\f3redirect\fP \f3yes\fP|\f3true\fP|\f3on\fP|\f3no\fP|\f3false\fP|\f3off\fP
 .br
 Turn redirection on or off (see the
 .B \-R
@@ -390,7 +396,7 @@ Set the base port number used by child processes (see the
 .B \-b
 command-line flag).
 .TP
-\f3setproctitle\fP \f3yes\fP|\f3true\fP|\f3on\fP|\f3no\fP|\f3false\fP|\f3off
+\f3setproctitle\fP \f3yes\fP|\f3true\fP|\f3on\fP|\f3no\fP|\f3false\fP|\f3off\fP
 .br
 Set whether or not the process title shows master/group functionality
 as well as the port number the process is listening on and how many
@@ -407,7 +413,19 @@ credentials file location (see the
 .B \-c
 command-line flag).
 .TP
-\f3sslrequired\fP \f3yes\fP|\f3true\fP|\f3on\fP|\f3no\fP|\f3false\fP|\f3off
+\f3sslcacertificatefile\fP \f2filename\fP
+.br
+Load the valid CA certificates for the
+.SM SSL
+connection from the PEM encoded file.  This option overrides the global CA
+list.
+.TP
+\f3sslreqclientcert\fP \f3yes\fP|\f3true\fP|\f3on\fP|\f3no\fP|\f3false\fP|\f3off\fP
+.br
+Set whether or not a certificate is required by the client to connect.
+The default is ``no''.
+.TP
+\f3sslrequired\fP \f3yes\fP|\f3true\fP|\f3on\fP|\f3no\fP|\f3false\fP|\f3off\fP
 .br
 Set whether or not encryption is required when talking to clients (see the
 .B \-E
@@ -460,6 +478,13 @@ Assign the break sequence
 .I n
 as the default for the console, which is used by
 the ``^Ecl0'' client escape sequence.
+.TP
+\f3breaklist\fP \f2n\fP[\f3,\fP...]|\f3""\fP
+Associate a list of break sequences referenced by
+.I n
+with the console.
+If ``*'' is used (the default), all defined break sequences will be available.
+If the null string (``\f3""\fP'') is used, no sequences will be available.
 .TP
 \f3device\fP \f2filename\fP
 .br
@@ -1040,6 +1065,13 @@ will be granted (or denied, if prefixed with `!') read-write access.
 If the null string (``\f3""\fP'') is used, any
 users previously defined for the console's read-write list are removed.
 .TP
+\f3tasklist\fP \f2c\fP[\f3,\fP...]|\f3""\fP
+Associate a list of tasks referenced by
+.I c
+with the console.
+If ``*'' is used (the default), all defined tasks will be available.
+If the null string (``\f3""\fP'') is used, no tasks will be available.
+.TP
 \f3timestamp\fP [\f2number\fP[\f3m\fP|\f3h\fP|\f3d\fP|\f3l\fP]][\f3a\fP][\f3b\fP]|\f3""\fP
 .br
 Specifies the time between timestamps applied to the console
@@ -1126,7 +1158,7 @@ If the null string (``\f3""\fP'') is used, no replacements will be done.
 \f3group\fP \f2name\fP
 .br
 Define a user group identified as
-.I name
+.IR name .
 .RS
 .TP
 \f3users\fP [\f3!\fP]\f2username\fP[\f3,\fP...]|\f3""\fP
@@ -1152,6 +1184,74 @@ doesn't match a previous group and doesn't begin with `@', the users
 will be recorded with (or without, if prefixed with `!') access.
 If the null string (``\f3""\fP'') is used, any
 users previously defined for this group are removed.
+.RE
+.TP
+\f3task\fP \f2c\fP
+.br
+Define a task where
+.I c
+is a lowercase alphanumeric (0-9a-z).
+Tasks are invoked via the
+.RI ``^Ec! c ''
+client escape sequence.
+.RS
+.TP
+\f3cmd\fP \f2command\fP|\f3""\fP
+.br
+Invoke
+.I command
+on the server when instructed by the client.
+All file descriptors are closed, except for stderr (which is inherited from
+the server).
+The
+.I command
+is passed as an argument to ``/bin/sh -ce'' and is a ``fire and forget''
+methodology (you need to check logs for any issues).
+If the null string (``\f3""\fP'') is used, the entire task definition is ignored.
+.TP
+\f3confirm\fP \f3yes\fP|\f3true\fP|\f3on\fP|\f3no\fP|\f3false\fP|\f3off\fP
+.br
+Set whether or not to ask the client for confirmation before invoking the task.
+The default is ``no''.
+.TP
+\f3description\fP \f2string\fP
+.br
+Set a description for the task.  When a client lists tasks,
+.I string
+will be printed instead of the command defined above.
+If the null string (``\f3""\fP'') is used, the command defined above will
+be printed.
+.TP
+\f3runas\fP [\f2user\fP][:\f2group\fP]|\f3""\fP
+.br
+By default, the command invoked by
+.B cmd
+is run with the same privileges as the server.
+If the server is running with root privileges, this option resets the user
+and/or group of the invoked process to
+.I user
+and
+.I group
+respectively.
+.I user
+may be a username or numeric uid and
+.I group
+may be a group name or numeric gid.
+Either one is optional.
+If the server is not running with root privileges, these values
+are not used.
+If the null string (``\f3""\fP'') is specified, the default of running
+with the same privileges as the server is restored.
+.TP
+\f3subst\fP \f2c\fP\f3=\fP\f2t\fP[\f2n\fP]\f2f\fP[\f3,\fP...]|\f3""\fP
+.br
+Perform character substitutions on the
+.B cmd
+value.
+See the
+.B devicesubst
+option for an explanation of the format string.
+If the null string (``\f3""\fP'') is used, no replacements will be done.
 .RE
 .SH AUTHORS
 Bryan Stansell, conserver.com
