@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.188 2013/09/18 14:31:39 bryan Exp $
+ *  $Id: console.c,v 5.189 2014/04/02 00:02:47 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -376,9 +376,6 @@ Version()
 #if HAVE_GSSAPI
 	"gssapi",
 #endif
-#if HAVE_PAM
-	"pam",
-#endif
 #if USE_UNIX_DOMAIN_SOCKETS
 	"uds",
 #endif
@@ -392,12 +389,12 @@ Version()
 
     Msg(MyVersion());
 #if USE_UNIX_DOMAIN_SOCKETS
-    Msg("default socket directory `%s\'", UDSDIR);
+    Msg("default socket directory `%s'", UDSDIR);
 #else
-    Msg("default initial master server `%s\'", MASTERHOST);
+    Msg("default initial master server `%s'", MASTERHOST);
     Msg("default port referenced as `%s'", DEFPORT);
 #endif
-    Msg("default escape sequence `%s%s\'", FmtCtl(DEFATTN, acA1),
+    Msg("default escape sequence `%s%s'", FmtCtl(DEFATTN, acA1),
 	FmtCtl(DEFESC, acA2));
     Msg("default site-wide configuration in `%s'", CLIENTCONFIGFILE);
     Msg("default per-user configuration in `%s'", "$HOME/.consolerc");

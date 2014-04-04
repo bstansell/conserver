@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.95 2013/09/25 22:10:29 bryan Exp $
+ *  $Id: client.c,v 5.96 2014/04/02 04:45:31 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -131,7 +131,7 @@ Replay(pCE, fdOut, back)
     STRING *line = (STRING *)0;
     off_t file_pos;
     off_t buf_pos;
-    char *buf;
+    char *buf = (char *)0;
     char *bp = (char *)0;
     int ch;
     struct stat stLog;

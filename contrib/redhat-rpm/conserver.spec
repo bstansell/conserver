@@ -4,7 +4,7 @@
 #
 
 %define pkg  conserver
-%define ver  8.1.19
+%define ver  8.1.20
 
 # define the name of the machine on which the main conserver
 # daemon will be running if you don't want to use the default
@@ -16,10 +16,11 @@
 
 # compile arguments. defaults to 0
 # example: rpmbuild -bb conserver.spec --with openssl
-%define with_openssl %{?_with_openssl: 1} %{?!_with_openssl: 0}
-%define with_libwrap %{?_with_libwrap: 1} %{?!_with_libwrap: 0}
-%define with_pam     %{?_with_pam:     1} %{?!_with_pam:     0}
-%define with_dmalloc %{?_with_dmalloc: 1} %{?!_with_dmalloc: 0}
+%define with_openssl  %{?_with_openssl:  1} %{?!_with_openssl:  0}
+%define with_libwrap  %{?_with_libwrap:  1} %{?!_with_libwrap:  0}
+%define with_pam      %{?_with_pam:      1} %{?!_with_pam:      0}
+%define with_dmalloc  %{?_with_dmalloc:  1} %{?!_with_dmalloc:  0}
+%define with_freeipmi %{?_with_freeipmi: 1} %{?!_with_freeipmi: 0}
 
 # additionally you can use macros logfile pidfile
 # example: rpmbuild -bb conserver.spec --define "pidfile /var/run/conserver/pid"
@@ -34,6 +35,7 @@ URL: http://www.conserver.com/
 Source: http://www.conserver.com/%{pkg}-%{ver}.tar.gz
 BuildRoot: %{_tmppath}/%{pkg}-buildroot
 %if %{with_openssl}
+Requires: openssl
 BuildRequires: openssl-devel
 %endif
 %if %{with_pam}
@@ -45,6 +47,10 @@ Requires: tcp_wrappers
 %if %{with_dmalloc}
 Requires: dmalloc
 BuildRequires: dmalloc
+%endif
+%if %{with_freeipmi}
+Requires: freeipmi
+BuildRequires: freeipmi-devel
 %endif
 Prefix: %{_prefix}
 
@@ -83,7 +89,7 @@ f="conserver/Makefile.in"
 %{__mv} $f $f.orig
 %{__sed} -e 's/^.*conserver\.rc.*$//' < $f.orig > $f
 
-%configure %{?_with_openssl} %{?_with_libwrap} %{?_with_dmalloc} %{?_with_pam} %{?logfile: --with-logfile=%{logfile}} %{?pidfile: --with-pidfile=%{pidfile}} %{?master: --with-master=%{master}}
+%configure %{?_with_openssl} %{?_with_libwrap} %{?_with_dmalloc} %{?_with_freeipmi} %{?_with_pam} %{?logfile: --with-logfile=%{logfile}} %{?pidfile: --with-pidfile=%{pidfile}} %{?master: --with-master=%{master}}
 
 make
 

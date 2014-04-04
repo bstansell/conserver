@@ -33,6 +33,9 @@
 /* have dmalloc support */
 #undef HAVE_DMALLOC
 
+/* have freeipmi support */
+#undef HAVE_FREEIPMI
+
 /* Define to 1 if you have the `getaudit' function. */
 #undef HAVE_GETAUDIT
 

@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.72 2013/09/26 17:32:55 bryan Exp $
+ *  $Id: consent.h,v 5.74 2014/04/04 16:17:10 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -57,8 +57,18 @@ typedef enum consType {
     EXEC,
     HOST,
     NOOP,
-    UDS
+    UDS,
+#if HAVE_FREEIPMI
+    IPMI,
+#endif
 } CONSTYPE;
+
+#if HAVE_FREEIPMI
+#define IPMIL_UNKNOWN  (0)
+#define IPMIL_USER     (IPMICONSOLE_PRIVILEGE_USER+1)
+#define IPMIL_OPERATOR (IPMICONSOLE_PRIVILEGE_OPERATOR+1)
+#define IPMIL_ADMIN    (IPMICONSOLE_PRIVILEGE_ADMIN+1)
+#endif
 
 typedef struct names {
     char *name;
@@ -91,6 +101,17 @@ typedef struct consent {	/* console information                  */
     FLAG ixoff;			/* XON/XOFF flow control on input       */
 #if defined(CRTSCTS)
     FLAG crtscts;		/* use hardware flow control            */
+#endif
+#if HAVE_FREEIPMI
+    /* type == IPMI */
+    int ipmiprivlevel;		/* IPMI authentication level            */
+    ipmiconsole_ctx_t ipmictx;	/* IPMI ctx                             */
+    unsigned int ipmiworkaround;	/* IPMI workaround flags                */
+    short ipmiwrkset;		/* workaround flags set in config       */
+    int ipmiciphersuite;	/* IPMI cipher suite                    */
+    char *username;		/* Username to log as                   */
+    char *password;		/* Login Password                       */
+    STRING *ipmikg;		/* IPMI k_g auth key                    */
 #endif
     /* type == HOST */
     char *host;			/* hostname                             */

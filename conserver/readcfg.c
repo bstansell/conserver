@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.202 2013/09/26 17:50:24 bryan Exp $
+ *  $Id: readcfg.c,v 5.204 2014/04/04 16:17:10 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -316,9 +316,9 @@ BreakDestroy()
 	for (i = 0; i < 9; i++) {
 	    Msg("Break[%d] = `%s', delay=%d", i,
 		breakList[i].seq ==
-		(STRING *)0 ? "(null)" : (breakList[i].seq->
-					  string ? breakList[i].seq->
-					  string : "(null)"),
+		(STRING *)0 ? "(null)" : (breakList[i].
+					  seq->string ? breakList[i].
+					  seq->string : "(null)"),
 		breakList[i].delay);
 	}
     }
@@ -680,6 +680,14 @@ DestroyParserDefaultOrConsole(c, ph, pt)
 	free(c->breaklist);
     if (c->execSlave != (char *)0)
 	free(c->execSlave);
+#if HAVE_FREEIPMI
+    if (c->username != (char *)0)
+	free(c->username);
+    if (c->password != (char *)0)
+	free(c->password);
+    if (c->ipmikg != (STRING *)0)
+	DestroyString(c->ipmikg);
+#endif
     while (c->aliases != (NAMES *)0) {
 	NAMES *name;
 	name = c->aliases->next;
@@ -884,6 +892,35 @@ ApplyDefault(d, c)
 	if ((c->breaklist = StrDup(d->breaklist)) == (char *)0)
 	    OutOfMem();
     }
+#if HAVE_FREEIPMI
+    if (d->ipmiwrkset != 0) {
+	c->ipmiworkaround = d->ipmiworkaround;
+	c->ipmiwrkset = d->ipmiwrkset;
+    }
+    if (d->ipmiciphersuite != 0)
+	c->ipmiciphersuite = d->ipmiciphersuite;
+    if (d->ipmiprivlevel != IPMIL_UNKNOWN)
+	c->ipmiprivlevel = d->ipmiprivlevel;
+    if (d->username != (char *)0) {
+	if (c->username != (char *)0)
+	    free(c->username);
+	if ((c->username = StrDup(d->username)) == (char *)0)
+	    OutOfMem();
+    }
+    if (d->password != (char *)0) {
+	if (c->password != (char *)0)
+	    free(c->password);
+	if ((c->password = StrDup(d->password)) == (char *)0)
+	    OutOfMem();
+    }
+    if (d->ipmikg != (STRING *)0) {
+	if (c->ipmikg != (STRING *)0)
+	    BuildString((char *)0, c->ipmikg);
+	else
+	    c->ipmikg = AllocString();
+	BuildStringN(d->ipmikg->string, d->ipmikg->used - 1, c->ipmikg);
+    }
+#endif
     CopyConsentUserList(d->ro, &(c->ro), 0);
     CopyConsentUserList(d->rw, &(c->rw), 0);
 }
@@ -1360,6 +1397,39 @@ DefaultItemInitrunas(id)
     ProcessInitrunas(parserDefaultTemp, id);
 }
 
+#if HAVE_FREEIPMI
+void
+#if PROTOTYPES
+ProcessIpmiPrivLevel(CONSENT *c, char *id)
+#else
+ProcessIpmiPrivLevel(c, id)
+    CONSENT *c;
+    char *id;
+#endif
+{
+    if (!strcasecmp("user", id))
+	c->ipmiprivlevel = IPMIL_USER;
+    else if (!strcasecmp("operator", id))
+	c->ipmiprivlevel = IPMIL_OPERATOR;
+    else if (!strcasecmp("admin", id))
+	c->ipmiprivlevel = IPMIL_ADMIN;
+    else
+	Error("invalid ipmiprivlevel `%s' [%s:%d]", id, file, line);
+}
+
+void
+#if PROTOTYPES
+DefaultItemIpmiPrivLevel(char *id)
+#else
+DefaultItemIpmiPrivLevel(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemIpmiPrivLevel(%s) [%s:%d]", id, file, line));
+    ProcessIpmiPrivLevel(parserDefaultTemp, id);
+}
+#endif /*freeipmi */
+
 void
 #if PROTOTYPES
 DefaultItemExecrunas(char *id)
@@ -1493,6 +1563,311 @@ DefaultItemUds(id)
     CONDDEBUG((1, "DefaultItemUds(%s) [%s:%d]", id, file, line));
     ProcessUds(parserDefaultTemp, id);
 }
+
+#if HAVE_FREEIPMI
+void
+#if PROTOTYPES
+ProcessIpmiKG(CONSENT *c, char *id)
+#else
+ProcessIpmiKG(c, id)
+    CONSENT *c;
+    char *id;
+#endif
+{
+    char s;
+    char oct = '\000';
+    short octs = 0;
+    short backslash = 0;
+    char *i = id;
+    static STRING *t = (STRING *)0;
+
+    if (t == (STRING *)0)
+	t = AllocString();
+
+    if ((id == (char *)0) || (*id == '\000')) {
+	if (c->ipmikg != (STRING *)0) {
+	    DestroyString(c->ipmikg);
+	    c->ipmikg = (STRING *)0;
+	}
+	return;
+    }
+
+    BuildString((char *)0, t);
+
+    while ((s = (*i++)) != '\000') {
+	if (octs > 0 && octs < 3 && s >= '0' && s <= '7') {
+	    ++octs;
+	    oct = oct * 8 + (s - '0');
+	    continue;
+	}
+	if (octs != 0) {
+	    BuildStringChar(oct, t);
+	    octs = 0;
+	    oct = '\000';
+	}
+	if (backslash) {
+	    backslash = 0;
+	    if (s >= '0' && s <= '7') {
+		++octs;
+		oct = oct * 8 + (s - '0');
+		continue;
+	    }
+	    BuildStringChar(s, t);
+	    continue;
+	}
+	if (s == '\\') {
+	    backslash = 1;
+	    continue;
+	}
+	BuildStringChar(s, t);
+    }
+
+    if (octs != 0)
+	BuildStringChar(oct, t);
+
+    if (backslash)
+	BuildStringChar('\\', t);
+
+    if (t->used > 21) {		/* max 20 chars */
+	if (isMaster)
+	    Error("ipmikg string `%s' over 20 characters [%s:%d]", id,
+		  file, line);
+	return;
+    }
+    if (!ipmiconsole_k_g_is_valid((unsigned char *)t->string, t->used - 1)) {
+	if (isMaster)
+	    Error("invalid ipmikg string `%s' [%s:%d]", id, file, line);
+	return;
+    }
+
+    if (c->ipmikg == (STRING *)0)
+	c->ipmikg = AllocString();
+    BuildString((char *)0, c->ipmikg);
+    BuildStringN(t->string, t->used - 1, c->ipmikg);
+}
+
+void
+#if PROTOTYPES
+DefaultItemIpmiKG(char *id)
+#else
+DefaultItemIpmiKG(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemIpmiKG(%s) [%s:%d]", id, file, line));
+    ProcessIpmiKG(parserDefaultTemp, id);
+}
+
+void
+#if PROTOTYPES
+ProcessUsername(CONSENT *c, char *id)
+#else
+ProcessUsername(c, id)
+    CONSENT *c;
+    char *id;
+#endif
+{
+    if ((id == (char *)0) || (*id == '\000')) {
+	c->username = (char *)0;
+	return;
+    }
+    c->username = strdup(id);
+}
+
+void
+#if PROTOTYPES
+DefaultItemUsername(char *id)
+#else
+DefaultItemUsername(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemUsername(%s) [%s:%d]", id, file, line));
+    ProcessUsername(parserDefaultTemp, id);
+}
+
+void
+#if PROTOTYPES
+ProcessIpmiCipherSuite(CONSENT *c, char *id)
+#else
+ProcessIpmiCipherSuite(c, id)
+    CONSENT *c;
+    char *id;
+#endif
+{
+    char *p;
+    int i;
+
+    if ((id == (char *)0) || (*id == '\000')) {
+	c->ipmiciphersuite = 0;
+	return;
+    }
+
+    /* if we have -1, allow it (we allow >= -1 now) */
+    if (id[0] == '-' && id[1] == '1' && id[2] == '\000') {
+	c->ipmiciphersuite = 1;
+	return;
+    }
+
+    for (p = id; *p != '\000'; p++)
+	if (!isdigit((int)(*p)))
+	    break;
+
+    /* if it wasn't a number */
+    if (*p != '\000') {
+	if (isMaster)
+	    Error("invalid ipmiciphersuite number `%s' [%s:%d]", id, file,
+		  line);
+	return;
+    }
+
+    i = atoi(id);
+
+    if (ipmiconsole_cipher_suite_id_is_valid(i))
+	c->ipmiciphersuite = i + 2;
+    else {
+	if (isMaster)
+	    Error("invalid ipmiciphersuite number `%s' [%s:%d]", id, file,
+		  line);
+	return;
+    }
+}
+
+void
+#if PROTOTYPES
+DefaultItemIpmiCipherSuite(char *id)
+#else
+DefaultItemIpmiCipherSuite(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemIpmiCipherSuite(%s) [%s:%d]", id, file,
+	       line));
+    ProcessIpmiCipherSuite(parserDefaultTemp, id);
+}
+
+void
+#if PROTOTYPES
+ProcessIpmiWorkaround(CONSENT *c, char *id)
+#else
+ProcessIpmiWorkaround(c, id)
+    CONSENT *c;
+    char *id;
+#endif
+{
+    unsigned int flag;
+    char *token = (char *)0;
+    short valid = 0;
+    unsigned int wrk = 0;
+
+    if ((id == (char *)0) || (*id == '\000')) {
+	c->ipmiworkaround = 0;
+	c->ipmiwrkset = 1;
+	return;
+    }
+
+    for (token = strtok(id, ALLWORDSEP); token != (char *)0;
+	 token = strtok(NULL, ALLWORDSEP)) {
+	short not;
+	if (token[0] == '!') {
+	    token++;
+	    not = 1;
+	} else
+	    not = 0;
+	if (!strcmp(token, "default"))
+	    flag = IPMICONSOLE_WORKAROUND_DEFAULT;
+#if defined(IPMICONSOLE_WORKAROUND_AUTHENTICATION_CAPABILITIES)
+	else if (!strcmp(token, "auth-capabilites"))
+	    flag = IPMICONSOLE_WORKAROUND_AUTHENTICATION_CAPABILITIES;
+#endif
+#if defined(IPMICONSOLE_WORKAROUND_INTEL_2_0_SESSION)
+	else if (!strcmp(token, "intel-session"))
+	    flag = IPMICONSOLE_WORKAROUND_INTEL_2_0_SESSION;
+#endif
+#if defined(IPMICONSOLE_WORKAROUND_SUPERMICRO_2_0_SESSION)
+	else if (!strcmp(token, "supermicro-session"))
+	    flag = IPMICONSOLE_WORKAROUND_SUPERMICRO_2_0_SESSION;
+#endif
+#if defined(IPMICONSOLE_WORKAROUND_SUN_2_0_SESSION)
+	else if (!strcmp(token, "sun-session"))
+	    flag = IPMICONSOLE_WORKAROUND_SUN_2_0_SESSION;
+#endif
+#if defined(IPMICONSOLE_WORKAROUND_OPEN_SESSION_PRIVILEGE)
+	else if (!strcmp(token, "privilege"))
+	    flag = IPMICONSOLE_WORKAROUND_OPEN_SESSION_PRIVILEGE;
+#endif
+#if defined(IPMICONSOLE_WORKAROUND_NON_EMPTY_INTEGRITY_CHECK_VALUE)
+	else if (!strcmp(token, "integrity"))
+	    flag = IPMICONSOLE_WORKAROUND_NON_EMPTY_INTEGRITY_CHECK_VALUE;
+#endif
+#if defined(IPMICONSOLE_WORKAROUND_NO_CHECKSUM_CHECK)
+	else if (!strcmp(token, "checksum"))
+	    flag = IPMICONSOLE_WORKAROUND_NO_CHECKSUM_CHECK;
+#endif
+#if defined(IPMICONSOLE_WORKAROUND_SERIAL_ALERTS_DEFERRED)
+	else if (!strcmp(token, "serial-alerts"))
+	    flag = IPMICONSOLE_WORKAROUND_SERIAL_ALERTS_DEFERRED;
+#endif
+#if defined(IPMICONSOLE_WORKAROUND_INCREMENT_SOL_PACKET_SEQUENCE)
+	else if (!strcmp(token, "packet-sequence"))
+	    flag = IPMICONSOLE_WORKAROUND_INCREMENT_SOL_PACKET_SEQUENCE;
+#endif
+#if defined(IPMICONSOLE_WORKAROUND_IGNORE_SOL_PAYLOAD_SIZE)
+	else if (!strcmp(token, "ignore-payload-size"))
+	    flag = IPMICONSOLE_WORKAROUND_IGNORE_SOL_PAYLOAD_SIZE;
+#endif
+#if defined(IPMICONSOLE_WORKAROUND_IGNORE_SOL_PORT)
+	else if (!strcmp(token, "ignore-port"))
+	    flag = IPMICONSOLE_WORKAROUND_IGNORE_SOL_PORT;
+#endif
+#if defined(IPMICONSOLE_WORKAROUND_SKIP_SOL_ACTIVATION_STATUS)
+	else if (!strcmp(token, "activation-status"))
+	    flag = IPMICONSOLE_WORKAROUND_SKIP_SOL_ACTIVATION_STATUS;
+#endif
+#if defined(IPMICONSOLE_WORKAROUND_SKIP_CHANNEL_PAYLOAD_SUPPORT)
+	else if (!strcmp(token, "channel-payload"))
+	    flag = IPMICONSOLE_WORKAROUND_SKIP_CHANNEL_PAYLOAD_SUPPORT;
+#endif
+	else {
+	    if (isMaster)
+		Error("invalid ipmiworkaround `%s' [%s:%d]", token, file,
+		      line);
+	    continue;
+	}
+	if (not) {
+	    wrk &= ~flag;
+	} else {
+	    wrk |= flag;
+	}
+	valid = 1;
+    }
+
+    if (valid) {
+	if (ipmiconsole_workaround_flags_is_valid(wrk)) {
+	    c->ipmiworkaround = wrk;
+	    c->ipmiwrkset = 1;
+	} else {
+	    if (isMaster)
+		Error("invalid ipmiworkaround setting [%s:%d]", file,
+		      line);
+	    return;
+	}
+    }
+}
+
+void
+#if PROTOTYPES
+DefaultItemIpmiWorkaround(char *id)
+#else
+DefaultItemIpmiWorkaround(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemIpmiWorkaround(%s) [%s:%d]", id, file,
+	       line));
+    ProcessIpmiWorkaround(parserDefaultTemp, id);
+}
+#endif /*freeipmi */
 
 void
 #if PROTOTYPES
@@ -1862,6 +2237,36 @@ DefaultItemParity(id)
     CONDDEBUG((1, "DefaultItemParity(%s) [%s:%d]", id, file, line));
     ProcessParity(parserDefaultTemp, id);
 }
+
+#if HAVE_FREEIPMI
+void
+#if PROTOTYPES
+ProcessPassword(CONSENT *c, char *id)
+#else
+ProcessPassword(c, id)
+    CONSENT *c;
+    char *id;
+#endif
+{
+    if ((id == (char *)0) || (*id == '\000')) {
+	c->password = (char *)0;
+	return;
+    }
+    c->password = strdup(id);
+}
+
+void
+#if PROTOTYPES
+DefaultItemPassword(char *id)
+#else
+DefaultItemPassword(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "DefaultItemPassword(%s) [%s:%d]", id, file, line));
+    ProcessPassword(parserDefaultTemp, id);
+}
+#endif /*freeipmi */
 
 void
 #if PROTOTYPES
@@ -2550,6 +2955,10 @@ ProcessType(c, id)
     }
     if (strcasecmp("device", id) == 0)
 	t = DEVICE;
+#if HAVE_FREEIPMI
+    else if (strcasecmp("ipmi", id) == 0)
+	t = IPMI;
+#endif
     else if (strcasecmp("exec", id) == 0)
 	t = EXEC;
     else if (strcasecmp("host", id) == 0)
@@ -2713,6 +3122,16 @@ ConsoleEnd()
 		}
 	    }
 	    break;
+#if HAVE_FREEIPMI
+	case IPMI:
+	    if (parserConsoleTemp->host == (char *)0) {
+		if (isMaster)
+		    Error("[%s] console missing 'host' attribute [%s:%d]",
+			  parserConsoleTemp->server, file, line);
+		invalid = 1;
+	    }
+	    break;
+#endif
 	case HOST:
 	    if (parserConsoleTemp->host == (char *)0) {
 		if (isMaster)
@@ -2745,8 +3164,9 @@ ConsoleEnd()
 	    break;
 	case UNKNOWNTYPE:
 	    if (isMaster)
-		Error("[%s] console type unknown [%s:%d]",
-		      parserConsoleTemp->server, file, line);
+		Error("[%s] console type unknown %d [%s:%d]",
+		      parserConsoleTemp->server, parserConsoleTemp->type,
+		      file, line);
 	    invalid = 1;
 	    break;
     }
@@ -3088,6 +3508,7 @@ ConsoleAdd(c)
 	    if (!FileBufEmpty(pCEmatch->cofile))
 		FD_SET(cofile, &winit);
 	}
+
 	if (pCEmatch->initfile != (CONSFILE *)0) {
 	    int initfile = FileFDNum(pCEmatch->initfile);
 	    FD_SET(initfile, &rinit);
@@ -3222,6 +3643,78 @@ ConsoleAdd(c)
 		}
 #endif
 		break;
+#if HAVE_FREEIPMI
+	    case IPMI:
+		if (pCEmatch->host != (char *)0 && c->host != (char *)0) {
+		    if (strcasecmp(pCEmatch->host, c->host) != 0) {
+			SwapStr(&pCEmatch->host, &c->host);
+			closeMatch = 0;
+		    }
+		} else if (pCEmatch->host != (char *)0 ||
+			   c->host != (char *)0) {
+		    SwapStr(&pCEmatch->host, &c->host);
+		    closeMatch = 0;
+		}
+		if (pCEmatch->username != (char *)0 &&
+		    c->username != (char *)0) {
+		    if (strcmp(pCEmatch->username, c->username) != 0) {
+			SwapStr(&pCEmatch->username, &c->username);
+			closeMatch = 0;
+		    }
+		} else if (pCEmatch->username != (char *)0 ||
+			   c->username != (char *)0) {
+		    SwapStr(&pCEmatch->username, &c->username);
+		    closeMatch = 0;
+		}
+		if (pCEmatch->password != (char *)0 &&
+		    c->password != (char *)0) {
+		    if (strcmp(pCEmatch->password, c->password) != 0) {
+			SwapStr(&pCEmatch->password, &c->password);
+			closeMatch = 0;
+		    }
+		} else if (pCEmatch->password != (char *)0 ||
+			   c->password != (char *)0) {
+		    SwapStr(&pCEmatch->password, &c->password);
+		    closeMatch = 0;
+		}
+		if (pCEmatch->ipmiprivlevel != c->ipmiprivlevel) {
+		    pCEmatch->ipmiprivlevel = c->ipmiprivlevel;
+		    closeMatch = 0;
+		}
+		if (pCEmatch->ipmiworkaround != c->ipmiworkaround) {
+		    pCEmatch->ipmiworkaround = c->ipmiworkaround;
+		    closeMatch = 0;
+		}
+		if (pCEmatch->ipmiciphersuite != c->ipmiciphersuite) {
+		    pCEmatch->ipmiciphersuite = c->ipmiciphersuite;
+		    closeMatch = 0;
+		}
+		if (pCEmatch->ipmikg->used != 0 &&
+		    c->ipmikg->used == pCEmatch->ipmikg->used) {
+		    if (
+#if HAVE_MEMCMP
+			   memcmp(pCEmatch->ipmikg->string, c->ipmikg,
+				  c->ipmikg->used) != 0
+#else
+			   bcmp(pCEmatch->ipmikg->string, c->ipmikg,
+				c->ipmikg->used) != 0
+#endif
+			) {
+			BuildString((char *)0, pCEmatch->ipmikg);
+			BuildStringN(c->ipmikg->string,
+				     c->ipmikg->used - 1,
+				     pCEmatch->ipmikg);
+			closeMatch = 0;
+		    }
+		} else if (pCEmatch->ipmikg->used != 0 ||
+			   c->ipmikg->used != 0) {
+		    BuildString((char *)0, pCEmatch->ipmikg);
+		    BuildStringN(c->ipmikg->string, c->ipmikg->used - 1,
+				 pCEmatch->ipmikg);
+		    closeMatch = 0;
+		}
+		break;
+#endif /* freeipmi */
 	    case HOST:
 		if (pCEmatch->host != (char *)0 && c->host != (char *)0) {
 		    if (strcasecmp(pCEmatch->host, c->host) != 0) {
@@ -3360,6 +3853,24 @@ ConsoleDestroy()
      */
     for (c = parserConsoles; c != (CONSENT *)0; c = cNext) {
 	/* time to set some defaults and fix up values */
+
+#if HAVE_FREEIPMI
+	if (c->ipmiprivlevel == 0)
+	    c->ipmiprivlevel = IPMIL_ADMIN;
+	c->ipmiprivlevel--;
+
+	if (c->ipmiciphersuite == 0)
+	    c->ipmiciphersuite = 1;
+	c->ipmiciphersuite -= 2;
+
+	if (c->ipmikg == (STRING *)0)
+	    c->ipmikg = AllocString();
+
+	if (c->ipmiwrkset == 0) {
+	    c->ipmiworkaround = IPMICONSOLE_WORKAROUND_DEFAULT;
+	    c->ipmiwrkset = 1;
+	}
+#endif
 
 	/* default break number */
 	if (c->breakNum == 0)
@@ -3559,6 +4070,10 @@ ConsoleDestroy()
 				 (c->parity ? c->parity->key[0] : ' ')),
 				s);
 		    break;
+#if HAVE_FREEIPMI
+		case IPMI:
+		    BuildString(BuildTmpStringPrint("@:%s", c->host), s);
+#endif
 		case UNKNOWNTYPE:	/* shut up gcc */
 		    break;
 	    }
@@ -3872,6 +4387,58 @@ ConsoleItemUds(id)
     ProcessUds(parserConsoleTemp, id);
 }
 
+#if HAVE_FREEIPMI
+void
+#if PROTOTYPES
+ConsoleItemIpmiKG(char *id)
+#else
+ConsoleItemIpmiKG(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemIpmiKG(%s) [%s:%d]", id, file, line));
+    ProcessIpmiKG(parserConsoleTemp, id);
+}
+
+void
+#if PROTOTYPES
+ConsoleItemUsername(char *id)
+#else
+ConsoleItemUsername(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemUsername(%s) [%s:%d]", id, file, line));
+    ProcessUsername(parserConsoleTemp, id);
+}
+
+void
+#if PROTOTYPES
+ConsoleItemIpmiCipherSuite(char *id)
+#else
+ConsoleItemIpmiCipherSuite(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemIpmiCipherSuite(%s) [%s:%d]", id, file,
+	       line));
+    ProcessIpmiCipherSuite(parserConsoleTemp, id);
+}
+
+void
+#if PROTOTYPES
+ConsoleItemIpmiWorkaround(char *id)
+#else
+ConsoleItemIpmiWorkaround(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemIpmiWorkaround(%s) [%s:%d]", id, file,
+	       line));
+    ProcessIpmiWorkaround(parserConsoleTemp, id);
+}
+#endif /*freeipmi */
+
 void
 #if PROTOTYPES
 ConsoleItemInclude(char *id)
@@ -3979,6 +4546,20 @@ ConsoleItemParity(id)
     CONDDEBUG((1, "ConsoleItemParity(%s) [%s:%d]", id, file, line));
     ProcessParity(parserConsoleTemp, id);
 }
+
+#if HAVE_FREEIPMI
+void
+#if PROTOTYPES
+ConsoleItemPassword(char *id)
+#else
+ConsoleItemPassword(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemPassword(%s) [%s:%d]", id, file, line));
+    ProcessPassword(parserConsoleTemp, id);
+}
+#endif /*freeipmi */
 
 void
 #if PROTOTYPES
@@ -4484,9 +5065,10 @@ AccessProcessACL(trust, acl)
     char *token = (char *)0;
     ACCESS **ppa = (ACCESS **)0;
     ACCESS *pa = (ACCESS *)0;
-    in_addr_t addr;
 #if HAVE_INET_ATON
     struct in_addr inetaddr;
+#else
+    in_addr_t addr;
 #endif
 
     /* an empty acl will clear out that type of acl */
@@ -4544,7 +5126,6 @@ AccessProcessACL(trust, acl)
 #if HAVE_INET_ATON
 		if (inet_aton(token, &inetaddr) == 0)
 		    goto cidrerror;
-		addr = inetaddr.s_addr;
 #else
 		addr = inet_addr(token);
 		if (addr == (in_addr_t) (-1))
@@ -4826,6 +5407,20 @@ ConfigItemDefaultaccess(id)
 	    Error("invalid access type `%s' [%s:%d]", id, file, line);
     }
 }
+
+#if HAVE_FREEIPMI
+void
+#if PROTOTYPES
+ConsoleItemIpmiPrivLevel(char *id)
+#else
+ConsoleItemIpmiPrivLevel(id)
+    char *id;
+#endif
+{
+    CONDDEBUG((1, "ConsoleItemIpmiPrivLevel(%s) [%s:%d]", id, file, line));
+    ProcessIpmiPrivLevel(parserConsoleTemp, id);
+}
+#endif /*freeipmi */
 
 void
 #if PROTOTYPES
@@ -5388,6 +5983,14 @@ ITEM keyDefault[] = {
     {"type", DefaultItemType},
     {"uds", DefaultItemUds},
     {"udssubst", DefaultItemUdssubst},
+#if HAVE_FREEIPMI
+    {"ipmiciphersuite", DefaultItemIpmiCipherSuite},
+    {"ipmikg", DefaultItemIpmiKG},
+    {"ipmiprivlevel", DefaultItemIpmiPrivLevel},
+    {"ipmiworkaround", DefaultItemIpmiWorkaround},
+    {"password", DefaultItemPassword},
+    {"username", DefaultItemUsername},
+#endif
     {(char *)0, (void *)0}
 };
 
@@ -5429,6 +6032,14 @@ ITEM keyConsole[] = {
     {"type", ConsoleItemType},
     {"uds", ConsoleItemUds},
     {"udssubst", ConsoleItemUdssubst},
+#if HAVE_FREEIPMI
+    {"ipmiciphersuite", ConsoleItemIpmiCipherSuite},
+    {"ipmikg", ConsoleItemIpmiKG},
+    {"ipmiprivlevel", ConsoleItemIpmiPrivLevel},
+    {"ipmiworkaround", ConsoleItemIpmiWorkaround},
+    {"password", ConsoleItemPassword},
+    {"username", ConsoleItemUsername},
+#endif
     {(char *)0, (void *)0}
 };
 

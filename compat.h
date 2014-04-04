@@ -331,3 +331,7 @@ typedef int socklen_t;
 #if HAVE_DMALLOC
 #include <dmalloc.h>
 #endif
+
+#if HAVE_FREEIPMI
+#include <ipmiconsole.h>
+#endif

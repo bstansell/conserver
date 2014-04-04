@@ -1,6 +1,12 @@
 				CHANGES
 				=======
 
+version 8.1.20 (Apr 4, 2014):
+	- IPMI serial over LAN support via FreeIPMI - based on patch by Anton
+	  D. Kachalov <mouse@yandex-team.ru>
+	- minor cleanup of code, removal of gcc warnings and such that should
+	  have no fuctional change
+
 version 8.1.19 (Sep 26, 2013):
 	- prevent select/read loop when EOF on non-pty input (console) -
 	  reported by Chris Marget <chris@marget.com>
@@ -932,5 +938,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.238 2013/09/26 17:57:44 bryan Exp $
+#  $Id: CHANGES,v 1.239 2014/04/04 16:27:38 bryan Exp $
 #

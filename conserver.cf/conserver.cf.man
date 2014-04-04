@@ -1,5 +1,5 @@
-.\" $Id: conserver.cf.man,v 1.84 2013/09/25 22:10:29 bryan Exp $
-.TH CONSERVER.CF 5 "2013/09/25" "conserver-8.1.19" "conserver"
+.\" $Id: conserver.cf.man,v 1.85 2014/04/04 16:17:45 bryan Exp $
+.TH CONSERVER.CF 5 "2014/04/04" "conserver-8.1.20" "conserver"
 .SH NAME
 conserver.cf \- console configuration file for
 .BR conserver (8)
@@ -616,9 +616,9 @@ Assign
 as the host to connect to for accessing the console.
 You must also set the
 .B port
-option as well.
-Normally, only consoles of type ``host'' will use this value, however
-if the
+option for consoles of type ``host''.
+Normally, only consoles of type ``host'' and ``ipmi'' will use this value,
+however if the
 .BR devicesubst ,
 .BR execsubst ,
 or
@@ -651,6 +651,111 @@ If an `s', `m', or `h' is used after
 .IR number ,
 the specified time is interpreted as seconds, minutes, or hours.
 Set the timeout to zero to disable the idle timeout (the default).
+.TP
+\f3ipmiciphersuite\fP \f2number\fP
+.br
+Set the IPMI cipher suite.  Syntactically valid
+values are -1 (the default) and greater.  Check the FreeIPMI documentation
+for usable values.
+.TP
+\f3ipmikg\fP \f2string\fP|\f3""\fP
+Set the BMC authentication key K_g to
+.IR string .
+A K_g value is a simple character string with the exception of `\e':
+.RS
+.RS
+.sp
+.PD 0
+.TP 6
+.B \e\e
+backslash
+.TP
+.BI \e ooo
+octal representation of a character (where
+.I ooo
+is one to three octal digits)
+.TP
+.BI \e c
+character
+.I c
+.PD
+.RE
+.RE
+.IP
+The resulting value must be no more than 20 characters.
+The null string (``\f3""\fP'') is the default.
+.TP
+\f3impiworkaround\fP [\f3!\fP]option[\f3,\fP...]|\f3""\fP
+.br
+You can turn off a workaround by prefixing it with a
+.RB `` ! ''
+character.
+So, to turn off the
+.B integrity
+workaround, you would use
+.BR !integrity .
+The following are valid
+.IR option s
+and their mapping to FreeIPMI settings:
+.RS
+.sp
+.PD 0
+.TP 21
+.B activation-status
+.SM SKIP_SOL_ACTIVATION_STATUS
+.TP
+.B auth-capabilites
+.SM AUTHENTICATION_CAPABILITIES
+.TP
+.B channel-payload
+.SM SKIP_CHANNEL_PAYLOAD_SUPPORT
+.TP
+.B checksum
+.SM NO_CHECKSUM_CHECK
+.TP
+.B default
+.SM DEFAULT
+.TP
+.B ignore-payload-size
+.SM IGNORE_SOL_PAYLOAD_SIZE
+.TP
+.B ignore-port
+.SM IGNORE_SOL_PORT
+.TP
+.B integrity
+.SM NON_EMPTY_INTEGRITY_CHECK_VALUE
+.TP
+.B intel-session
+.SM INTEL_2_0_SESSION
+.TP
+.B packet-sequence
+.SM INCREMENT_SOL_PACKET_SEQUENCE
+.TP
+.B privilege
+.SM OPEN_SESSION_PRIVILEGE
+.TP
+.B serial-alerts
+.SM SERIAL_ALERTS_DEFERRED
+.TP
+.B sun-session
+.SM SUN_2_0_SESSION
+.TP
+.B supermicro-session
+.SM SUPERMICRO_2_0_SESSION
+.PD
+.RE
+.IP
+If no
+.B ipmiworkaround
+is specified, the ``\f3default\fP'' workaround will be used.
+The null string (``\f3""\fP'') unsets all workarounds,
+including ``\f3default\fP''.
+See the FreeIPMI documentation for details on what workarounds affect.
+.TP
+\f3ipmiprivlevel\fP \f2user\fP|\f2operator\fP|\f2admin\fP
+.br
+Set the privilege level for the username used during IPMI authentication.
+The default privilege level is ``\f2admin\fP''.
 .TP
 \f3include\fP \f2default\fP
 .br
@@ -932,6 +1037,13 @@ Default is
 Set the parity option for the console.
 Only consoles of type ``device'' will use this value.
 .TP
+\f3password\fP \f2password\fP|\f3""\fP
+.br
+Use
+.I password
+during IPMI authentication.
+If the null string (``\f3""\fP'') is used (the default), no password will be used.
+.TP
 \f3port\fP \f2number\fP|\f2name\fP
 .br
 Set the port used to access the console.
@@ -960,7 +1072,7 @@ terminal server by their physical numbering of
 or
 .RI 1.. n
 (depending on if you like zero-based or one-based numbering).
-Warning: you can generate a \-1 value with this formula,
+Warning: you can generate a -1 value with this formula,
 which will become a very high numbered positive
 value (since things are stored unsigned).
 You must also set the
@@ -1101,7 +1213,7 @@ A
 .RB ` b '
 can be specified to add logging of break sequences sent to the console.
 .TP
-\f3type\fP \f3device\fP|\f3exec\fP|\f3host\fP|\f3noop\fP|\f3uds\fP
+\f3type\fP \f3device\fP|\f3ipmi\fP|\f3exec\fP|\f3host\fP|\f3noop\fP|\f3uds\fP
 .br
 Set the type of console.
 A type of
@@ -1109,6 +1221,16 @@ A type of
 should be used for local serial ports (also set the
 .B device
 value).
+A type of
+.RB `` ipmi ''
+should be used for IPMI serial over LAN consoles (also set the
+.B host
+value and possibly the
+.BR username ,
+.BR password ,
+and
+.BR ipmi *
+values).
 A type of
 .RB `` exec ''
 should be used for command invocations (perhaps also set the
@@ -1153,6 +1275,13 @@ See the
 .B devicesubst
 option for an explanation of the format string.
 If the null string (``\f3""\fP'') is used, no replacements will be done.
+.TP
+\f3username\fP \f2username\fP|\f3""\fP
+.br
+Use
+.I username
+during IPMI authentication.
+If the null string (``\f3""\fP'') is used (the default), the ``null'' user will be used.
 .RE
 .TP
 \f3group\fP \f2name\fP

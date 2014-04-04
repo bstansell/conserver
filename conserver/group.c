@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.344 2013/09/26 17:50:24 bryan Exp $
+ *  $Id: group.c,v 5.346 2014/04/04 16:17:10 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -207,7 +207,7 @@ AbortAnyClientExec(pCL)
     }
 }
 
-static int
+void
 #if PROTOTYPES
 StopTask(CONSENT *pCE)
 #else
@@ -2085,7 +2085,6 @@ InvokeTask(pCLServing, pCEServing, id)
 #endif
 {
     TASKS *t = (TASKS *)0;
-    int ret;
     char *cmd;
 
     if ((id < '0' || id > '9') && (id < 'a' || id > 'z')) {
@@ -2472,6 +2471,13 @@ CommandExamine(pGE, pCLServing, pCEServing, tyme, args)
 		b = pCE->baud->acrate;
 		p = pCE->parity->key[0];
 		break;
+#if HAVE_FREEIPMI
+	    case IPMI:
+		d = BuildTmpStringPrint("%s", pCE->host);
+		b = "IPMI";
+		p = ' ';
+		break;
+#endif
 	    case HOST:
 		d = BuildTmpStringPrint("%s/%hu", pCE->host, pCE->netport);
 		b = "Netwk";
@@ -2622,8 +2628,8 @@ CommandHosts(pGE, pCLServing, pCEServing, tyme, args)
 						  pCE->ioState == ISNORMAL)
 		  ? (pCE->initfile == (CONSFILE *)
 		     0 ? "up" : "init") : "down",
-		  pCE->pCLwr ? pCE->pCLwr->acid->string : pCE->
-		  pCLon ? "<spies>" : "<none>");
+		  pCE->pCLwr ? pCE->pCLwr->acid->
+		  string : pCE->pCLon ? "<spies>" : "<none>");
 	if (args != (char *)0)
 	    break;
     }
@@ -2662,6 +2668,12 @@ CommandInfo(pGE, pCLServing, pCEServing, tyme, args)
 			  (unsigned long)pCE->ipid, pCE->execSlave,
 			  FileFDNum(pCE->cofile));
 		break;
+#if HAVE_FREEIPMI
+	    case IPMI:
+		FilePrint(pCLServing->fd, FLAGTRUE, "@:%s,%d:", pCE->host,
+			  FileFDNum(pCE->cofile));
+		break;
+#endif
 	    case HOST:
 		FilePrint(pCLServing->fd, FLAGTRUE, "!:%s,%hu,%s,%d:",
 			  pCE->host, pCE->netport,
@@ -2734,20 +2746,24 @@ CommandInfo(pGE, pCLServing, pCEServing, tyme, args)
 	}
 	BuildTmpString((char *)0);
 	s = (char *)0;
-	if (pCE->hupcl == FLAGTRUE)
-	    s = BuildTmpString(",hupcl");
-	if (pCE->cstopb == FLAGTRUE)
-	    s = BuildTmpString(",cstopb");
-	if (pCE->ixon == FLAGTRUE)
-	    s = BuildTmpString(",ixon");
-	if (pCE->ixany == FLAGTRUE)
-	    s = BuildTmpString(",ixany");
-	if (pCE->ixoff == FLAGTRUE)
-	    s = BuildTmpString(",ixoff");
+	if (pCE->type == DEVICE) {
+	    if (pCE->hupcl == FLAGTRUE)
+		s = BuildTmpString(",hupcl");
+	    if (pCE->cstopb == FLAGTRUE)
+		s = BuildTmpString(",cstopb");
 #if defined(CRTSCTS)
-	if (pCE->crtscts == FLAGTRUE)
-	    s = BuildTmpString(",crtscts");
+	    if (pCE->crtscts == FLAGTRUE)
+		s = BuildTmpString(",crtscts");
 #endif
+	}
+	if (pCE->type == DEVICE || pCE->type == EXEC) {
+	    if (pCE->ixon == FLAGTRUE)
+		s = BuildTmpString(",ixon");
+	    if (pCE->ixany == FLAGTRUE)
+		s = BuildTmpString(",ixany");
+	    if (pCE->ixoff == FLAGTRUE)
+		s = BuildTmpString(",ixoff");
+	}
 	if (pCE->ondemand == FLAGTRUE)
 	    s = BuildTmpString(",ondemand");
 	if (pCE->reinitoncc == FLAGTRUE)
@@ -2919,6 +2935,7 @@ DoConsoleRead(pCEServing)
 	FD_CLR(cofile, &winit);
 	return;
     }
+
     /* read terminal line */
     if ((nr =
 	 FileRead(pCEServing->cofile, acInOrig, sizeof(acInOrig))) < 0) {
@@ -3121,7 +3138,7 @@ DoTaskRead(pCEServing)
 #endif
 {
     unsigned char acInOrig[BUFSIZ];
-    int nr, i, fd;
+    int nr, fd;
     CONSCLIENT *pCL;
 
     if (pCEServing->taskfile == (CONSFILE *)0)
@@ -3303,7 +3320,6 @@ DoClientRead(pGE, pCLServing)
     CONSCLIENT *pCLServing;
 #endif
 {
-    struct termios sbuf;
     CONSENT *pCEServing = pCLServing->pCEto;
     int nr, i, l;
     unsigned char acIn[BUFSIZ], acInOrig[BUFSIZ];
@@ -3690,8 +3706,9 @@ DoClientRead(pGE, pCLServing)
 				    pcArgs, pCLServing->acid->string);
 			    num =
 				DisconnectCertainClients(pGE,
-							 pCLServing->acid->
-							 string, pcArgs);
+							 pCLServing->
+							 acid->string,
+							 pcArgs);
 			    /* client expects this string to be formatted
 			     * in this way only.
 			     */
@@ -4338,8 +4355,8 @@ DoClientRead(pGE, pCLServing)
 				    BumpClient(pCEServing, (char *)0);
 				    TagLogfileAct(pCEServing,
 						  "%s detached",
-						  pCLServing->acid->
-						  string);
+						  pCLServing->
+						  acid->string);
 				    FindWrite(pCEServing);
 				}
 				break;
@@ -4356,8 +4373,8 @@ DoClientRead(pGE, pCLServing)
 			    case '|':	/* wait for client */
 				if (!pCLServing->fwr ||
 				    ConsentUserOk(pLUList,
-						  pCLServing->username->
-						  string) == 1)
+						  pCLServing->
+						  username->string) == 1)
 				    goto unknownchar;
 				FileSetQuoteIAC(pCLServing->fd, FLAGFALSE);
 				FilePrint(pCLServing->fd, FLAGFALSE,
@@ -5008,68 +5025,101 @@ Kiddie(pGE, sfd)
 		continue;
 	    switch (pCEServing->ioState) {
 		case INCONNECT:
-		    /* deal with this state above as well */
-		    if (FileCanWrite(pCEServing->cofile, &rmask, &wmask)) {
-			socklen_t slen;
-			int flags = 0;
-			int cofile = FileFDNum(pCEServing->cofile);
-			slen = sizeof(flags);
-			/* So, getsockopt seems to return -1 if there is
-			 * something interesting in SO_ERROR under
-			 * solaris...sheesh.  So, the error message has
-			 * the small change it's not accurate.
-			 */
-			if (getsockopt
-			    (cofile, SOL_SOCKET, SO_ERROR, (char *)&flags,
-			     &slen) < 0) {
-			    Error
-				("[%s] getsockopt(%u,SO_ERROR): %s: forcing down",
-				 pCEServing->server, cofile,
-				 strerror(errno));
-			    /* no ConsoleError() for same reason as above */
-			    SendIWaitClientsMsg(pCEServing, "down]\r\n");
-			    ConsDown(pCEServing, FLAGTRUE, FLAGTRUE);
+#if HAVE_FREEIPMI
+		    if (pCEServing->type == IPMI) {
+			if (FileCanRead
+			    (pCEServing->cofile, &rmask, &wmask)) {
+			    if (IPMICONSOLE_CTX_STATUS_SOL_ESTABLISHED ==
+				ipmiconsole_ctx_status
+				(pCEServing->ipmictx)) {
+				/* Read in the NULL from OUTPUT_ON_SOL_ESTABLISHED flag */
+				char b[1];
+				FileRead(pCEServing->cofile, b, 1);	/* trust it's NULL */
+			    } else {
+				Error("[%s] IPMI error: %s: forcing down",
+				      pCEServing->server,
+				      ipmiconsole_ctx_errormsg(pCEServing->
+							       ipmictx));
+				/* no ConsoleError() for same reason as above */
+				SendIWaitClientsMsg(pCEServing,
+						    "down]\r\n");
+				ConsDown(pCEServing, FLAGTRUE, FLAGTRUE);
+				break;
+			    }
+			} else
 			    break;
-			}
-			if (flags != 0) {
-			    Error("[%s] connect(%u): %s: forcing down",
-				  pCEServing->server, cofile,
-				  strerror(flags));
-			    /* no ConsoleError() for same reason as above */
-			    SendIWaitClientsMsg(pCEServing, "down]\r\n");
-			    ConsDown(pCEServing, FLAGTRUE, FLAGTRUE);
+		    } else {
+#endif /* freeipmi */
+			/* deal with this state above as well */
+			if (FileCanWrite
+			    (pCEServing->cofile, &rmask, &wmask)) {
+			    socklen_t slen;
+			    int flags = 0;
+			    int cofile = FileFDNum(pCEServing->cofile);
+			    slen = sizeof(flags);
+			    /* So, getsockopt seems to return -1 if there is
+			     * something interesting in SO_ERROR under
+			     * solaris...sheesh.  So, the error message has
+			     * the small change it's not accurate.
+			     */
+			    if (getsockopt
+				(cofile, SOL_SOCKET, SO_ERROR,
+				 (char *)&flags, &slen) < 0) {
+				Error
+				    ("[%s] getsockopt(%u,SO_ERROR): %s: forcing down",
+				     pCEServing->server, cofile,
+				     strerror(errno));
+				/* no ConsoleError() for same reason as above */
+				SendIWaitClientsMsg(pCEServing,
+						    "down]\r\n");
+				ConsDown(pCEServing, FLAGTRUE, FLAGTRUE);
+				break;
+			    }
+			    if (flags != 0) {
+				Error("[%s] connect(%u): %s: forcing down",
+				      pCEServing->server, cofile,
+				      strerror(flags));
+				/* no ConsoleError() for same reason as above */
+				SendIWaitClientsMsg(pCEServing,
+						    "down]\r\n");
+				ConsDown(pCEServing, FLAGTRUE, FLAGTRUE);
+				break;
+			    }
+
+			    /* waiting for a connect(), we watch the write bit,
+			     * so switch around and now watch for the read and
+			     * start gathering data
+			     */
+			    FD_SET(cofile, &rinit);
+			    FD_CLR(cofile, &winit);
+			} else
 			    break;
-			}
-			pCEServing->ioState = ISNORMAL;
-			pCEServing->lastWrite = time((time_t *)0);
-#if HAVE_GETTIMEOFDAY
-			if (gettimeofday(&tv, (void *)0) == 0)
-			    pCEServing->lastInit = tv;
-#else
-			if ((tv = time((time_t *)0)) != (time_t)-1)
-			    pCEServing->lastInit = tv;
-#endif
-			/* waiting for a connect(), we watch the write bit,
-			 * so switch around and now watch for the read and
-			 * start gathering data
-			 */
-			FD_SET(cofile, &rinit);
-			FD_CLR(cofile, &winit);
-			if (pCEServing->idletimeout != (time_t)0 &&
-			    (timers[T_CIDLE] == (time_t)0 ||
-			     timers[T_CIDLE] >
-			     pCEServing->lastWrite +
-			     pCEServing->idletimeout))
-			    timers[T_CIDLE] =
-				pCEServing->lastWrite +
-				pCEServing->idletimeout;
-			if (pCEServing->downHard == FLAGTRUE) {
-			    Msg("[%s] console up", pCEServing->server);
-			    pCEServing->downHard = FLAGFALSE;
-			}
-			SendIWaitClientsMsg(pCEServing, "up]\r\n");
-			StartInit(pCEServing);
+#if HAVE_FREEIPMI
 		    }
+#endif
+
+		    pCEServing->ioState = ISNORMAL;
+		    pCEServing->lastWrite = time((time_t *)0);
+#if HAVE_GETTIMEOFDAY
+		    if (gettimeofday(&tv, (void *)0) == 0)
+			pCEServing->lastInit = tv;
+#else
+		    if ((tv = time((time_t *)0)) != (time_t)-1)
+			pCEServing->lastInit = tv;
+#endif
+		    if (pCEServing->idletimeout != (time_t)0 &&
+			(timers[T_CIDLE] == (time_t)0 ||
+			 timers[T_CIDLE] >
+			 pCEServing->lastWrite + pCEServing->idletimeout))
+			timers[T_CIDLE] =
+			    pCEServing->lastWrite +
+			    pCEServing->idletimeout;
+		    if (pCEServing->downHard == FLAGTRUE) {
+			Msg("[%s] console up", pCEServing->server);
+			pCEServing->downHard = FLAGFALSE;
+		    }
+		    SendIWaitClientsMsg(pCEServing, "up]\r\n");
+		    StartInit(pCEServing);
 		    break;
 		case ISNORMAL:
 		    if (FileCanRead(pCEServing->cofile, &rmask, &wmask))

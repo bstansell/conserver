@@ -1,5 +1,5 @@
 /*
- *  $Id: cutil.c,v 1.138 2013/09/26 17:50:24 bryan Exp $
+ *  $Id: cutil.c,v 1.140 2014/04/04 16:17:10 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -540,10 +540,14 @@ FmtCtlStr(pcIn, len, pcOut)
 {
     unsigned char c;
 
+    BuildString((char *)0, pcOut);
+
+    if (pcIn == (char *)0)
+	return;
+
     if (len < 0)
 	len = strlen(pcIn);
 
-    BuildString((char *)0, pcOut);
     for (; len; len--, pcIn++) {
 	c = *pcIn & 0xff;
 	if (c > 127) {
@@ -1385,15 +1389,19 @@ FileCanRead(cfp, prfd, pwfd)
     fd_set *pwfd;
 #endif
 {
+#if HAVE_OPENSSL
     int fdout;
+#endif
 
     if (cfp == (CONSFILE *)0)
 	return 0;
 
+#if HAVE_OPENSSL
     if (cfp->ftype == simplePipe)
 	fdout = cfp->fdout;
     else
 	fdout = cfp->fd;
+#endif
 
     return ((FD_ISSET(cfp->fd, prfd)
 #if HAVE_OPENSSL
@@ -2746,7 +2754,11 @@ GetWord(fp, line, spaceok, word)
 		    if (c == '\n') {
 			if (fname->used > 0) {
 			    while (fname->used > 1 && isspace((int)
-							      (fname->string[fname->used - 2])))
+							      (fname->
+							       string
+							       [fname->
+								used -
+								2])))
 				fname->used--;
 			    if (fname->used > 0)
 				fname->string[fname->used - 1] = '\000';
@@ -3036,8 +3048,8 @@ ParseFile(filename, fp, level)
 		case VALUE:
 		    switch (token) {
 			case WORD:
-			    (*sections[secIndex].
-			     items[keyIndex].reg) (word->string);
+			    (*sections[secIndex].items[keyIndex].
+			     reg) (word->string);
 			    state = SEMI;
 			    break;
 			case SEMICOLON:

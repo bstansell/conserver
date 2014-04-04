@@ -15,6 +15,7 @@ dnl AH_TEMPLATE([HAVE_POSIX_REGCOMP], [have POSIX regcomp])
 AH_TEMPLATE([HAVE_PAM], [have PAM support])
 AH_TEMPLATE([HAVE_OPENSSL], [have openssl support])
 AH_TEMPLATE([HAVE_GSSAPI], [have gss-api support])
+AH_TEMPLATE([HAVE_FREEIPMI], [have freeipmi support])
 AH_TEMPLATE([STRIP_REALM], [retry username without @REALM with gss-api authentication])
 AH_TEMPLATE([HAVE_DMALLOC], [have dmalloc support])
 AH_TEMPLATE([HAVE_SA_LEN],[Defined if sa_len member exists in struct sockaddr])
@@ -592,6 +593,51 @@ AC_ARG_WITH(gssapi,
     fi]
 )
 
+cons_with_freeipmi="NO"
+AC_ARG_WITH(freeipmi,
+    AS_HELP_STRING([--with-freeipmi@<:@=PATH@:>@],
+	[Compile in FreeIPMI support]),
+    [if test "$withval" != "no"; then
+	if test "$withval" != "yes"; then
+	    FREEIPMICPPFLAGS="-I$withval/include"
+	    if test "$use_dash_r" != "yes"; then
+		FREEIPMILDFLAGS="-L$withval/lib"
+	    else
+		FREEIPMILDFLAGS="-L$withval/lib -R$withval/lib"
+	    fi
+	else
+	    FREEIPMICPPFLAGS=""
+	    FREEIPMILDFLAGS=""
+	fi
+
+	oCPPFLAGS="$CPPFLAGS"
+	oLDFLAGS="$LDFLAGS"
+	oLIBS="$LIBS"
+	have_freeipmi=no
+
+	CPPFLAGS="$CPPFLAGS $FREEIPMICPPFLAGS"
+	LDFLAGS="$LDFLAGS $FREEIPMILDFLAGS"
+
+	AC_CHECK_HEADER([ipmiconsole.h],
+	    [LIBS="$LIBS -lipmiconsole"
+	    AC_MSG_CHECKING(for freeipmi libraries -lipmiconsole)
+	    AC_TRY_LINK([#include <ipmiconsole.h>
+		],[ipmiconsole_ctx_fd(0)],
+		[AC_MSG_RESULT(yes)
+		cons_with_freeipmi="YES"
+		AC_DEFINE(HAVE_FREEIPMI)
+		CONSLIBS="$CONSLIBS -lipmiconsole"
+		have_freeipmi=yes],
+		[AC_MSG_RESULT(no)])],)
+
+	LIBS="$oLIBS"
+	if test $have_freeipmi = no; then
+	    CPPFLAGS="$oCPPFLAGS"
+	    LDFLAGS="$oLDFLAGS"
+	fi
+    fi]
+)
+
 cons_with_dmalloc="NO"
 AC_ARG_WITH(dmalloc,
     AS_HELP_STRING([--with-dmalloc@<:@=PATH@:>@],
@@ -744,6 +790,7 @@ echo "  Unix domain sockets (--with-uds)       : $cons_with_uds"
 echo "         TCP wrappers (--with-libwrap)   : $cons_with_libwrap"
 echo "              OpenSSL (--with-openssl)   : $cons_with_openssl"
 echo "              GSS-API (--with-gssapi)    : $cons_with_gssapi"
+echo "             FreeIPMI (--with-freeipmi)  : $cons_with_freeipmi"
 if [ $cons_with_gssapi = "YES" ]; then
 echo "         strip @REALM (--with-striprealm): $cons_strip_realm"
 fi

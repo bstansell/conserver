@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.208 2013/09/25 22:10:29 bryan Exp $
+ *  $Id: main.c,v 5.210 2014/04/04 16:17:10 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -658,6 +658,9 @@ Version()
 #if HAVE_DMALLOC
 	"dmalloc",
 #endif
+#if HAVE_FREEIPMI
+	"freeipmi",
+#endif
 #if USE_LIBWRAP
 	"libwrap",
 #endif
@@ -727,6 +730,15 @@ Version()
     }
 #endif
     Msg("dmalloc version: %s", acA1->string);
+#endif
+#if HAVE_FREEIPMI
+    BuildString((char *)0, acA1);
+    BuildStringChar('0' + LIBIPMICONSOLE_VERSION_MAJOR, acA1);
+    BuildStringChar('.', acA1);
+    BuildStringChar('0' + LIBIPMICONSOLE_VERSION_MINOR, acA1);
+    BuildStringChar('.', acA1);
+    BuildStringChar('0' + LIBIPMICONSOLE_VERSION_PATCH, acA1);
+    Msg("freeipmi version: %s", acA1->string);
 #endif
 #if HAVE_OPENSSL
     Msg("openssl version: %s", OPENSSL_VERSION_TEXT);
@@ -854,6 +866,12 @@ SummarizeDataStructures()
 		size += strlen(pCE->tasklist);
 	    if (pCE->breaklist != (char *)0)
 		size += strlen(pCE->breaklist);
+#if HAVE_FREEIPMI
+	    if (pCE->username != (char *)0)
+		size += strlen(pCE->username);
+	    if (pCE->password != (char *)0)
+		size += strlen(pCE->password);
+#endif
 	    if (pCE->fdlog != (CONSFILE *)0)
 		size += sizeof(CONSFILE);
 	    if (pCE->cofile != (CONSFILE *)0)
@@ -936,6 +954,11 @@ DumpDataStructures()
     REMOTE *pRC;
     int i;
     TASKS *t;
+#if HAVE_FREEIPMI
+    static STRING *tmpString = (STRING *)0;
+    if (tmpString == (STRING *)0)
+	tmpString = AllocString();
+#endif
 
 #if HAVE_DMALLOC && DMALLOC_MARK_MAIN
     CONDDEBUG((1, "DumpDataStructures(): dmalloc / MarkMain"));
@@ -979,6 +1002,27 @@ DumpDataStructures()
 			       pCE->execuid, pCE->execgid));
 
 		    break;
+#if HAVE_FREEIPMI
+		case IPMI:
+		    CONDDEBUG((1,
+			       "DumpDataStructures():  server=%s, type=IPMI",
+			       EMPTYSTR(pCE->server)));
+		    CONDDEBUG((1,
+			       "DumpDataStructures():  host=%s, username=%s, password=%s, ipmiprivlevel=%d",
+			       EMPTYSTR(pCE->host),
+			       EMPTYSTR(pCE->username),
+			       EMPTYSTR(pCE->password),
+			       pCE->ipmiprivlevel));
+		    CONDDEBUG((1,
+			       "DumpDataStructures():  ipmiwrkset=%d, ipmiworkaround=%u, ipmiciphersuite=%d",
+			       pCE->ipmiwrkset, pCE->ipmiworkaround,
+			       pCE->ipmiciphersuite));
+		    FmtCtlStr(pCE->ipmikg->string, pCE->ipmikg->used - 1,
+			      tmpString);
+		    CONDDEBUG((1, "DumpDataStructures():  ipmikg=%s",
+			       EMPTYSTR(tmpString->string)));
+		    break;
+#endif
 		case HOST:
 		    CONDDEBUG((1,
 			       "DumpDataStructures():  server=%s, type=HOST",

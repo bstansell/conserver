@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.c,v 5.153 2013/09/26 17:32:54 bryan Exp $
+ *  $Id: consent.c,v 5.154 2014/04/02 04:45:31 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -338,6 +338,54 @@ StopInit(pCE)
 	pCE->initfile = (CONSFILE *)0;
     }
 }
+
+#if HAVE_FREEIPMI
+ipmiconsole_ctx_t
+#if PROTOTYPES
+IpmiSOLCreate(CONSENT *pCE)
+#else
+IpmiSOLCreate(pCE)
+    CONSENT *pCE;
+#endif
+{
+    ipmiconsole_ctx_t ctx;
+    struct ipmiconsole_ipmi_config ipmi;
+    struct ipmiconsole_protocol_config protocol;
+    struct ipmiconsole_engine_config engine;
+
+    if (ipmiconsole_engine_init(1, 0) < 0)
+	return 0;
+
+    ipmi.username = pCE->username;
+    ipmi.password = pCE->password;
+    if (pCE->ipmikg->used <= 1) {	/* 1 == NULL only */
+	ipmi.k_g = NULL;
+	ipmi.k_g_len = 0;
+    } else {
+	ipmi.k_g = (unsigned char *)pCE->ipmikg->string;
+	ipmi.k_g_len = pCE->ipmikg->used - 1;
+    }
+    ipmi.privilege_level = pCE->ipmiprivlevel;
+    ipmi.cipher_suite_id = pCE->ipmiciphersuite;
+    ipmi.workaround_flags = pCE->ipmiworkaround;
+
+    protocol.session_timeout_len = -1;
+    protocol.retransmission_timeout_len = -1;
+    protocol.retransmission_backoff_count = -1;
+    protocol.keepalive_timeout_len = -1;
+    protocol.retransmission_keepalive_timeout_len = -1;
+    protocol.acceptable_packet_errors_count = -1;
+    protocol.maximum_retransmission_count = -1;
+
+    engine.engine_flags = IPMICONSOLE_ENGINE_OUTPUT_ON_SOL_ESTABLISHED;
+    engine.behavior_flags = 0;
+    engine.debug_flags = 0;
+
+    ctx = ipmiconsole_ctx_create(pCE->host, &ipmi, &protocol, &engine);
+
+    return ctx;
+}
+#endif
 
 /* invoke the initcmd command */
 void
@@ -728,6 +776,14 @@ ConsDown(pCE, downHard, force)
 	FD_CLR(cofile, &winit);
 	FileClose(&pCE->cofile);
     }
+#if HAVE_FREEIPMI
+    /* need to do this after cofile close above as
+     * ipmiconsole_ctx_destroy will close the fd */
+    if (pCE->ipmictx != (ipmiconsole_ctx_t) 0) {
+	ipmiconsole_ctx_destroy(pCE->ipmictx);
+	pCE->ipmictx = (ipmiconsole_ctx_t) 0;
+    }
+#endif
     if (pCE->fdlog != (CONSFILE *)0) {
 	if (pCE->nolog) {
 	    TagLogfile(pCE, "Console logging restored");
@@ -1039,6 +1095,56 @@ ConsInit(pCE)
 	    TtyDev(pCE);
 	    pCE->ioState = ISNORMAL;
 	    break;
+
+#if HAVE_FREEIPMI
+	case IPMI:
+	    if (!(pCE->ipmictx = IpmiSOLCreate(pCE))) {
+		Error("[%s] Could not create IPMI context: forcing down",
+		      pCE->server);
+		ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+		return;
+	    }
+
+	    if (ipmiconsole_engine_submit(pCE->ipmictx, NULL, NULL) < 0) {
+		Error
+		    ("[%s] Could not connect to IPMI host `%s': forcing down",
+		     pCE->server, pCE->host);
+		ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+		return;
+	    }
+
+	    cofile = ipmiconsole_ctx_fd(pCE->ipmictx);
+	    if (!SetFlags(cofile, O_NONBLOCK, 0)) {
+		ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+		return;
+	    }
+
+	    if ((pCE->cofile =
+		 FileOpenFD(cofile, simpleFile)) == (CONSFILE *)0) {
+		Error("[%s] FileOpenFD(simpleFile) failed: forcing down",
+		      pCE->server);
+		ConsDown(pCE, FLAGTRUE, FLAGTRUE);
+		return;
+	    }
+
+	    if (ipmiconsole_ctx_status(pCE->ipmictx) ==
+		IPMICONSOLE_CTX_STATUS_SOL_ESTABLISHED) {
+		/* Read in the NULL from OUTPUT_ON_SOL_ESTABLISHED flag */
+		char b[1];
+		FileRead(pCE->cofile, b, 1);	/* trust it's NULL */
+		pCE->ioState = ISNORMAL;
+		pCE->stateTimer = 0;
+	    } else {
+		/* Error status cases will be handled in Kiddie() */
+		pCE->ioState = INCONNECT;
+		pCE->stateTimer = time((time_t *)0) + CONNECTTIMEOUT;
+		if (timers[T_STATE] == (time_t)0 ||
+		    timers[T_STATE] > pCE->stateTimer)
+		    timers[T_STATE] = pCE->stateTimer;
+	    }
+	    pCE->fup = 1;
+	    break;
+#endif
     }
 
     if (!pCE->fup) {
@@ -1057,6 +1163,11 @@ ConsInit(pCE)
 	    Verbose("[%s] port %hu on %s", pCE->server, pCE->netport,
 		    pCE->host);
 	    break;
+#if HAVE_FREEIPMI
+	case IPMI:
+	    Verbose("[%s] on %s", pCE->server);
+	    break;
+#endif
 	case NOOP:
 	    Verbose("[%s] noop", pCE->server);
 	    break;
@@ -1073,7 +1184,12 @@ ConsInit(pCE)
 	/* if we're waiting for connect() to finish, watch the
 	 * write bit, otherwise watch for the read bit
 	 */
-	if (pCE->ioState == INCONNECT)
+	if (pCE->ioState == INCONNECT
+#if HAVE_FREEIPMI
+	    /* We wait for read() with the libipmiconsole */
+	    && pCE->type != IPMI
+#endif
+	    )
 	    FD_SET(cofile, &winit);
 	else
 	    FD_SET(cofile, &rinit);

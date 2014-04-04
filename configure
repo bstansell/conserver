@@ -690,6 +690,7 @@ with_openssl
 with_req_server_cert
 with_gssapi
 with_striprealm
+with_freeipmi
 with_dmalloc
 with_pam
 '
@@ -1338,6 +1339,7 @@ Optional Packages:
   --with-gssapi[=PATH]    Compile in GSS-API support
   --with-striprealm       retry username without @REALM with gss-api
                           authentication
+  --with-freeipmi[=PATH]  Compile in FreeIPMI support
   --with-dmalloc[=PATH]   Compile in dmalloc support
   --with-pam              Enable PAM support
 
@@ -5336,6 +5338,76 @@ fi
 fi
 
 
+cons_with_freeipmi="NO"
+
+# Check whether --with-freeipmi was given.
+if test "${with_freeipmi+set}" = set; then :
+  withval=$with_freeipmi; if test "$withval" != "no"; then
+	if test "$withval" != "yes"; then
+	    FREEIPMICPPFLAGS="-I$withval/include"
+	    if test "$use_dash_r" != "yes"; then
+		FREEIPMILDFLAGS="-L$withval/lib"
+	    else
+		FREEIPMILDFLAGS="-L$withval/lib -R$withval/lib"
+	    fi
+	else
+	    FREEIPMICPPFLAGS=""
+	    FREEIPMILDFLAGS=""
+	fi
+
+	oCPPFLAGS="$CPPFLAGS"
+	oLDFLAGS="$LDFLAGS"
+	oLIBS="$LIBS"
+	have_freeipmi=no
+
+	CPPFLAGS="$CPPFLAGS $FREEIPMICPPFLAGS"
+	LDFLAGS="$LDFLAGS $FREEIPMILDFLAGS"
+
+	ac_fn_c_check_header_mongrel "$LINENO" "ipmiconsole.h" "ac_cv_header_ipmiconsole_h" "$ac_includes_default"
+if test "x$ac_cv_header_ipmiconsole_h" = xyes; then :
+  LIBS="$LIBS -lipmiconsole"
+	    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for freeipmi libraries -lipmiconsole" >&5
+$as_echo_n "checking for freeipmi libraries -lipmiconsole... " >&6; }
+	    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <ipmiconsole.h>
+
+int
+main ()
+{
+ipmiconsole_ctx_fd(0)
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+		cons_with_freeipmi="YES"
+		$as_echo "#define HAVE_FREEIPMI 1" >>confdefs.h
+
+		CONSLIBS="$CONSLIBS -lipmiconsole"
+		have_freeipmi=yes
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+fi
+
+
+
+	LIBS="$oLIBS"
+	if test $have_freeipmi = no; then
+	    CPPFLAGS="$oCPPFLAGS"
+	    LDFLAGS="$oLDFLAGS"
+	fi
+    fi
+
+fi
+
+
 cons_with_dmalloc="NO"
 
 # Check whether --with-dmalloc was given.
@@ -6987,6 +7059,7 @@ echo "  Unix domain sockets (--with-uds)       : $cons_with_uds"
 echo "         TCP wrappers (--with-libwrap)   : $cons_with_libwrap"
 echo "              OpenSSL (--with-openssl)   : $cons_with_openssl"
 echo "              GSS-API (--with-gssapi)    : $cons_with_gssapi"
+echo "             FreeIPMI (--with-freeipmi)  : $cons_with_freeipmi"
 if [ $cons_with_gssapi = "YES" ]; then
 echo "         strip @REALM (--with-striprealm): $cons_strip_realm"
 fi
