@@ -1,5 +1,5 @@
 /*
- *  $Id: fallback.c,v 5.61 2004/04/16 16:58:09 bryan Exp $
+ *  $Id: fallback.c,v 5.62 2014/04/20 06:45:07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -27,44 +27,38 @@
  * packages, i think things are ok...hopefully it's true!
  */
 static int
-#if PROTOTYPES
 GetPseudoTTY(STRING *slave, int *slaveFD)
-#else
-GetPseudoTTY(slave, slaveFD)
-    STRING *slave;
-    int *slaveFD;
-#endif
 {
 #if HAVE_OPENPTY
     int fd = -1;
     int sfd = -1;
     int opty = 0;
     char *pcName;
-#if HAVE_SIGACTION
+# if HAVE_SIGACTION
     sigset_t oldmask, newmask;
-#else
-    extern RETSIGTYPE FlagReapVirt PARAMS((int));
-#endif
+# else
+    extern RETSIGTYPE FlagReapVirt(int);
+# endif
 
-#if HAVE_SIGACTION
+# if HAVE_SIGACTION
     sigemptyset(&newmask);
     sigaddset(&newmask, SIGCHLD);
     if (sigprocmask(SIG_BLOCK, &newmask, &oldmask) < 0)
 	Error("GetPseudoTTY(): sigprocmask(SIG_BLOCK): %s",
 	      strerror(errno));
-#else
+# else
     SimpleSignal(SIGCHLD, SIG_DFL);
-#endif
+# endif
 
     opty = openpty(&fd, &sfd, NULL, NULL, NULL);
 
-#if HAVE_SIGACTION
+# if HAVE_SIGACTION
     if (sigprocmask(SIG_SETMASK, &oldmask, NULL) < 0)
 	Error("GetPseudoTTY(): sigprocmask(SIG_SETMASK): %s",
 	      strerror(errno));
-#else
+# else
     SimpleSignal(SIGCHLD, FlagReapVirt);
-#endif
+# endif
 
     if (opty != 0) {
 	if (fd >= 0)
@@ -84,15 +78,15 @@ GetPseudoTTY(slave, slaveFD)
     *slaveFD = sfd;
     return fd;
 #else
-#if (HAVE_PTSNAME && HAVE_GRANTPT && HAVE_UNLOCKPT) || defined(_AIX)
+# if (HAVE_PTSNAME && HAVE_GRANTPT && HAVE_UNLOCKPT) || defined(_AIX)
     int fd = -1;
     int sfd = -1;
     char *pcName;
-#if HAVE_SIGACTION
+#  if HAVE_SIGACTION
     sigset_t oldmask, newmask;
-#else
-    extern RETSIGTYPE FlagReapVirt PARAMS((int));
-#endif
+#  else
+    extern RETSIGTYPE FlagReapVirt(int);
+#  endif
     int c;
     /* clone list and idea stolen from xemacs distribution */
     static char *clones[] = {
@@ -111,48 +105,48 @@ GetPseudoTTY(slave, slaveFD)
     if (fd < 0)
 	return -1;
 
-#if HAVE_SIGACTION
+#  if HAVE_SIGACTION
     sigemptyset(&newmask);
     sigaddset(&newmask, SIGCHLD);
     if (sigprocmask(SIG_BLOCK, &newmask, &oldmask) < 0)
 	Error("GetPseudoTTY(): sigprocmask(SIG_BLOCK): %s",
 	      strerror(errno));
-#else
+#  else
     SimpleSignal(SIGCHLD, SIG_DFL);
-#endif
+#  endif
 
-#if HAVE_GRANTPT
+#  if HAVE_GRANTPT
     grantpt(fd);		/* change permission of slave */
-#endif
+#  endif
 
-#if HAVE_SIGACTION
+#  if HAVE_SIGACTION
     if (sigprocmask(SIG_SETMASK, &oldmask, NULL) < 0)
 	Error("GetPseudoTTY(): sigprocmask(SIG_SETMASK): %s",
 	      strerror(errno));
-#else
+#  else
     SimpleSignal(SIGCHLD, FlagReapVirt);
-#endif
+#  endif
 
-#if HAVE_UNLOCKPT
+#  if HAVE_UNLOCKPT
     unlockpt(fd);		/* unlock slave */
-#endif
+#  endif
 
-#if defined(_AIX)
+#  if defined(_AIX)
     if ((pcName = ttyname(fd)) == (char *)0) {
 	close(fd);
 	return -1;
     }
-#else
-# if HAVE_PTSNAME
+#  else
+#   if HAVE_PTSNAME
     if ((pcName = ptsname(fd)) == (char *)0) {
 	close(fd);
 	return -1;
     }
-# else
+#   else
     close(fd);
     return -1;
-# endif
-#endif
+#   endif
+#  endif
 
     /* go ahead and open the slave */
     if ((sfd = open(pcName, O_RDWR, 0)) < 0) {
@@ -166,7 +160,7 @@ GetPseudoTTY(slave, slaveFD)
 
     *slaveFD = sfd;
     return fd;
-#else
+# else
     /*
      * Below is the string for finding /dev/ptyXX.  For each architecture we
      * leave some pty's world writable because we don't have source for
@@ -234,7 +228,7 @@ GetPseudoTTY(slave, slaveFD)
 
     *slaveFD = sfd;
     return fd;
-#endif /* (HAVE_PTSNAME && HAVE_GRANTPT && HAVE_UNLOCKPT) || defined(_AIX) */
+# endif	/* (HAVE_PTSNAME && HAVE_GRANTPT && HAVE_UNLOCKPT) || defined(_AIX) */
 #endif /* HAVE_OPENPTY */
 }
 
@@ -242,13 +236,7 @@ GetPseudoTTY(slave, slaveFD)
  * get a pty using the GetPseudoTTY code above
  */
 int
-#if PROTOTYPES
 FallBack(char **slave, int *sfd)
-#else
-FallBack(slave, sfd)
-    char **slave;
-    int *sfd;
-#endif
 {
     int fd;
     static STRING *pcTSlave = (STRING *)0;

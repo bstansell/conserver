@@ -1,5 +1,5 @@
 /*
- *  $Id: client.c,v 5.96 2014/04/02 04:45:31 bryan Exp $
+ *  $Id: client.c,v 5.97 2014/04/20 06:45:07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -43,9 +43,14 @@
 #include <group.h>
 #include <readcfg.h>
 
+#if USE_IPV6
+# include <sys/socket.h>
+# include <netdb.h>
+#endif /* USE_IPV6 */
+
 #if defined(USE_LIBWRAP)
-#include <syslog.h>
-#include <tcpd.h>
+# include <syslog.h>
+# include <tcpd.h>
 int allow_severity = LOG_INFO;
 int deny_severity = LOG_WARNING;
 #endif
@@ -54,12 +59,7 @@ int deny_severity = LOG_WARNING;
 /* find the next guy who wants to write on the console			(ksb)
  */
 void
-#if PROTOTYPES
 FindWrite(CONSENT *pCE)
-#else
-FindWrite(pCE)
-    CONSENT *pCE;
-#endif
 {
     CONSCLIENT *pCLfound = (CONSCLIENT *)0;
     CONSCLIENT *pCL;
@@ -91,13 +91,7 @@ FindWrite(pCE)
 }
 
 void
-#if PROTOTYPES
 BumpClient(CONSENT *pCE, char *message)
-#else
-BumpClient(pCE, message)
-    CONSENT *pCE;
-    char *message;
-#endif
 {
     if ((CONSCLIENT *)0 == pCE->pCLwr)
 	return;
@@ -118,14 +112,7 @@ BumpClient(pCE, message)
 #define REPLAYBUFFER 4096
 
 void
-#if PROTOTYPES
 Replay(CONSENT *pCE, CONSFILE *fdOut, unsigned short back)
-#else
-Replay(pCE, fdOut, back)
-    CONSENT *pCE;
-    CONSFILE *fdOut;
-    unsigned short back;
-#endif
 {
     CONSFILE *fdLog = (CONSFILE *)0;
     STRING *line = (STRING *)0;
@@ -424,12 +411,7 @@ static HELP aHLTable[] = {
 /* list the commands we know for the user				(ksb)
  */
 void
-#if PROTOTYPES
 HelpUser(CONSCLIENT *pCL)
-#else
-HelpUser(pCL, pCE)
-    CONSCLIENT *pCL;
-#endif
 {
     int i, j, iCmp;
     static char
@@ -505,34 +487,19 @@ HelpUser(pCL, pCE)
 }
 
 int
-#if PROTOTYPES
 ClientAccessOk(CONSCLIENT *pCL)
-#else
-ClientAccessOk(pCL)
-    CONSCLIENT *pCL;
-#endif
 {
     char *peername = (char *)0;
     int retval = 1;
 
-#if USE_UNIX_DOMAIN_SOCKETS
-    struct in_addr addr;
-
-# if HAVE_INET_ATON
-    inet_aton("127.0.0.1", &addr);
-# else
-    addr.s_addr = inet_addr("127.0.0.1");
-# endif
-    pCL->caccess = AccType(&addr, &peername);
-    if (pCL->caccess == 'r') {
-	FileWrite(pCL->fd, FLAGFALSE, "access from your host refused\r\n",
-		  -1);
-	retval = 0;
-    }
-#else
+#if USE_IPV6 || !USE_UNIX_DOMAIN_SOCKETS
     socklen_t so;
     int cfd;
-    struct sockaddr_in in_port;
+# if USE_IPV6
+    int error;
+    char addr[NI_MAXHOST];
+# endif
+    SOCKADDR_STYPE in_port;
     int getpeer = -1;
 
     cfd = FileFDNum(pCL->fd);
@@ -559,20 +526,56 @@ ClientAccessOk(pCL)
 	retval = 0;
 	goto setpeer;
     }
-    pCL->caccess = AccType(&in_port.sin_addr, &peername);
+    pCL->caccess = AccType(
+# if USE_IPV6
+			      &in_port,
+# else
+			      &in_port.sin_addr,
+# endif
+			      &peername);
     if (pCL->caccess == 'r') {
 	FileWrite(pCL->fd, FLAGFALSE, "access from your host refused\r\n",
 		  -1);
 	retval = 0;
     }
   setpeer:
+#else
+    struct in_addr addr;
+
+# if HAVE_INET_ATON
+    inet_aton("127.0.0.1", &addr);
+# else
+    addr.s_addr = inet_addr("127.0.0.1");
+# endif
+    pCL->caccess = AccType(&addr, &peername);
+    if (pCL->caccess == 'r') {
+	FileWrite(pCL->fd, FLAGFALSE, "access from your host refused\r\n",
+		  -1);
+	retval = 0;
+    }
 #endif
 
     if (pCL->peername != (STRING *)0) {
 	BuildString((char *)0, pCL->peername);
 	if (peername != (char *)0)
 	    BuildString(peername, pCL->peername);
-#if USE_UNIX_DOMAIN_SOCKETS
+#if USE_IPV6
+	else if (getpeer != -1) {
+	    error =
+		getnameinfo((struct sockaddr *)&in_port, so, addr,
+			    sizeof(addr), NULL, 0, NI_NUMERICHOST);
+	    if (error) {
+		FileWrite(pCL->fd, FLAGFALSE, "getnameinfo failed\r\n",
+			  -1);
+		Error("ClientAccessOk(): gatenameinfo: %s",
+		      gai_strerror(error));
+		retval = 0;
+	    }
+
+	    BuildString(addr, pCL->peername);
+	} else
+	    BuildString("<unknown>", pCL->peername);
+#elif USE_UNIX_DOMAIN_SOCKETS
 	else
 	    BuildString("127.0.0.1", pCL->peername);
 #else

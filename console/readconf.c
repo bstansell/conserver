@@ -1,5 +1,5 @@
 /*
- *  $Id: readconf.c,v 5.7 2013/09/18 14:31:39 bryan Exp $
+ *  $Id: readconf.c,v 5.8 2014/04/20 06:45:07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -19,12 +19,7 @@ TERM *parserTermDefault = (TERM *)0;
 TERM *pTerm = (TERM *)0;
 
 void
-#if PROTOTYPES
 DestroyConfig(CONFIG *c)
-#else
-DestroyConfig(c)
-    CONFIG *c;
-#endif
 {
     if (c == (CONFIG *)0)
 	return;
@@ -48,12 +43,7 @@ DestroyConfig(c)
 }
 
 void
-#if PROTOTYPES
 ApplyConfigDefault(CONFIG *c)
-#else
-ApplyConfigDefault(c)
-    CONFIG *c;
-#endif
 {
     if (parserConfigDefault == (CONFIG *)0)
 	return;
@@ -121,12 +111,7 @@ ApplyConfigDefault(c)
 }
 
 void
-#if PROTOTYPES
 ConfigBegin(char *id)
-#else
-ConfigBegin(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigBegin(%s) [%s:%d]", id, file, line));
     if (id == (char *)0 || id[0] == '\000') {
@@ -144,11 +129,7 @@ ConfigBegin(id)
 }
 
 void
-#if PROTOTYPES
 ConfigEnd(void)
-#else
-ConfigEnd()
-#endif
 {
     CONDDEBUG((1, "ConfigEnd() [%s:%d]", file, line));
 
@@ -170,11 +151,7 @@ ConfigEnd()
 }
 
 void
-#if PROTOTYPES
 ConfigAbort(void)
-#else
-ConfigAbort()
-#endif
 {
     CONDDEBUG((1, "ConfigAbort() [%s:%d]", file, line));
     if (parserConfigTemp == (CONFIG *)0)
@@ -185,11 +162,7 @@ ConfigAbort()
 }
 
 void
-#if PROTOTYPES
 ConfigDestroy(void)
-#else
-ConfigDestroy()
-#endif
 {
     CONDDEBUG((1, "ConfigDestroy() [%s:%d]", file, line));
 
@@ -206,12 +179,7 @@ ConfigDestroy()
 }
 
 void
-#if PROTOTYPES
 DestroyTerminal(TERM *t)
-#else
-DestroyTerminal(t)
-    TERM *t;
-#endif
 {
     if (t == (TERM *)0)
 	return;
@@ -227,12 +195,7 @@ DestroyTerminal(t)
 }
 
 void
-#if PROTOTYPES
 ApplyTermDefault(TERM *t)
-#else
-ApplyTermDefault(t)
-    TERM *t;
-#endif
 {
     if (parserTermDefault == (TERM *)0)
 	return;
@@ -266,12 +229,7 @@ ApplyTermDefault(t)
 }
 
 void
-#if PROTOTYPES
 TerminalBegin(char *id)
-#else
-TerminalBegin(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "TerminalBegin(%s) [%s:%d]", id, file, line));
     if (id == (char *)0 || id[0] == '\000') {
@@ -289,11 +247,7 @@ TerminalBegin(id)
 }
 
 void
-#if PROTOTYPES
 TerminalEnd(void)
-#else
-TerminalEnd()
-#endif
 {
     static char *term = (char *)0;
 
@@ -323,11 +277,7 @@ TerminalEnd()
 }
 
 void
-#if PROTOTYPES
 TerminalAbort(void)
-#else
-TerminalAbort()
-#endif
 {
     CONDDEBUG((1, "TerminalAbort() [%s:%d]", file, line));
     if (parserTermTemp == (TERM *)0)
@@ -338,11 +288,7 @@ TerminalAbort()
 }
 
 void
-#if PROTOTYPES
 TerminalDestroy(void)
-#else
-TerminalDestroy()
-#endif
 {
     CONDDEBUG((1, "TerminalDestroy() [%s:%d]", file, line));
 
@@ -359,13 +305,7 @@ TerminalDestroy()
 }
 
 void
-#if PROTOTYPES
 ProcessYesNo(char *id, FLAG *flag)
-#else
-ProcessYesNo(id, flag)
-    char *id;
-    FLAG *flag;
-#endif
 {
     if (id == (char *)0 || id[0] == '\000')
 	*flag = FLAGFALSE;
@@ -378,12 +318,7 @@ ProcessYesNo(id, flag)
 }
 
 void
-#if PROTOTYPES
 ConfigItemEscape(char *id)
-#else
-ConfigItemEscape(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemEscape(%s) [%s:%d]", id, file, line));
 
@@ -399,12 +334,7 @@ ConfigItemEscape(id)
 }
 
 void
-#if PROTOTYPES
 ConfigItemMaster(char *id)
-#else
-ConfigItemMaster(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemMaster(%s) [%s:%d]", id, file, line));
 
@@ -420,12 +350,7 @@ ConfigItemMaster(id)
 }
 
 void
-#if PROTOTYPES
 ConfigItemPlayback(char *id)
-#else
-ConfigItemPlayback(id)
-    char *id;
-#endif
 {
     int i;
 
@@ -449,12 +374,7 @@ ConfigItemPlayback(id)
 }
 
 void
-#if PROTOTYPES
 ConfigItemPort(char *id)
-#else
-ConfigItemPort(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemPort(%s) [%s:%d]", id, file, line));
 
@@ -470,12 +390,7 @@ ConfigItemPort(id)
 }
 
 void
-#if PROTOTYPES
 ConfigItemReplay(char *id)
-#else
-ConfigItemReplay(id)
-    char *id;
-#endif
 {
     int i;
 
@@ -499,12 +414,7 @@ ConfigItemReplay(id)
 }
 
 void
-#if PROTOTYPES
 ConfigItemSslcredentials(char *id)
-#else
-ConfigItemSslcredentials(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemSslcredentials(%s) [%s:%d]", id, file, line));
 #if HAVE_OPENSSL
@@ -525,12 +435,7 @@ ConfigItemSslcredentials(id)
 }
 
 void
-#if PROTOTYPES
 ConfigItemSslcacertificatefile(char *id)
-#else
-ConfigItemSslcacertificatefile(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemSslcacertificatefile(%s) [%s:%d]", id, file,
 	       line));
@@ -552,12 +457,7 @@ ConfigItemSslcacertificatefile(id)
 }
 
 void
-#if PROTOTYPES
 ConfigItemSslcacertificatepath(char *id)
-#else
-ConfigItemSslcacertificatepath(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemSslcacertificatepath(%s) [%s:%d]", id, file,
 	       line));
@@ -579,12 +479,7 @@ ConfigItemSslcacertificatepath(id)
 }
 
 void
-#if PROTOTYPES
 ConfigItemSslrequired(char *id)
-#else
-ConfigItemSslrequired(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemSslrequired(%s) [%s:%d]", id, file, line));
 #if HAVE_OPENSSL
@@ -597,12 +492,7 @@ ConfigItemSslrequired(id)
 }
 
 void
-#if PROTOTYPES
 ConfigItemSslenabled(char *id)
-#else
-ConfigItemSslenabled(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemSslenabled(%s) [%s:%d]", id, file, line));
 #if HAVE_OPENSSL
@@ -614,24 +504,14 @@ ConfigItemSslenabled(id)
 }
 
 void
-#if PROTOTYPES
 ConfigItemStriphigh(char *id)
-#else
-ConfigItemStriphigh(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemStriphigh(%s) [%s:%d]", id, file, line));
     ProcessYesNo(id, &(parserConfigTemp->striphigh));
 }
 
 void
-#if PROTOTYPES
 ConfigItemUsername(char *id)
-#else
-ConfigItemUsername(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemUsername(%s) [%s:%d]", id, file, line));
 
@@ -649,12 +529,7 @@ ConfigItemUsername(id)
 SUBST *substData = (SUBST *)0;
 
 SUBSTTOKEN
-#if PROTOTYPES
 SubstToken(char c)
-#else
-SubstToken(c)
-    char c;
-#endif
 {
     switch (c) {
 	case 'u':
@@ -666,14 +541,7 @@ SubstToken(c)
 }
 
 int
-#if PROTOTYPES
 SubstValue(char c, char **s, int *i)
-#else
-SubstValue(c, s, i)
-    char c;
-    char **s;
-    int *i;
-#endif
 {
     int retval = 0;
 
@@ -696,11 +564,7 @@ SubstValue(c, s, i)
 }
 
 void
-#if PROTOTYPES
 InitSubstCallback(void)
-#else
-InitSubstCallback()
-#endif
 {
     if (substData == (SUBST *)0) {
 	if ((substData = (SUBST *)calloc(1, sizeof(SUBST))) == (SUBST *)0)
@@ -712,12 +576,7 @@ InitSubstCallback()
 
 
 void
-#if PROTOTYPES
 TerminalItemAttach(char *id)
-#else
-TerminalItemAttach(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "TerminalItemAttach(%s) [%s:%d]", id, file, line));
 
@@ -733,12 +592,7 @@ TerminalItemAttach(id)
 }
 
 void
-#if PROTOTYPES
 TerminalItemAttachsubst(char *id)
-#else
-TerminalItemAttachsubst(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "TerminalItemAttachsubst(%s) [%s:%d]", id, file, line));
     ProcessSubst(substData, (char **)0, &(parserTermTemp->attachsubst),
@@ -746,12 +600,7 @@ TerminalItemAttachsubst(id)
 }
 
 void
-#if PROTOTYPES
 TerminalItemDetach(char *id)
-#else
-TerminalItemDetach(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "TerminalItemDetach(%s) [%s:%d]", id, file, line));
 
@@ -767,12 +616,7 @@ TerminalItemDetach(id)
 }
 
 void
-#if PROTOTYPES
 TerminalItemDetachsubst(char *id)
-#else
-TerminalItemDetachsubst(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "TerminalItemDetachsubst(%s) [%s:%d]", id, file, line));
     ProcessSubst(substData, (char **)0, &(parserTermTemp->detachsubst),
@@ -812,13 +656,7 @@ SECTION sections[] = {
 };
 
 void
-#if PROTOTYPES
 ReadConf(char *filename, FLAG verbose)
-#else
-ReadConf(filename, verbose)
-    char *filename;
-    FLAG verbose;
-#endif
 {
     FILE *fp;
 

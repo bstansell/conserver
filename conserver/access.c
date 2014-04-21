@@ -1,5 +1,5 @@
 /*
- *  $Id: access.c,v 5.73 2004/05/23 16:44:25 bryan Exp $
+ *  $Id: access.c,v 5.74 2014/04/20 06:45:07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -44,7 +44,14 @@
 #include <readcfg.h>
 #include <main.h>
 
+#if USE_IPV6
+# include <net/if.h>
+# include <ifaddrs.h>
+# include <sys/socket.h>
+# include <netdb.h>
+#endif
 
+#if !USE_IPV6
 /* Compare an Internet address (IPv4 expected), with an address pattern
  * passed as a character string representing an address in the Internet
  * standard `.' notation, optionally followed by a slash and an integer
@@ -58,20 +65,14 @@
  * Returns 0 if the addresses match, else returns 1.
  */
 int
-#if PROTOTYPES
 AddrCmp(struct in_addr *addr, char *pattern)
-#else
-AddrCmp(addr, pattern)
-    struct in_addr *addr;
-    char *pattern;
-#endif
 {
     in_addr_t hostaddr, pattern_addr, netmask;
     char *p, *slash_posn;
     static STRING *buf = (STRING *)0;
-#if HAVE_INET_ATON
+# if HAVE_INET_ATON
     struct in_addr inetaddr;
-#endif
+# endif
 
     if (buf == (STRING *)0)
 	buf = AllocString();
@@ -84,15 +85,15 @@ AddrCmp(addr, pattern)
     } else
 	p = pattern;
 
-#if HAVE_INET_ATON
+# if HAVE_INET_ATON
     if (inet_aton(p, &inetaddr) == 0)
 	return 1;
     pattern_addr = inetaddr.s_addr;
-#else
+# else
     pattern_addr = inet_addr(p);
     if (pattern_addr == (in_addr_t) (-1))
 	return 1;		/* malformed address */
-#endif
+# endif
 
     if (slash_posn) {
 	/* convert explicit netmask */
@@ -121,33 +122,70 @@ AddrCmp(addr, pattern)
 	       pattern_addr & netmask, pattern_addr, netmask));
     return (hostaddr & netmask) != (pattern_addr & netmask);
 }
+#endif /* USE_IPV6 */
 
 /* return the access type for a given host entry			(ksb)
  */
 char
-#if PROTOTYPES
-AccType(struct in_addr *addr, char **peername)
-#else
-AccType(addr, peername)
-    struct in_addr *addr;
-    char **peername;
-#endif
+AccType(INADDR_STYPE *addr, char **peername)
 {
     ACCESS *pACtmp;
     socklen_t so;
+    char ret;
+#if USE_IPV6
+    int error;
+    char host[NI_MAXHOST];
+    char ipaddr[NI_MAXHOST];
+#else
     struct hostent *he = (struct hostent *)0;
     int a;
-    char ret;
-#if TRUST_REVERSE_DNS
+# if TRUST_REVERSE_DNS
     char **revNames = (char **)0;
-#endif
+# endif
 
     CONDDEBUG((1, "AccType(): ip=%s", inet_ntoa(*addr)));
+#endif /* USE_IPV6 */
 
     ret = config->defaultaccess;
     so = sizeof(*addr);
 
-#if TRUST_REVERSE_DNS
+#if USE_IPV6
+    error =
+	getnameinfo((struct sockaddr *)addr, so, ipaddr, sizeof(ipaddr),
+		    NULL, 0, NI_NUMERICHOST);
+    if (error) {
+	Error("AccType(): getnameinfo failed: %s", gai_strerror(error));
+	goto common_ret;
+    }
+    CONDDEBUG((1, "AccType(): ip=%s", ipaddr));
+
+    error =
+	getnameinfo((struct sockaddr *)addr, so, host, sizeof(host), NULL,
+		    0, 0);
+    if (!error)
+	CONDDEBUG((1, "AccType(): host=%s", host));
+
+    for (pACtmp = pACList; pACtmp != (ACCESS *)0; pACtmp = pACtmp->pACnext) {
+	CONDDEBUG((1, "AccType(): who=%s, trust=%c", pACtmp->pcwho,
+		   pACtmp->ctrust));
+
+	if (strstr(ipaddr, pACtmp->pcwho) != NULL) {
+	    CONDDEBUG((1, "AccType(): match for ip=%s", ipaddr));
+	    ret = pACtmp->ctrust;
+	    goto common_ret;
+	}
+
+	if (!error && strstr(host, pACtmp->pcwho) != NULL) {
+	    CONDDEBUG((1, "AccType(): match for host=%s", host));
+	    ret = pACtmp->ctrust;
+	    goto common_ret;
+	}
+    }
+  common_ret:
+    if (config->loghostnames == FLAGTRUE && !error)
+	*peername = StrDup(host);
+#else
+# if TRUST_REVERSE_DNS
     /* if we trust reverse dns, we get the names associated with
      * the address we're checking and then check each of those
      * against the access list entries (below).
@@ -177,7 +215,7 @@ AccType(addr, peername)
 	    }
 	}
     }
-#endif
+# endif
 
     for (pACtmp = pACList; pACtmp != (ACCESS *)0; pACtmp = pACtmp->pACnext) {
 	CONDDEBUG((1, "AccType(): who=%s, trust=%c", pACtmp->pcwho,
@@ -203,20 +241,20 @@ AccType(addr, peername)
 			   inet_ntoa(*(struct in_addr *)
 				     (he->h_addr_list[a]))));
 		if (
-#if HAVE_MEMCMP
+# if HAVE_MEMCMP
 		       memcmp(&(addr->s_addr), he->h_addr_list[a],
 			      he->h_length)
-#else
+# else
 		       bcmp(&(addr->s_addr), he->h_addr_list[a],
 			    he->h_length)
-#endif
+# endif
 		       == 0) {
 		    ret = pACtmp->ctrust;
 		    goto common_ret;
 		}
 	    }
 	}
-#if TRUST_REVERSE_DNS
+# if TRUST_REVERSE_DNS
 	/* we chop bits off client names so that we can put domain
 	 * names in access lists or even top-level domains.
 	 *    allowed conserver.com, net;
@@ -245,43 +283,49 @@ AccType(addr, peername)
 		}
 	    }
 	}
-#endif
+# endif
     }
 
   common_ret:
     if (config->loghostnames == FLAGTRUE && peername != (char **)0) {
-#if TRUST_REVERSE_DNS
+# if TRUST_REVERSE_DNS
 	if (revNames != (char **)0 && revNames[0] != (char *)0)
 	    *peername = StrDup(revNames[0]);
-#else
+# else
 	if ((he =
 	     gethostbyaddr((char *)addr, so,
 			   AF_INET)) != (struct hostent *)0) {
 	    *peername = StrDup(he->h_name);
 	}
-#endif
+# endif
     }
-#if TRUST_REVERSE_DNS
+# if TRUST_REVERSE_DNS
   common_ret2:
     if (revNames != (char **)0) {
 	for (a = 0; revNames[a] != (char *)0; a++)
 	    free(revNames[a]);
 	free(revNames);
     }
-#endif
+# endif
+#endif /* USE_IPV6 */
     return ret;
 }
 
 void
-#if PROTOTYPES
-SetDefAccess(struct in_addr *pAddr, char *pHost)
+SetDefAccess(
+#if USE_IPV6
+		void
 #else
-SetDefAccess(pAddr, pHost)
-    struct in_addr *pAddr;
-    char *pHost;
+		struct in_addr *pAddr, char *pHost
 #endif
+    )
 {
     ACCESS *a;
+#if USE_IPV6
+    int error;
+    char addr[NI_MAXHOST];
+    struct ifaddrs *myAddrs, *ifa;
+#endif /* USE_IPV6 */
 
     while (pACList != (ACCESS *)0) {
 	a = pACList->pACnext;
@@ -289,7 +333,39 @@ SetDefAccess(pAddr, pHost)
 	pACList = a;
     }
 
-#if USE_UNIX_DOMAIN_SOCKETS
+#if USE_IPV6
+    /* get list of all addresses on system */
+    error = getifaddrs(&myAddrs);
+    if (error) {
+	Error("SetDefAccess(): getifaddrs: %s", strerror(errno));
+	return;
+    }
+
+    for (ifa = myAddrs; ifa != NULL; ifa = ifa->ifa_next) {
+	/* skip interfaces without address or in down state */
+	if (ifa->ifa_addr == NULL || !(ifa->ifa_flags & IFF_UP))
+	    continue;
+
+	error =
+	    getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_storage),
+			addr, sizeof(addr), NULL, 0, NI_NUMERICHOST);
+	if (error)
+	    continue;
+
+	if ((a = (ACCESS *)calloc(1, sizeof(ACCESS))) == (ACCESS *)0)
+	    OutOfMem();
+	if ((a->pcwho = StrDup(addr)) == (char *)0)
+	    OutOfMem();
+
+	a->ctrust = 'a';
+	a->pACnext = pACList;
+	pACList = a;
+
+	CONDDEBUG((1, "SetDefAccess(): trust=%c, who=%s", pACList->ctrust,
+		   pACList->pcwho));
+    }
+    freeifaddrs(myAddrs);
+#elif USE_UNIX_DOMAIN_SOCKETS
     if ((pACList = (ACCESS *)calloc(1, sizeof(ACCESS))) == (ACCESS *)0)
 	OutOfMem();
     if ((pACList->pcwho = StrDup("127.0.0.1")) == (char *)0)
@@ -318,12 +394,7 @@ SetDefAccess(pAddr, pHost)
 }
 
 void
-#if PROTOTYPES
 DestroyAccessList(ACCESS *pACList)
-#else
-DestroyAccessList(pACList)
-    ACCESS *pACList;
-#endif
 {
     if (pACList == (ACCESS *)0)
 	return;

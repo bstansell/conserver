@@ -682,9 +682,10 @@ with_maxmemb
 with_timeout
 with_trustrevdns
 with_extmsgs
-with_uds
 with_rpath
 with_cycladests
+with_uds
+with_trust_uds_cred
 with_libwrap
 with_openssl
 with_req_server_cert
@@ -693,6 +694,7 @@ with_striprealm
 with_freeipmi
 with_dmalloc
 with_pam
+with_ipv6
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1329,10 +1331,11 @@ Optional Packages:
   --with-timeout=TIMEOUT  Specify connect() timeout in seconds [10]
   --with-trustrevdns      Trust reverse DNS information
   --with-extmsgs          Produce extended messages
+  --with-rpath            Use -R as well as -L for libraries
+  --with-cycladests       (deprecated - noop) Build for a Cyclades TS
   --with-uds[=DIR]        Use Unix domain sockets for client/server
                           communication [/tmp/conserver]
-  --with-rpath            Use -R as well as -L for libraries
-  --with-cycladests       Build for a Cyclades TS
+  --with-trust-uds-cred   Trust UDS credentials obtained via socket
   --with-libwrap[=PATH]   Compile in libwrap (tcp_wrappers) support
   --with-openssl[=PATH]   Compile in OpenSSL support
   --with-req-server-cert  Require server SSL certificate by client
@@ -1342,6 +1345,8 @@ Optional Packages:
   --with-freeipmi[=PATH]  Compile in FreeIPMI support
   --with-dmalloc[=PATH]   Compile in dmalloc support
   --with-pam              Enable PAM support
+  --with-ipv6             (experimental) Use IPv6 for client/server
+                          communication
 
 Some influential environment variables:
   CC          C compiler command
@@ -2596,52 +2601,6 @@ $as_echo "yes" >&6; }
 	    *)
 		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
-		;;
-	esac
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to use Unix domain sockets" >&5
-$as_echo_n "checking whether to use Unix domain sockets... " >&6; }
-cons_with_uds="NO"
-
-# Check whether --with-uds was given.
-if test "${with_uds+set}" = set; then :
-  withval=$with_uds; case "$withval" in
-	    yes)
-		cat >>confdefs.h <<_ACEOF
-#define UDSDIR "/tmp/conserver"
-_ACEOF
-
-		$as_echo "#define USE_UNIX_DOMAIN_SOCKETS 1" >>confdefs.h
-
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: /tmp/conserver" >&5
-$as_echo "/tmp/conserver" >&6; }
-		cons_with_uds="YES"
-		;;
-	    no)
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-		;;
-	    *)
-		cat >>confdefs.h <<_ACEOF
-#define UDSDIR "$withval"
-_ACEOF
-
-		$as_echo "#define USE_UNIX_DOMAIN_SOCKETS 1" >>confdefs.h
-
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: '$withval'" >&5
-$as_echo "'$withval'" >&6; }
-		cons_with_uds="YES"
-		if expr "$withval" : '/' >/dev/null 2>&1; then
-		    :
-		else
-		    echo "*** WARNING *** you may have better success using a fully-qualified path"
-		    echo "*** WARNING *** instead of '$withval'"
-		fi
 		;;
 	esac
 else
@@ -4192,22 +4151,6 @@ $as_echo "#define const /**/" >>confdefs.h
 
 fi
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for function prototypes" >&5
-$as_echo_n "checking for function prototypes... " >&6; }
-if test "$ac_cv_prog_cc_c89" != no; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-
-$as_echo "#define PROTOTYPES 1" >>confdefs.h
-
-
-$as_echo "#define __PROTOTYPES 1" >>confdefs.h
-
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
-$as_echo "no" >&6; }
-fi
-
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for ANSI C header files" >&5
@@ -4995,6 +4938,149 @@ fi
 
 
 
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to use Unix domain sockets" >&5
+$as_echo_n "checking whether to use Unix domain sockets... " >&6; }
+cons_with_uds="NO"
+
+# Check whether --with-uds was given.
+if test "${with_uds+set}" = set; then :
+  withval=$with_uds; case "$withval" in
+	    yes)
+		cat >>confdefs.h <<_ACEOF
+#define UDSDIR "/tmp/conserver"
+_ACEOF
+
+		$as_echo "#define USE_UNIX_DOMAIN_SOCKETS 1" >>confdefs.h
+
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: /tmp/conserver" >&5
+$as_echo "/tmp/conserver" >&6; }
+		cons_with_uds="YES"
+		;;
+	    no)
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+		;;
+	    *)
+		cat >>confdefs.h <<_ACEOF
+#define UDSDIR "$withval"
+_ACEOF
+
+		$as_echo "#define USE_UNIX_DOMAIN_SOCKETS 1" >>confdefs.h
+
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: '$withval'" >&5
+$as_echo "'$withval'" >&6; }
+		cons_with_uds="YES"
+		if expr "$withval" : '/' >/dev/null 2>&1; then
+		    :
+		else
+		    echo "*** WARNING *** you may have better success using a fully-qualified path"
+		    echo "*** WARNING *** instead of '$withval'"
+		fi
+		;;
+	esac
+
+	if test $cons_with_uds = YES; then
+	    { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to trust UDS credentials" >&5
+$as_echo_n "checking whether to trust UDS credentials... " >&6; }
+
+# Check whether --with-trust-uds-cred was given.
+if test "${with_trust_uds_cred+set}" = set; then :
+  withval=$with_trust_uds_cred; case "$withval" in
+			yes)
+			    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <sys/types.h>
+				    #include <sys/socket.h>
+int
+main ()
+{
+
+struct ucred u;
+u.uid = 0;
+#if !defined(SO_PEERCRED)
+#error "no SO_PEERCRED defined"
+#endif
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+$as_echo "#define UDS_CRED_STYPE ucred" >>confdefs.h
+
+
+$as_echo "#define UDS_CRED_UID uid" >>confdefs.h
+
+
+$as_echo "#define UDS_CRED_SO SO_PEERCRED" >>confdefs.h
+
+				     $as_echo "#define TRUST_UDS_CRED 1" >>confdefs.h
+
+else
+
+					cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <sys/types.h>
+						#include <sys/socket.h>
+int
+main ()
+{
+
+struct peercred_struct u;
+u.euid = 0;
+#if !defined(SO_PEERID)
+#error "no SO_PEERID defined"
+#endif
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+$as_echo "#define UDS_CRED_STYPE peercred_struct" >>confdefs.h
+
+
+$as_echo "#define UDS_CRED_UID euid" >>confdefs.h
+
+
+$as_echo "#define UDS_CRED_SO SO_PEERID" >>confdefs.h
+
+						 $as_echo "#define TRUST_UDS_CRED 1" >>confdefs.h
+
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+			    ;;
+			*)
+			    { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+			    ;;
+		    esac
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+	fi
+
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
 cons_with_libwrap="NO"
 
 # Check whether --with-libwrap was given.
@@ -5572,6 +5658,32 @@ else
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
 $as_echo "no" >&6; }
 fi
+
+
+cons_with_ipv6="NO"
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to support IPv6" >&5
+$as_echo_n "checking whether to support IPv6... " >&6; }
+
+# Check whether --with-ipv6 was given.
+if test "${with_ipv6+set}" = set; then :
+  withval=$with_ipv6; case "$withval" in
+	    yes)
+		$as_echo "#define USE_IPV6 1" >>confdefs.h
+
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+		cons_with_ipv6="YES"
+		;;
+	    *)
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+		;;
+	esac
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
 
 
 for ac_header in pty.h libutil.h util.h
@@ -7065,6 +7177,7 @@ echo "         strip @REALM (--with-striprealm): $cons_strip_realm"
 fi
 echo "              dmalloc (--with-dmalloc)   : $cons_with_dmalloc"
 echo "          PAM support (--with-pam)       : $cons_with_pam"
+echo "         IPv6 support (--with-ipv6)      : $cons_with_ipv6"
 echo ""
 echo "=============================================================="
 

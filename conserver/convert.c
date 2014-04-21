@@ -1,5 +1,5 @@
 /*
- *  $Id: convert.c,v 1.13 2014/04/02 04:45:32 bryan Exp $
+ *  $Id: convert.c,v 1.14 2014/04/20 06:45:07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -58,14 +58,7 @@ DestroyDataStructures()
 }
 
 char *
-#if PROTOTYPES
 ReadLine2(FILE *fp, STRING *save, int *iLine)
-#else
-ReadLine2(fp, save, iLine)
-    FILE *fp;
-    STRING *save;
-    int *iLine;
-#endif
 {
     static char buf[1024];
     char *wholeline = (char *)0;
@@ -154,13 +147,7 @@ ReadLine2(fp, save, iLine)
  * to manage the consoles
  */
 void
-#if PROTOTYPES
 ReadCfg(char *pcFile, FILE *fp)
-#else
-ReadCfg(pcFile, fp)
-    char *pcFile;
-    FILE *fp;
-#endif
 {
     int iLine;
     unsigned char *acIn;
@@ -480,13 +467,7 @@ ReadCfg(pcFile, fp)
 }
 
 int
-#if PROTOTYPES
 main(int argc, char **argv)
-#else
-main(argc, argv)
-    int argc;
-    char **argv;
-#endif
 {
     char *pcFile;
     FILE *fp;

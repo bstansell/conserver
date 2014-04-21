@@ -1,5 +1,5 @@
 /*
- *  $Id: master.h,v 5.17 2003/10/03 14:23:37 bryan Exp $
+ *  $Id: master.h,v 5.18 2014/04/20 06:45:07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -39,5 +39,5 @@
  */
 extern CONSCLIENT *pCLmall;
 extern CONSCLIENT *pCLmfree;
-extern void Master PARAMS((void));
-extern void SignalKids PARAMS((int));
+extern void Master(void);
+extern void SignalKids(int);

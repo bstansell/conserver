@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.204 2014/04/04 16:17:10 bryan Exp $
+ *  $Id: readcfg.c,v 5.206 2014/04/20 07:17:56 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -66,13 +66,7 @@ REMOTE **ppRC = (REMOTE **)0;
 
 /* 'task' handling (plus) */
 void
-#if PROTOTYPES
 ProcessYesNo(char *id, FLAG *flag)
-#else
-ProcessYesNo(id, flag)
-    char *id;
-    FLAG *flag;
-#endif
 {
     if (id == (char *)0 || id[0] == '\000')
 	*flag = FLAGFALSE;
@@ -87,12 +81,7 @@ ProcessYesNo(id, flag)
 }
 
 void
-#if PROTOTYPES
 DestroyTask(TASKS *task)
-#else
-DestroyTask(task)
-    TASKS *task;
-#endif
 {
     if (task->cmd != (STRING *)0) {
 	DestroyString(task->cmd);
@@ -108,11 +97,7 @@ DestroyTask(task)
 }
 
 void
-#if PROTOTYPES
 DestroyTaskList(void)
-#else
-DestroyTaskList()
-#endif
 {
     TASKS *n;
     while (taskList != (TASKS *)0) {
@@ -127,11 +112,7 @@ DestroyTaskList()
 }
 
 void
-#if PROTOTYPES
 DestroyBreakList(void)
-#else
-DestroyBreakList()
-#endif
 {
     int i;
 
@@ -144,11 +125,7 @@ DestroyBreakList()
 }
 
 void
-#if PROTOTYPES
 DestroyUserList(void)
-#else
-DestroyUserList()
-#endif
 {
     NAMES *n;
     while (userList != (NAMES *)0) {
@@ -161,12 +138,7 @@ DestroyUserList()
 }
 
 NAMES *
-#if PROTOTYPES
 FindUserList(char *id)
-#else
-FindUserList(id)
-    char *id;
-#endif
 {
     NAMES *u;
     for (u = userList; u != (NAMES *)0; u = u->next) {
@@ -177,12 +149,7 @@ FindUserList(id)
 }
 
 NAMES *
-#if PROTOTYPES
 AddUserList(char *id)
-#else
-AddUserList(id)
-    char *id;
-#endif
 {
     NAMES *u;
 
@@ -206,14 +173,7 @@ int parserBreakNum = 0;
 FLAG parserBreakConfirm = FLAGFALSE;
 
 CONSENTUSERS *
-#if PROTOTYPES
 ConsentAddUser(CONSENTUSERS **ppCU, char *id, short not)
-#else
-ConsentAddUser(ppCU, id, not)
-    CONSENTUSERS **ppCU;
-    char *id;
-    short not;
-#endif
 {
     CONSENTUSERS *u = (CONSENTUSERS *)0;
     CONSENTUSERS *p = (CONSENTUSERS *)0;
@@ -244,12 +204,7 @@ ConsentAddUser(ppCU, id, not)
 }
 
 void
-#if PROTOTYPES
 BreakBegin(char *id)
-#else
-BreakBegin(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "BreakBegin(%s) [%s:%d]", id, file, line));
     if ((id == (char *)0) || (*id == '\000') || id[0] < '1' || id[0] > '9'
@@ -269,11 +224,7 @@ BreakBegin(id)
 }
 
 void
-#if PROTOTYPES
 BreakEnd(void)
-#else
-BreakEnd()
-#endif
 {
     CONDDEBUG((1, "BreakEnd() [%s:%d]", file, line));
 
@@ -288,22 +239,14 @@ BreakEnd()
 }
 
 void
-#if PROTOTYPES
 BreakAbort(void)
-#else
-BreakAbort()
-#endif
 {
     CONDDEBUG((1, "BreakAbort() [%s:%d]", file, line));
     parserBreakNum = 0;
 }
 
 void
-#if PROTOTYPES
 BreakDestroy(void)
-#else
-BreakDestroy()
-#endif
 {
     CONDDEBUG((1, "BreakDestroy() [%s:%d]", file, line));
     if (parserBreak != (STRING *)0) {
@@ -316,9 +259,9 @@ BreakDestroy()
 	for (i = 0; i < 9; i++) {
 	    Msg("Break[%d] = `%s', delay=%d", i,
 		breakList[i].seq ==
-		(STRING *)0 ? "(null)" : (breakList[i].
-					  seq->string ? breakList[i].
-					  seq->string : "(null)"),
+		(STRING *)0 ? "(null)" : (breakList[i].seq->
+					  string ? breakList[i].seq->
+					  string : "(null)"),
 		breakList[i].delay);
 	}
     }
@@ -326,12 +269,7 @@ BreakDestroy()
 }
 
 void
-#if PROTOTYPES
 BreakItemString(char *id)
-#else
-BreakItemString(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "BreakItemString(%s) [%s:%d]", id, file, line));
     BuildString((char *)0, parserBreak);
@@ -341,12 +279,7 @@ BreakItemString(id)
 }
 
 void
-#if PROTOTYPES
 BreakItemDelay(char *id)
-#else
-BreakItemDelay(id)
-    char *id;
-#endif
 {
     char *p;
     int delay;
@@ -371,12 +304,7 @@ BreakItemDelay(id)
 }
 
 void
-#if PROTOTYPES
 BreakItemConfirm(char *id)
-#else
-BreakItemConfirm(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "BreakItemConfirm(%s) [%s:%d]", id, file, line));
     ProcessYesNo(id, &(parserBreakConfirm));
@@ -393,12 +321,7 @@ PARSERGROUP *parserGroups = (PARSERGROUP *)0;
 PARSERGROUP *parserGroupTemp = (PARSERGROUP *)0;
 
 void
-#if PROTOTYPES
 DestroyParserGroup(PARSERGROUP *pg)
-#else
-DestroyParserGroup(pg)
-    PARSERGROUP *pg;
-#endif
 {
     PARSERGROUP **ppg = &parserGroups;
 
@@ -426,12 +349,7 @@ DestroyParserGroup(pg)
 }
 
 PARSERGROUP *
-#if PROTOTYPES
 GroupFind(char *id)
-#else
-GroupFind(id)
-    char *id;
-#endif
 {
     PARSERGROUP *pg;
     for (pg = parserGroups; pg != (PARSERGROUP *)0; pg = pg->next) {
@@ -442,12 +360,7 @@ GroupFind(id)
 }
 
 void
-#if PROTOTYPES
 GroupBegin(char *id)
-#else
-GroupBegin(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "GroupBegin(%s) [%s:%d]", id, file, line));
     if (id == (char *)0 || id[0] == '\000') {
@@ -465,11 +378,7 @@ GroupBegin(id)
 }
 
 void
-#if PROTOTYPES
 GroupEnd(void)
-#else
-GroupEnd()
-#endif
 {
     PARSERGROUP *pg = (PARSERGROUP *)0;
 
@@ -493,11 +402,7 @@ GroupEnd()
 }
 
 void
-#if PROTOTYPES
 GroupAbort(void)
-#else
-GroupAbort()
-#endif
 {
     CONDDEBUG((1, "GroupAbort() [%s:%d]", file, line));
     DestroyParserGroup(parserGroupTemp);
@@ -505,11 +410,7 @@ GroupAbort()
 }
 
 void
-#if PROTOTYPES
 GroupDestroy(void)
-#else
-GroupDestroy()
-#endif
 {
     CONDDEBUG((1, "GroupDestroy() [%s:%d]", file, line));
 #if DUMPDATA
@@ -537,27 +438,13 @@ GroupDestroy()
 }
 
 CONSENTUSERS *
-#if PROTOTYPES
 GroupAddUser(PARSERGROUP *pg, char *id, short not)
-#else
-GroupAddUser(pg, id, not)
-    PARSERGROUP *pg;
-    char *id;
-    short not;
-#endif
 {
     return ConsentAddUser(&(pg->users), id, not);
 }
 
 void
-#if PROTOTYPES
 CopyConsentUserList(CONSENTUSERS *s, CONSENTUSERS **d, short not)
-#else
-CopyConsentUserList(s, d, not)
-    CONSENTUSERS *s;
-    CONSENTUSERS **d;
-    short not;
-#endif
 {
     /* we have to add things backwards, since it's an ordered list */
     if (s == (CONSENTUSERS *)0 || d == (CONSENTUSERS **)0)
@@ -570,12 +457,7 @@ CopyConsentUserList(s, d, not)
 
 
 void
-#if PROTOTYPES
 GroupItemUsers(char *id)
-#else
-GroupItemUsers(id)
-    char *id;
-#endif
 {
     char *token = (char *)0;
     PARSERGROUP *pg = (PARSERGROUP *)0;
@@ -608,14 +490,7 @@ CONSENT **parserDefaultsTail = &parserDefaults;
 CONSENT *parserDefaultTemp = (CONSENT *)0;
 
 void
-#if PROTOTYPES
 DestroyParserDefaultOrConsole(CONSENT *c, CONSENT **ph, CONSENT ***pt)
-#else
-DestroyParserDefaultOrConsole(c, ph, pt)
-    CONSENT *c;
-    CONSENT **ph;
-    CONSENT ***pt;
-#endif
 {
     if (c == (CONSENT *)0)
 	return;
@@ -702,13 +577,7 @@ DestroyParserDefaultOrConsole(c, ph, pt)
 }
 
 CONSENT *
-#if PROTOTYPES
 FindParserDefaultOrConsole(CONSENT *c, char *id)
-#else
-FindParserDefaultOrConsole(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     for (; c != (CONSENT *)0; c = c->pCEnext) {
 	if (strcasecmp(id, c->server) == 0)
@@ -718,13 +587,7 @@ FindParserDefaultOrConsole(c, id)
 }
 
 void
-#if PROTOTYPES
 ApplyDefault(CONSENT *d, CONSENT *c)
-#else
-ApplyDefault(d, c)
-    CONSENT *d;
-    CONSENT *c;
-#endif
 {
     if (d->type != UNKNOWNTYPE)
 	c->type = d->type;
@@ -926,12 +789,7 @@ ApplyDefault(d, c)
 }
 
 void
-#if PROTOTYPES
 DefaultBegin(char *id)
-#else
-DefaultBegin(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultBegin(%s) [%s: %d]", id, file, line));
     if (id == (char *)0 || id[0] == '\000') {
@@ -952,11 +810,7 @@ DefaultBegin(id)
 }
 
 void
-#if PROTOTYPES
 DefaultEnd(void)
-#else
-DefaultEnd()
-#endif
 {
     CONSENT *c = (CONSENT *)0;
 
@@ -985,11 +839,7 @@ DefaultEnd()
 }
 
 void
-#if PROTOTYPES
 DefaultAbort(void)
-#else
-DefaultAbort()
-#endif
 {
     CONDDEBUG((1, "DefaultAbort() [%s:%d]", file, line));
     DestroyParserDefaultOrConsole(parserDefaultTemp, (CONSENT **)0,
@@ -998,11 +848,7 @@ DefaultAbort()
 }
 
 void
-#if PROTOTYPES
 DefaultDestroy(void)
-#else
-DefaultDestroy()
-#endif
 {
     CONDDEBUG((1, "DefaultDestroy() [%s:%d]", file, line));
 
@@ -1015,13 +861,7 @@ DefaultDestroy()
 }
 
 void
-#if PROTOTYPES
 ProcessBaud(CONSENT *c, char *id)
-#else
-ProcessBaud(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     if ((id == (char *)0) || (*id == '\000')) {
 	c->baud = (BAUD *)0;
@@ -1035,25 +875,14 @@ ProcessBaud(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemBaud(char *id)
-#else
-DefaultItemBaud(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemBaud(%s) [%s:%d]", id, file, line));
     ProcessBaud(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 ProcessBreak(CONSENT *c, char *id)
-#else
-ProcessBreak(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     if ((id == (char *)0) || (*id == '\000')) {
 	c->breakNum = 0;
@@ -1068,25 +897,14 @@ ProcessBreak(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemBreak(char *id)
-#else
-DefaultItemBreak(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemBreak(%s) [%s:%d]", id, file, line));
     ProcessBreak(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 ProcessDevice(CONSENT *c, char *id)
-#else
-ProcessDevice(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     if (c->device != (char *)0) {
 	free(c->device);
@@ -1100,12 +918,7 @@ ProcessDevice(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemDevice(char *id)
-#else
-DefaultItemDevice(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemDevice(%s) [%s:%d]", id, file, line));
     ProcessDevice(parserDefaultTemp, id);
@@ -1116,22 +929,13 @@ SUBST *substData = (SUBST *)0;
 int substTokenCount[255];
 
 int
-#if PROTOTYPES
 SubstTokenCount(char c)
-#else
-SubstTokenCount(c)
-    char c;
-#endif
 {
     return substTokenCount[(unsigned)c];
 }
 
 void
-#if PROTOTYPES
 ZeroSubstTokenCount(void)
-#else
-ZeroSubstTokenCount()
-#endif
 {
 #if HAVE_MEMSET
     memset((void *)&substTokenCount, 0, sizeof(substTokenCount));
@@ -1142,14 +946,7 @@ ZeroSubstTokenCount()
 
 
 int
-#if PROTOTYPES
 SubstValue(char c, char **s, int *i)
-#else
-SubstValue(c, s, i)
-    char c;
-    char **s;
-    int *i;
-#endif
 {
     int retval = 0;
     CONSENT *pCE;
@@ -1198,12 +995,7 @@ SubstValue(c, s, i)
 }
 
 SUBSTTOKEN
-#if PROTOTYPES
 SubstToken(char c)
-#else
-SubstToken(c)
-    char c;
-#endif
 {
     switch (c) {
 	case 'p':
@@ -1221,11 +1013,7 @@ SubstToken(c)
 }
 
 void
-#if PROTOTYPES
 InitSubstCallback(void)
-#else
-InitSubstCallback()
-#endif
 {
     if (substData == (SUBST *)0) {
 	if ((substData = (SUBST *)calloc(1, sizeof(SUBST))) == (SUBST *)0)
@@ -1237,12 +1025,7 @@ InitSubstCallback()
 }
 
 void
-#if PROTOTYPES
 DefaultItemDevicesubst(char *id)
-#else
-DefaultItemDevicesubst(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemDevicesubst(%s) [%s:%d]", id, file, line));
     ProcessSubst(substData, (char **)0, &(parserDefaultTemp->devicesubst),
@@ -1250,12 +1033,7 @@ DefaultItemDevicesubst(id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemExecsubst(char *id)
-#else
-DefaultItemExecsubst(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemExecsubst(%s) [%s:%d]", id, file, line));
     ProcessSubst(substData, (char **)0, &(parserDefaultTemp->execsubst),
@@ -1263,12 +1041,7 @@ DefaultItemExecsubst(id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemUdssubst(char *id)
-#else
-DefaultItemUdssubst(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemUdssubst(%s) [%s:%d]", id, file, line));
     ProcessSubst(substData, (char **)0, &(parserDefaultTemp->udssubst),
@@ -1276,12 +1049,7 @@ DefaultItemUdssubst(id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemInitsubst(char *id)
-#else
-DefaultItemInitsubst(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemInitsubst(%s) [%s:%d]", id, file, line));
     ProcessSubst(substData, (char **)0, &(parserDefaultTemp->initsubst),
@@ -1289,14 +1057,7 @@ DefaultItemInitsubst(id)
 }
 
 void
-#if PROTOTYPES
 ProcessUidGid(uid_t * uid, gid_t * gid, char *id)
-#else
-ProcessUidGid(uid, gid, id)
-    uid_t *uid;
-    gid_t *gid;
-    char *id;
-#endif
 {
     char *colon = (char *)0;
     int i;
@@ -1360,38 +1121,21 @@ ProcessUidGid(uid, gid, id)
 }
 
 void
-#if PROTOTYPES
 ProcessInitrunas(CONSENT *c, char *id)
-#else
-ProcessInitrunas(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ProcessInitrunas(%s) [%s:%d]", id, file, line));
     ProcessUidGid(&(c->inituid), &(c->initgid), id);
 }
 
 void
-#if PROTOTYPES
 ProcessExecrunas(CONSENT *c, char *id)
-#else
-ProcessExecrunas(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ProcessExecrunas(%s) [%s:%d]", id, file, line));
     ProcessUidGid(&(c->execuid), &(c->execgid), id);
 }
 
 void
-#if PROTOTYPES
 DefaultItemInitrunas(char *id)
-#else
-DefaultItemInitrunas(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemInitrunas(%s) [%s:%d]", id, file, line));
     ProcessInitrunas(parserDefaultTemp, id);
@@ -1399,13 +1143,7 @@ DefaultItemInitrunas(id)
 
 #if HAVE_FREEIPMI
 void
-#if PROTOTYPES
 ProcessIpmiPrivLevel(CONSENT *c, char *id)
-#else
-ProcessIpmiPrivLevel(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     if (!strcasecmp("user", id))
 	c->ipmiprivlevel = IPMIL_USER;
@@ -1418,12 +1156,7 @@ ProcessIpmiPrivLevel(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemIpmiPrivLevel(char *id)
-#else
-DefaultItemIpmiPrivLevel(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemIpmiPrivLevel(%s) [%s:%d]", id, file, line));
     ProcessIpmiPrivLevel(parserDefaultTemp, id);
@@ -1431,25 +1164,14 @@ DefaultItemIpmiPrivLevel(id)
 #endif /*freeipmi */
 
 void
-#if PROTOTYPES
 DefaultItemExecrunas(char *id)
-#else
-DefaultItemExecrunas(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemExecrunas(%s) [%s:%d]", id, file, line));
     ProcessExecrunas(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 ProcessExec(CONSENT *c, char *id)
-#else
-ProcessExec(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     if (c->exec != (char *)0) {
 	free(c->exec);
@@ -1464,50 +1186,28 @@ ProcessExec(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemExec(char *id)
-#else
-DefaultItemExec(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemExec(%s) [%s:%d]", id, file, line));
     ProcessExec(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 ProcessFlow(CONSENT *c, char *id)
-#else
-ProcessFlow(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     if (isMaster)
 	Error("unimplemented code for `flow' [%s:%d]", file, line);
 }
 
 void
-#if PROTOTYPES
 DefaultItemFlow(char *id)
-#else
-DefaultItemFlow(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemFlow(%s) [%s:%d]", id, file, line));
     ProcessFlow(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 ProcessHost(CONSENT *c, char *id)
-#else
-ProcessHost(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     if (c->host != (char *)0) {
 	free(c->host);
@@ -1521,25 +1221,14 @@ ProcessHost(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemHost(char *id)
-#else
-DefaultItemHost(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemHost(%s) [%s:%d]", id, file, line));
     ProcessHost(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 ProcessUds(CONSENT *c, char *id)
-#else
-ProcessUds(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     if (c->uds != (char *)0) {
 	free(c->uds);
@@ -1553,12 +1242,7 @@ ProcessUds(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemUds(char *id)
-#else
-DefaultItemUds(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemUds(%s) [%s:%d]", id, file, line));
     ProcessUds(parserDefaultTemp, id);
@@ -1566,13 +1250,7 @@ DefaultItemUds(id)
 
 #if HAVE_FREEIPMI
 void
-#if PROTOTYPES
 ProcessIpmiKG(CONSENT *c, char *id)
-#else
-ProcessIpmiKG(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     char s;
     char oct = '\000';
@@ -1647,25 +1325,14 @@ ProcessIpmiKG(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemIpmiKG(char *id)
-#else
-DefaultItemIpmiKG(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemIpmiKG(%s) [%s:%d]", id, file, line));
     ProcessIpmiKG(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 ProcessUsername(CONSENT *c, char *id)
-#else
-ProcessUsername(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     if ((id == (char *)0) || (*id == '\000')) {
 	c->username = (char *)0;
@@ -1675,25 +1342,14 @@ ProcessUsername(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemUsername(char *id)
-#else
-DefaultItemUsername(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemUsername(%s) [%s:%d]", id, file, line));
     ProcessUsername(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 ProcessIpmiCipherSuite(CONSENT *c, char *id)
-#else
-ProcessIpmiCipherSuite(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     char *p;
     int i;
@@ -1734,12 +1390,7 @@ ProcessIpmiCipherSuite(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemIpmiCipherSuite(char *id)
-#else
-DefaultItemIpmiCipherSuite(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemIpmiCipherSuite(%s) [%s:%d]", id, file,
 	       line));
@@ -1747,13 +1398,7 @@ DefaultItemIpmiCipherSuite(id)
 }
 
 void
-#if PROTOTYPES
 ProcessIpmiWorkaround(CONSENT *c, char *id)
-#else
-ProcessIpmiWorkaround(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     unsigned int flag;
     char *token = (char *)0;
@@ -1776,58 +1421,58 @@ ProcessIpmiWorkaround(c, id)
 	    not = 0;
 	if (!strcmp(token, "default"))
 	    flag = IPMICONSOLE_WORKAROUND_DEFAULT;
-#if defined(IPMICONSOLE_WORKAROUND_AUTHENTICATION_CAPABILITIES)
+# if defined(IPMICONSOLE_WORKAROUND_AUTHENTICATION_CAPABILITIES)
 	else if (!strcmp(token, "auth-capabilites"))
 	    flag = IPMICONSOLE_WORKAROUND_AUTHENTICATION_CAPABILITIES;
-#endif
-#if defined(IPMICONSOLE_WORKAROUND_INTEL_2_0_SESSION)
+# endif
+# if defined(IPMICONSOLE_WORKAROUND_INTEL_2_0_SESSION)
 	else if (!strcmp(token, "intel-session"))
 	    flag = IPMICONSOLE_WORKAROUND_INTEL_2_0_SESSION;
-#endif
-#if defined(IPMICONSOLE_WORKAROUND_SUPERMICRO_2_0_SESSION)
+# endif
+# if defined(IPMICONSOLE_WORKAROUND_SUPERMICRO_2_0_SESSION)
 	else if (!strcmp(token, "supermicro-session"))
 	    flag = IPMICONSOLE_WORKAROUND_SUPERMICRO_2_0_SESSION;
-#endif
-#if defined(IPMICONSOLE_WORKAROUND_SUN_2_0_SESSION)
+# endif
+# if defined(IPMICONSOLE_WORKAROUND_SUN_2_0_SESSION)
 	else if (!strcmp(token, "sun-session"))
 	    flag = IPMICONSOLE_WORKAROUND_SUN_2_0_SESSION;
-#endif
-#if defined(IPMICONSOLE_WORKAROUND_OPEN_SESSION_PRIVILEGE)
+# endif
+# if defined(IPMICONSOLE_WORKAROUND_OPEN_SESSION_PRIVILEGE)
 	else if (!strcmp(token, "privilege"))
 	    flag = IPMICONSOLE_WORKAROUND_OPEN_SESSION_PRIVILEGE;
-#endif
-#if defined(IPMICONSOLE_WORKAROUND_NON_EMPTY_INTEGRITY_CHECK_VALUE)
+# endif
+# if defined(IPMICONSOLE_WORKAROUND_NON_EMPTY_INTEGRITY_CHECK_VALUE)
 	else if (!strcmp(token, "integrity"))
 	    flag = IPMICONSOLE_WORKAROUND_NON_EMPTY_INTEGRITY_CHECK_VALUE;
-#endif
-#if defined(IPMICONSOLE_WORKAROUND_NO_CHECKSUM_CHECK)
+# endif
+# if defined(IPMICONSOLE_WORKAROUND_NO_CHECKSUM_CHECK)
 	else if (!strcmp(token, "checksum"))
 	    flag = IPMICONSOLE_WORKAROUND_NO_CHECKSUM_CHECK;
-#endif
-#if defined(IPMICONSOLE_WORKAROUND_SERIAL_ALERTS_DEFERRED)
+# endif
+# if defined(IPMICONSOLE_WORKAROUND_SERIAL_ALERTS_DEFERRED)
 	else if (!strcmp(token, "serial-alerts"))
 	    flag = IPMICONSOLE_WORKAROUND_SERIAL_ALERTS_DEFERRED;
-#endif
-#if defined(IPMICONSOLE_WORKAROUND_INCREMENT_SOL_PACKET_SEQUENCE)
+# endif
+# if defined(IPMICONSOLE_WORKAROUND_INCREMENT_SOL_PACKET_SEQUENCE)
 	else if (!strcmp(token, "packet-sequence"))
 	    flag = IPMICONSOLE_WORKAROUND_INCREMENT_SOL_PACKET_SEQUENCE;
-#endif
-#if defined(IPMICONSOLE_WORKAROUND_IGNORE_SOL_PAYLOAD_SIZE)
+# endif
+# if defined(IPMICONSOLE_WORKAROUND_IGNORE_SOL_PAYLOAD_SIZE)
 	else if (!strcmp(token, "ignore-payload-size"))
 	    flag = IPMICONSOLE_WORKAROUND_IGNORE_SOL_PAYLOAD_SIZE;
-#endif
-#if defined(IPMICONSOLE_WORKAROUND_IGNORE_SOL_PORT)
+# endif
+# if defined(IPMICONSOLE_WORKAROUND_IGNORE_SOL_PORT)
 	else if (!strcmp(token, "ignore-port"))
 	    flag = IPMICONSOLE_WORKAROUND_IGNORE_SOL_PORT;
-#endif
-#if defined(IPMICONSOLE_WORKAROUND_SKIP_SOL_ACTIVATION_STATUS)
+# endif
+# if defined(IPMICONSOLE_WORKAROUND_SKIP_SOL_ACTIVATION_STATUS)
 	else if (!strcmp(token, "activation-status"))
 	    flag = IPMICONSOLE_WORKAROUND_SKIP_SOL_ACTIVATION_STATUS;
-#endif
-#if defined(IPMICONSOLE_WORKAROUND_SKIP_CHANNEL_PAYLOAD_SUPPORT)
+# endif
+# if defined(IPMICONSOLE_WORKAROUND_SKIP_CHANNEL_PAYLOAD_SUPPORT)
 	else if (!strcmp(token, "channel-payload"))
 	    flag = IPMICONSOLE_WORKAROUND_SKIP_CHANNEL_PAYLOAD_SUPPORT;
-#endif
+# endif
 	else {
 	    if (isMaster)
 		Error("invalid ipmiworkaround `%s' [%s:%d]", token, file,
@@ -1856,12 +1501,7 @@ ProcessIpmiWorkaround(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemIpmiWorkaround(char *id)
-#else
-DefaultItemIpmiWorkaround(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemIpmiWorkaround(%s) [%s:%d]", id, file,
 	       line));
@@ -1870,13 +1510,7 @@ DefaultItemIpmiWorkaround(id)
 #endif /*freeipmi */
 
 void
-#if PROTOTYPES
 ProcessInclude(CONSENT *c, char *id)
-#else
-ProcessInclude(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     CONSENT *inc = (CONSENT *)0;
     if ((id == (char *)0) || (*id == '\000'))
@@ -1891,25 +1525,14 @@ ProcessInclude(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemInclude(char *id)
-#else
-DefaultItemInclude(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemInclude(%s) [%s:%d]", id, file, line));
     ProcessInclude(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 ProcessLogfile(CONSENT *c, char *id)
-#else
-ProcessLogfile(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     if (c->logfile != (char *)0) {
 	free(c->logfile);
@@ -1924,13 +1547,7 @@ ProcessLogfile(c, id)
 }
 
 void
-#if PROTOTYPES
 ProcessInitcmd(CONSENT *c, char *id)
-#else
-ProcessInitcmd(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     if (c->initcmd != (char *)0) {
 	free(c->initcmd);
@@ -1945,13 +1562,7 @@ ProcessInitcmd(c, id)
 }
 
 void
-#if PROTOTYPES
 ProcessMOTD(CONSENT *c, char *id)
-#else
-ProcessMOTD(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     if (c->motd != (char *)0) {
 	free(c->motd);
@@ -1966,13 +1577,7 @@ ProcessMOTD(c, id)
 }
 
 void
-#if PROTOTYPES
 ProcessIdlestring(CONSENT *c, char *id)
-#else
-ProcessIdlestring(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     if (c->idlestring != (char *)0) {
 	free(c->idlestring);
@@ -1986,25 +1591,14 @@ ProcessIdlestring(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemLogfile(char *id)
-#else
-DefaultItemLogfile(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemLogfile(%s) [%s:%d]", id, file, line));
     ProcessLogfile(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 ProcessLogfilemax(CONSENT *c, char *id)
-#else
-ProcessLogfilemax(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     char *p;
     off_t v = 0;
@@ -2046,61 +1640,35 @@ ProcessLogfilemax(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemLogfilemax(char *id)
-#else
-DefaultItemLogfilemax(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemLogfilemax(%s) [%s:%d]", id, file, line));
     ProcessLogfilemax(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 DefaultItemInitcmd(char *id)
-#else
-DefaultItemInitcmd(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemInitcmd(%s) [%s:%d]", id, file, line));
     ProcessInitcmd(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 DefaultItemMOTD(char *id)
-#else
-DefaultItemMOTD(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemMOTD(%s) [%s:%d]", id, file, line));
     ProcessMOTD(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 DefaultItemIdlestring(char *id)
-#else
-DefaultItemIdlestring(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemIdlestring(%s) [%s:%d]", id, file, line));
     ProcessIdlestring(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 ProcessMaster(CONSENT *c, char *id)
-#else
-ProcessMaster(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     if (c->master != (char *)0) {
 	free(c->master);
@@ -2114,25 +1682,14 @@ ProcessMaster(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemMaster(char *id)
-#else
-DefaultItemMaster(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemMaster(%s) [%s:%d]", id, file, line));
     ProcessMaster(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 ProcessOptions(CONSENT *c, char *id)
-#else
-ProcessOptions(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     char *token = (char *)0;
     int negative = 0;
@@ -2195,25 +1752,14 @@ ProcessOptions(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemOptions(char *id)
-#else
-DefaultItemOptions(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemOptions(%s) [%s:%d]", id, file, line));
     ProcessOptions(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 ProcessParity(CONSENT *c, char *id)
-#else
-ProcessParity(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     if ((id == (char *)0) || (*id == '\000')) {
 	c->parity = (PARITY *)0;
@@ -2227,12 +1773,7 @@ ProcessParity(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemParity(char *id)
-#else
-DefaultItemParity(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemParity(%s) [%s:%d]", id, file, line));
     ProcessParity(parserDefaultTemp, id);
@@ -2240,13 +1781,7 @@ DefaultItemParity(id)
 
 #if HAVE_FREEIPMI
 void
-#if PROTOTYPES
 ProcessPassword(CONSENT *c, char *id)
-#else
-ProcessPassword(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     if ((id == (char *)0) || (*id == '\000')) {
 	c->password = (char *)0;
@@ -2256,12 +1791,7 @@ ProcessPassword(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemPassword(char *id)
-#else
-DefaultItemPassword(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemPassword(%s) [%s:%d]", id, file, line));
     ProcessPassword(parserDefaultTemp, id);
@@ -2269,13 +1799,7 @@ DefaultItemPassword(id)
 #endif /*freeipmi */
 
 void
-#if PROTOTYPES
 ProcessPort(CONSENT *c, char *id)
-#else
-ProcessPort(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     char *p;
 
@@ -2306,13 +1830,7 @@ ProcessPort(c, id)
 }
 
 void
-#if PROTOTYPES
 ProcessPortinc(CONSENT *c, char *id)
-#else
-ProcessPortinc(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     char *p;
 
@@ -2333,13 +1851,7 @@ ProcessPortinc(c, id)
 }
 
 void
-#if PROTOTYPES
 ProcessPortbase(CONSENT *c, char *id)
-#else
-ProcessPortbase(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     char *p;
 
@@ -2368,49 +1880,28 @@ ProcessPortbase(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemPort(char *id)
-#else
-DefaultItemPort(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemPort(%s) [%s:%d]", id, file, line));
     ProcessPort(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 DefaultItemPortbase(char *id)
-#else
-DefaultItemPortbase(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemPortbase(%s) [%s:%d]", id, file, line));
     ProcessPortbase(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 DefaultItemPortinc(char *id)
-#else
-DefaultItemPortinc(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemPortinc(%s) [%s:%d]", id, file, line));
     ProcessPortinc(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 ProcessInitspinmax(CONSENT *c, char *id)
-#else
-ProcessInitspinmax(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     char *p;
     int i;
@@ -2440,25 +1931,14 @@ ProcessInitspinmax(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemInitspinmax(char *id)
-#else
-DefaultItemInitspinmax(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemInitspinmax(%s) [%s:%d]", id, file, line));
     ProcessInitspinmax(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 ProcessInitspintimer(CONSENT *c, char *id)
-#else
-ProcessInitspintimer(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     char *p;
     int i;
@@ -2488,25 +1968,14 @@ ProcessInitspintimer(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemInitspintimer(char *id)
-#else
-DefaultItemInitspintimer(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemInitspintimer(%s) [%s:%d]", id, file, line));
     ProcessInitspintimer(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 ProcessProtocol(CONSENT *c, char *id)
-#else
-ProcessProtocol(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     if ((id == (char *)0) || (*id == '\000')) {
 	c->raw = FLAGUNKNOWN;
@@ -2526,25 +1995,14 @@ ProcessProtocol(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemProtocol(char *id)
-#else
-DefaultItemProtocol(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemProtocol(%s) [%s:%d]", id, file, line));
     ProcessProtocol(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 ProcessReplstring(CONSENT *c, char *id)
-#else
-ProcessReplstring(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     if (c->replstring != (char *)0) {
 	free(c->replstring);
@@ -2558,25 +2016,14 @@ ProcessReplstring(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemReplstring(char *id)
-#else
-DefaultItemReplstring(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemReplstring(%s) [%s:%d]", id, file, line));
     ProcessReplstring(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 ProcessTasklist(CONSENT *c, char *id)
-#else
-ProcessTasklist(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     char *token = (char *)0;
     char *list = (char *)0;
@@ -2611,25 +2058,14 @@ ProcessTasklist(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemTasklist(char *id)
-#else
-DefaultItemTasklist(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemTasklist(%s) [%s:%d]", id, file, line));
     ProcessTasklist(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 ProcessBreaklist(CONSENT *c, char *id)
-#else
-ProcessBreaklist(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     char *token = (char *)0;
     char *list = (char *)0;
@@ -2663,25 +2099,14 @@ ProcessBreaklist(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemBreaklist(char *id)
-#else
-DefaultItemBreaklist(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemBreaklist(%s) [%s:%d]", id, file, line));
     ProcessBreaklist(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 ProcessIdletimeout(CONSENT *c, char *id)
-#else
-ProcessIdletimeout(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     char *p;
     int factor = 0;
@@ -2710,25 +2135,14 @@ ProcessIdletimeout(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemIdletimeout(char *id)
-#else
-DefaultItemIdletimeout(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemIdletimeout(%s) [%s:%d]", id, file, line));
     ProcessIdletimeout(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 ProcessRoRw(CONSENTUSERS **ppCU, char *id)
-#else
-ProcessRoRw(ppCU, id)
-    CONSENTUSERS **ppCU;
-    char *id;
-#endif
 {
     char *token = (char *)0;
     PARSERGROUP *pg = (PARSERGROUP *)0;
@@ -2756,37 +2170,21 @@ ProcessRoRw(ppCU, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemRo(char *id)
-#else
-DefaultItemRo(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemRo(%s) [%s:%d]", id, file, line));
     ProcessRoRw(&(parserDefaultTemp->ro), id);
 }
 
 void
-#if PROTOTYPES
 DefaultItemRw(char *id)
-#else
-DefaultItemRw(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemRw(%s) [%s:%d]", id, file, line));
     ProcessRoRw(&(parserDefaultTemp->rw), id);
 }
 
 void
-#if PROTOTYPES
 ProcessTimestamp(CONSENT *c, char *id)
-#else
-ProcessTimestamp(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     time_t tyme;
     char *p = (char *)0, *n = (char *)0;
@@ -2928,25 +2326,14 @@ ProcessTimestamp(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemTimestamp(char *id)
-#else
-DefaultItemTimestamp(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemTimestamp(%s) [%s:%d]", id, file, line));
     ProcessTimestamp(parserDefaultTemp, id);
 }
 
 void
-#if PROTOTYPES
 ProcessType(CONSENT *c, char *id)
-#else
-ProcessType(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     CONSTYPE t = UNKNOWNTYPE;
     if ((id == (char *)0) || (*id == '\000')) {
@@ -2975,12 +2362,7 @@ ProcessType(c, id)
 }
 
 void
-#if PROTOTYPES
 DefaultItemType(char *id)
-#else
-DefaultItemType(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "DefaultItemType(%s) [%s:%d]", id, file, line));
     ProcessType(parserDefaultTemp, id);
@@ -2992,12 +2374,7 @@ CONSENT **parserConsolesTail = &parserConsoles;
 CONSENT *parserConsoleTemp = (CONSENT *)0;
 
 void
-#if PROTOTYPES
 ConsoleBegin(char *id)
-#else
-ConsoleBegin(id)
-    char *id;
-#endif
 {
     CONSENT *c;
 
@@ -3032,13 +2409,7 @@ ConsoleBegin(id)
 
 /* returns 1 if there's an error, otherwise 0 */
 int
-#if PROTOTYPES
 CheckSubst(char *label, char *subst)
-#else
-CheckSubst(label, subst)
-    char *label;
-    char *subst;
-#endif
 {
     int invalid = 0;
 
@@ -3065,11 +2436,7 @@ CheckSubst(label, subst)
 }
 
 void
-#if PROTOTYPES
 ConsoleEnd(void)
-#else
-ConsoleEnd()
-#endif
 {
     int invalid = 0;
 
@@ -3204,11 +2571,7 @@ ConsoleEnd()
 }
 
 void
-#if PROTOTYPES
 ConsoleAbort(void)
-#else
-ConsoleAbort()
-#endif
 {
     CONDDEBUG((1, "ConsoleAbort() [%s:%d]", file, line));
     DestroyParserDefaultOrConsole(parserConsoleTemp, (CONSENT **)0,
@@ -3217,13 +2580,7 @@ ConsoleAbort()
 }
 
 void
-#if PROTOTYPES
 SwapStr(char **s1, char **s2)
-#else
-SwapStr(s1, s2)
-    char **s1;
-    char **s2;
-#endif
 {
     char *s;
     s = *s1;
@@ -3232,13 +2589,7 @@ SwapStr(s1, s2)
 }
 
 void
-#if PROTOTYPES
 ExpandLogfile(CONSENT *c, char *id)
-#else
-ExpandLogfile(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     char *amp = (char *)0;
     char *p = (char *)0;
@@ -3270,12 +2621,7 @@ ExpandLogfile(c, id)
  * a new console.
  */
 void
-#if PROTOTYPES
 ConsoleAdd(CONSENT *c)
-#else
-ConsoleAdd(c)
-    CONSENT *c;
-#endif
 {
     CONSENT *pCEmatch = (CONSENT *)0;
     GRPENT *pGEmatch = (GRPENT *)0, *pGEtmp = (GRPENT *)0;
@@ -3692,13 +3038,13 @@ ConsoleAdd(c)
 		if (pCEmatch->ipmikg->used != 0 &&
 		    c->ipmikg->used == pCEmatch->ipmikg->used) {
 		    if (
-#if HAVE_MEMCMP
+# if HAVE_MEMCMP
 			   memcmp(pCEmatch->ipmikg->string, c->ipmikg,
 				  c->ipmikg->used) != 0
-#else
+# else
 			   bcmp(pCEmatch->ipmikg->string, c->ipmikg,
 				c->ipmikg->used) != 0
-#endif
+# endif
 			) {
 			BuildString((char *)0, pCEmatch->ipmikg);
 			BuildStringN(c->ipmikg->string,
@@ -3818,11 +3164,7 @@ ConsoleAdd(c)
 }
 
 void
-#if PROTOTYPES
 ConsoleDestroy(void)
-#else
-ConsoleDestroy()
-#endif
 {
     GRPENT **ppGE = (GRPENT **)0;
     GRPENT *pGEtmp = (GRPENT *)0;
@@ -4160,13 +3502,7 @@ ConsoleDestroy()
 }
 
 CONSENT *
-#if PROTOTYPES
 FindConsoleName(CONSENT *c, char *id)
-#else
-FindConsoleName(c, id)
-    CONSENT *c;
-    char *id;
-#endif
 {
     NAMES *a = (NAMES *)0;
     for (; c != (CONSENT *)0; c = c->pCEnext) {
@@ -4180,12 +3516,7 @@ FindConsoleName(c, id)
 }
 
 void
-#if PROTOTYPES
 ConsoleItemAliases(char *id)
-#else
-ConsoleItemAliases(id)
-    char *id;
-#endif
 {
     char *token = (char *)0;
     NAMES *name = (NAMES *)0;
@@ -4228,48 +3559,28 @@ ConsoleItemAliases(id)
 }
 
 void
-#if PROTOTYPES
 ConsoleItemBaud(char *id)
-#else
-ConsoleItemBaud(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemBaud(%s) [%s:%d]", id, file, line));
     ProcessBaud(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemBreak(char *id)
-#else
-ConsoleItemBreak(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemBreak(%s) [%s:%d]", id, file, line));
     ProcessBreak(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemDevice(char *id)
-#else
-ConsoleItemDevice(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemDevice(%s) [%s:%d]", id, file, line));
     ProcessDevice(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemDevicesubst(char *id)
-#else
-ConsoleItemDevicesubst(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemDevicesubst(%s) [%s:%d]", id, file, line));
     ProcessSubst(substData, (char **)0, &(parserConsoleTemp->devicesubst),
@@ -4277,12 +3588,7 @@ ConsoleItemDevicesubst(id)
 }
 
 void
-#if PROTOTYPES
 ConsoleItemExecsubst(char *id)
-#else
-ConsoleItemExecsubst(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemExecsubst(%s) [%s:%d]", id, file, line));
     ProcessSubst(substData, (char **)0, &(parserConsoleTemp->execsubst),
@@ -4290,12 +3596,7 @@ ConsoleItemExecsubst(id)
 }
 
 void
-#if PROTOTYPES
 ConsoleItemUdssubst(char *id)
-#else
-ConsoleItemUdssubst(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemUdssubst(%s) [%s:%d]", id, file, line));
     ProcessSubst(substData, (char **)0, &(parserConsoleTemp->udssubst),
@@ -4303,12 +3604,7 @@ ConsoleItemUdssubst(id)
 }
 
 void
-#if PROTOTYPES
 ConsoleItemInitsubst(char *id)
-#else
-ConsoleItemInitsubst(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemInitsubst(%s) [%s:%d]", id, file, line));
     ProcessSubst(substData, (char **)0, &(parserConsoleTemp->initsubst),
@@ -4316,72 +3612,42 @@ ConsoleItemInitsubst(id)
 }
 
 void
-#if PROTOTYPES
 ConsoleItemInitrunas(char *id)
-#else
-ConsoleItemInitrunas(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemInitrunas(%s) [%s:%d]", id, file, line));
     ProcessInitrunas(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemExecrunas(char *id)
-#else
-ConsoleItemExecrunas(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemExecrunas(%s) [%s:%d]", id, file, line));
     ProcessExecrunas(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemExec(char *id)
-#else
-ConsoleItemExec(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemExec(%s) [%s:%d]", id, file, line));
     ProcessExec(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemFlow(char *id)
-#else
-ConsoleItemFlow(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemFlow(%s) [%s:%d]", id, file, line));
     ProcessFlow(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemHost(char *id)
-#else
-ConsoleItemHost(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemHost(%s) [%s:%d]", id, file, line));
     ProcessHost(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemUds(char *id)
-#else
-ConsoleItemUds(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemUds(%s) [%s:%d]", id, file, line));
     ProcessUds(parserConsoleTemp, id);
@@ -4389,36 +3655,21 @@ ConsoleItemUds(id)
 
 #if HAVE_FREEIPMI
 void
-#if PROTOTYPES
 ConsoleItemIpmiKG(char *id)
-#else
-ConsoleItemIpmiKG(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemIpmiKG(%s) [%s:%d]", id, file, line));
     ProcessIpmiKG(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemUsername(char *id)
-#else
-ConsoleItemUsername(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemUsername(%s) [%s:%d]", id, file, line));
     ProcessUsername(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemIpmiCipherSuite(char *id)
-#else
-ConsoleItemIpmiCipherSuite(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemIpmiCipherSuite(%s) [%s:%d]", id, file,
 	       line));
@@ -4426,12 +3677,7 @@ ConsoleItemIpmiCipherSuite(id)
 }
 
 void
-#if PROTOTYPES
 ConsoleItemIpmiWorkaround(char *id)
-#else
-ConsoleItemIpmiWorkaround(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemIpmiWorkaround(%s) [%s:%d]", id, file,
 	       line));
@@ -4440,108 +3686,63 @@ ConsoleItemIpmiWorkaround(id)
 #endif /*freeipmi */
 
 void
-#if PROTOTYPES
 ConsoleItemInclude(char *id)
-#else
-ConsoleItemInclude(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemInclude(%s) [%s:%d]", id, file, line));
     ProcessInclude(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemLogfile(char *id)
-#else
-ConsoleItemLogfile(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemLogfile(%s) [%s:%d]", id, file, line));
     ProcessLogfile(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemLogfilemax(char *id)
-#else
-ConsoleItemLogfilemax(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemLogfilemax(%s) [%s:%d]", id, file, line));
     ProcessLogfilemax(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemInitcmd(char *id)
-#else
-ConsoleItemInitcmd(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemInitcmd(%s) [%s:%d]", id, file, line));
     ProcessInitcmd(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemMOTD(char *id)
-#else
-ConsoleItemMOTD(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemMOTD(%s) [%s:%d]", id, file, line));
     ProcessMOTD(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemIdlestring(char *id)
-#else
-ConsoleItemIdlestring(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemIdlestring(%s) [%s:%d]", id, file, line));
     ProcessIdlestring(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemMaster(char *id)
-#else
-ConsoleItemMaster(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemMaster(%s) [%s:%d]", id, file, line));
     ProcessMaster(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemOptions(char *id)
-#else
-ConsoleItemOptions(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemOptions(%s) [%s:%d]", id, file, line));
     ProcessOptions(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemParity(char *id)
-#else
-ConsoleItemParity(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemParity(%s) [%s:%d]", id, file, line));
     ProcessParity(parserConsoleTemp, id);
@@ -4549,12 +3750,7 @@ ConsoleItemParity(id)
 
 #if HAVE_FREEIPMI
 void
-#if PROTOTYPES
 ConsoleItemPassword(char *id)
-#else
-ConsoleItemPassword(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemPassword(%s) [%s:%d]", id, file, line));
     ProcessPassword(parserConsoleTemp, id);
@@ -4562,168 +3758,98 @@ ConsoleItemPassword(id)
 #endif /*freeipmi */
 
 void
-#if PROTOTYPES
 ConsoleItemPort(char *id)
-#else
-ConsoleItemPort(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemPort(%s) [%s:%d]", id, file, line));
     ProcessPort(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemPortbase(char *id)
-#else
-ConsoleItemPortbase(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemPortbase(%s) [%s:%d]", id, file, line));
     ProcessPortbase(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemPortinc(char *id)
-#else
-ConsoleItemPortinc(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemPortinc(%s) [%s:%d]", id, file, line));
     ProcessPortinc(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemInitspinmax(char *id)
-#else
-ConsoleItemInitspinmax(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemInitspinmax(%s) [%s:%d]", id, file, line));
     ProcessInitspinmax(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemInitspintimer(char *id)
-#else
-ConsoleItemInitspintimer(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemInitspintimer(%s) [%s:%d]", id, file, line));
     ProcessInitspintimer(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemProtocol(char *id)
-#else
-ConsoleItemProtocol(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemProtocol(%s) [%s:%d]", id, file, line));
     ProcessProtocol(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemReplstring(char *id)
-#else
-ConsoleItemReplstring(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemReplstring(%s) [%s:%d]", id, file, line));
     ProcessReplstring(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemTasklist(char *id)
-#else
-ConsoleItemTasklist(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemTasklist(%s) [%s:%d]", id, file, line));
     ProcessTasklist(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemBreaklist(char *id)
-#else
-ConsoleItemBreaklist(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemBreaklist(%s) [%s:%d]", id, file, line));
     ProcessBreaklist(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemIdletimeout(char *id)
-#else
-ConsoleItemIdletimeout(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemIdletimeout(%s) [%s:%d]", id, file, line));
     ProcessIdletimeout(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemRo(char *id)
-#else
-ConsoleItemRo(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemRo(%s) [%s:%d]", id, file, line));
     ProcessRoRw(&(parserConsoleTemp->ro), id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemRw(char *id)
-#else
-ConsoleItemRw(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemRw(%s) [%s:%d]", id, file, line));
     ProcessRoRw(&(parserConsoleTemp->rw), id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemTimestamp(char *id)
-#else
-ConsoleItemTimestamp(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemTimestamp(%s) [%s:%d]", id, file, line));
     ProcessTimestamp(parserConsoleTemp, id);
 }
 
 void
-#if PROTOTYPES
 ConsoleItemType(char *id)
-#else
-ConsoleItemType(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemType(%s) [%s:%d]", id, file, line));
     ProcessType(parserConsoleTemp, id);
@@ -4743,12 +3869,7 @@ PARSERACCESS **parserAccessesTail = &parserAccesses;
 PARSERACCESS *parserAccessTemp = (PARSERACCESS *)0;
 
 void
-#if PROTOTYPES
 DestroyParserAccess(PARSERACCESS *pa)
-#else
-DestroyParserAccess(pa)
-    PARSERACCESS *pa;
-#endif
 {
     PARSERACCESS **ppa = &parserAccesses;
     ACCESS *a = (ACCESS *)0;
@@ -4790,12 +3911,7 @@ DestroyParserAccess(pa)
 }
 
 PARSERACCESS *
-#if PROTOTYPES
 AccessFind(char *id)
-#else
-AccessFind(id)
-    char *id;
-#endif
 {
     PARSERACCESS *pa;
     for (pa = parserAccesses; pa != (PARSERACCESS *)0; pa = pa->next) {
@@ -4806,13 +3922,7 @@ AccessFind(id)
 }
 
 void
-#if PROTOTYPES
 AccessAddACL(PARSERACCESS *pa, ACCESS *access)
-#else
-AccessAddACL(pa, access)
-    PARSERACCESS *pa;
-    ACCESS *access;
-#endif
 {
     ACCESS **ppa = (ACCESS **)0;
     ACCESS *new = (ACCESS *)0;
@@ -4839,12 +3949,7 @@ AccessAddACL(pa, access)
 }
 
 void
-#if PROTOTYPES
 AccessBegin(char *id)
-#else
-AccessBegin(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "AccessBegin(%s) [%s:%d]", id, file, line));
     if (id == (char *)0 || id[0] == '\000') {
@@ -4863,11 +3968,7 @@ AccessBegin(id)
 }
 
 void
-#if PROTOTYPES
 AccessEnd(void)
-#else
-AccessEnd()
-#endif
 {
     PARSERACCESS *pa = (PARSERACCESS *)0;
 
@@ -4893,11 +3994,7 @@ AccessEnd()
 }
 
 void
-#if PROTOTYPES
 AccessAbort(void)
-#else
-AccessAbort()
-#endif
 {
     CONDDEBUG((1, "AccessAbort() [%s:%d]", file, line));
     DestroyParserAccess(parserAccessTemp);
@@ -4905,11 +4002,7 @@ AccessAbort()
 }
 
 void
-#if PROTOTYPES
 AccessDestroy(void)
-#else
-AccessDestroy()
-#endif
 {
     ACCESS *a;
     PARSERACCESS *p;
@@ -4993,36 +4086,21 @@ AccessDestroy()
 }
 
 void
-#if PROTOTYPES
 AccessItemAdmin(char *id)
-#else
-AccessItemAdmin(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "AccessItemAdmin(%s) [%s:%d]", id, file, line));
     ProcessRoRw(&(parserAccessTemp->admin), id);
 }
 
 void
-#if PROTOTYPES
 AccessItemLimited(char *id)
-#else
-AccessItemLimited(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "AccessItemLimited(%s) [%s:%d]", id, file, line));
     ProcessRoRw(&(parserAccessTemp->limited), id);
 }
 
 void
-#if PROTOTYPES
 AccessItemInclude(char *id)
-#else
-AccessItemInclude(id)
-    char *id;
-#endif
 {
     char *token = (char *)0;
     PARSERACCESS *pa = (PARSERACCESS *)0;
@@ -5054,13 +4132,7 @@ AccessItemInclude(id)
 }
 
 void
-#if PROTOTYPES
 AccessProcessACL(char trust, char *acl)
-#else
-AccessProcessACL(trust, acl)
-    char trust;
-    char *acl;
-#endif
 {
     char *token = (char *)0;
     ACCESS **ppa = (ACCESS **)0;
@@ -5170,36 +4242,21 @@ AccessProcessACL(trust, acl)
 }
 
 void
-#if PROTOTYPES
 AccessItemAllowed(char *id)
-#else
-AccessItemAllowed(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "AccessItemAllowed(%s) [%s:%d]", id, file, line));
     AccessProcessACL('a', id);
 }
 
 void
-#if PROTOTYPES
 AccessItemRejected(char *id)
-#else
-AccessItemRejected(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "AccessItemRejected(%s) [%s:%d]", id, file, line));
     AccessProcessACL('r', id);
 }
 
 void
-#if PROTOTYPES
 AccessItemTrusted(char *id)
-#else
-AccessItemTrusted(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "AccessItemTrusted(%s) [%s:%d]", id, file, line));
     AccessProcessACL('t', id);
@@ -5209,12 +4266,7 @@ AccessItemTrusted(id)
 CONFIG *parserConfigTemp = (CONFIG *)0;
 
 void
-#if PROTOTYPES
 DestroyConfig(CONFIG *c)
-#else
-DestroyConfig(c)
-    CONFIG *c;
-#endif
 {
     if (c == (CONFIG *)0)
 	return;
@@ -5238,12 +4290,7 @@ DestroyConfig(c)
 }
 
 void
-#if PROTOTYPES
 ConfigBegin(char *id)
-#else
-ConfigBegin(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigBegin(%s) [%s:%d]", id, file, line));
     if (id == (char *)0 || id[0] == '\000') {
@@ -5261,11 +4308,7 @@ ConfigBegin(id)
 }
 
 void
-#if PROTOTYPES
 ConfigEnd(void)
-#else
-ConfigEnd()
-#endif
 {
     CONDDEBUG((1, "ConfigEnd() [%s:%d]", file, line));
 
@@ -5353,11 +4396,7 @@ ConfigEnd()
 }
 
 void
-#if PROTOTYPES
 ConfigAbort(void)
-#else
-ConfigAbort()
-#endif
 {
     CONDDEBUG((1, "ConfigAbort() [%s:%d]", file, line));
     if (parserConfigTemp == (CONFIG *)0)
@@ -5368,11 +4407,7 @@ ConfigAbort()
 }
 
 void
-#if PROTOTYPES
 ConfigDestroy(void)
-#else
-ConfigDestroy()
-#endif
 {
     CONDDEBUG((1, "ConfigDestroy() [%s:%d]", file, line));
     if (parserConfigTemp == (CONFIG *)0)
@@ -5383,12 +4418,7 @@ ConfigDestroy()
 }
 
 void
-#if PROTOTYPES
 ConfigItemDefaultaccess(char *id)
-#else
-ConfigItemDefaultaccess(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemDefaultaccess(%s) [%s:%d]", id, file, line));
 
@@ -5410,12 +4440,7 @@ ConfigItemDefaultaccess(id)
 
 #if HAVE_FREEIPMI
 void
-#if PROTOTYPES
 ConsoleItemIpmiPrivLevel(char *id)
-#else
-ConsoleItemIpmiPrivLevel(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConsoleItemIpmiPrivLevel(%s) [%s:%d]", id, file, line));
     ProcessIpmiPrivLevel(parserConsoleTemp, id);
@@ -5423,36 +4448,21 @@ ConsoleItemIpmiPrivLevel(id)
 #endif /*freeipmi */
 
 void
-#if PROTOTYPES
 ConfigItemAutocomplete(char *id)
-#else
-ConfigItemAutocomplete(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemAutocomplete(%s) [%s:%d]", id, file, line));
     ProcessYesNo(id, &(parserConfigTemp->autocomplete));
 }
 
 void
-#if PROTOTYPES
 ConfigItemDaemonmode(char *id)
-#else
-ConfigItemDaemonmode(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemDaemonmode(%s) [%s:%d]", id, file, line));
     ProcessYesNo(id, &(parserConfigTemp->daemonmode));
 }
 
 void
-#if PROTOTYPES
 ConfigItemLogfile(char *id)
-#else
-ConfigItemLogfile(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemLogfile(%s) [%s:%d]", id, file, line));
 
@@ -5468,12 +4478,7 @@ ConfigItemLogfile(id)
 }
 
 void
-#if PROTOTYPES
 ConfigItemPasswordfile(char *id)
-#else
-ConfigItemPasswordfile(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemPasswordfile(%s) [%s:%d]", id, file, line));
 
@@ -5489,12 +4494,7 @@ ConfigItemPasswordfile(id)
 }
 
 void
-#if PROTOTYPES
 ConfigItemUnifiedlog(char *id)
-#else
-ConfigItemUnifiedlog(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemUnifiedlog(%s) [%s:%d]", id, file, line));
 
@@ -5511,12 +4511,7 @@ ConfigItemUnifiedlog(id)
 }
 
 void
-#if PROTOTYPES
 ConfigItemPrimaryport(char *id)
-#else
-ConfigItemPrimaryport(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemPrimaryport(%s) [%s:%d]", id, file, line));
 
@@ -5532,36 +4527,21 @@ ConfigItemPrimaryport(id)
 }
 
 void
-#if PROTOTYPES
 ConfigItemRedirect(char *id)
-#else
-ConfigItemRedirect(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemRedirect(%s) [%s:%d]", id, file, line));
     ProcessYesNo(id, &(parserConfigTemp->redirect));
 }
 
 void
-#if PROTOTYPES
 ConfigItemLoghostnames(char *id)
-#else
-ConfigItemLoghostnames(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemLoghostnames(%s) [%s:%d]", id, file, line));
     ProcessYesNo(id, &(parserConfigTemp->loghostnames));
 }
 
 void
-#if PROTOTYPES
 ConfigItemReinitcheck(char *id)
-#else
-ConfigItemReinitcheck(id)
-    char *id;
-#endif
 {
     char *p;
 
@@ -5587,12 +4567,7 @@ ConfigItemReinitcheck(id)
 }
 
 void
-#if PROTOTYPES
 ConfigItemInitdelay(char *id)
-#else
-ConfigItemInitdelay(id)
-    char *id;
-#endif
 {
     char *p;
 
@@ -5617,12 +4592,7 @@ ConfigItemInitdelay(id)
 }
 
 void
-#if PROTOTYPES
 ConfigItemSecondaryport(char *id)
-#else
-ConfigItemSecondaryport(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemSecondaryport(%s) [%s:%d]", id, file, line));
 
@@ -5638,12 +4608,7 @@ ConfigItemSecondaryport(id)
 }
 
 void
-#if PROTOTYPES
 ConfigItemSslcredentials(char *id)
-#else
-ConfigItemSslcredentials(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemSslcredentials(%s) [%s:%d]", id, file, line));
 #if HAVE_OPENSSL
@@ -5665,12 +4630,7 @@ ConfigItemSslcredentials(id)
 }
 
 void
-#if PROTOTYPES
 ConfigItemSslcacertificatefile(char *id)
-#else
-ConfigItemSslcacertificatefile(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemSslcacertificatefile(%s) [%s:%d]", id, file,
 	       line));
@@ -5693,12 +4653,7 @@ ConfigItemSslcacertificatefile(id)
 }
 
 void
-#if PROTOTYPES
 ConfigItemSslrequired(char *id)
-#else
-ConfigItemSslrequired(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemSslrequired(%s) [%s:%d]", id, file, line));
 #if HAVE_OPENSSL
@@ -5712,12 +4667,7 @@ ConfigItemSslrequired(id)
 }
 
 void
-#if PROTOTYPES
 ConfigItemSslreqclientcert(char *id)
-#else
-ConfigItemSslreqclientcert(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemSslreqclientcert(%s) [%s:%d]", id, file,
 	       line));
@@ -5732,12 +4682,7 @@ ConfigItemSslreqclientcert(id)
 }
 
 void
-#if PROTOTYPES
 ConfigItemSetproctitle(char *id)
-#else
-ConfigItemSetproctitle(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "ConfigItemSetproctitle(%s) [%s:%d]", id, file, line));
 #if HAVE_SETPROCTITLE
@@ -5754,12 +4699,7 @@ ConfigItemSetproctitle(id)
 TASKS *parserTask;
 
 void
-#if PROTOTYPES
 TaskBegin(char *id)
-#else
-TaskBegin(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "TaskBegin(%s) [%s:%d]", id, file, line));
     if (id == (char *)0 || id[0] == '\000' || id[1] != '\000' ||
@@ -5790,11 +4730,7 @@ TaskBegin(id)
 }
 
 void
-#if PROTOTYPES
 TaskEnd(void)
-#else
-TaskEnd()
-#endif
 {
     TASKS *t;
     TASKS **prev;
@@ -5823,11 +4759,7 @@ TaskEnd()
 }
 
 void
-#if PROTOTYPES
 TaskAbort(void)
-#else
-TaskAbort()
-#endif
 {
     CONDDEBUG((1, "TaskAbort() [%s:%d]", file, line));
     if (parserTask == (TASKS *)0 || parserTask->id == ' ')
@@ -5837,11 +4769,7 @@ TaskAbort()
 }
 
 void
-#if PROTOTYPES
 TaskDestroy(void)
-#else
-TaskDestroy()
-#endif
 {
     CONDDEBUG((1, "TaskDestroy() [%s:%d]", file, line));
     if (parserTask != (TASKS *)0) {
@@ -5851,12 +4779,7 @@ TaskDestroy()
 }
 
 void
-#if PROTOTYPES
 TaskItemRunas(char *id)
-#else
-TaskItemRunas(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "TaskItemRunas(%s) [%s:%d]", id, file, line));
     if (parserTask == (TASKS *)0 || parserTask->id == ' ')
@@ -5865,12 +4788,7 @@ TaskItemRunas(id)
 }
 
 void
-#if PROTOTYPES
 TaskItemSubst(char *id)
-#else
-TaskItemSubst(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "TaskItemSubst(%s) [%s:%d]", id, file, line));
     if (parserTask == (TASKS *)0 || parserTask->id == ' ')
@@ -5879,12 +4797,7 @@ TaskItemSubst(id)
 }
 
 void
-#if PROTOTYPES
 TaskItemCmd(char *id)
-#else
-TaskItemCmd(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "TaskItemCmd(%s) [%s:%d]", id, file, line));
     if (parserTask == (TASKS *)0 || parserTask->id == ' ')
@@ -5896,12 +4809,7 @@ TaskItemCmd(id)
 }
 
 void
-#if PROTOTYPES
 TaskItemDescr(char *id)
-#else
-TaskItemDescr(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "TaskItemDescr(%s) [%s:%d]", id, file, line));
     if (parserTask == (TASKS *)0 || parserTask->id == ' ')
@@ -5913,12 +4821,7 @@ TaskItemDescr(id)
 }
 
 void
-#if PROTOTYPES
 TaskItemConfirm(char *id)
-#else
-TaskItemConfirm(id)
-    char *id;
-#endif
 {
     CONDDEBUG((1, "TaskItemConfirm(%s) [%s:%d]", id, file, line));
     ProcessYesNo(id, &(parserTask->confirm));
@@ -6090,13 +4993,7 @@ SECTION sections[] = {
 };
 
 void
-#if PROTOTYPES
 ReadCfg(char *filename, FILE *fp)
-#else
-ReadCfg(filename, fp)
-    char *filename;
-    FILE *fp;
-#endif
 {
     int i;
 #if HAVE_DMALLOC && DMALLOC_MARK_READCFG
@@ -6151,13 +5048,7 @@ ReadCfg(filename, fp)
 }
 
 void
-#if PROTOTYPES
 ReReadCfg(int fd, int msfd)
-#else
-ReReadCfg(fd, msfd)
-    int fd;
-    int msfd;
-#endif
 {
     FILE *fpConfig;
 
@@ -6308,7 +5199,11 @@ ReReadCfg(fd, msfd)
     /* if no one can use us we need to come up with a default
      */
     if (pACList == (ACCESS *)0)
+#if USE_IPV6
+	SetDefAccess();
+#else
 	SetDefAccess(myAddrs, myHostname);
+#endif
 
     if (isMaster) {
 	GRPENT *pGE;

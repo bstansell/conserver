@@ -1,6 +1,20 @@
 				CHANGES
 				=======
 
+version 8.2.0 (Apr 20, 2014):
+	- added --with-trust-uds-cred which uses getsockopt() to fetch and
+	  trust the client uid, bypassing password lookups - patch by Anton
+	  Lundin <glance@acc.umu.se>
+	- missing closedir() causing memory leak - patch by Anton Lundin
+	  <glance@acc.umu.se>
+	- sending a break signal over IPMI was broken - based on patch by
+	  Alexander Y.  Fomichev <git.user@gmail.com>
+	- IPv6 support (marked as experimental at this point because it's
+	  untested (except by the author), there's a lack of documentation, and
+	  I'm hoping for non-getifaddrs() system support) - patch by Milos
+	  Vyletel <milos.vyletel@gmail.com>
+	- no more K&R compiler support
+
 version 8.1.20 (Apr 4, 2014):
 	- IPMI serial over LAN support via FreeIPMI - based on patch by Anton
 	  D. Kachalov <mouse@yandex-team.ru>
@@ -938,5 +952,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.239 2014/04/04 16:27:38 bryan Exp $
+#  $Id: CHANGES,v 1.247 2014/04/21 04:47:37 bryan Exp $
 #

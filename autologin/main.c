@@ -20,9 +20,7 @@ static int
  * does +arg if you give a last argument of "+", else give (char *)0
  */
 static int
-getopt(nargc, nargv, ostr)
-    int nargc;
-    char **nargv, *ostr;
+getopt(int nargc, char **nargv, char *ostr)
 {
     register char *oli;		/* option letter list index     */
     static char EMSG[] = "";	/* just a null place            */
@@ -84,7 +82,7 @@ getopt(nargc, nargv, ostr)
 
 char
  *progname =
-    "$Id: main.c,v 1.2 2013/09/20 21:15:13 bryan Exp $", *au_terse[] = {
+    "$Id: main.c,v 1.3 2014/04/20 06:45:07 bryan Exp $", *au_terse[] = {
     " [-u] [-c cmd] [-e env=value] [-g group] [-l login] [-t tty]",
     " -h",
     " -V",
@@ -104,18 +102,16 @@ int
   fMakeUtmp = 1, iErrs = 0;
 
 #ifndef u_terse
-#define u_terse	(au_terse[0])
+# define u_terse	(au_terse[0])
 #endif
 
-static char *rcsid = "$Id: main.c,v 1.2 2013/09/20 21:15:13 bryan Exp $";
+static char *rcsid = "$Id: main.c,v 1.3 2014/04/20 06:45:07 bryan Exp $";
 
 /*
  * parser
  */
 int
-main(argc, argv)
-    int argc;
-    char **argv;
+main(int argc, char **argv)
 {
     static char
       sbOpt[] = "c:e:g:hl:t:uV", *u_pch = (char *)0;

@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.h,v 5.49 2013/09/23 22:58:21 bryan Exp $
+ *  $Id: readcfg.h,v 5.50 2014/04/20 06:45:07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -63,12 +63,12 @@ extern SUBST *taskSubst;	/* substitution function data for tasks */
 extern CONFIG *pConfig;		/* settings seen by config parser */
 extern SUBST *substData;	/* substitution function data */
 
-extern void ReadCfg PARAMS((char *, FILE *));
-extern void ReReadCfg PARAMS((int, int));
-extern void DestroyBreakList PARAMS((void));
-extern void DestroyTaskList PARAMS((void));
-extern void DestroyUserList PARAMS((void));
-extern void DestroyConfig PARAMS((CONFIG *));
-extern NAMES *FindUserList PARAMS((char *));
-extern NAMES *AddUserList PARAMS((char *));
-extern CONSENT *FindConsoleName PARAMS((CONSENT *, char *));
+extern void ReadCfg(char *, FILE *);
+extern void ReReadCfg(int, int);
+extern void DestroyBreakList(void);
+extern void DestroyTaskList(void);
+extern void DestroyUserList(void);
+extern void DestroyConfig(CONFIG *);
+extern NAMES *FindUserList(char *);
+extern NAMES *AddUserList(char *);
+extern CONSENT *FindConsoleName(CONSENT *, char *);

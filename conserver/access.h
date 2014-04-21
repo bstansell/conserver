@@ -1,5 +1,5 @@
 /*
- *  $Id: access.h,v 5.26 2003/08/10 18:11:20 bryan Exp $
+ *  $Id: access.h,v 5.27 2014/04/20 06:45:07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -44,6 +44,12 @@ typedef struct access {
     struct access *pACnext;	/* next access list                     */
 } ACCESS;
 
-extern char AccType PARAMS((struct in_addr *, char **));
-extern void SetDefAccess PARAMS((struct in_addr *, char *));
-extern void DestroyAccessList PARAMS((ACCESS *));
+extern char AccType(INADDR_STYPE *, char **);
+extern void SetDefAccess(
+#if USE_IPV6
+			    void
+#else
+			    struct in_addr *, char *
+#endif
+    );
+extern void DestroyAccessList(ACCESS *);

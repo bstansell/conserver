@@ -1,5 +1,5 @@
 /*
- *  $Id: readconf.h,v 5.6 2013/09/18 14:31:39 bryan Exp $
+ *  $Id: readconf.h,v 5.7 2014/04/20 06:45:07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -37,6 +37,6 @@ extern CONFIG *pConfig;
 extern TERM *pTerm;
 extern SUBST *substData;
 
-extern void ReadConf PARAMS((char *, FLAG));
-extern void DestroyConfig PARAMS((CONFIG *));
-extern void DestroyTerminal PARAMS((TERM *));
+extern void ReadConf(char *, FLAG);
+extern void DestroyConfig(CONFIG *);
+extern void DestroyTerminal(TERM *);

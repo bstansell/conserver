@@ -1,5 +1,5 @@
 /*
- *  $Id: master.c,v 5.139 2013/09/23 23:17:42 bryan Exp $
+ *  $Id: master.c,v 5.141 2014/04/20 06:45:07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -49,12 +49,7 @@ static unsigned long dmallocMarkClientConnection = 0;
 
 
 static RETSIGTYPE
-#if PROTOTYPES
 FlagSawCHLD(int sig)
-#else
-FlagSawCHLD(sig)
-    int sig;
-#endif
 {
     fSawCHLD = 1;
 #if !HAVE_SIGACTION
@@ -66,12 +61,7 @@ FlagSawCHLD(sig)
  * Called when master process receives SIGCHLD
  */
 static void
-#if PROTOTYPES
 FixKids(int msfd)
-#else
-FixKids(msfd)
-    int msfd;
-#endif
 {
     pid_t pid;
     int UWbuf;
@@ -135,12 +125,7 @@ FixKids(msfd)
  * Called when master process receives SIGTERM
  */
 static RETSIGTYPE
-#if PROTOTYPES
 FlagQuitIt(int arg)
-#else
-FlagQuitIt(arg)
-    int arg;
-#endif
 {
     fSawQuit = 1;
 #if !HAVE_SIGACTION
@@ -152,12 +137,7 @@ FlagQuitIt(arg)
  * want to do something special on SIGINT at some point.
  */
 static RETSIGTYPE
-#if PROTOTYPES
 FlagSawINT(int arg)
-#else
-FlagSawINT(arg)
-    int arg;
-#endif
 {
     fSawQuit = 1;
 #if !HAVE_SIGACTION
@@ -166,12 +146,7 @@ FlagSawINT(arg)
 }
 
 static RETSIGTYPE
-#if PROTOTYPES
 FlagSawHUP(int arg)
-#else
-FlagSawHUP(arg)
-    int arg;
-#endif
 {
     fSawHUP = 1;
 #if !HAVE_SIGACTION
@@ -180,12 +155,7 @@ FlagSawHUP(arg)
 }
 
 static RETSIGTYPE
-#if PROTOTYPES
 FlagSawUSR2(int arg)
-#else
-FlagSawUSR2(arg)
-    int arg;
-#endif
 {
     fSawUSR2 = 1;
 #if !HAVE_SIGACTION
@@ -194,12 +164,7 @@ FlagSawUSR2(arg)
 }
 
 static RETSIGTYPE
-#if PROTOTYPES
 FlagSawUSR1(int arg)
-#else
-FlagSawUSR1(arg)
-    int arg;
-#endif
 {
     fSawUSR1 = 1;
 #if !HAVE_SIGACTION
@@ -210,12 +175,7 @@ FlagSawUSR1(arg)
 /* Signal all the kids...
  */
 void
-#if PROTOTYPES
 SignalKids(int arg)
-#else
-SignalKids(arg)
-    int arg;
-#endif
 {
     GRPENT *pGE;
 
@@ -232,12 +192,7 @@ SignalKids(arg)
 }
 
 REMOTE *
-#if PROTOTYPES
 FindRemoteConsole(char *args)
-#else
-FindRemoteConsole(args)
-    char *args;
-#endif
 {
     REMOTE *pRC;
     NAMES *name;
@@ -254,13 +209,7 @@ FindRemoteConsole(args)
 }
 
 void
-#if PROTOTYPES
 CommandCall(CONSCLIENT *pCL, char *args)
-#else
-CommandCall(pCL, args)
-    CONSCLIENT *pCL;
-    char *args;
-#endif
 {
     int found;
     REMOTE *pRC, *pRCFound;
@@ -383,13 +332,7 @@ CommandCall(pCL, args)
 }
 
 void
-#if PROTOTYPES
 DropMasterClient(CONSCLIENT *pCLServing, FLAG force)
-#else
-DropMasterClient(pCLServing, force)
-    CONSCLIENT *pCLServing;
-    FLAG force;
-#endif
 {
     /* if we have data buffered and aren't forced to close,
      * we can't close quite yet
@@ -425,12 +368,7 @@ DropMasterClient(pCLServing, force)
 }
 
 void
-#if PROTOTYPES
 DoNormalRead(CONSCLIENT *pCLServing)
-#else
-DoNormalRead(pCLServing)
-    CONSCLIENT *pCLServing;
-#endif
 {
     char *pcCmd;
     char *pcArgs;
@@ -586,11 +524,9 @@ DoNormalRead(pCLServing)
 		int iSep = 1;
 
 		if ((GRPENT *)0 != pGroups) {
-#if USE_UNIX_DOMAIN_SOCKETS
-		    FilePrint(pCLServing->fd, FLAGTRUE, "@0");
-		    iSep = 0;
-#else
-		    struct sockaddr_in lcl;
+#if USE_IPV6 || !USE_UNIX_DOMAIN_SOCKETS
+		    SOCKADDR_STYPE lcl;
+
 		    socklen_t so = sizeof(lcl);
 		    if (-1 ==
 			getsockname(FileFDNum(pCLServing->fd),
@@ -602,10 +538,25 @@ DoNormalRead(pCLServing)
 			      FileFDNum(pCLServing->fd), strerror(errno));
 			iSep = -1;
 		    } else {
+# if USE_IPV6
+			int error;
+			char addr[NI_MAXHOST];
+			error =
+			    getnameinfo((struct sockaddr *)&lcl, so, addr,
+					sizeof(addr), NULL, 0,
+					NI_NUMERICHOST);
+			if (!error)
+			    FilePrint(pCLServing->fd, FLAGTRUE, "@%s",
+				      addr);
+# else
 			FilePrint(pCLServing->fd, FLAGTRUE, "@%s",
 				  inet_ntoa(lcl.sin_addr));
+# endif
 			iSep = 0;
 		    }
+#else
+		    FilePrint(pCLServing->fd, FLAGTRUE, "@0");
+		    iSep = 0;
 #endif
 		}
 		if (iSep >= 0) {
@@ -723,24 +674,24 @@ DoNormalRead(pCLServing)
 /* this routine is used by the master console server process		(ksb)
  */
 void
-#if PROTOTYPES
 Master(void)
-#else
-Master()
-#endif
 {
     int cfd;
     int msfd;
     socklen_t so;
     fd_set rmask, wmask;
-#if USE_UNIX_DOMAIN_SOCKETS
-    struct sockaddr_un master_port;
-    static STRING *portPath = (STRING *)0;
-#else
+#if USE_IPV6 || !USE_UNIX_DOMAIN_SOCKETS
+# if USE_IPV6
+    struct addrinfo *rp;
+# else
     struct sockaddr_in master_port;
+# endif
 # if HAVE_SETSOCKOPT
     int true = 1;
 # endif
+#else
+    struct sockaddr_un master_port;
+    static STRING *portPath = (STRING *)0;
 #endif
     FILE *fp;
     CONSCLIENT *pCLServing = (CONSCLIENT *)0;
@@ -780,13 +731,44 @@ Master()
 
     /* set up port for master to listen on
      */
-#if HAVE_MEMSET
+#if !USE_IPV6
+# if HAVE_MEMSET
     memset((void *)&master_port, 0, sizeof(master_port));
-#else
+# else
     bzero((char *)&master_port, sizeof(master_port));
+# endif
 #endif
 
-#if USE_UNIX_DOMAIN_SOCKETS
+#if USE_IPV6
+    for (rp = bindAddr; rp != NULL; rp = rp->ai_next) {
+	if ((msfd =
+	     socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol)) < 0)
+	    continue;
+
+# if HAVE_SETSOCKOPT
+	if (setsockopt
+	    (msfd, SOL_SOCKET, SO_REUSEADDR, (char *)&true,
+	     sizeof(true)) < 0)
+	    goto fail;
+# endif
+	if (!SetFlags(msfd, O_NONBLOCK, 0))
+	    goto fail;
+
+	if (bind(msfd, rp->ai_addr, rp->ai_addrlen) == 0)
+	    break;
+
+      fail:
+	close(msfd);
+    }
+
+    if (listen(msfd, SOMAXCONN) < 0) {
+	Error("Master(): listen(): %s", strerror(errno));
+	return;
+    }
+
+    /* save addrlen for accept */
+    so = rp->ai_addrlen;
+#elif USE_UNIX_DOMAIN_SOCKETS
     master_port.sun_family = AF_UNIX;
 
     if (portPath == (STRING *)0)
@@ -819,6 +801,11 @@ Master()
 	      strerror(errno));
 	return;
     }
+# ifdef TRUST_UDS_CRED
+    /* Allow everyone to connect, but we later auth them via SO_PEERCRED */
+    chmod(master_port.sun_path, 0666);
+# endif
+
 #else
     master_port.sin_family = AF_INET;
     master_port.sin_addr.s_addr = bindAddr;
@@ -985,7 +972,9 @@ Master()
 	dmallocMarkClientConnection = dmalloc_mark();
 #endif
 
+#if !USE_IPV6
 	so = sizeof(struct sockaddr_in);
+#endif
 	for (cfd = 0; cfd == 0;) {
 	    cfd =
 		accept(msfd, (struct sockaddr *)&pCLmfree->cnct_port, &so);

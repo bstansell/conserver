@@ -1,5 +1,5 @@
 /*
- *  $Id: group.h,v 5.51 2013/09/23 23:17:42 bryan Exp $
+ *  $Id: group.h,v 5.52 2014/04/20 06:45:07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -64,25 +64,24 @@ typedef struct grpent {		/* group info                           */
 
 extern time_t timers[];
 
-extern void Spawn PARAMS((GRPENT *, int));
-extern int CheckPass PARAMS((char *, char *, FLAG));
-extern void TagLogfile PARAMS((const CONSENT *, char *, ...));
-extern void TagLogfileAct PARAMS((const CONSENT *, char *, ...));
-extern void DestroyGroup PARAMS((GRPENT *));
-extern void DestroyConsent PARAMS((GRPENT *, CONSENT *));
-extern void SendClientsMsg PARAMS((CONSENT *, char *));
-extern void ResetMark PARAMS((void));
-extern void DestroyConsentUsers PARAMS((CONSENTUSERS **));
-extern CONSENTUSERS *ConsentFindUser PARAMS((CONSENTUSERS *, char *));
-extern int ConsentUserOk PARAMS((CONSENTUSERS *, char *));
-extern void DisconnectClient
-PARAMS((GRPENT *, CONSCLIENT *, char *, FLAG));
-extern int ClientAccess PARAMS((CONSENT *, char *));
-extern void DestroyClient PARAMS((CONSCLIENT *));
-extern int CheckPasswd PARAMS((CONSCLIENT *, char *, FLAG));
-extern void DeUtmp PARAMS((GRPENT *, int));
-extern void ClientWantsWrite PARAMS((CONSCLIENT *));
-extern void SendIWaitClientsMsg PARAMS((CONSENT *, char *));
+extern void Spawn(GRPENT *, int);
+extern int CheckPass(char *, char *, FLAG);
+extern void TagLogfile(const CONSENT *, char *, ...);
+extern void TagLogfileAct(const CONSENT *, char *, ...);
+extern void DestroyGroup(GRPENT *);
+extern void DestroyConsent(GRPENT *, CONSENT *);
+extern void SendClientsMsg(CONSENT *, char *);
+extern void ResetMark(void);
+extern void DestroyConsentUsers(CONSENTUSERS **);
+extern CONSENTUSERS *ConsentFindUser(CONSENTUSERS *, char *);
+extern int ConsentUserOk(CONSENTUSERS *, char *);
+extern void DisconnectClient(GRPENT *, CONSCLIENT *, char *, FLAG);
+extern int ClientAccess(CONSENT *, char *);
+extern void DestroyClient(CONSCLIENT *);
+extern int CheckPasswd(CONSCLIENT *, char *, FLAG);
+extern void DeUtmp(GRPENT *, int);
+extern void ClientWantsWrite(CONSCLIENT *);
+extern void SendIWaitClientsMsg(CONSENT *, char *);
 #if HAVE_OPENSSL
-extern int AttemptSSL PARAMS((CONSCLIENT *));
+extern int AttemptSSL(CONSCLIENT *);
 #endif

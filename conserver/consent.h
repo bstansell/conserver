@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.74 2014/04/04 16:17:10 bryan Exp $
+ *  $Id: consent.h,v 5.75 2014/04/20 06:45:07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -64,10 +64,10 @@ typedef enum consType {
 } CONSTYPE;
 
 #if HAVE_FREEIPMI
-#define IPMIL_UNKNOWN  (0)
-#define IPMIL_USER     (IPMICONSOLE_PRIVILEGE_USER+1)
-#define IPMIL_OPERATOR (IPMICONSOLE_PRIVILEGE_OPERATOR+1)
-#define IPMIL_ADMIN    (IPMICONSOLE_PRIVILEGE_ADMIN+1)
+# define IPMIL_UNKNOWN  (0)
+# define IPMIL_USER     (IPMICONSOLE_PRIVILEGE_USER+1)
+# define IPMIL_OPERATOR (IPMICONSOLE_PRIVILEGE_OPERATOR+1)
+# define IPMIL_ADMIN    (IPMICONSOLE_PRIVILEGE_ADMIN+1)
 #endif
 
 typedef struct names {
@@ -209,13 +209,13 @@ typedef struct remote {		/* console at another host              */
     NAMES *aliases;		/* aliases for remote server name       */
 } REMOTE;
 
-extern PARITY *FindParity PARAMS((char *));
-extern BAUD *FindBaud PARAMS((char *));
-extern void ConsInit PARAMS((CONSENT *));
-extern void ConsDown PARAMS((CONSENT *, FLAG, FLAG));
-extern REMOTE *FindUniq PARAMS((REMOTE *));
-extern void DestroyRemoteConsole PARAMS((REMOTE *));
-extern void StartInit PARAMS((CONSENT *));
-extern void StopInit PARAMS((CONSENT *));
-extern char *ConsState PARAMS((CONSENT *));
-extern void SetupTty PARAMS((CONSENT *, int));
+extern PARITY *FindParity(char *);
+extern BAUD *FindBaud(char *);
+extern void ConsInit(CONSENT *);
+extern void ConsDown(CONSENT *, FLAG, FLAG);
+extern REMOTE *FindUniq(REMOTE *);
+extern void DestroyRemoteConsole(REMOTE *);
+extern void StartInit(CONSENT *);
+extern void StopInit(CONSENT *);
+extern char *ConsState(CONSENT *);
+extern void SetupTty(CONSENT *, int);

@@ -1,5 +1,5 @@
 /*
- *  $Id: cutil.c,v 1.140 2014/04/04 16:17:10 bryan Exp $
+ *  $Id: cutil.c,v 1.142 2014/04/20 07:17:56 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -12,11 +12,14 @@
 #include <version.h>
 
 #include <net/if.h>
+#if USE_IPV6
+# include <ifaddrs.h>
+#endif
 #if HAVE_SYS_SOCKIO_H
 # include <sys/sockio.h>
 #endif
 #if HAVE_OPENSSL
-#include <openssl/ssl.h>
+# include <openssl/ssl.h>
 #endif
 
 
@@ -27,7 +30,9 @@ pid_t thepid = 0;
 int fDebug = 0;
 STRING *allStrings = (STRING *)0;
 int stringCount = 0;		/* count of allStrings list */
+#if !USE_IPV6
 struct in_addr *myAddrs = (struct in_addr *)0;
+#endif
 char myHostname[MAXHOSTNAME];	/* staff.cc.purdue.edu                  */
 fd_set rinit;
 fd_set winit;
@@ -39,11 +44,7 @@ int isMaster = 1;
 /* in the routines below (the init code) we can bomb if malloc fails	(ksb)
  */
 void
-#if PROTOTYPES
-OutOfMem()
-#else
-OutOfMem()
-#endif
+OutOfMem(void)
 {
     static char acNoMem[] = ": out of memory\n";
 
@@ -54,12 +55,7 @@ OutOfMem()
 
 /* do a general cleanup and exit */
 void
-#if PROTOTYPES
 Bye(int status)
-#else
-Bye(status)
-    int status;
-#endif
 {
     DestroyDataStructures();
 #if HAVE_OPENSSL
@@ -74,12 +70,7 @@ Bye(status)
  * It's overwritten each time, so use it and forget it.
  */
 const char *
-#if PROTOTYPES
 StrTime(time_t *ltime)
-#else
-StrTime(ltime)
-    time_t *ltime;
-#endif
 {
     static char curtime[40];	/* just in case ctime() varies */
     time_t tyme;
@@ -95,13 +86,7 @@ StrTime(ltime)
 #define STRING_ALLOC_SIZE 64
 
 char *
-#if PROTOTYPES
 BuildStringChar(const char ch, STRING *msg)
-#else
-BuildStringChar(ch, msg)
-    const char ch;
-    STRING *msg;
-#endif
 {
     if (msg->used + 1 >= msg->allocated) {
 	if (0 == msg->allocated) {
@@ -132,13 +117,7 @@ BuildStringChar(ch, msg)
 }
 
 char *
-#if PROTOTYPES
 BuildString(const char *str, STRING *msg)
-#else
-BuildString(str, msg)
-    const char *str;
-    STRING *msg;
-#endif
 {
     int len;
 
@@ -190,14 +169,7 @@ BuildString(str, msg)
 }
 
 char *
-#if PROTOTYPES
 BuildStringN(const char *str, int n, STRING *msg)
-#else
-BuildStringN(str, n, msg)
-    const char *str;
-    int n;
-    STRING *msg;
-#endif
 {
     int len;
 
@@ -245,14 +217,7 @@ BuildStringN(str, n, msg)
 }
 
 void *
-#if PROTOTYPES
 MemMove(void *dest, void *src, size_t n)
-#else
-MemMove(void *dest, void *src, size_t n)
-    void *dest;
-    void *src;
-    size_t n;
-#endif
 {
 #if HAVE_MEMMOVE
     return memmove(dest, src, n);
@@ -274,13 +239,7 @@ MemMove(void *dest, void *src, size_t n)
 }
 
 char *
-#if PROTOTYPES
 ShiftString(STRING *msg, int n)
-#else
-ShiftString(msg, n)
-    STRING *msg;
-    int n;
-#endif
 {
     if (msg == (STRING *)0 || n <= 0 || n > msg->used - 1)
 	return (char *)0;
@@ -292,24 +251,14 @@ ShiftString(msg, n)
 }
 
 void
-#if PROTOTYPES
 InitString(STRING *msg)
-#else
-InitString(msg)
-    STRING *msg;
-#endif
 {
     msg->string = (char *)0;
     msg->used = msg->allocated = 0;
 }
 
 void
-#if PROTOTYPES
 DestroyString(STRING *msg)
-#else
-DestroyString(msg)
-    STRING *msg;
-#endif
 {
     if (msg->prev == (STRING *)0 && msg->next == (STRING *)0 &&
 	allStrings != msg) {
@@ -334,11 +283,7 @@ DestroyString(msg)
 }
 
 STRING *
-#if PROTOTYPES
 AllocString(void)
-#else
-AllocString()
-#endif
 {
     STRING *s;
     if ((s = (STRING *)calloc(1, sizeof(STRING)))
@@ -357,11 +302,7 @@ AllocString()
 }
 
 void
-#if PROTOTYPES
 DestroyStrings(void)
-#else
-DestroyStrings()
-#endif
 {
     while (allStrings != (STRING *)0) {
 	DestroyString(allStrings);
@@ -371,12 +312,7 @@ DestroyStrings()
 static STRING *mymsg = (STRING *)0;
 
 char *
-#if PROTOTYPES
 BuildTmpString(const char *str)
-#else
-BuildTmpString(str)
-    const char *str;
-#endif
 {
     if (mymsg == (STRING *)0)
 	mymsg = AllocString();
@@ -384,12 +320,7 @@ BuildTmpString(str)
 }
 
 char *
-#if PROTOTYPES
 BuildTmpStringChar(const char c)
-#else
-BuildTmpStringChar(c)
-    const char c;
-#endif
 {
     if (mymsg == (STRING *)0)
 	mymsg = AllocString();
@@ -397,14 +328,7 @@ BuildTmpStringChar(c)
 }
 
 char *
-#if PROTOTYPES
 ReadLine(FILE *fp, STRING *save, int *iLine)
-#else
-ReadLine(fp, save, iLine)
-    FILE *fp;
-    STRING *save;
-    int *iLine;
-#endif
 {
     static char buf[1024];
     char *wholeline = (char *)0;
@@ -496,13 +420,7 @@ ReadLine(fp, save, iLine)
  * another
  */
 char *
-#if PROTOTYPES
 FmtCtl(int ci, STRING *pcIn)
-#else
-FmtCtl(ci, pcIn)
-    int ci;
-    STRING *pcIn;
-#endif
 {
     unsigned char c;
 
@@ -529,14 +447,7 @@ FmtCtl(ci, pcIn)
 }
 
 void
-#if PROTOTYPES
 FmtCtlStr(char *pcIn, int len, STRING *pcOut)
-#else
-FmtCtlStr(pcIn, len, pcOut)
-    char *pcIn;
-    int len;
-    STRING *pcOut;
-#endif
 {
     unsigned char c;
 
@@ -565,24 +476,13 @@ FmtCtlStr(pcIn, len, pcOut)
 }
 
 void
-#if PROTOTYPES
 Debug(int level, char *fmt, ...)
-#else
-Debug(level, fmt, va_alist)
-    int level;
-    char *fmt;
-    va_dcl
-#endif
 {
     va_list ap;
 
     if (fDebug < level)
 	return;
-#if PROTOTYPES
     va_start(ap, fmt);
-#else
-    va_start(ap);
-#endif
     if (isMultiProc)
 	fprintf(stderr, "[%s] %s (%lu): DEBUG: [%s:%d] ",
 		StrTime((time_t *)0), progname, (unsigned long)thepid,
@@ -596,20 +496,10 @@ Debug(level, fmt, va_alist)
 }
 
 void
-#if PROTOTYPES
 Error(char *fmt, ...)
-#else
-Error(fmt, va_alist)
-    char *fmt;
-    va_dcl
-#endif
 {
     va_list ap;
-#if PROTOTYPES
     va_start(ap, fmt);
-#else
-    va_start(ap);
-#endif
     if (isMultiProc)
 	fprintf(stderr, "[%s] %s (%lu): ERROR: ", StrTime((time_t *)0),
 		progname, (unsigned long)thepid);
@@ -622,20 +512,10 @@ Error(fmt, va_alist)
 }
 
 void
-#if PROTOTYPES
 Msg(char *fmt, ...)
-#else
-Msg(fmt, va_alist)
-    char *fmt;
-    va_dcl
-#endif
 {
     va_list ap;
-#if PROTOTYPES
     va_start(ap, fmt);
-#else
-    va_start(ap);
-#endif
     if (isMultiProc)
 	fprintf(stdout, "[%s] %s (%lu): ", StrTime((time_t *)0), progname,
 		(unsigned long)thepid);
@@ -647,24 +527,14 @@ Msg(fmt, va_alist)
 }
 
 void
-#if PROTOTYPES
 Verbose(char *fmt, ...)
-#else
-Verbose(fmt, va_alist)
-    char *fmt;
-    va_dcl
-#endif
 {
     va_list ap;
 
     if (!fVerbose)
 	return;
 
-#if PROTOTYPES
     va_start(ap, fmt);
-#else
-    va_start(ap);
-#endif
     if (isMultiProc)
 	fprintf(stdout, "[%s] %s (%lu): INFO: ", StrTime((time_t *)0),
 		progname, (unsigned long)thepid);
@@ -676,13 +546,7 @@ Verbose(fmt, va_alist)
 }
 
 void
-#if PROTOTYPES
 SimpleSignal(int sig, RETSIGTYPE(*disp) (int))
-#else
-SimpleSignal(sig, disp)
-    int sig;
-RETSIGTYPE(*disp) (int);
-#endif
 {
 #if HAVE_SIGACTION
     struct sigaction sa;
@@ -697,11 +561,7 @@ RETSIGTYPE(*disp) (int);
 }
 
 int
-#if PROTOTYPES
-GetMaxFiles()
-#else
-GetMaxFiles()
-#endif
+GetMaxFiles(void)
 {
     int mf;
 #if HAVE_SYSCONF
@@ -740,13 +600,7 @@ GetMaxFiles()
  * object.  Returns a CONSFILE pointer to that object.
  */
 CONSFILE *
-#if PROTOTYPES
 FileOpenFD(int fd, enum consFileType type)
-#else
-FileOpenFD(fd, type)
-    int fd;
-    enum consFileType type;
-#endif
 {
     CONSFILE *cfp;
 
@@ -790,13 +644,7 @@ FileOpenFD(fd, type)
  * object.  Returns a CONSFILE pointer to that object.
  */
 CONSFILE *
-#if PROTOTYPES
 FileOpenPipe(int fd, int fdout)
-#else
-FileOpenPipe(fd, fdout)
-    int fd;
-    int fdout;
-#endif
 {
     CONSFILE *cfp;
 
@@ -840,12 +688,7 @@ FileOpenPipe(fd, fdout)
 
 /* This is to "unencapsulate" the file descriptor */
 int
-#if PROTOTYPES
 FileUnopen(CONSFILE *cfp)
-#else
-FileUnopen(cfp)
-    CONSFILE *cfp;
-#endif
 {
     int retval = 0;
 
@@ -888,14 +731,7 @@ FileUnopen(cfp)
  * or a (CONSFILE *)0 on error
  */
 CONSFILE *
-#if PROTOTYPES
 FileOpen(const char *path, int flag, int mode)
-#else
-FileOpen(path, flag, mode)
-    const char *path;
-    int flag;
-    int mode;
-#endif
 {
     CONSFILE *cfp;
     int fd;
@@ -945,12 +781,7 @@ FileOpen(path, flag, mode)
  * this function - even if there was an error.
  */
 int
-#if PROTOTYPES
 FileClose(CONSFILE **pcfp)
-#else
-FileClose(pcfp)
-    CONSFILE **pcfp;
-#endif
 {
     CONSFILE *cfp;
     int retval = 0;
@@ -1044,14 +875,7 @@ FileClose(pcfp)
 
 /* returns: -1 on error or eof, >= 0 for valid reads */
 int
-#if PROTOTYPES
 FileRead(CONSFILE *cfp, void *buf, int len)
-#else
-FileRead(cfp, buf, len)
-    CONSFILE *cfp;
-    void *buf;
-    int len;
-#endif
 {
     int retval = -1;
 
@@ -1122,10 +946,10 @@ FileRead(cfp, buf, len)
 		    cfp->ftype = simpleSocket;
 		    break;
 	    }
-#if DEBUG_CONSFILE_IO
+# if DEBUG_CONSFILE_IO
 	    if (cfp->debugrfd != -1)
 		write(cfp->debugrfd, buf, retval);
-#endif
+# endif
 	    break;
 #endif
 	default:
@@ -1165,15 +989,7 @@ FileRead(cfp, buf, len)
 
 /* returns: -1 on error or eof, >= 0 for valid reads */
 int
-#if PROTOTYPES
 FileWrite(CONSFILE *cfp, FLAG bufferonly, char *buf, int len)
-#else
-FileWrite(cfp, bufferonly, buf, len)
-    CONSFILE *cfp;
-    FLAG bufferonly;
-    char *buf;
-    int len;
-#endif
 {
     int len_orig = len;
     int len_out = 0;
@@ -1324,10 +1140,10 @@ FileWrite(cfp, bufferonly, buf, len)
 		}
 		if (retval <= 0)
 		    break;
-#if DEBUG_CONSFILE_IO
+# if DEBUG_CONSFILE_IO
 		if (cfp->debugwfd != -1)
 		    write(cfp->debugwfd, buf, retval);
-#endif
+# endif
 		buf += retval;
 		len -= retval;
 		len_out += retval;
@@ -1380,14 +1196,7 @@ FileWrite(cfp, bufferonly, buf, len)
 }
 
 int
-#if PROTOTYPES
 FileCanRead(CONSFILE *cfp, fd_set *prfd, fd_set *pwfd)
-#else
-FileCanRead(cfp, prfd, pwfd)
-    CONSFILE *cfp;
-    fd_set *prfd;
-    fd_set *pwfd;
-#endif
 {
 #if HAVE_OPENSSL
     int fdout;
@@ -1414,14 +1223,7 @@ FileCanRead(cfp, prfd, pwfd)
 }
 
 int
-#if PROTOTYPES
 FileCanWrite(CONSFILE *cfp, fd_set *prfd, fd_set *pwfd)
-#else
-FileCanWrite(cfp, prfd, pwfd)
-    CONSFILE *cfp;
-    fd_set *prfd;
-    fd_set *pwfd;
-#endif
 {
     int fdout;
 
@@ -1443,12 +1245,7 @@ FileCanWrite(cfp, prfd, pwfd)
 }
 
 int
-#if PROTOTYPES
 FileBufEmpty(CONSFILE *cfp)
-#else
-FileBufEmpty(cfp)
-    CONSFILE *cfp;
-#endif
 {
     if (cfp == (CONSFILE *)0)
 	return 1;
@@ -1456,16 +1253,7 @@ FileBufEmpty(cfp)
 }
 
 void
-#if PROTOTYPES
 VWrite(CONSFILE *cfp, FLAG bufferonly, STRING *str, char *fmt, va_list ap)
-#else
-VWrite(cfp, bufferonly, str, fmt, ap)
-    CONSFILE *cfp;
-    FLAG bufferonly;
-    STRING *str;
-    char *fmt;
-    va_list ap;
-#endif
 {
     int s, l, e;
     char c;
@@ -1683,21 +1471,10 @@ VWrite(cfp, bufferonly, str, fmt, ap)
 }
 
 char *
-#if PROTOTYPES
 BuildStringPrint(STRING *str, char *fmt, ...)
-#else
-BuildStringPrint(str, fmt, va_alist)
-    STRING *str;
-    char *fmt;
-    va_dcl
-#endif
 {
     va_list ap;
-#if PROTOTYPES
     va_start(ap, fmt);
-#else
-    va_start(ap);
-#endif
     VWrite((CONSFILE *)0, FLAGFALSE, str, fmt, ap);
     va_end(ap);
     if (str == (STRING *)0)
@@ -1707,20 +1484,10 @@ BuildStringPrint(str, fmt, va_alist)
 }
 
 char *
-#if PROTOTYPES
 BuildTmpStringPrint(char *fmt, ...)
-#else
-BuildTmpStringPrint(fmt, va_alist)
-    char *fmt;
-    va_dcl
-#endif
 {
     va_list ap;
-#if PROTOTYPES
     va_start(ap, fmt);
-#else
-    va_start(ap);
-#endif
     if (mymsg == (STRING *)0)
 	mymsg = AllocString();
     VWrite((CONSFILE *)0, FLAGFALSE, mymsg, fmt, ap);
@@ -1729,49 +1496,23 @@ BuildTmpStringPrint(fmt, va_alist)
 }
 
 void
-#if PROTOTYPES
 FileVWrite(CONSFILE *cfp, FLAG bufferonly, char *fmt, va_list ap)
-#else
-FileVWrite(cfp, bufferonly, fmt, ap)
-    CONSFILE *cfp;
-    FLAG bufferonly;
-    char *fmt;
-    va_list ap;
-#endif
 {
     VWrite(cfp, bufferonly, (STRING *)0, fmt, ap);
 }
 
 void
-#if PROTOTYPES
 FilePrint(CONSFILE *cfp, FLAG bufferonly, char *fmt, ...)
-#else
-FilePrint(cfp, bufferonly, fmt, va_alist)
-    CONSFILE *cfp;
-    FLAG bufferonly;
-    char *fmt;
-    va_dcl
-#endif
 {
     va_list ap;
-#if PROTOTYPES
     va_start(ap, fmt);
-#else
-    va_start(ap);
-#endif
     FileVWrite(cfp, bufferonly, fmt, ap);
     va_end(ap);
 }
 
 /* Unless otherwise stated, returns the same values as fstat(2) */
 int
-#if PROTOTYPES
 FileStat(CONSFILE *cfp, struct stat *buf)
-#else
-FileStat(cfp, buf)
-    CONSFILE *cfp;
-    struct stat *buf;
-#endif
 {
     int retval = 0;
 
@@ -1806,14 +1547,7 @@ FileStat(cfp, buf)
 
 /* Unless otherwise stated, returns the same values as lseek(2) */
 int
-#if PROTOTYPES
 FileSeek(CONSFILE *cfp, off_t offset, int whence)
-#else
-FileSeek(cfp, offset, whence)
-    CONSFILE *cfp;
-    off_t offset;
-    int whence;
-#endif
 {
     int retval = 0;
 
@@ -1848,12 +1582,7 @@ FileSeek(cfp, offset, whence)
 
 /* Returns the file descriptor number of the underlying file */
 int
-#if PROTOTYPES
 FileFDNum(CONSFILE *cfp)
-#else
-FileFDNum(cfp)
-    CONSFILE *cfp;
-#endif
 {
     int retval = 0;
 
@@ -1885,12 +1614,7 @@ FileFDNum(cfp)
 
 /* Returns the file descriptor number of the underlying file */
 int
-#if PROTOTYPES
 FileFDOutNum(CONSFILE *cfp)
-#else
-FileFDOutNum(cfp)
-    CONSFILE *cfp;
-#endif
 {
     if (cfp == (CONSFILE *)0 || cfp->ftype != simplePipe)
 	return -1;
@@ -1900,12 +1624,7 @@ FileFDOutNum(cfp)
 
 /* Returns the file type */
 enum consFileType
-#if PROTOTYPES
 FileGetType(CONSFILE *cfp)
-#else
-FileGetType(cfp)
-    CONSFILE *cfp;
-#endif
 {
     switch (cfp->ftype) {
 	case simpleFile:
@@ -1925,37 +1644,20 @@ FileGetType(cfp)
 
 /* Sets the file type */
 void
-#if PROTOTYPES
 FileSetType(CONSFILE *cfp, enum consFileType type)
-#else
-FileSetType(cfp, type)
-    CONSFILE *cfp;
-    enum consFileType type;
-#endif
 {
     cfp->ftype = type;
 }
 
 /* Sets the file quoting method */
 void
-#if PROTOTYPES
 FileSetQuoteIAC(CONSFILE *cfp, FLAG flag)
-#else
-FileSetQuoteIAC(cfp, flag)
-    CONSFILE *cfp;
-    FLAG flag;
-#endif
 {
     cfp->quoteiac = flag;
 }
 
 FLAG
-#if PROTOTYPES
 FileSawQuoteSusp(CONSFILE *cfp)
-#else
-FileSawQuoteSusp(cfp)
-    CONSFILE *cfp;
-#endif
 {
     FLAG r = cfp->sawiacsusp;
     cfp->sawiacsusp = FLAGFALSE;
@@ -1963,12 +1665,7 @@ FileSawQuoteSusp(cfp)
 }
 
 FLAG
-#if PROTOTYPES
 FileSawQuoteExec(CONSFILE *cfp)
-#else
-FileSawQuoteExec(cfp)
-    CONSFILE *cfp;
-#endif
 {
     FLAG r = cfp->sawiacexec;
     cfp->sawiacexec = FLAGFALSE;
@@ -1976,12 +1673,7 @@ FileSawQuoteExec(cfp)
 }
 
 FLAG
-#if PROTOTYPES
 FileSawQuoteAbrt(CONSFILE *cfp)
-#else
-FileSawQuoteAbrt(cfp)
-    CONSFILE *cfp;
-#endif
 {
     FLAG r = cfp->sawiacabrt;
     cfp->sawiacabrt = FLAGFALSE;
@@ -1989,12 +1681,7 @@ FileSawQuoteAbrt(cfp)
 }
 
 FLAG
-#if PROTOTYPES
 FileSawQuoteGoto(CONSFILE *cfp)
-#else
-FileSawQuoteGoto(cfp)
-    CONSFILE *cfp;
-#endif
 {
     FLAG r = cfp->sawiacgoto;
     cfp->sawiacgoto = FLAGFALSE;
@@ -2004,39 +1691,21 @@ FileSawQuoteGoto(cfp)
 #if HAVE_OPENSSL
 /* Get the SSL instance */
 SSL *
-#if PROTOTYPES
 FileGetSSL(CONSFILE *cfp)
-#else
-FileGetSSL(cfp)
-    CONSFILE *cfp;
-#endif
 {
     return cfp->ssl;
 }
 
 /* Sets the SSL instance */
 void
-#if PROTOTYPES
 FileSetSSL(CONSFILE *cfp, SSL *ssl)
-#else
-FileSetSSL(cfp, ssl)
-    CONSFILE *cfp;
-    SSL *ssl;
-#endif
 {
     cfp->ssl = ssl;
 }
 
 /* return -1 on error, 0 for "wait" state, 1 for success */
 int
-#if PROTOTYPES
 FileCanSSLAccept(CONSFILE *cfp, fd_set *prfd, fd_set *pwfd)
-#else
-FileCanSSLAccept(cfp)
-    CONSFILE *cfp;
-    fd_set *prfd;
-    fd_set *pwfd;
-#endif
 {
     if (cfp == (CONSFILE *)0)
 	return 0;
@@ -2049,12 +1718,7 @@ FileCanSSLAccept(cfp)
 
 /* return -1 on error, 0 for "wait" state, 1 for success */
 int
-#if PROTOTYPES
 FileSSLAccept(CONSFILE *cfp)
-#else
-FileSSLAccept(cfp)
-    CONSFILE *cfp;
-#endif
 {
     int retval;
     if (cfp->waitForWrite == FLAGTRUE) {
@@ -2096,15 +1760,7 @@ FileSSLAccept(cfp)
 
 /* Unless otherwise stated, returns the same values as send(2) */
 int
-#if PROTOTYPES
 FileSend(CONSFILE *cfp, const void *msg, size_t len, int flags)
-#else
-FileSend(cfp, msg, len, flags)
-    CONSFILE *cfp;
-    const void *msg;
-    size_t len;
-    int flags;
-#endif
 {
     int retval = 0;
     int fdout;
@@ -2151,12 +1807,7 @@ FileSend(cfp, msg, len, flags)
  * a pointer to the start of the non-space part
  */
 char *
-#if PROTOTYPES
 PruneSpace(char *string)
-#else
-PruneSpace(string)
-    char *string;
-#endif
 {
     char *p;
     char *head = (char *)0;
@@ -2187,24 +1838,20 @@ PruneSpace(string)
 	return string;
 }
 
+#if !USE_IPV6
 /* fills the myAddrs array with host interface addresses */
 void
-#if PROTOTYPES
 ProbeInterfaces(in_addr_t bindAddr)
-#else
-ProbeInterfaces(bindAddr)
-    in_addr_t bindAddr;
-#endif
 {
-#ifdef SIOCGIFCONF
+# ifdef SIOCGIFCONF
     struct ifconf ifc;
     struct ifreq *ifr;
-#ifdef SIOCGIFFLAGS
+#  ifdef SIOCGIFFLAGS
     struct ifreq ifrcopy;
-#endif
-#ifdef SIOCGIFNUM
+#  endif
+#  ifdef SIOCGIFNUM
     int nifr;
-#endif
+#  endif
     int sock;
     int r = 0, m = 0;
     int bufsize = 2048;
@@ -2215,11 +1862,11 @@ ProbeInterfaces(bindAddr)
 	myAddrs = (struct in_addr *)calloc(2, sizeof(struct in_addr));
 	if (myAddrs == (struct in_addr *)0)
 	    OutOfMem();
-#if HAVE_MEMCPY
+#  if HAVE_MEMCPY
 	memcpy(&(myAddrs[0].s_addr), &bindAddr, sizeof(in_addr_t));
-#else
+#  else
 	bcopy(&bindAddr, &(myAddrs[0].s_addr), sizeof(in_addr_t));
-#endif
+#  endif
 	Verbose("interface address %s (-M option)", inet_ntoa(myAddrs[0]));
 	return;
     }
@@ -2228,10 +1875,10 @@ ProbeInterfaces(bindAddr)
 	Error("ProbeInterfaces(): socket(): %s", strerror(errno));
 	Bye(EX_OSERR);
     }
-#ifdef SIOCGIFNUM
+#  ifdef SIOCGIFNUM
     if (ioctl(sock, SIOCGIFNUM, &nifr) == 0)
 	bufsize = nifr * sizeof(struct ifreq) + 512;
-#endif
+#  endif
 
     while (bufsize) {
 	ifc.ifc_len = bufsize;
@@ -2291,11 +1938,11 @@ ProbeInterfaces(bindAddr)
 	/* don't use less than a ifreq sized chunk */
 	if ((ifc.ifc_len - r) < sizeof(*ifr))
 	    break;
-#ifdef HAVE_SA_LEN
+#  ifdef HAVE_SA_LEN
 	if (sa->sa_len > sizeof(ifr->ifr_ifru))
 	    r += sizeof(ifr->ifr_name) + sa->sa_len;
 	else
-#endif
+#  endif
 	    r += sizeof(*ifr);
 
 	if (sa->sa_family == AF_INET) {
@@ -2305,32 +1952,32 @@ ProbeInterfaces(bindAddr)
 	     * signal the end of our list
 	     */
 	    if (
-#if HAVE_MEMCMP
+#  if HAVE_MEMCMP
 		   memcmp(&(myAddrs[m]), &(sin->sin_addr),
 			  sizeof(struct in_addr))
-#else
+#  else
 		   bcmp(&(myAddrs[m]), &(sin->sin_addr),
 			sizeof(struct in_addr))
-#endif
+#  endif
 		   == 0)
 		continue;
 
-#ifdef SIOCGIFFLAGS
+#  ifdef SIOCGIFFLAGS
 	    /* make sure the interface is up */
 	    ifrcopy = *ifr;
 	    if ((ioctl(sock, SIOCGIFFLAGS, &ifrcopy) == 0) &&
 		((ifrcopy.ifr_flags & IFF_UP) == 0))
 		continue;
-#endif
+#  endif
 
 	    CONDDEBUG((1, "ProbeInterfaces(): name=%s addr=%s",
 		       ifr->ifr_name, inet_ntoa(sin->sin_addr)));
 
-#if HAVE_MEMCPY
+#  if HAVE_MEMCPY
 	    memcpy(&myAddrs[m], &(sin->sin_addr), sizeof(struct in_addr));
-#else
+#  else
 	    bcopy(&(sin->sin_addr), &myAddrs[m], sizeof(struct in_addr));
-#endif
+#  endif
 
 	    Verbose("interface address %s (%s)", inet_ntoa(myAddrs[m]),
 		    ifr->ifr_name);
@@ -2343,7 +1990,7 @@ ProbeInterfaces(bindAddr)
     }
     close(sock);
     free(ifc.ifc_req);
-#else /* use the hostname like the old code did (but use all addresses!) */
+# else /* use the hostname like the old code did (but use all addresses!) */
     int count;
     struct hostent *he;
 
@@ -2352,11 +1999,11 @@ ProbeInterfaces(bindAddr)
 	myAddrs = (struct in_addr *)calloc(2, sizeof(struct in_addr));
 	if (myAddrs == (struct in_addr *)0)
 	    OutOfMem();
-#if HAVE_MEMCPY
+#  if HAVE_MEMCPY
 	memcpy(&(myAddrs[0].s_addr), &bindAddr, sizeof(in_addr_t));
-#else
+#  else
 	bcopy(&bindAddr, &(myAddrs[0].s_addr), sizeof(in_addr_t));
-#endif
+#  endif
 	Verbose("interface address %s (-M option)", inet_ntoa(myAddrs[0]));
 	return;
     }
@@ -2384,51 +2031,113 @@ ProbeInterfaces(bindAddr)
     if (myAddrs == (struct in_addr *)0)
 	OutOfMem();
     for (count--; count >= 0; count--) {
-#if HAVE_MEMCPY
+#  if HAVE_MEMCPY
 	memcpy(&(myAddrs[count].s_addr), he->h_addr_list[count],
 	       he->h_length);
-#else
+#  else
 	bcopy(he->h_addr_list[count], &(myAddrs[count].s_addr),
 	      he->h_length);
-#endif
+#  endif
 	Verbose("interface address %s (hostname address)",
 		inet_ntoa(myAddrs[count]));
     }
-#endif
+# endif
 }
+#endif /* USE_IPV6 */
 
 int
-#if PROTOTYPES
 IsMe(char *id)
-#else
-IsMe(id)
-    char *id;
-#endif
 {
+#if USE_IPV6
+    int ret = 0;
+    int error;
+    struct addrinfo hints;
+    struct addrinfo *res, *rp;
+    struct ifaddrs *myAddrs, *ifa;
+    void *a, *b;
+    size_t len;
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = PF_UNSPEC;
+
+    /* get IP based on hostname */
+    error = getaddrinfo(id, NULL, &hints, &res);
+    if (error) {
+	perror(gai_strerror(error));
+	return 0;
+    }
+
+    /* get list of all addresses on system */
+    error = getifaddrs(&myAddrs);
+    if (error) {
+	perror("getifaddrs failed");
+	return 0;
+    }
+
+    /* try to find a match */
+    for (ifa = myAddrs; ifa != NULL; ifa = ifa->ifa_next) {
+	/* skip interfaces without address or in down state */
+	if (ifa->ifa_addr == NULL || !(ifa->ifa_flags & IFF_UP))
+	    continue;
+
+	for (rp = res; rp != NULL; rp = rp->ai_next) {
+	    if (ifa->ifa_addr->sa_family == rp->ai_addr->sa_family) {
+		/* I really don't like to hardcode it but we have to */
+		if (ifa->ifa_addr->sa_family == AF_INET) {	/* IPv4 */
+		    a = &(((struct sockaddr_in *)ifa->ifa_addr)->sin_addr);
+		    b = &(((struct sockaddr_in *)rp->ai_addr)->sin_addr);
+		    len = sizeof(struct in_addr);
+		} else {	/* IPv6 */
+		    a = &(((struct sockaddr_in6 *)ifa->ifa_addr)->
+			  sin6_addr);
+		    b = &(((struct sockaddr_in6 *)rp->ai_addr)->sin6_addr);
+		    len = sizeof(struct in6_addr);
+		}
+
+		if (
+# if HAVE_MEMCMP
+		       memcmp(a, b, len)
+# else
+		       bcmp(a, b, len)
+# endif
+		       == 0) {
+		    ret = 1;
+		    goto done;
+		}
+	    }
+	}
+    }
+
+  done:
+    freeaddrinfo(res);
+    freeifaddrs(myAddrs);
+    CONDDEBUG((1, "IsMe: ret %d id %s", ret, id));
+    return ret;
+#else
     int j, i;
     struct hostent *he;
     in_addr_t addr;
-#if HAVE_INET_ATON
+# if HAVE_INET_ATON
     struct in_addr inetaddr;
-#endif
+# endif
 
     /* check for ip address match */
-#if HAVE_INET_ATON
+# if HAVE_INET_ATON
     if (inet_aton(id, &inetaddr) != 0) {
 	addr = inetaddr.s_addr;
-#else
+# else
     addr = inet_addr(id);
     if (addr != (in_addr_t) (-1)) {
-#endif
+# endif
 	for (i = 0;
 	     myAddrs != (struct in_addr *)0 &&
 	     myAddrs[i].s_addr != (in_addr_t) 0; i++) {
 	    if (
-#if HAVE_MEMCMP
+# if HAVE_MEMCMP
 		   memcmp(&(myAddrs[i].s_addr), &addr, sizeof(addr))
-#else
+# else
 		   bcmp(&(myAddrs[i].s_addr), &addr, sizeof(addr))
-#endif
+# endif
 		   == 0)
 		return 1;
 	}
@@ -2452,30 +2161,25 @@ IsMe(id)
 	     myAddrs != (struct in_addr *)0 &&
 	     myAddrs[i].s_addr != (in_addr_t) 0; i++) {
 	    if (
-#if HAVE_MEMCMP
+# if HAVE_MEMCMP
 		   memcmp(&(myAddrs[i].s_addr), he->h_addr_list[j],
 			  he->h_length)
-#else
+# else
 		   bcmp(&(myAddrs[i].s_addr), he->h_addr_list[j],
 			he->h_length)
-#endif
+# endif
 		   == 0)
 		return 1;
 	}
     }
     return 0;
+#endif /* USE_IPV6 */
 }
 
 #if HAVE_OPENSSL
 /* Unless otherwise stated, returns the same values as send(2) */
 int
-#if PROTOTYPES
 SSLVerifyCallback(int ok, X509_STORE_CTX *store)
-#else
-SSLVerifyCallback(ok, store)
-    int ok;
-    X509_STORE_CTX *store;
-#endif
 {
     char data[256];
     if (ok) {
@@ -2510,12 +2214,7 @@ SSLVerifyCallback(ok, store)
 #endif
 
 int
-#if PROTOTYPES
 SetFlags(int fd, int s, int c)
-#else
-SetFlags(fd, s, c)
-    int fd, s, c;
-#endif
 {
     int flags;
 
@@ -2535,12 +2234,7 @@ SetFlags(fd, s, c)
 }
 
 char *
-#if PROTOTYPES
 StrDup(const char *msg)
-#else
-StrDup(msg)
-    const char *msg;
-#endif
 {
     int len;
     char *buf;
@@ -2560,14 +2254,7 @@ StrDup(msg)
 }
 
 char *
-#if PROTOTYPES
 StringChar(STRING *msg, int offset, char c)
-#else
-StringChar(msg, offset, c)
-    STRING *msg;
-    int offset;
-    char c;
-#endif
 {
     int o;
 
@@ -2590,14 +2277,7 @@ StringChar(msg, offset, c)
  * this *WILL* modify the buffer (OB_IAC sequences get extracted/shrunk)
  */
 int
-#if PROTOTYPES
 ParseIACBuf(CONSFILE *cfp, void *msg, int *len)
-#else
-ParseIACBuf(cfp, msg, len)
-    CONSFILE *cfp;
-    void *msg;
-    int *len;
-#endif
 {
     int l = 0;
     unsigned char *b = msg;
@@ -2704,15 +2384,7 @@ int line = 1;			/* current line number */
 char *file = (char *)0;
 
 TOKEN
-#if PROTOTYPES
 GetWord(FILE *fp, int *line, short spaceok, STRING *word)
-#else
-GetWord(fp, line, spaceok, word)
-    FILE *fp;
-    int *line;
-    short spaceok;
-    STRING *word;
-#endif
 {
     int c;
     short backslash = 0;
@@ -2754,11 +2426,7 @@ GetWord(fp, line, spaceok, word)
 		    if (c == '\n') {
 			if (fname->used > 0) {
 			    while (fname->used > 1 && isspace((int)
-							      (fname->
-							       string
-							       [fname->
-								used -
-								2])))
+							      (fname->string[fname->used - 2])))
 				fname->used--;
 			    if (fname->used > 0)
 				fname->string[fname->used - 1] = '\000';
@@ -2863,14 +2531,7 @@ GetWord(fp, line, spaceok, word)
 }
 
 void
-#if PROTOTYPES
 ParseFile(char *filename, FILE *fp, int level)
-#else
-ParseFile(filename, fp, level)
-    char *filename;
-    FILE *fp;
-    int level;
-#endif
 {
     /* things that should be used between recursions */
     static STATES state = START;
@@ -3048,8 +2709,8 @@ ParseFile(filename, fp, level)
 		case VALUE:
 		    switch (token) {
 			case WORD:
-			    (*sections[secIndex].items[keyIndex].
-			     reg) (word->string);
+			    (*sections[secIndex].
+			     items[keyIndex].reg) (word->string);
 			    state = SEMI;
 			    break;
 			case SEMICOLON:
@@ -3146,16 +2807,7 @@ ParseFile(filename, fp, level)
 }
 
 void
-#if PROTOTYPES
 ProcessSubst(SUBST *s, char **repl, char **str, char *name, char *id)
-#else
-ProcessSubst(s, repl, str, name, id)
-    SUBST *s;
-    char **repl;
-    char **str;
-    char *name;
-    char *id;
-#endif
 {
     /*
      * (CONSENT *pCE) and (char **repl) are used when a replacement is to
@@ -3391,11 +3043,7 @@ ProcessSubst(s, repl, str, name, id)
 }
 
 char *
-#if PROTOTYPES
 MyVersion(void)
-#else
-MyVersion()
-#endif
 {
     static STRING *version = (STRING *)0;
     if (version != (STRING *)0)
@@ -3407,12 +3055,7 @@ MyVersion()
 }
 
 unsigned int
-#if PROTOTYPES
 AtoU(char *str)
-#else
-AtoU(c)
-    char *str;
-#endif
 {
     unsigned int v;
     int i;
@@ -3425,14 +3068,7 @@ AtoU(c)
 }
 
 void
-#if PROTOTYPES
 StrCpy(char *dst, const char *src, unsigned int size)
-#else
-StrCpy(dst, src, size)
-    char *dst;
-    const char *src;
-    unsigned int size;
-#endif
 {
 #ifdef HAVE_STRLCPY
     strlcpy(dst, src, size);

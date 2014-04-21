@@ -49,15 +49,15 @@
 /* For legacy compile-time setting of the port...
  */
 #if ! defined(DEFPORT)
-#  if defined(SERVICENAME)
-#    define DEFPORT SERVICENAME
+# if defined(SERVICENAME)
+#  define DEFPORT SERVICENAME
+# else
+#  if defined(PORTNUMBER)
+#   define DEFPORT PORTNUMBER
 #  else
-#    if defined(PORTNUMBER)
-#      define DEFPORT PORTNUMBER
-#    else
-#      define DEFPORT "conserver"
-#    endif
+#   define DEFPORT "conserver"
 #  endif
+# endif
 #endif
 
 #if STDC_HEADERS
@@ -129,7 +129,7 @@ typedef long fd_set;
 #endif
 
 #if HAVE_TYPES_H
-#include <sys/types.h>
+# include <sys/types.h>
 #endif
 
 #if HAVE_SYS_WAIT_H
@@ -138,30 +138,30 @@ typedef long fd_set;
 #define LO(s) ((unsigned)((s) & 0377))
 #define HI(s) ((unsigned)(((s) >> 8) & 0377))
 #if !defined(WIFEXITED)
-#define WIFEXITED(s) (LO(s)==0)
+# define WIFEXITED(s) (LO(s)==0)
 #endif
 #if !defined(WEXITSTATUS)
-#define WEXITSTATUS(s) HI(s)
+# define WEXITSTATUS(s) HI(s)
 #endif
 #if !defined(WIFSIGNALED)
-#define WIFSIGNALED(s) ((LO(s)>0)&&(HI(s)==0))
+# define WIFSIGNALED(s) ((LO(s)>0)&&(HI(s)==0))
 #endif
 #if !defined(WTERMSIG)
-#define WTERMSIG(s) (LO(s)&0177)
+# define WTERMSIG(s) (LO(s)&0177)
 #endif
 #if !defined(WIFSTOPPED)
-#define WIFSTOPPED(s) ((LO(s)==0177)&&(HI(s)!=0))
+# define WIFSTOPPED(s) ((LO(s)==0177)&&(HI(s)!=0))
 #endif
 #if !defined(WSTOPSIG)
-#define WSTOPSIG(s) HI(s)
+# define WSTOPSIG(s) HI(s)
 #endif
 
 #if HAVE_SYSEXITS_H
-#include <sysexits.h>
+# include <sysexits.h>
 #else
-#define EX_OK 0
-#define EX_UNAVAILABLE 69
-#define EX_TEMPFAIL 75
+# define EX_OK 0
+# define EX_UNAVAILABLE 69
+# define EX_TEMPFAIL 75
 #endif
 
 #include <errno.h>
@@ -235,19 +235,19 @@ extern char *h_errlist[];
 #endif
 
 #ifdef HAVE_USERSEC_H
-#include <usersec.h>
+# include <usersec.h>
 #endif
 
 #ifdef HAVE_PTY_H
-#include <pty.h>
+# include <pty.h>
 #endif
 
 #ifdef HAVE_LIBUTIL_H
-#include <libutil.h>
+# include <libutil.h>
 #endif
 
 #ifdef HAVE_UTIL_H
-#include <util.h>
+# include <util.h>
 #endif
 
 
@@ -280,58 +280,66 @@ typedef int socklen_t;
  *  as legacy definitions.
  */
 #ifndef IUCLC
-#define IUCLC 0
+# define IUCLC 0
 #endif
 #ifndef OLCUC
-#define OLCUC 0
+# define OLCUC 0
 #endif
 #ifndef XCASE
-#define XCASE 0
+# define XCASE 0
 #endif
 /* Some systems don't have OFILL or *DLY. */
 #ifndef OFILL
-#define OFILL 0
+# define OFILL 0
 #endif
 #ifndef NLDLY
-#define NLDLY 0
+# define NLDLY 0
 #endif
 #ifndef CRDLY
-#define CRDLY 0
+# define CRDLY 0
 #endif
 #ifndef TABDLY
-#define TABDLY 0
+# define TABDLY 0
 #endif
 #ifndef BSDLY
-#define BSDLY 0
+# define BSDLY 0
 #endif
 #ifndef ONOCR
-#define ONOCR 0
+# define ONOCR 0
 #endif
 #ifndef ONLRET
-#define ONLRET 0
+# define ONLRET 0
 #endif
 
 #ifndef SEEK_SET
-#define SEEK_SET L_SET
-#endif
-
-#ifndef PARAMS
-# if PROTOTYPES
-#  define PARAMS(protos) protos
-# else /* no PROTOTYPES */
-#  define PARAMS(protos) ()
-# endif	/* no PROTOTYPES */
+# define SEEK_SET L_SET
 #endif
 
 /* setup a conditional debugging line */
 #ifndef CONDDEBUG
-#define CONDDEBUG(line) if (fDebug) {debugFileName=__FILE__; debugLineNo=__LINE__; Debug line;}
+# define CONDDEBUG(line) if (fDebug) {debugFileName=__FILE__; debugLineNo=__LINE__; Debug line;}
 #endif
 
 #if HAVE_DMALLOC
-#include <dmalloc.h>
+# include <dmalloc.h>
 #endif
 
 #if HAVE_FREEIPMI
-#include <ipmiconsole.h>
+# include <ipmiconsole.h>
+#endif
+
+#ifndef INADDR_STYPE
+# if USE_IPV6
+#  define INADDR_STYPE struct sockaddr_storage
+# else
+#  define INADDR_STYPE struct in_addr
+# endif
+#endif
+
+#ifndef SOCKADDR_STYPE
+# if USE_IPV6
+#  define SOCKADDR_STYPE struct sockaddr_storage
+# else
+#  define SOCKADDR_STYPE struct sockaddr_in
+# endif
 #endif

@@ -330,9 +330,6 @@
 /* pidfile to write to */
 #undef PIDFILE
 
-/* Define to 1 if the C compiler supports function prototypes. */
-#undef PROTOTYPES
-
 /* Defined if client requires server SSL certificate */
 #undef REQ_SERVER_CERT
 
@@ -351,11 +348,26 @@
 /* Defined if we trust reverse DNS */
 #undef TRUST_REVERSE_DNS
 
+/* Defined if we trust credentials from UDS client */
+#undef TRUST_UDS_CRED
+
 /* Directory for Unix domain sockets */
 #undef UDSDIR
 
+/* Defined to UDS credential socket option */
+#undef UDS_CRED_SO
+
+/* Defined to UDS credential structure name */
+#undef UDS_CRED_STYPE
+
+/* Defined to UDS credential structure uid field */
+#undef UDS_CRED_UID
+
 /* Defined if we produce extended messages */
 #undef USE_EXTENDED_MESSAGES
+
+/* Defined if building with IPv6 support */
+#undef USE_IPV6
 
 /* use tcp_wrappers libwrap */
 #undef USE_LIBWRAP
@@ -394,9 +406,6 @@
 
 /* Define to 1 if you need to in order for `stat' and other things to work. */
 #undef _POSIX_SOURCE
-
-/* Define like PROTOTYPES; this can be used by system headers. */
-#undef __PROTOTYPES
 
 /* Define to empty if `const' does not conform to ANSI C. */
 #undef const

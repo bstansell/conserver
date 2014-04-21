@@ -1,5 +1,5 @@
 /*
- *  $Id: main.h,v 5.54 2009/09/26 09:23:04 bryan Exp $
+ *  $Id: main.h,v 5.55 2014/04/20 06:45:07 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -39,11 +39,16 @@
 extern char rcsid[];
 extern int fAll, fNoinit, fInteractive, fStrip, fDaemon, fReopen,
     fNoautoreup, fSyntaxOnly;
+#if USE_IPV6
+extern struct addrinfo *bindAddr;
+extern struct addrinfo *bindBaseAddr;
+#else
 extern in_addr_t bindAddr;
+extern struct sockaddr_in in_port;
+#endif
 extern unsigned short bindPort, bindBasePort;
 extern char *pcConfig;
 extern int cMaxMemb;
-extern struct sockaddr_in in_port;
 extern CONFIG *optConf;
 extern CONFIG *config;
 extern CONFIG defConfig;
@@ -58,6 +63,6 @@ extern SSL_CTX *ctx;
 extern gss_name_t gss_myname;
 extern gss_cred_id_t gss_mycreds;
 #endif
-extern void ReopenLogfile PARAMS((void));
-extern void ReopenUnifiedlog PARAMS((void));
-extern void DumpDataStructures PARAMS((void));
+extern void ReopenLogfile(void);
+extern void ReopenUnifiedlog(void);
+extern void DumpDataStructures(void);
