@@ -1,5 +1,5 @@
 /*
- *  $Id: main.c,v 5.212 2014/04/20 06:45:07 bryan Exp $
+ *  $Id: main.c,v 5.213 2015/06/02 17:19:31 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -1076,9 +1076,10 @@ DumpDataStructures(void)
 	    }
 	}
     }
-    for (i = 0; i < 9; i++) {
+    for (i = 0; i < BREAKLISTSIZE; i++) {
 	CONDDEBUG((1,
-		   "DumpDataStructures(): break: string=%s, delay=%d, confirm=%s",
+		   "DumpDataStructures(): break: #%c, string=%s, delay=%d, confirm=%s",
+		   '1' + i + (i > 8 ? BREAKALPHAOFFSET : 0),
 		   EMPTYSTR(breakList[i].seq->string), breakList[i].delay,
 		   FLAGSTR(breakList[i].confirm)));
     }
@@ -1240,6 +1241,9 @@ main(int argc, char **argv)
     setvbuf(stdout, NULL, _IOLBF, BUFSIZ);
     setvbuf(stderr, NULL, _IOLBF, BUFSIZ);
 #endif
+
+    /* Initialize the break list */
+    InitBreakList();
 
     /* prep the config options */
     if ((optConf = (CONFIG *)calloc(1, sizeof(CONFIG)))

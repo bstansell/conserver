@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.h,v 5.50 2014/04/20 06:45:07 bryan Exp $
+ *  $Id: readcfg.h,v 5.51 2015/06/02 17:19:31 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -7,6 +7,8 @@
  */
 
 #define BREAKDELAYDEFAULT 250
+#define BREAKLISTSIZE 35	/* ('z'-('a'-1))+('9'-('1'-1)) */
+#define BREAKALPHAOFFSET 39	/* ('a'-('9'+1)) */
 
 typedef struct config {
     STRING *name;
@@ -57,7 +59,7 @@ extern REMOTE *pRCUniq;		/* list of uniq console servers */
 extern ACCESS *pACList;		/* `who do you love' (or trust) */
 extern CONSENTUSERS *pADList;	/* list of admin users */
 extern CONSENTUSERS *pLUList;	/* list of limited users */
-extern BREAKS breakList[9];	/* list of break sequences */
+extern BREAKS breakList[BREAKLISTSIZE];	/* list of break sequences */
 extern TASKS *taskList;		/* list of tasks */
 extern SUBST *taskSubst;	/* substitution function data for tasks */
 extern CONFIG *pConfig;		/* settings seen by config parser */
@@ -66,6 +68,7 @@ extern SUBST *substData;	/* substitution function data */
 extern void ReadCfg(char *, FILE *);
 extern void ReReadCfg(int, int);
 extern void DestroyBreakList(void);
+extern void InitBreakList(void);
 extern void DestroyTaskList(void);
 extern void DestroyUserList(void);
 extern void DestroyConfig(CONFIG *);

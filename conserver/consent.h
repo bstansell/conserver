@@ -1,5 +1,5 @@
 /*
- *  $Id: consent.h,v 5.75 2014/04/20 06:45:07 bryan Exp $
+ *  $Id: consent.h,v 5.76 2015/06/02 17:19:31 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -130,7 +130,7 @@ typedef struct consent {	/* console information                  */
     char *udssubst;		/* socket file substitution pattern     */
     /* global stuff */
     char *master;		/* master hostname                      */
-    unsigned short breakNum;	/* break type [1-9]                     */
+    unsigned short breakNum;	/* break type [1-35]                    */
     char *logfile;		/* logfile                              */
     off_t logfilemax;		/* size limit for rolling logfile       */
     char *initcmd;		/* initcmd command                      */

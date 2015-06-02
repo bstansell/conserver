@@ -1,5 +1,5 @@
 /*
- *  $Id: cutil.c,v 1.142 2014/04/20 07:17:56 bryan Exp $
+ *  $Id: cutil.c,v 1.143 2015/06/02 17:19:31 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -2088,8 +2088,8 @@ IsMe(char *id)
 		    b = &(((struct sockaddr_in *)rp->ai_addr)->sin_addr);
 		    len = sizeof(struct in_addr);
 		} else {	/* IPv6 */
-		    a = &(((struct sockaddr_in6 *)ifa->ifa_addr)->
-			  sin6_addr);
+		    a = &(((struct sockaddr_in6 *)ifa->
+			   ifa_addr)->sin6_addr);
 		    b = &(((struct sockaddr_in6 *)rp->ai_addr)->sin6_addr);
 		    len = sizeof(struct in6_addr);
 		}
@@ -2426,7 +2426,11 @@ GetWord(FILE *fp, int *line, short spaceok, STRING *word)
 		    if (c == '\n') {
 			if (fname->used > 0) {
 			    while (fname->used > 1 && isspace((int)
-							      (fname->string[fname->used - 2])))
+							      (fname->
+							       string
+							       [fname->
+								used -
+								2])))
 				fname->used--;
 			    if (fname->used > 0)
 				fname->string[fname->used - 1] = '\000';
@@ -2709,8 +2713,8 @@ ParseFile(char *filename, FILE *fp, int level)
 		case VALUE:
 		    switch (token) {
 			case WORD:
-			    (*sections[secIndex].
-			     items[keyIndex].reg) (word->string);
+			    (*sections[secIndex].items[keyIndex].
+			     reg) (word->string);
 			    state = SEMI;
 			    break;
 			case SEMICOLON:

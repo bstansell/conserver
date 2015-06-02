@@ -1,5 +1,5 @@
 /*
- *  $Id: group.c,v 5.350 2014/04/20 07:20:56 bryan Exp $
+ *  $Id: group.c,v 5.352 2015/06/02 17:19:31 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -1634,7 +1634,9 @@ ExpandString(char *str, CONSENT *pCE, short breaknum)
 		continue;
 	    } else if (s == 'd') {
 		PutConsole(pCE, IAC, 0);
-		PutConsole(pCE, '0' + breaknum, 0);
+		PutConsole(pCE,
+			   '0' + breaknum + (breaknum >
+					     9 ? BREAKALPHAOFFSET : 0), 0);
 		continue;
 	    } else if (s == 'z') {
 		PutConsole(pCE, IAC, 0);
@@ -1680,7 +1682,7 @@ SendBreak(CONSCLIENT *pCLServing, CONSENT *pCEServing, short bt)
     CONSCLIENT *pCL;
 
     short waszero = 0;
-    if (bt < 0 || bt > 9) {
+    if (bt < 0 || bt > BREAKLISTSIZE) {
 	FileWrite(pCLServing->fd, FLAGFALSE, "aborted]\r\n", -1);
 	return;
     }
@@ -1730,10 +1732,12 @@ SendBreak(CONSCLIENT *pCLServing, CONSENT *pCEServing, short bt)
 
     if (pCEServing->breaklog == FLAGTRUE) {
 	if (waszero) {
-	    TagLogfile(pCEServing, "break #0(%d) sent -- `%s'", bt,
+	    TagLogfile(pCEServing, "break #0(%c) sent -- `%s'",
+		       '0' + bt + (bt > 9 ? BREAKALPHAOFFSET : 0),
 		       breakList[bt - 1].seq->string);
 	} else {
-	    TagLogfile(pCEServing, "break #%d sent -- `%s'", bt,
+	    TagLogfile(pCEServing, "break #%c sent -- `%s'",
+		       '0' + bt + (bt > 9 ? BREAKALPHAOFFSET : 0),
 		       breakList[bt - 1].seq->string);
 	}
     }
@@ -1746,7 +1750,7 @@ StartTask(CONSENT *pCE, char *cmd, uid_t uid, gid_t gid)
     extern char **environ;
     char *pcShell, **ppcArgv;
     extern int FallBack(char **, int *);
-    char *execSlave;		/* pseudo-device slave side             */
+    char *execSlave = (char *)0;	/* pseudo-device slave side             */
     int execSlaveFD;		/* fd of slave side                     */
     int cofile;
 
@@ -3522,7 +3526,8 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 		    case S_HALT1:	/* halt sequence? */
 			pCLServing->iState = S_NORMAL;
 			if (acIn[i] != '?' &&
-			    (acIn[i] < '0' || acIn[i] > '9')) {
+			    ((acIn[i] < '0' || acIn[i] > '9') &&
+			     (acIn[i] < 'a' || acIn[i] > 'z'))) {
 			    FileWrite(pCLServing->fd, FLAGFALSE,
 				      "aborted]\r\n", -1);
 			    continue;
@@ -3530,13 +3535,16 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 
 			if (acIn[i] == '?') {
 			    int i;
+			    int mod;
 			    FileWrite(pCLServing->fd, FLAGFALSE,
 				      "list]\r\n", -1);
 			    i = pCEServing->breakNum;
+			    mod = i > 9 ? BREAKALPHAOFFSET : 0;
 			    if (i == 0 || breakList[i - 1].seq->used <= 1
 				|| pCEServing->breaklist == (char *)0 ||
 				((char *)0 ==
-				 strchr(pCEServing->breaklist, '1' + i)
+				 strchr(pCEServing->breaklist,
+					'0' + i + mod)
 				 && (char *)0 ==
 				 strchr(pCEServing->breaklist, '*')))
 				FileWrite(pCLServing->fd, FLAGTRUE,
@@ -3552,10 +3560,12 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 					  acA1->string);
 			    }
 			    if (pCEServing->breaklist != (char *)0) {
-				for (i = 0; i < 9; i++) {
+				for (i = 0; i < BREAKLISTSIZE; i++) {
+				    char btc;
+				    mod = i > 8 ? BREAKALPHAOFFSET : 0;
+				    btc = '1' + i + mod;
 				    if ((char *)0 ==
-					strchr(pCEServing->breaklist,
-					       '1' + i)
+					strchr(pCEServing->breaklist, btc)
 					&& (char *)0 ==
 					strchr(pCEServing->breaklist, '*'))
 					continue;
@@ -3564,9 +3574,8 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 						  breakList[i].seq->used -
 						  1, acA1);
 					FilePrint(pCLServing->fd, FLAGTRUE,
-						  " %d - %3dms, `%s'\r\n",
-						  i + 1,
-						  breakList[i].delay,
+						  " %c - %3dms, `%s'\r\n",
+						  btc, breakList[i].delay,
 						  acA1->string);
 				    }
 				}
@@ -3575,7 +3584,10 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 				      0);
 			} else {
 			    if (pCLServing->fwr) {
-				int bt = acIn[i] - '0';
+				int bt =
+				    acIn[i] - '0' - (acIn[i] >
+						     '9' ? BREAKALPHAOFFSET
+						     : 0);
 				SendBreak(pCLServing, pCEServing, bt);
 			    } else
 				FileWrite(pCLServing->fd, FLAGFALSE,
@@ -4140,7 +4152,9 @@ FlushConsole(CONSENT *pCEServing)
 	    unsigned char next =
 		(unsigned char)pCEServing->wbuf->string[offset + 1];
 	    if ((next >= '0' && next <= '9') ||
-		(next == BREAK && pCEServing->type != HOST)) {
+		(next >= 'a' && next <= 'z') || (next == BREAK &&
+						 pCEServing->type !=
+						 HOST)) {
 		CONDDEBUG((1, "Kiddie(): heavy IAC for [%s]",
 			   pCEServing->server));
 		offset += 2;
@@ -4171,10 +4185,13 @@ FlushConsole(CONSENT *pCEServing)
 		}
 
 		/* Do the operation */
-		if (next >= '0' && next <= '9') {
+		if ((next >= '0' && next <= '9') ||
+		    (next >= 'a' && next <= 'z')) {
 		    int delay = BREAKDELAYDEFAULT;
+		    int bnum =
+			next - '1' - (next > '9' ? BREAKALPHAOFFSET : 0);
 		    if (next != '0')
-			delay = breakList[next - '1'].delay;
+			delay = breakList[bnum].delay;
 		    /* in theory this sets the break length to whatever
 		     * the "default" break sequence is for the console.
 		     * but, i think it would be better to just use the

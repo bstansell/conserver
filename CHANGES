@@ -1,6 +1,14 @@
 				CHANGES
 				=======
 
+version 8.2.1 (Jun 2, 2015):
+	- added TCP keepalives between client and server - TCP-based consoles
+	  already had the code - this was mostly an oversight
+	- patch for SEGV and task execution - patch by Artem Savkov
+	  <asavkov@redhat.com>
+	- expanded break sequences from [1-9] to [1-9a-z] - based on patch by
+	  Artem Savkov <asavkov@redhat.com>
+
 version 8.2.0 (Apr 20, 2014):
 	- added --with-trust-uds-cred which uses getsockopt() to fetch and
 	  trust the client uid, bypassing password lookups - patch by Anton
@@ -952,5 +960,5 @@ before version 6.05:
 	  and enhancements of various types were applied.
 
 #
-#  $Id: CHANGES,v 1.247 2014/04/21 04:47:37 bryan Exp $
+#  $Id: CHANGES,v 1.251 2015/06/02 17:33:29 bryan Exp $
 #

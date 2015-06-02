@@ -1,5 +1,5 @@
 /*
- *  $Id: console.c,v 5.190 2014/04/20 06:45:07 bryan Exp $
+ *  $Id: console.c,v 5.191 2015/06/01 15:36:59 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -518,6 +518,9 @@ GetPort(char *pcToHost, unsigned short sPort)
     struct hostent *hp = (struct hostent *)0;
     struct sockaddr_in port;
 #endif
+#if HAVE_SETSOCKOPT
+    int one = 1;
+#endif
 
 #if USE_IPV6
 # if HAVE_MEMSET
@@ -561,8 +564,15 @@ GetPort(char *pcToHost, unsigned short sPort)
 	 */
 	s = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
 	if (s != -1) {
+# if HAVE_SETSOCKOPT
+	    if (setsockopt
+		(s, SOL_SOCKET, SO_KEEPALIVE, (char *)&one,
+		 sizeof(one)) < 0)
+		goto fail;
+# endif
 	    if (connect(s, rp->ai_addr, rp->ai_addrlen) == 0)
 		goto success;
+	  fail:
 	    close(s);
 	}
 	rp = rp->ai_next;
@@ -639,10 +649,19 @@ GetPort(char *pcToHost, unsigned short sPort)
 	Error("socket(AF_INET,SOCK_STREAM): %s", strerror(errno));
 	return (CONSFILE *)0;
     }
+# if HAVE_SETSOCKOPT
+    if (setsockopt(s, SOL_SOCKET, SO_KEEPALIVE, (char *)&one, sizeof(one))
+	< 0) {
+	Error("setsockopt(SO_KEEPALIVE): %s", strerror(errno));
+	close(s);
+	return (CONSFILE *)0;
+    }
+# endif
 
     if (connect(s, (struct sockaddr *)(&port), sizeof(port)) < 0) {
 	Error("connect(): %hu@%s: %s", ntohs(port.sin_port), pcToHost,
 	      strerror(errno));
+	close(s);
 	return (CONSFILE *)0;
     }
 #endif

@@ -1,5 +1,5 @@
 /*
- *  $Id: readcfg.c,v 5.206 2014/04/20 07:17:56 bryan Exp $
+ *  $Id: readcfg.c,v 5.207 2015/06/02 17:19:31 bryan Exp $
  *
  *  Copyright conserver.com, 2000
  *
@@ -45,11 +45,7 @@ CONSENTUSERS *pADList = (CONSENTUSERS *)0;
 CONSENTUSERS *pLUList = (CONSENTUSERS *)0;
 REMOTE *pRCUniq = (REMOTE *)0;
 CONFIG *pConfig = (CONFIG *)0;
-BREAKS breakList[9] = {
-    {(STRING *)0, 0}, {(STRING *)0, 0}, {(STRING *)0, 0},
-    {(STRING *)0, 0}, {(STRING *)0, 0}, {(STRING *)0, 0},
-    {(STRING *)0, 0}, {(STRING *)0, 0}, {(STRING *)0, 0}
-};
+BREAKS breakList[BREAKLISTSIZE];
 
 TASKS *taskList = (TASKS *)0;
 SUBST *taskSubst = (SUBST *)0;
@@ -112,11 +108,23 @@ DestroyTaskList(void)
 }
 
 void
+InitBreakList(void)
+{
+    int i;
+
+    for (i = 0; i < BREAKLISTSIZE; i++) {
+	breakList[i].seq = (STRING *)0;
+	breakList[i].delay = 0;
+	breakList[i].confirm = FLAGUNKNOWN;
+    }
+}
+
+void
 DestroyBreakList(void)
 {
     int i;
 
-    for (i = 0; i < 9; i++) {
+    for (i = 0; i < BREAKLISTSIZE; i++) {
 	if (breakList[i].seq != (STRING *)0) {
 	    DestroyString(breakList[i].seq);
 	    breakList[i].seq = (STRING *)0;
@@ -207,13 +215,15 @@ void
 BreakBegin(char *id)
 {
     CONDDEBUG((1, "BreakBegin(%s) [%s:%d]", id, file, line));
-    if ((id == (char *)0) || (*id == '\000') || id[0] < '1' || id[0] > '9'
-	|| id[1] != '\000') {
+    if ((id == (char *)0) || (*id == '\000') ||
+	((id[0] < '1' || id[0] > '9')
+	 && (id[0] < 'a' || id[0] > 'z')) || id[1] != '\000') {
 	if (isMaster)
 	    Error("invalid break number `%s' [%s:%d]", id, file, line);
 	parserBreakNum = 0;
     } else {
-	parserBreakNum = id[0] - '0';
+	parserBreakNum =
+	    id[0] - '0' - (id[0] > '9' ? BREAKALPHAOFFSET : 0);
 	if (parserBreak == (STRING *)0)
 	    parserBreak = AllocString();
 	else
@@ -256,12 +266,12 @@ BreakDestroy(void)
 #if DUMPDATA
     {
 	int i;
-	for (i = 0; i < 9; i++) {
+	for (i = 0; i < BREAKLISTSIZE; i++) {
 	    Msg("Break[%d] = `%s', delay=%d", i,
 		breakList[i].seq ==
-		(STRING *)0 ? "(null)" : (breakList[i].seq->
-					  string ? breakList[i].seq->
-					  string : "(null)"),
+		(STRING *)0 ? "(null)" : (breakList[i].
+					  seq->string ? breakList[i].
+					  seq->string : "(null)"),
 		breakList[i].delay);
 	}
     }
@@ -888,8 +898,9 @@ ProcessBreak(CONSENT *c, char *id)
 	c->breakNum = 0;
 	return;
     }
-    if ((id[0] >= '1') && (id[0] <= '9') && (id[1] == '\000')) {
-	c->breakNum = id[0] - '0';
+    if (((id[0] >= '1' && id[0] <= '9') || (id[0] >= 'a' && id[0] <= 'z'))
+	&& (id[1] == '\000')) {
+	c->breakNum = id[0] - '0' - (id[0] > '9' ? BREAKALPHAOFFSET : 0);
 	return;
     }
     if (isMaster)
@@ -2083,7 +2094,8 @@ ProcessBreaklist(CONSENT *c, char *id)
     for (token = strtok(id, ALLWORDSEP); token != (char *)0;
 	 token = strtok(NULL, ALLWORDSEP)) {
 	if (token[1] != '\000' ||
-	    ((token[0] < '0' || token[0] > '9') && token[0] != '*')) {
+	    (((token[0] < '0' || token[0] > '9') &&
+	      (token[0] < 'a' || token[0] > 'z')) && token[0] != '*')) {
 	    if (isMaster)
 		Error("invalid breaklist reference `%s' [%s:%d]", token,
 		      file, line);
@@ -5006,7 +5018,7 @@ ReadCfg(char *filename, FILE *fp)
     isStartup = (pGroups == (GRPENT *)0 && pRCList == (REMOTE *)0);
 
     /* initialize the break lists */
-    for (i = 0; i < 9; i++) {
+    for (i = 0; i < BREAKLISTSIZE; i++) {
 	if (breakList[i].seq == (STRING *)0) {
 	    breakList[i].seq = AllocString();
 	} else {

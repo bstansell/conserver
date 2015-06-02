@@ -1,5 +1,5 @@
-.\" $Id: console.man,v 1.65 2013/09/25 22:10:30 bryan Exp $
-.TH CONSOLE 1 "2013/09/25" "conserver-8.2.0" "conserver"
+.\" $Id: console.man,v 1.66 2015/06/02 17:19:31 bryan Exp $
+.TH CONSOLE 1 "2015/06/02" "conserver-8.2.1" "conserver"
 .SH NAME
 console \- console server client program
 .SH SYNOPSIS
@@ -857,7 +857,7 @@ list the break sequences available
 .B l0
 send the break sequence associated with this console
 .TP
-.B l1-9
+.B l1-9a-z
 send the specific break sequence
 .TP
 .B m
