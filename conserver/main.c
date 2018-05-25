@@ -86,6 +86,41 @@ unsigned long dmallocMarkMain = 0;
 #endif
 
 #if HAVE_OPENSSL
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+int DH_set0_pqg(DH *dh, BIGNUM *p, BIGNUM *q, BIGNUM *g)
+{
+    /* If the fields p and g in d are NULL, the corresponding input
+     * parameters MUST be non-NULL.  q may remain NULL.
+     */
+    if ((dh->p == NULL && p == NULL)
+        || (dh->g == NULL && g == NULL))
+        return 0;
+
+    if (p != NULL) {
+        BN_free(dh->p);
+        dh->p = p;
+    }
+    if (q != NULL) {
+        BN_free(dh->q);
+        dh->q = q;
+    }
+    if (g != NULL) {
+        BN_free(dh->g);
+        dh->g = g;
+    }
+
+    if (q != NULL) {
+        dh->length = BN_num_bits(q);
+    }
+
+    return 1;
+}
+#define TLS_method SSLv23_method
+#define CIPHER_SEC0
+#else
+#define CIPHER_SEC0 ":@SECLEVEL=0"
+#endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
+
 SSL_CTX *ctx = (SSL_CTX *)0;
 DH *dh512 = (DH *)0;
 DH *dh1024 = (DH *)0;
@@ -93,7 +128,7 @@ DH *dh2048 = (DH *)0;
 DH *dh4096 = (DH *)0;
 
 DH *
-DHFromArray(char *dh_p, size_t dh_p_size, char *dh_g, size_t dh_g_size) {
+DHFromArray(unsigned char *dh_p, size_t dh_p_size, unsigned char *dh_g, size_t dh_g_size) {
     DH *dh;
     BIGNUM *p, *g;
 
@@ -104,7 +139,7 @@ DHFromArray(char *dh_p, size_t dh_p_size, char *dh_g, size_t dh_g_size) {
 
     g = BN_bin2bn(dh_g, dh_g_size, NULL);
     if (g == NULL) {
-	BN_free(p);
+	BN_free(g);
 	return (NULL);
     }
 
@@ -301,12 +336,14 @@ SetupSSL(void)
     if (ctx == (SSL_CTX *)0) {
 	char *ciphers;
 	int verifymode;
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 	SSL_load_error_strings();
 	if (!SSL_library_init()) {
 	    Error("SetupSSL(): SSL_library_init() failed");
 	    Bye(EX_SOFTWARE);
 	}
-	if ((ctx = SSL_CTX_new(SSLv23_method())) == (SSL_CTX *)0) {
+#endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
+	if ((ctx = SSL_CTX_new(TLS_method())) == (SSL_CTX *)0) {
 	    Error("SetupSSL(): SSL_CTX_new() failed");
 	    Bye(EX_SOFTWARE);
 	}
@@ -332,7 +369,7 @@ SetupSSL(void)
 	    }
 	    ciphers = "ALL:!LOW:!EXP:!MD5:!aNULL:@STRENGTH";
 	} else {
-	    ciphers = "ALL:!LOW:!EXP:!MD5:@STRENGTH";
+	    ciphers = "ALL:aNULL:!LOW:!EXP:!MD5:@STRENGTH" CIPHER_SEC0;
 	}
 	if (config->sslcacertificatefile != (char *)0) {
 	    STACK_OF(X509_NAME) * cert_names;
