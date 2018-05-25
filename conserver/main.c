@@ -92,6 +92,38 @@ DH *dh1024 = (DH *)0;
 DH *dh2048 = (DH *)0;
 DH *dh4096 = (DH *)0;
 
+DH *
+DHFromArray(char *dh_p, size_t dh_p_size, char *dh_g, size_t dh_g_size) {
+    DH *dh;
+    BIGNUM *p, *g;
+
+    p = BN_bin2bn(dh_p, dh_p_size, NULL);
+    if (p == NULL) {
+	BN_free(p);
+	return (NULL);
+    }
+
+    g = BN_bin2bn(dh_g, dh_g_size, NULL);
+    if (g == NULL) {
+	BN_free(g);
+	return (NULL);
+    }
+
+    if ((dh = DH_new()) == NULL) {
+	BN_free(p);
+	BN_free(g);
+	return (NULL);
+    }
+
+    if (!DH_set0_pqg(dh, p, NULL, g)) {
+	BN_free(p);
+	BN_free(g);
+	DH_free(dh);
+	return (NULL);
+    }
+
+    return (dh);
+}
 
 DH *
 GetDH512(void)
@@ -108,17 +140,8 @@ GetDH512(void)
     static unsigned char dh512_g[] = {
 	0x02,
     };
-    DH *dh;
 
-    if ((dh = DH_new()) == NULL)
-	return (NULL);
-    dh->p = BN_bin2bn(dh512_p, sizeof(dh512_p), NULL);
-    dh->g = BN_bin2bn(dh512_g, sizeof(dh512_g), NULL);
-    if ((dh->p == NULL) || (dh->g == NULL)) {
-	DH_free(dh);
-	return (NULL);
-    }
-    return (dh);
+    return DHFromArray(dh512_p, sizeof(dh512_p), dh512_g, sizeof(dh512_g));
 }
 
 DH *
@@ -142,17 +165,8 @@ GetDH1024(void)
     static unsigned char dh1024_g[] = {
 	0x02,
     };
-    DH *dh;
 
-    if ((dh = DH_new()) == NULL)
-	return (NULL);
-    dh->p = BN_bin2bn(dh1024_p, sizeof(dh1024_p), NULL);
-    dh->g = BN_bin2bn(dh1024_g, sizeof(dh1024_g), NULL);
-    if ((dh->p == NULL) || (dh->g == NULL)) {
-	DH_free(dh);
-	return (NULL);
-    }
-    return (dh);
+    return DHFromArray(dh1024_p, sizeof(dh1024_p), dh1024_g, sizeof(dh1024_g));
 }
 
 DH *
@@ -189,17 +203,8 @@ GetDH2048(void)
     static unsigned char dh2048_g[] = {
 	0x02,
     };
-    DH *dh;
 
-    if ((dh = DH_new()) == NULL)
-	return (NULL);
-    dh->p = BN_bin2bn(dh2048_p, sizeof(dh2048_p), NULL);
-    dh->g = BN_bin2bn(dh2048_g, sizeof(dh2048_g), NULL);
-    if ((dh->p == NULL) || (dh->g == NULL)) {
-	DH_free(dh);
-	return (NULL);
-    }
-    return (dh);
+    return DHFromArray(dh2048_p, sizeof(dh2048_p), dh2048_g, sizeof(dh2048_g));
 }
 
 DH *
@@ -262,17 +267,8 @@ GetDH4096(void)
     static unsigned char dh4096_g[] = {
 	0x02,
     };
-    DH *dh;
 
-    if ((dh = DH_new()) == NULL)
-	return (NULL);
-    dh->p = BN_bin2bn(dh4096_p, sizeof(dh4096_p), NULL);
-    dh->g = BN_bin2bn(dh4096_g, sizeof(dh4096_g), NULL);
-    if ((dh->p == NULL) || (dh->g == NULL)) {
-	DH_free(dh);
-	return (NULL);
-    }
-    return (dh);
+    return DHFromArray(dh4096_p, sizeof(dh4096_p), dh4096_g, sizeof(dh4096_g));
 }
 
 DH *
