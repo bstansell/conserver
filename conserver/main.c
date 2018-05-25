@@ -99,13 +99,12 @@ DHFromArray(char *dh_p, size_t dh_p_size, char *dh_g, size_t dh_g_size) {
 
     p = BN_bin2bn(dh_p, dh_p_size, NULL);
     if (p == NULL) {
-	BN_free(p);
 	return (NULL);
     }
 
     g = BN_bin2bn(dh_g, dh_g_size, NULL);
     if (g == NULL) {
-	BN_free(g);
+	BN_free(p);
 	return (NULL);
     }
 
