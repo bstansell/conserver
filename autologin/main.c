@@ -81,8 +81,7 @@ getopt(int nargc, char **nargv, char *ostr)
 #endif /* ! HAVE_GETOPT */
 
 char
- *progname =
-    "$Id: main.c,v 1.3 2014/04/20 06:45:07 bryan Exp $", *au_terse[] = {
+ *progname = "", *au_terse[] = {
     " [-u] [-c cmd] [-e env=value] [-g group] [-l login] [-t tty]",
     " -h",
     " -V",
@@ -104,8 +103,6 @@ int
 #ifndef u_terse
 # define u_terse	(au_terse[0])
 #endif
-
-static char *rcsid = "$Id: main.c,v 1.3 2014/04/20 06:45:07 bryan Exp $";
 
 /*
  * parser
@@ -174,7 +171,7 @@ main(int argc, char **argv)
 		fMakeUtmp = 0;
 		continue;
 	    case 'V':
-		printf("%s: %s\n", progname, rcsid);
+		printf("%s\n", progname);
 		exit(0);
 	}
 	break;

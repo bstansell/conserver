@@ -1,7 +1,5 @@
 # dummy conserver config file
 #
-# $Id: test.cf,v 1.2 2003/07/04 18:04:05 bryan Exp $
-#
 default full {
 	rw *;
 }

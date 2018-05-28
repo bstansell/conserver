@@ -5,7 +5,3 @@ then modify extensively.  The man page for conserver.cf and conserver.passwd
 should explain the files with enough detail to get you going.
 
 That's about it.  Good luck.
-
-#
-#  $Id: INSTALL,v 1.4 2005/05/21 13:47:18 bryan Exp $
-#

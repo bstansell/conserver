@@ -68,9 +68,6 @@
  * Global variables
  */
 
-#ifndef	lint
-char *rcsid = "$Id: autologin.c,v 1.28 2014/04/20 06:45:07 bryan Exp $";
-#endif /* not lint */
 extern char *progname;
 gid_t awGrps[NGROUPS_MAX];
 int iGrps = 0;
