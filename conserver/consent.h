@@ -1,6 +1,4 @@
 /*
- *  $Id: consent.h,v 5.76 2015/06/02 17:19:31 bryan Exp $
- *
  *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)

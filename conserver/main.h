@@ -1,6 +1,4 @@
 /*
- *  $Id: main.h,v 5.55 2014/04/20 06:45:07 bryan Exp $
- *
  *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
@@ -36,7 +34,6 @@
 
 /* program options and stuff
  */
-extern char rcsid[];
 extern int fAll, fNoinit, fInteractive, fStrip, fDaemon, fReopen,
     fNoautoreup, fSyntaxOnly;
 #if USE_IPV6
