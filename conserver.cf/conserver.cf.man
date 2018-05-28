@@ -1,4 +1,4 @@
-.TH CONSERVER.CF 5 "2015/06/02" "conserver-8.2.1" "conserver"
+.TH CONSERVER.CF 5 "2018/05/28" "conserver-8.2.2" "conserver"
 .SH NAME
 conserver.cf \- console configuration file for
 .BR conserver (8)
