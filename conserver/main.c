@@ -86,12 +86,74 @@ unsigned long dmallocMarkMain = 0;
 #endif
 
 #if HAVE_OPENSSL
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+int DH_set0_pqg(DH *dh, BIGNUM *p, BIGNUM *q, BIGNUM *g)
+{
+    /* If the fields p and g in d are NULL, the corresponding input
+     * parameters MUST be non-NULL.  q may remain NULL.
+     */
+    if ((dh->p == NULL && p == NULL)
+        || (dh->g == NULL && g == NULL))
+        return 0;
+
+    if (p != NULL) {
+        BN_free(dh->p);
+        dh->p = p;
+    }
+    if (q != NULL) {
+        BN_free(dh->q);
+        dh->q = q;
+    }
+    if (g != NULL) {
+        BN_free(dh->g);
+        dh->g = g;
+    }
+
+    if (q != NULL) {
+        dh->length = BN_num_bits(q);
+    }
+
+    return 1;
+}
+#endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
+
 SSL_CTX *ctx = (SSL_CTX *)0;
 DH *dh512 = (DH *)0;
 DH *dh1024 = (DH *)0;
 DH *dh2048 = (DH *)0;
 DH *dh4096 = (DH *)0;
 
+DH *
+DHFromArray(unsigned char *dh_p, size_t dh_p_size, unsigned char *dh_g, size_t dh_g_size) {
+    DH *dh;
+    BIGNUM *p, *g;
+
+    p = BN_bin2bn(dh_p, dh_p_size, NULL);
+    if (p == NULL) {
+	return (NULL);
+    }
+
+    g = BN_bin2bn(dh_g, dh_g_size, NULL);
+    if (g == NULL) {
+	BN_free(g);
+	return (NULL);
+    }
+
+    if ((dh = DH_new()) == NULL) {
+	BN_free(p);
+	BN_free(g);
+	return (NULL);
+    }
+
+    if (!DH_set0_pqg(dh, p, NULL, g)) {
+	BN_free(p);
+	BN_free(g);
+	DH_free(dh);
+	return (NULL);
+    }
+
+    return (dh);
+}
 
 DH *
 GetDH512(void)
@@ -108,17 +170,8 @@ GetDH512(void)
     static unsigned char dh512_g[] = {
 	0x02,
     };
-    DH *dh;
 
-    if ((dh = DH_new()) == NULL)
-	return (NULL);
-    dh->p = BN_bin2bn(dh512_p, sizeof(dh512_p), NULL);
-    dh->g = BN_bin2bn(dh512_g, sizeof(dh512_g), NULL);
-    if ((dh->p == NULL) || (dh->g == NULL)) {
-	DH_free(dh);
-	return (NULL);
-    }
-    return (dh);
+    return DHFromArray(dh512_p, sizeof(dh512_p), dh512_g, sizeof(dh512_g));
 }
 
 DH *
@@ -142,17 +195,8 @@ GetDH1024(void)
     static unsigned char dh1024_g[] = {
 	0x02,
     };
-    DH *dh;
 
-    if ((dh = DH_new()) == NULL)
-	return (NULL);
-    dh->p = BN_bin2bn(dh1024_p, sizeof(dh1024_p), NULL);
-    dh->g = BN_bin2bn(dh1024_g, sizeof(dh1024_g), NULL);
-    if ((dh->p == NULL) || (dh->g == NULL)) {
-	DH_free(dh);
-	return (NULL);
-    }
-    return (dh);
+    return DHFromArray(dh1024_p, sizeof(dh1024_p), dh1024_g, sizeof(dh1024_g));
 }
 
 DH *
@@ -189,17 +233,8 @@ GetDH2048(void)
     static unsigned char dh2048_g[] = {
 	0x02,
     };
-    DH *dh;
 
-    if ((dh = DH_new()) == NULL)
-	return (NULL);
-    dh->p = BN_bin2bn(dh2048_p, sizeof(dh2048_p), NULL);
-    dh->g = BN_bin2bn(dh2048_g, sizeof(dh2048_g), NULL);
-    if ((dh->p == NULL) || (dh->g == NULL)) {
-	DH_free(dh);
-	return (NULL);
-    }
-    return (dh);
+    return DHFromArray(dh2048_p, sizeof(dh2048_p), dh2048_g, sizeof(dh2048_g));
 }
 
 DH *
@@ -262,17 +297,8 @@ GetDH4096(void)
     static unsigned char dh4096_g[] = {
 	0x02,
     };
-    DH *dh;
 
-    if ((dh = DH_new()) == NULL)
-	return (NULL);
-    dh->p = BN_bin2bn(dh4096_p, sizeof(dh4096_p), NULL);
-    dh->g = BN_bin2bn(dh4096_g, sizeof(dh4096_g), NULL);
-    if ((dh->p == NULL) || (dh->g == NULL)) {
-	DH_free(dh);
-	return (NULL);
-    }
-    return (dh);
+    return DHFromArray(dh4096_p, sizeof(dh4096_p), dh4096_g, sizeof(dh4096_g));
 }
 
 DH *
@@ -306,12 +332,14 @@ SetupSSL(void)
     if (ctx == (SSL_CTX *)0) {
 	char *ciphers;
 	int verifymode;
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 	SSL_load_error_strings();
 	if (!SSL_library_init()) {
 	    Error("SetupSSL(): SSL_library_init() failed");
 	    Bye(EX_SOFTWARE);
 	}
-	if ((ctx = SSL_CTX_new(SSLv23_method())) == (SSL_CTX *)0) {
+#endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
+	if ((ctx = SSL_CTX_new(TLS_method())) == (SSL_CTX *)0) {
 	    Error("SetupSSL(): SSL_CTX_new() failed");
 	    Bye(EX_SOFTWARE);
 	}
@@ -337,7 +365,7 @@ SetupSSL(void)
 	    }
 	    ciphers = "ALL:!LOW:!EXP:!MD5:!aNULL:@STRENGTH";
 	} else {
-	    ciphers = "ALL:!LOW:!EXP:!MD5:@STRENGTH";
+	    ciphers = "ALL:aNULL:!LOW:!EXP:!MD5:@STRENGTH" CIPHER_SEC0;
 	}
 	if (config->sslcacertificatefile != (char *)0) {
 	    STACK_OF(X509_NAME) * cert_names;

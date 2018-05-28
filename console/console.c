@@ -36,8 +36,6 @@
 #include <readconf.h>
 #include <version.h>
 #if HAVE_OPENSSL
-# include <openssl/ssl.h>
-# include <openssl/err.h>
 # include <openssl/opensslv.h>
 #endif
 #if HAVE_GSSAPI
@@ -78,12 +76,14 @@ SetupSSL(void)
 {
     if (ctx == (SSL_CTX *)0) {
 	char *ciphers;
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 	SSL_load_error_strings();
 	if (!SSL_library_init()) {
 	    Error("SSL library initialization failed");
 	    Bye(EX_UNAVAILABLE);
 	}
-	if ((ctx = SSL_CTX_new(SSLv23_method())) == (SSL_CTX *)0) {
+#endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
+	if ((ctx = SSL_CTX_new(TLS_method())) == (SSL_CTX *)0) {
 	    Error("Creating SSL context failed");
 	    Bye(EX_UNAVAILABLE);
 	}
@@ -123,7 +123,7 @@ SetupSSL(void)
 # if defined(REQ_SERVER_CERT)
 	    ciphers = "ALL:!LOW:!EXP:!MD5:!aNULL:@STRENGTH";
 # else
-	    ciphers = "ALL:!LOW:!EXP:!MD5:@STRENGTH";
+	    ciphers = "ALL:aNULL:!LOW:!EXP:!MD5:@STRENGTH" CIPHER_SEC0;
 # endif
 	}
 	SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, SSLVerifyCallback);
