@@ -36,8 +36,6 @@
 #include <readconf.h>
 #include <version.h>
 #if HAVE_OPENSSL
-# include <openssl/ssl.h>
-# include <openssl/err.h>
 # include <openssl/opensslv.h>
 #endif
 #if HAVE_GSSAPI
@@ -71,15 +69,6 @@ struct winsize ws;
 #endif
 
 #if HAVE_OPENSSL
-
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-#define TLS_method SSLv23_method
-#define CIPHER_SEC0
-#else
-#define CIPHER_SEC0 ":@SECLEVEL=0"
-#endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
-
-
 SSL_CTX *ctx = (SSL_CTX *)0;
 
 void

@@ -10,6 +10,12 @@
 #if HAVE_OPENSSL
 # include <openssl/ssl.h>
 # include <openssl/err.h>
+# if OPENSSL_VERSION_NUMBER < 0x10100000L
+#  define TLS_method SSLv23_method
+#  define CIPHER_SEC0
+# else
+#  define CIPHER_SEC0 ":@SECLEVEL=0"
+# endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
 #endif
 #if HAVE_GSSAPI
 # include <gssapi/gssapi.h>
