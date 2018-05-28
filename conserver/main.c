@@ -115,10 +115,6 @@ int DH_set0_pqg(DH *dh, BIGNUM *p, BIGNUM *q, BIGNUM *g)
 
     return 1;
 }
-#define TLS_method SSLv23_method
-#define CIPHER_SEC0
-#else
-#define CIPHER_SEC0 ":@SECLEVEL=0"
 #endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
 
 SSL_CTX *ctx = (SSL_CTX *)0;
