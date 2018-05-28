@@ -1,6 +1,11 @@
 				CHANGES
 				=======
 
+version 8.2.2 ():
+	- fixes for OpenSSL 1.1+ - patch by Eneas U de Queiroz
+	  <cote2004-github@yahoo.com>
+	- adjustments to documentation after move to github
+
 version 8.2.1 (Jun 2, 2015):
 	- added TCP keepalives between client and server - TCP-based consoles
 	  already had the code - this was mostly an oversight
