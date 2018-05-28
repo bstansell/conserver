@@ -1,6 +1,4 @@
 /*
- *  $Id: master.c,v 5.141 2014/04/20 06:45:07 bryan Exp $
- *
  *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)

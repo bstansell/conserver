@@ -1,5 +1,3 @@
-# $Id: README.old,v 1.1 2003/11/04 02:36:24 bryan Exp $
-
 This program can be used to put a root shell on the console at boot time.
 See the manual page.
 

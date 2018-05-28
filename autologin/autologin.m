@@ -1,7 +1,5 @@
 # mkcmd parser for autologin program
 %%
-static char *rcsid =
-	"$Id: autologin.m,v 1.1 2003/11/04 02:36:24 bryan Exp $";
 %%
 
 integer variable "iErrs" {

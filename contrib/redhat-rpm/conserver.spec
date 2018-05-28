@@ -3,8 +3,8 @@
 # platform that doesn't have red hat rpm >= 4.0.2 installed.
 #
 
-%define pkg  conserver
-%define ver  8.2.1
+%define pkg conserver
+%define ver 8.2.2
 
 # define the name of the machine on which the main conserver
 # daemon will be running if you don't want to use the default

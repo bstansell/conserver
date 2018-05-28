@@ -286,8 +286,3 @@ Other Information And Gotchas
         connecting to servers, you might be tickling this bug and you
         can upgrade the compiler, turn off the optimization, or apply
         this code change.
-
-
-#
-#  $Id: INSTALL,v 1.41 2014/04/20 06:45:07 bryan Exp $
-#
