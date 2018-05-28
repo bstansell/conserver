@@ -1,10 +1,11 @@
 				CHANGES
 				=======
 
-version 8.2.2 ():
+version 8.2.2 (May 28, 2018):
 	- fixes for OpenSSL 1.1+ - patch by Eneas U de Queiroz
 	  <cote2004-github@yahoo.com>
 	- adjustments to documentation after move to github
+	- removal of old RCS/CVS tags since we have git
 
 version 8.2.1 (Jun 2, 2015):
 	- added TCP keepalives between client and server - TCP-based consoles
@@ -963,7 +964,3 @@ version 6.05:
 before version 6.05:
 	- Many, many variations.  Nothing was tracked well.  Bug fixes
 	  and enhancements of various types were applied.
-
-#
-#  $Id: CHANGES,v 1.251 2015/06/02 17:33:29 bryan Exp $
-#

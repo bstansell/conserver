@@ -300,7 +300,3 @@ The more "interesting" escape sequences are the following.
 	    " -- attached (nologging)]"
 	    " -- attached]"
 	    " -- spy mode]"
-
-#
-#  $Id: PROTOCOL,v 1.2 2005/09/05 21:54:03 bryan Exp $
-#

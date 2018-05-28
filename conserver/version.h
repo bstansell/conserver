@@ -1,6 +1,4 @@
 /*
- *  $Id: version.h,v 1.82 2015/06/01 15:36:59 bryan Exp $
- *
  *  Copyright conserver.com, 2000
  *
  *  Maintainer/Enhancer: Bryan Stansell (bryan@conserver.com)
