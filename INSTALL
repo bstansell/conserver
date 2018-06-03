@@ -135,6 +135,8 @@ Quickie Instructions
 
     - Download conserver (http://www.conserver.com/) and unpack
 
+    - Run './autogen.sh' (only when compiling from git clone)
+
     - Run './configure'
 
     - Run 'make'

@@ -1,0 +1,47 @@
+usrsbin_exec_PROGRAMS += \
+	conserver/conserver \
+	conserver/conserver.convert
+dist_man_MANS += conserver/conserver.8
+
+conserver_conserver_SOURCES = \
+	conserver/access.c \
+	conserver/access.h \
+	conserver/client.c \
+	conserver/client.h \
+	conserver/consent.c \
+	conserver/consent.h \
+	conserver/cutil.c \
+	conserver/cutil.h \
+	conserver/fallback.c \
+	conserver/group.c \
+	conserver/group.h \
+	conserver/main.c \
+	conserver/main.h \
+	conserver/master.c \
+	conserver/master.h \
+	conserver/readcfg.c \
+	conserver/readcfg.h \
+	conserver/version.h
+
+conserver_conserver_LDADD = \
+	$(FREEIPMI_LIBS) \
+	$(GSSAPI_LIBS) \
+	$(OPENSSL_LIBS) \
+	$(SETPROCTITLE_LIBS) \
+	$(UTIL_LIBS)
+if HAVE_PAM
+conserver_conserver_LDADD += -lpam
+endif
+if USE_LIBWRAP
+conserver_conserver_LDADD += -lwrap
+endif
+
+conserver_conserver_convert_SOURCES = \
+	conserver/convert.c \
+	conserver/cutil.c \
+	conserver/cutil.h
+
+conserver_conserver_convert_LDADD = $(GSSAPI_LIBS) $(OPENSSL_LIBS)
+
+EXTRA_DIST += \
+	conserver/Sun-serial

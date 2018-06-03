@@ -14,7 +14,7 @@
 
 #include <compat.h>
 
-#include <cutil.h>
+#include "cutil.h"
 
 /*
  * get a pty for the user

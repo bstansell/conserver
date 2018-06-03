@@ -29,16 +29,17 @@
 
 #include <pwd.h>
 
-#include <cutil.h>
-#include <consent.h>
-#include <client.h>
-#include <group.h>
-#include <access.h>
-#include <master.h>
-#include <readcfg.h>
-#include <version.h>
+#include "cutil.h"
+#include "consent.h"
+#include "client.h"
+#include "group.h"
+#include "access.h"
+#include "master.h"
+#include "readcfg.h"
+#include "version.h"
 
 #include <dirent.h>
+#include <sysexits.h>
 #if HAVE_OPENSSL
 # include <openssl/opensslv.h>
 #endif

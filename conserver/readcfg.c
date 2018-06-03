@@ -26,13 +26,13 @@
 #include <pwd.h>
 #include <grp.h>
 
-#include <cutil.h>
-#include <consent.h>
-#include <client.h>
-#include <group.h>
-#include <access.h>
-#include <readcfg.h>
-#include <main.h>
+#include "cutil.h"
+#include "consent.h"
+#include "client.h"
+#include "group.h"
+#include "access.h"
+#include "readcfg.h"
+#include "main.h"
 
 /*****  external things *****/
 NAMES *userList = (NAMES *)0;
@@ -5374,8 +5374,12 @@ ReReadCfg(int fd, int msfd)
 		local += pGE->imembers;
 	    for (pRC = pRCList; (REMOTE *)0 != pRC; pRC = pRC->pRCnext)
 		remote++;
+#if USE_IPV6
+	    setproctitle("master: %d local, %d remote", local, remote);
+#else
 	    setproctitle("master: port %hu, %d local, %d remote", bindPort,
 			 local, remote);
+#endif
 	} else
 	    setproctitle("group %u: port %hu, %d %s", pGroups->id,
 			 pGroups->port, pGroups->imembers,

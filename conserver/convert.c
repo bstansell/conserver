@@ -30,14 +30,14 @@
 
 #include <compat.h>
 
-#include <cutil.h>
-#include <consent.h>
-#include <client.h>
-#include <group.h>
-#include <access.h>
-#include <readcfg.h>
-#include <master.h>
-#include <main.h>
+#include "cutil.h"
+#include "consent.h"
+#include "client.h"
+#include "group.h"
+#include "access.h"
+#include "readcfg.h"
+#include "master.h"
+#include "main.h"
 
 #if defined(USE_LIBWRAP)
 /* we don't use it...but we link to it */

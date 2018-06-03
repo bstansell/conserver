@@ -26,7 +26,7 @@ dotest()
 	eval "$2" > test.out 2>&1
     else
 	echo "$1" | \
-	    ../console/console -n -C /dev/null -M 127.0.0.1 -p 7777 shell > test.out 2>&1
+	    $top_builddir/console/console -n -C /dev/null -M 127.0.0.1 -p 7777 shell > test.out 2>&1
     fi
     if [ "$record" ]; then
 	echo "recorded"
@@ -47,7 +47,7 @@ dotest()
     fi
 }
 
-[ ! -f ../conserver/conserver -o ! -f ../console/console ] && \
+[ ! -f $top_builddir/conserver/conserver -o ! -f $top_builddir/console/console ] && \
     echo 'binaries do not exist - did you run make yet?' && exit 1
 
 trap cleanup 15
@@ -63,7 +63,7 @@ fi
 $ECHO "starting conserver...$EE"
 rm -f c.cf
 cp test1.cf c.cf
-../conserver/conserver -M 127.0.0.1 -p 7777 -v -C c.cf \
+$top_builddir/conserver/conserver -M 127.0.0.1 -p 7777 -v -C c.cf \
     -P test.passwd -m 32 > conserver.log 2>&1 &
 
 pid=$!
@@ -73,7 +73,7 @@ sleep 3
 
 [ ! -d results ] && mkdir results
 
-dotest EVAL "../console/console -n -C /dev/null -M 127.0.0.1 -p 7777 -u | sed -e 's/[0-9][0-9]*//g' -e 's/[ 	][ 	]*/ /g'"
+dotest EVAL "$top_builddir/console/console -n -C /dev/null -M 127.0.0.1 -p 7777 -u | sed -e 's/[0-9][0-9]*//g' -e 's/[ 	][ 	]*/ /g'"
 dotest 'c?c.'
 dotest 'cl?c.'
 dotest 'cdc.'
@@ -85,16 +85,16 @@ cp test2.cf c.cf
 kill -1 $pid
 sleep 3
 
-dotest EVAL "../console/console -n -C /dev/null -M 127.0.0.1 -p 7777 -u | sed -e 's/[0-9][0-9]*//g' -e 's/[ 	][ 	]*/ /g'"
+dotest EVAL "$top_builddir/console/console -n -C /dev/null -M 127.0.0.1 -p 7777 -u | sed -e 's/[0-9][0-9]*//g' -e 's/[ 	][ 	]*/ /g'"
 dotest 'c?c.'
 dotest 'cl?c.'
 dotest 'cdc.'
 dotest 'cocacoc.'
 
-dotest EVAL "echo 'tu.' | ../console/console -n -C /dev/null -M 127.0.0.1 -p 7777 -e 'tu' shell"
-dotest EVAL "../console/console -n -C /dev/null -M 127.0.0.1 -p 7777 -R | sed -e 's/ [^ ]*$//'"
-dotest EVAL "../console/console -n -C /dev/null -M 127.0.0.1 -p 7777 -x | sed -e 's/ on [^ ]* */ on /'"
-dotest EVAL "../console/console -n -C /dev/null -M 127.0.0.1 -p 7777 -x sh | sed -e '1s/^[^:]*//'"
-dotest EVAL "../console/console -n -C /dev/null -M 127.0.0.1 -p 7777 -x shell | sed -e 's/ on [^ ]* */ on /'"
+dotest EVAL "echo 'tu.' | $top_builddir/console/console -n -C /dev/null -M 127.0.0.1 -p 7777 -e 'tu' shell"
+dotest EVAL "$top_builddir/console/console -n -C /dev/null -M 127.0.0.1 -p 7777 -R | sed -e 's/ [^ ]*$//'"
+dotest EVAL "$top_builddir/console/console -n -C /dev/null -M 127.0.0.1 -p 7777 -x | sed -e 's/ on [^ ]* */ on /'"
+dotest EVAL "$top_builddir/console/console -n -C /dev/null -M 127.0.0.1 -p 7777 -x sh | sed -e '1s/^[^:]*//'"
+dotest EVAL "$top_builddir/console/console -n -C /dev/null -M 127.0.0.1 -p 7777 -x shell | sed -e 's/ on [^ ]* */ on /'"
 
 cleanup

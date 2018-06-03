@@ -34,13 +34,13 @@
 
 #include <compat.h>
 
-#include <cutil.h>
-#include <access.h>
-#include <consent.h>
-#include <client.h>
-#include <group.h>
-#include <readcfg.h>
-#include <main.h>
+#include "cutil.h"
+#include "access.h"
+#include "consent.h"
+#include "client.h"
+#include "group.h"
+#include "readcfg.h"
+#include "main.h"
 
 #if USE_IPV6
 # include <net/if.h>

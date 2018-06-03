@@ -1,0 +1,14 @@
+bin_PROGRAMS += \
+	console/console
+dist_man_MANS += console/console.1
+
+console_console_SOURCES = \
+	conserver/cutil.c \
+	conserver/cutil.h \
+	console/console.c \
+	console/getpassword.c \
+	console/getpassword.h \
+	console/readconf.c \
+	console/readconf.h
+
+console_console_LDADD = $(GSSAPI_LIBS) $(OPENSSL_LIBS)

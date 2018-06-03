@@ -6,8 +6,8 @@
 
 #include <compat.h>
 
-#include <cutil.h>
-#include <readconf.h>
+#include "cutil.h"
+#include "readconf.h"
 
 CONFIG *parserConfigTemp = (CONFIG *)0;
 CONFIG *parserConfigDefault = (CONFIG *)0;

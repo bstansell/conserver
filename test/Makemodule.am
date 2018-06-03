@@ -1,0 +1,26 @@
+TESTS_ENVIRONMENT = top_builddir=$(top_builddir) top_srcdir=$(top_srcdir)
+
+TESTS = \
+	test/dotest
+
+EXTRA_DIST += \
+	test/dotest \
+	test/results/test1 \
+	test/results/test10 \
+	test/results/test11 \
+	test/results/test12 \
+	test/results/test13 \
+	test/results/test14 \
+	test/results/test15 \
+	test/results/test2 \
+	test/results/test3 \
+	test/results/test4 \
+	test/results/test5 \
+	test/results/test6 \
+	test/results/test7 \
+	test/results/test8 \
+	test/results/test9 \
+	test/test1.cf \
+	test/test2.cf \
+	test/test.cf \
+	test/test.passwd

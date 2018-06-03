@@ -10,6 +10,7 @@
 
 #include <compat.h>
 
+#include "main.h"
 
 #ifndef HAVE_GETOPT
 static int

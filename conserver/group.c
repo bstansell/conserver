@@ -56,16 +56,18 @@
 #include <grp.h>
 #include <stdarg.h>
 #include <arpa/telnet.h>
+#include <sysexits.h>
+#include <shadow.h>
 
-#include <cutil.h>
-#include <consent.h>
-#include <client.h>
-#include <access.h>
-#include <group.h>
-#include <readcfg.h>
-#include <master.h>
-#include <main.h>
-#include <version.h>
+#include "cutil.h"
+#include "consent.h"
+#include "client.h"
+#include "access.h"
+#include "group.h"
+#include "readcfg.h"
+#include "master.h"
+#include "main.h"
+#include "version.h"
 
 #if HAVE_PAM
 # include <security/pam_appl.h>

@@ -45,7 +45,7 @@
 
 #include <compat.h>
 
-#include <main.h>
+#include "main.h"
 
 
 #define	TTYMODE	0600
@@ -81,6 +81,8 @@ extern char *optarg;
 
 void make_utmp();
 void usage();
+
+int addgroup(char *pcGrp);
 
 int
 Process(void)
@@ -330,7 +332,7 @@ Process(void)
 		      strerror(errno));
     }
 #endif
-    if (-1 != i && setpgrp(0, i)) {
+    if (-1 != i && setpgrp()) {
 	(void)fprintf(stderr, "%s: setpgrp: %s, i = %d\n", progname,
 		      strerror(errno), i);
     }
@@ -340,7 +342,7 @@ Process(void)
 		      strerror(errno));
     }
 #endif
-    if (-1 != iNewGrp && setpgrp(0, iNewGrp)) {
+    if (-1 != iNewGrp && setpgrp()) {
 	(void)fprintf(stderr, "%s: setpgrp: %s, iNewGrp = %d\n", progname,
 		      strerror(errno), iNewGrp);
     }

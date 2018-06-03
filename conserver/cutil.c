@@ -6,10 +6,11 @@
 
 #include <compat.h>
 
-#include <cutil.h>
-#include <version.h>
+#include "cutil.h"
+#include "version.h"
 
 #include <net/if.h>
+#include <sysexits.h>
 #if USE_IPV6
 # include <ifaddrs.h>
 #endif

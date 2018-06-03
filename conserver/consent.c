@@ -39,14 +39,15 @@
 #include <compat.h>
 
 #include <pwd.h>
+#include <sysexits.h>
 
-#include <cutil.h>
-#include <consent.h>
-#include <client.h>
-#include <group.h>
-#include <access.h>
-#include <readcfg.h>
-#include <main.h>
+#include "cutil.h"
+#include "consent.h"
+#include "client.h"
+#include "group.h"
+#include "access.h"
+#include "readcfg.h"
+#include "main.h"
 
 
 BAUD baud[] = {

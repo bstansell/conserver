@@ -1,0 +1,14 @@
+dist_man_MANS +=  \
+	conserver.cf/conserver.cf.5 \
+	conserver.cf/conserver.passwd.5
+
+dist_doc_DATA += \
+	conserver.cf/conserver.cf \
+	conserver.cf/conserver.passwd \
+	conserver.cf/label.ps \
+	conserver.cf/samples/average.cf \
+	conserver.cf/samples/average-distributed.cf \
+	conserver.cf/samples/basic.cf \
+	conserver.cf/samples/README \
+	conserver.cf/samples/simple.cf \
+	conserver.cf/test.cf

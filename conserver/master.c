@@ -27,14 +27,14 @@
 
 #include <compat.h>
 
-#include <cutil.h>
-#include <consent.h>
-#include <client.h>
-#include <group.h>
-#include <access.h>
-#include <master.h>
-#include <readcfg.h>
-#include <main.h>
+#include "cutil.h"
+#include "consent.h"
+#include "client.h"
+#include "group.h"
+#include "access.h"
+#include "master.h"
+#include "readcfg.h"
+#include "main.h"
 
 
 static sig_atomic_t fSawQuit = 0, fSawHUP = 0, fSawUSR2 = 0, fSawUSR1 =

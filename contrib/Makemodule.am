@@ -1,0 +1,20 @@
+if BUILD_CHAT
+bin_PROGRAMS += \
+	contrib/chat/chat
+contrib_chat_chat_SOURCES = \
+	contrib/chat/chat.c
+dist_man_MANS += contrib/chat/chat.8
+endif
+
+EXTRA_DIST += \
+	contrib/solaris-package/Makefile \
+	contrib/solaris-package/pkginfo \
+	contrib/solaris-package/man_tbl_header \
+	contrib/solaris-package/prototype \
+	contrib/redhat-rpm/conserver.defaults \
+	contrib/redhat-rpm/conserver.spec \
+	contrib/redhat-rpm/conserver.init \
+	contrib/redhat-rpm/README \
+	contrib/maketestcerts \
+	contrib/chat/README \
+	contrib/README
