@@ -2084,13 +2084,13 @@ IsMe(char *id)
 	    if (ifa->ifa_addr->sa_family == rp->ai_addr->sa_family) {
 		/* I really don't like to hardcode it but we have to */
 		if (ifa->ifa_addr->sa_family == AF_INET) {	/* IPv4 */
-		    a = &(((struct sockaddr_in *)ifa->ifa_addr)->sin_addr);
-		    b = &(((struct sockaddr_in *)rp->ai_addr)->sin_addr);
+		    a = (void *) &(((struct sockaddr_in *)ifa->ifa_addr)->sin_addr);
+		    b = (void *) &(((struct sockaddr_in *)rp->ai_addr)->sin_addr);
 		    len = sizeof(struct in_addr);
 		} else {	/* IPv6 */
-		    a = &(((struct sockaddr_in6 *)ifa->
+		    a = (void *) &(((struct sockaddr_in6 *)ifa->
 			   ifa_addr)->sin6_addr);
-		    b = &(((struct sockaddr_in6 *)rp->ai_addr)->sin6_addr);
+		    b = (void *) &(((struct sockaddr_in6 *)rp->ai_addr)->sin6_addr);
 		    len = sizeof(struct in6_addr);
 		}
 
