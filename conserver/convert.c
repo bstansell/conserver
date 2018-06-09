@@ -51,7 +51,7 @@ SECTION sections[] = {
 };
 
 void
-DestroyDataStructures()
+DestroyDataStructures(void)
 {
 }
 

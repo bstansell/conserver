@@ -79,8 +79,8 @@ int iGrps = 0;
 extern int optind;
 extern char *optarg;
 
-void make_utmp();
-void usage();
+void make_utmp(char *pclogin, char *pctty);
+void usage(void);
 
 int addgroup(char *pcGrp);
 
