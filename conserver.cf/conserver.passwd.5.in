@@ -18,7 +18,7 @@ It reads only until the first
 .I username
 match.
 .PP
-Blank lines and comment lines (those beginning with a ``#'' and
+Blank lines and comment lines (those beginning with a '#' and
 optional leading whitespace) are ignored.
 Non-ignored lines beginning with whitespace are considered
 continuations of the previous line.
@@ -31,7 +31,7 @@ Leading and trailing white space in each field is ignored.
 .I username
 the login name of the authorized user,
 or the string
-.RB `` *any* ''
+.RB ' *any* '
 to match any user.
 This is compared against the name sent by the
 .B console
@@ -42,14 +42,14 @@ Since
 only uses the first
 .I username
 match, a
-.RB `` *any* ''
+.RB ' *any* '
 entry will apply to any user
 without an entry earlier in the file.
 .TP
 .I password
 the encrypted password,
 or the string
-.RB `` *passwd* ''
+.RB ' *passwd* '
 to indicate that
 .B conserver
 should look up the user's password

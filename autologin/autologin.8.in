@@ -26,14 +26,14 @@ autologin \- create an automatic login session from /etc/inittab
 creates a login session for
 .I login
 by running an
-.RB ` "su \- 
+.RB ' "su \- 
 .IR login '
 on the specified device
 .RI ( tty ).
 If a
 .I command
 is given, that command is executed via 
-.RB ` "su \-
+.RB ' "su \-
 .IB login " \-c
 .IR command .'
 .PP

@@ -149,7 +149,7 @@ Any of the forms output by
 .B \-v
 option are accepted.
 The default value is
-.RB `` ^Ec ''.
+.RB ' ^Ec '.
 .TP
 .B \-E
 If encryption has been built into the code
@@ -194,7 +194,7 @@ client program polls
 .I master
 as the primary server,
 rather than the default set at compile time (typically
-.RB `` console '').
+.RB ' console ').
 The default
 .I master
 may be changed at compile time using the
@@ -208,7 +208,7 @@ to the directory which holds those sockets.
 The default
 .I master
 directory
-.RB (`` @UDSDIR@ '')
+.RB (' @UDSDIR@ ')
 may be changed at compile time using the
 .B --with-uds
 option.
@@ -239,7 +239,7 @@ The
 client connects to each server to request that the
 server daemon quit (shut down).
 The root password of the host(s) running conserver is required
-unless the local host is listed as ``trusted'' in the
+unless the local host is listed as 'trusted' in the
 conserver.cf file; in that case, just press <return>.
 .TP
 .B \-Q
@@ -285,10 +285,10 @@ attached to
 .IR console ).
 .TP
 .B \-u
-Show a list of all consoles with status (`up', `down', or `init')
+Show a list of all consoles with status ('up', 'down', or 'init')
 and attached users
 .RI ( user @ host
-if attached read-write, `<spies>' if only users in spy mode, or `<none>').
+if attached read-write, '<spies>' if only users in spy mode, or '<none>').
 .TP
 .B \-U
 If encryption has been built into the code
@@ -304,7 +304,7 @@ option is probably what you want.
 .TP
 .B \-v
 Be more verbose when building the connection(s).
-Use this option in combination with any of `show' options (below)
+Use this option in combination with any of 'show' options (below)
 for added benefit.
 .TP
 .B \-V
@@ -401,7 +401,7 @@ The
 options have the same effect as their lower-case variants.
 In addition, they each request the last 20 lines of the console output after
 making the connection (as if
-.RB `` ^Ecr ''
+.RB ' ^Ecr '
 were typed).
 .PP
 The
@@ -424,9 +424,9 @@ the console.
 .TP
 .I type
 The type of console.
-Values will be a `/' for a local device, `|' for
-a command, `!' for a remote port, `%' for a Unix domain socket,
-and `#' for a noop console.
+Values will be a '/' for a local device, '|' for
+a command, '!' for a remote port, '%' for a Unix domain socket,
+and '#' for a noop console.
 .TP
 .I console-details
 The details regarding the console.
@@ -436,7 +436,7 @@ file descriptor for the device.
 Commands will have values of the command, the command's pid, the
 pseudo-tty, and file descriptor for the pseudo-tty.
 Remote ports will have values of the remote hostname, remote port number,
-``raw'' or ``telnet'' protocol, and file descriptor for the socket connection.
+'raw' or 'telnet' protocol, and file descriptor for the socket connection.
 Unix domain sockets will have the path to the socket and the file
 descriptor for the socket connection.
 Noop consoles will have nothing.
@@ -444,28 +444,28 @@ Noop consoles will have nothing.
 .I users-list
 The details of each user connected to the console.
 The details for each
-user are an `@' separated list of `w', `r', or `s' (for read-write, read-only,
+user are an '@' separated list of 'w', 'r', or 's' (for read-write, read-only,
 or suspended), username, hostname the user is on, the user's idle time,
-and (for `r' and `s' users only) ``rw'' or ``ro'' (if the user wants
+and (for 'r' and 's' users only) 'rw' or 'ro' (if the user wants
 read-write mode or not).
 Each user bundle is separated by commas.
 .TP
 .I state
 The state of the console.
-Values with either be ``up'', ``down'', or ``init''.
+Values with either be 'up', 'down', or 'init'.
 .TP
 .I perm
-This value will either be ``rw'' or ``ro''.
-It will only be ``ro'' if
-the console is a local device (`/' type) and the permissions are such
+This value will either be 'rw' or 'ro'.
+It will only be 'ro' if
+the console is a local device ('/' type) and the permissions are such
 that the server can open the file for read, but not write.
 .TP
 .I logfile-details
 The details regarding the logging for the console.
 The comma-separated
-values will be the logfile, ``log'' or ``nolog'' (if logging is on
-or not - toggled via ``^EcL''), ``act'' or ``noact'' (if activity logging is
-enabled or not - the `a' timestamp option), the timestamp interval, and
+values will be the logfile, 'log' or 'nolog' (if logging is on
+or not - toggled via '^EcL'), 'act' or 'noact' (if activity logging is
+enabled or not - the 'a' timestamp option), the timestamp interval, and
 the file descriptor of the logfile.
 .TP
 .I break
@@ -473,8 +473,8 @@ The default break sequence used for the console.
 .TP
 .I reup
 If the console is currently down and the automatic reconnection code
-is at work, it will have the value of ``autoup'', otherwise it
-will be ``noautoup''.
+is at work, it will have the value of 'autoup', otherwise it
+will be 'noautoup'.
 .TP
 .I aliases
 The console aliases are presented in a comma-separated list.
@@ -500,7 +500,7 @@ and then applies command-line arguments.
 Each configuration location can override the previous.
 The same happens when parsing an individual file - the later entries
 always override the earlier entries.
-Because of that, you should put ``global'' defaults first and
+Because of that, you should put 'global' defaults first and
 more specific defaults second.
 .PP
 The configuration file is read using the same parser as 
@@ -515,7 +515,7 @@ Define a configuration block for the client host named
 .I hostname
 or using the address
 .IR ipaddr .
-If the value of ``*'' is used, the configuration block will be applied to
+If the value of '*' is used, the configuration block will be applied to
 all client hosts.
 .RS
 .TP
@@ -540,9 +540,9 @@ Override the playback length for the
 escape command to
 .I num
 lines (if the server supports it).
-Using the special value of ``0'' will cause the client to use the number
+Using the special value of '0' will cause the client to use the number
 of lines of the current terminal (if that can be determined).
-If the null string (``""'') is used, the playback length will not be overridden.
+If the null string ('""') is used, the playback length will not be overridden.
 .TP
 \f3port\fP \f2port\fP
 .br
@@ -559,9 +559,9 @@ Override the replay length for the
 escape command to
 .I num
 lines (if the server supports it).
-Using the special value of ``0'' will cause the client to use the number
+Using the special value of '0' will cause the client to use the number
 of lines of the current terminal (if that can be determined).
-If the null string (``""'') is used, the replay length will not be overridden.
+If the null string ('""') is used, the replay length will not be overridden.
 .TP
 \f3sslcacertificatefile\fP \f2filename\fP
 .br
@@ -615,7 +615,7 @@ command-line flag).
 .br
 Define a configuration block when using a terminal of type
 .IR type .
-If the value of ``*'' is used, the configuration block will be applied to
+If the value of '*' is used, the configuration block will be applied to
 all terminal types.
 .RS
 .TP
@@ -629,10 +629,10 @@ Character substitions will be performed based on the
 value and occur
 .I before
 interpretation of the special characters below.
-If the null string (``\f3""\fP'') is used, no string will be printed.
+If the null string ('\f3""\fP') is used, no string will be printed.
 .I string
-is a simple character string with the exception of `\e'
-and `^':
+is a simple character string with the exception of '\e'
+and '^':
 .RS
 .RS
 .sp
@@ -680,7 +680,7 @@ delete
 .BI ^ c
 control character
 .RI ( c
-is ``and''ed with 0x1f)
+is 'and'ed with 0x1f)
 .PD
 .RE
 .RE
@@ -752,16 +752,16 @@ For string replacements, if the replacement isn't at least
 .I n
 characters, it will be padded with space characters on the left.
 .I f
-must be `s'.
+must be 's'.
 For numeric replacements, the value will be formatted to at least
 .I n
 characters, padded with 0s if
 .I n
 begins with a 0, and space characters otherwise.
 .I f
-must be either `d', `x' or `X', specifying a decimal, lower-case
+must be either 'd', 'x' or 'X', specifying a decimal, lower-case
 hexadecimal, or an uppercase hexadecimal conversion.
-If the null string (``\f3""\fP'') is used, no replacements will be done.
+If the null string ('\f3""\fP') is used, no replacements will be done.
 .TP
 \f3detach\fP \f2string\fP|\f3""\fP
 .br
@@ -775,7 +775,7 @@ See the
 .B attach
 option for an explanation of
 .IR string .
-If the null string (``\f3""\fP'') is used, no string will be printed.
+If the null string ('\f3""\fP') is used, no string will be printed.
 .TP
 \f3detachsubst\fP \f2c\fP\f3=\fP\f2t\fP[\f2n\fP]\f2f\fP[\f3,\fP...]|\f3""\fP
 .br
@@ -808,7 +808,7 @@ config host1 {
 .SH "ESCAPE SEQUENCES"
 The connection can be controlled by a two-character escape sequence, followed
 by a command.
-The default escape sequence is ``control-E c''
+The default escape sequence is 'control-E c'
 (octal 005 143).
 (The escape sequences are actually processed by the server; see the
 .BR conserver (8)
@@ -929,18 +929,18 @@ first escape character before typing the second character directly.
 .PP
 In the
 .B \-u
-output, the login ``<none>'' indicates no one is
-viewing that console, and the login ``<spies>'' indicates that
+output, the login '<none>' indicates no one is
+viewing that console, and the login '<spies>' indicates that
 no one has a read-write connection (only read-only).
 .PP
 When running a local command via
-.RB `` ^Ec| '',
+.RB ' ^Ec| ',
 you can type 
-.RB ` ^C '
+.RB ' ^C '
 to send the command a SIGHUP,
-.RB ` ^\e '
+.RB ' ^\e '
 to send the command a SIGKILL, and
-.RB ` o '
+.RB ' o '
 to toggle the display of the console data.
 .SH EXAMPLES
 .TP 15
@@ -991,8 +991,8 @@ Either
 or number of days is displayed.
 .TP
 console \-e "^[1" lv426
-Requests a connection to the host ``lv426'' with the escape characters
-set to ``escape one''.
+Requests a connection to the host 'lv426' with the escape characters
+set to 'escape one'.
 .SH FILES
 .PP
 The following default file locations may be overridden
