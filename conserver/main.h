@@ -63,3 +63,5 @@ extern gss_cred_id_t gss_mycreds;
 extern void ReopenLogfile(void);
 extern void ReopenUnifiedlog(void);
 extern void DumpDataStructures(void);
+extern int FallBack(char **slave, int *sfd);
+extern int AttemptGSSAPI(CONSCLIENT *pCL);

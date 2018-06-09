@@ -367,7 +367,6 @@ StartInit(CONSENT *pCE)
 {
     int i;
     pid_t iNewGrp;
-    extern char **environ;
     int pin[2];
     int pout[2];
     static char *apcArgv[] = {
@@ -554,7 +553,6 @@ VirtDev(CONSENT *pCE)
 {
     int i;
     pid_t iNewGrp;
-    extern char **environ;
     char *pcShell, **ppcArgv;
 
     fflush(stdout);
@@ -760,7 +758,6 @@ void
 ConsInit(CONSENT *pCE)
 {
     time_t tyme;
-    extern int FallBack(char **, int *);
     int cofile = -1;
     int ret;
 #if HAVE_GETTIMEOFDAY

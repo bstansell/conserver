@@ -391,7 +391,6 @@ Process(void)
 #endif
 
     if (fMakeUtmp) {
-	extern char *ttyname();
 	make_utmp(pcLogin, (char *)0 != pcTty ? pcTty : ttyname(0));
     }
     /* Change ownership and modes on the tty.
