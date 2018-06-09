@@ -145,6 +145,8 @@ AC_DEFUN([CONSERVER_PKG], [
   AS_IF([test "x$with_$1" = "xyes"], [
     PKG_CHECK_MODULES([$3], [$4],
       [AC_DEFINE([HAVE_$3], [1], [Use $2])])
+  ], [
+    with_$1="no"
   ])
 ])
 
@@ -160,6 +162,7 @@ AC_DEFUN([CONSERVER_WITH], [
     [AC_DEFINE_UNQUOTED([$2], ["$conserver_withval"], [$4])]
   )
   AC_SUBST([$2], [$conserver_withval])
+  $2=$conserver_withval
 ])
 
 # Add function implemeting --with-foo / --without-foo boolean.
@@ -168,8 +171,10 @@ AC_DEFUN([CONSERVER_WWOPT], [
   AC_ARG_WITH([$1],
     [AS_HELP_STRING([--with-$1],[$3])],
     [AC_DEFINE([$2], [1], [$3])
-     AM_CONDITIONAL([$2], [true])],
-    [AM_CONDITIONAL([$2], [false])]
+     AM_CONDITIONAL([$2], [true])
+     $2=yes],
+    [AM_CONDITIONAL([$2], [false])
+     $2=no]
   )
 ])
 
@@ -181,9 +186,11 @@ AC_DEFUN([CONSERVER_PATH], [
     [AS_HELP_STRING([--with-$1=PATH], [$4, default: @<:@$3@:>@])],
     [conserver_withval="$withval"])
   AC_SUBST([$2], [$conserver_withval])
+  $2=$conserver_withval
 ])
 
 # The dmalloc is one of a kind.
+with_dmalloc=no
 AC_ARG_WITH([dmalloc],
   [AS_HELP_STRING([--with-dmalloc=DIR], [Define to compile with dmalloc support)])],
   [AS_CASE([$with_dmalloc],
@@ -195,6 +202,7 @@ AC_ARG_WITH([dmalloc],
     [AC_CHECK_HEADERS([dmalloc.h], [], [AC_MSG_ERROR([cannot find dmalloc.h header])])]
   )
 )
+
 CONSERVER_PKG([freeipmi], [FreeIPMI], [FREEIPMI], [libipmiconsole])
 CONSERVER_PKG([gssapi], [GSS-API], [GSSAPI], [krb5-gssapi])
 CONSERVER_PKG([libbsd], [libbsd], [SETPROCTITLE], [libbsd])
@@ -203,12 +211,14 @@ CONSERVER_PKG([openssl], [OpenSSL], [OPENSSL], [openssl])
 CONSERVER_WWOPT([libwrap], [USE_LIBWRAP], [Define to compile with libwrap support])
 AS_IF([test -z "$USE_LIBWRAP_TRUE"],
   [AC_CHECK_HEADERS([tcpd.h], [],
-    [AC_MSG_ERROR([cannot find tcpd.h header])])]
+    [AC_MSG_ERROR([cannot find tcpd.h header])])],
+  [with_libwrap="no"]
 )
 CONSERVER_WWOPT([pam], [HAVE_PAM], [Define to compile with PAM support])
 AS_IF([test -z "$HAVE_PAM_TRUE"],
   [AC_CHECK_HEADERS([security/pam_misc.h], [],
-    [AC_MSG_ERROR([cannot find security/pam_misc.h header])])]
+    [AC_MSG_ERROR([cannot find security/pam_misc.h header])])],
+  [with_pam="no"]
 )
 CONSERVER_WWOPT([ipv6], [USE_IPV6], [Define to compile with (experimental) IPv6 client/server])
 CONSERVER_WWOPT([autologin], [BUILD_AUTOLOGIN], [Define to compile autologin])
@@ -241,3 +251,40 @@ AC_DEFINE_UNQUOTED([CONFIGINVOCATION], ["$0 $configure_flags"], [Build time ./co
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
+
+AC_MSG_RESULT([==============================================================
+Feature Summary
+  ${PACKAGE}:         ${VERSION}
+
+  compiler:         ${CC}
+  cflags:           ${CFLAGS}
+
+  prefix:           ${prefix}
+  cffile:           ${CONFIGFILE}
+  ccffile:          ${CLIENTCONFIGFILE}
+  pwdfile:          ${PASSWDFILE}
+  logfile:          ${LOGFILEPATH}
+  pidfile:          ${PIDFILE}
+
+  dmalloc:          ${with_dmalloc}
+  freeipmi:         ${with_freeipmi}
+  gssapi:           ${with_gssapi}
+  openssl:          ${with_openssl}
+  libbsd:           ${with_libbsd}
+  libwrap:          ${with_libwrap}
+  pam:              ${with_pam}
+  ipv6:             ${USE_IPV6}
+  autologin:        ${BUILD_AUTOLOGIN}
+  chat:             ${BUILD_CHAT}
+  port:             ${DEFPORT}
+  base:             ${DEFBASEPORT}
+  master:           ${MASTERHOST}
+  maxmemb:          ${MAXMEMB}
+  timeout:          ${CONNECTTIMEOUT}
+  uds:              ${UDSDIR}
+  striprealm:       ${STRIP_REALM}
+  trustrevdns:      ${TRUST_REVERSE_DNS}
+  extmsgs:          ${USE_EXTENDED_MESSAGES}
+  trust-uds-cred:   ${TRUST_UDS_CRED}
+  req-server-cert:  ${REQ_SERVER_CERT}
+==============================================================])
