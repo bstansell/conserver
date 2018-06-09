@@ -1,6 +1,7 @@
 bin_PROGRAMS += \
 	autologin/autologin
 dist_man_MANS += autologin/autologin.8
+PATHFILES += autologin/autologin.8
 
 autologin_autologin_SOURCES = \
 	autologin/autologin.c \

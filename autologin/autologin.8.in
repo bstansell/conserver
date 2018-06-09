@@ -1,8 +1,8 @@
-.TH AUTOLOGIN 8L PUCC
+.TH "AUTOLOGIN" "8" "@VERSION@" "conserver" "System Administration"
 .SH NAME
 autologin \- create an automatic login session from /etc/inittab
 .SH SYNOPSIS
-.B /usr/local/etc/autologin
+.B autologin
 [
 .B \-u
 ] [
@@ -95,7 +95,7 @@ with any error messages directed to
 .IR /dev/console :
 .br
 .na
-	cons2:2:respawn:/usr/local/etc/autologin \-t/dev/tty0 \-lroot > /dev/console 2>&1
+	cons2:2:respawn:@bindir@/autologin \-t/dev/tty0 \-lroot > /dev/console 2>&1
 .ad
 .PP
 Adding the following line to
@@ -108,7 +108,7 @@ environment variable set to
 .IR reg20 :
 .br
 .na
-	ss10:2:respawn:/usr/local/etc/autologin \-e TERM=reg20 \-t/dev/tty10 \-lssinfo
+	ss10:2:respawn:@bindir@/autologin \-e TERM=reg20 \-t/dev/tty10 \-lssinfo
 .ad
 .PP
 Adding the following line to
@@ -118,7 +118,7 @@ on a Sun
 machine establishes a root login on the console device:
 .br
 .na
-	console "/usr/local/etc/autologin \-lroot \-t"    xterm   on local secure
+	console "@bindir@/autologin \-lroot \-t"    xterm   on local secure
 .ad
 .PP
 Note that

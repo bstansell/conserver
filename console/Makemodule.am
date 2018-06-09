@@ -1,6 +1,7 @@
 bin_PROGRAMS += \
 	console/console
 dist_man_MANS += console/console.1
+PATHFILES += console/console.1
 
 console_console_SOURCES = \
 	conserver/cutil.c \

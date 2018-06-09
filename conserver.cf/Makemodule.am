@@ -1,6 +1,9 @@
 dist_man_MANS +=  \
 	conserver.cf/conserver.cf.5 \
 	conserver.cf/conserver.passwd.5
+PATHFILES +=  \
+	conserver.cf/conserver.cf.5 \
+	conserver.cf/conserver.passwd.5
 
 dist_doc_DATA += \
 	conserver.cf/conserver.cf \

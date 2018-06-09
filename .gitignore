@@ -5,6 +5,7 @@
 
 /aclocal.m4
 /autologin/autologin
+/autologin/autologin.8
 /autom4te.cache/
 /build-aux/compile
 /build-aux/config.guess
@@ -19,10 +20,15 @@
 /config.log
 /config.status
 /configure
+/conserver.cf/conserver.cf.5
+/conserver.cf/conserver.passwd.5
 /conserver/conserver
+/conserver/conserver.8
 /conserver/conserver.convert
 /console/console
+/console/console.1
 /contrib/chat/chat
+/contrib/chat/chat.8
 /Makefile
 /Makefile.in
 /stamp-h1

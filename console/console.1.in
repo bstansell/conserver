@@ -1,4 +1,4 @@
-.TH CONSOLE 1 "2018/05/28" "conserver-8.2.2" "conserver"
+.TH "CONSOLE" "1" "@VERSION@" "conserver" "User Commands"
 .SH NAME
 console \- console server client program
 .SH SYNOPSIS
@@ -208,7 +208,7 @@ to the directory which holds those sockets.
 The default
 .I master
 directory
-.RB (`` /tmp/conserver '')
+.RB (`` @UDSDIR@ '')
 may be changed at compile time using the
 .B --with-uds
 option.
@@ -1003,7 +1003,7 @@ to see the defaults set at compile time.
 .PP
 .PD 0
 .TP 25
-.B /etc/console.cf
+.B @CONFIGFILE@
 system-wide configuration file
 .TP
 .B \s-1$HOME\s0/.consolerc

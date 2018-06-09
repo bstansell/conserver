@@ -1,12 +1,5 @@
 .\" -*- nroff -*-
-.\" manual page [] for chat 1.8
-.\" Id: chat.8,v 1.9 1999/09/06 05:10:23 paulus Exp
-.\" SH section heading
-.\" SS subsection heading
-.\" LP paragraph
-.\" IP indented paragraph
-.\" TP hanging label
-.TH CHAT 8 "22 May 1999" "Chat Version 1.22"
+.TH "CHAT" "8" "@VERSION@" "conserver" "System Administration"
 .SH "NAME"
 chat \- Automated conversational script with a modem
 .SH "SYNOPSIS"

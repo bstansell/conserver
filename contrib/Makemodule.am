@@ -4,6 +4,7 @@ bin_PROGRAMS += \
 contrib_chat_chat_SOURCES = \
 	contrib/chat/chat.c
 dist_man_MANS += contrib/chat/chat.8
+PATHFILES += contrib/chat/chat.8
 endif
 
 EXTRA_DIST += \

@@ -1,4 +1,4 @@
-.TH CONSERVER 8 "2018/05/28" "conserver-8.2.2" "conserver"
+.TH "CONSERVER" "8" "@VERSION@" "conserver" "System Administration"
 .SH NAME
 conserver \- console server daemon
 .SH SYNOPSIS
@@ -309,7 +309,7 @@ this points conserver to the directory where it should store the sockets.
 The default
 .I master
 directory
-.RB (`` /tmp/conserver '')
+.RB (`` @UDSDIR@ '')
 may be changed at compile time using the
 .B --with-uds
 option.
@@ -337,7 +337,7 @@ Set the TCP port for the master process to listen on.
 This may be either a port number or a service name.
 The default
 .IR port ,
-``conserver'' (typically 782),
+``@DEFPORT@'' (typically 782),
 may be changed at compile time using the
 .B --with-port
 option.
@@ -477,22 +477,22 @@ to see the defaults set at compile time.
 .PP
 .PD 0
 .TP 25
-.B /etc/conserver.cf
+.B @CONFIGFILE@
 description of console terminal lines and client host access levels;
 see
 .BR conserver.cf (5).
 .TP
-.B /etc/conserver.passwd
+.B @PASSWDFILE@
 users allowed to access consoles; see
 .BR conserver.passwd (5).
 .TP
-.B /var/run/conserver.pid
+.B @PIDFILE@
 the master conserver process ID
 .TP
-.B /var/log/conserver
+.B @LOGFILEPATH@
 log of errors and informational messages
 .TP
-.B /tmp/conserver
+.B @UDSDIR@
 directory to hold Unix domain sockets (if enabled)
 .PD
 .PP

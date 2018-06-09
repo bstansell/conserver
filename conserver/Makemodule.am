@@ -2,6 +2,7 @@ usrsbin_exec_PROGRAMS += \
 	conserver/conserver \
 	conserver/conserver.convert
 dist_man_MANS += conserver/conserver.8
+PATHFILES += conserver/conserver.8
 
 conserver_conserver_SOURCES = \
 	conserver/access.c \
