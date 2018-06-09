@@ -39,8 +39,8 @@
 
 static sig_atomic_t fSawQuit = 0, fSawHUP = 0, fSawUSR2 = 0, fSawUSR1 =
     0, fSawCHLD = 0;
-CONSCLIENT *pCLmfree = (CONSCLIENT *)0;
-CONSCLIENT *pCLmall = (CONSCLIENT *)0;
+CONSCLIENT *pCLmfree = NULL;
+CONSCLIENT *pCLmall = NULL;
 #if HAVE_DMALLOC && DMALLOC_MARK_CLIENT_CONNECTION
 static unsigned long dmallocMarkClientConnection = 0;
 #endif
@@ -77,7 +77,7 @@ FixKids(int msfd)
 	    continue;
 	}
 
-	for (pGE = pGroups; pGE != (GRPENT *)0; pGE = pGE->pGEnext) {
+	for (pGE = pGroups; pGE != NULL; pGE = pGE->pGEnext) {
 	    if (0 == pGE->imembers)
 		continue;
 	    if (pid != pGE->pid)
@@ -177,7 +177,7 @@ SignalKids(int arg)
 {
     GRPENT *pGE;
 
-    for (pGE = pGroups; pGE != (GRPENT *)0; pGE = pGE->pGEnext) {
+    for (pGE = pGroups; pGE != NULL; pGE = pGE->pGEnext) {
 	if (0 == pGE->imembers || -1 == pGE->pid)
 	    continue;
 	CONDDEBUG((1, "SignalKids(): sending pid %lu signal %d",
@@ -195,10 +195,10 @@ FindRemoteConsole(char *args)
     REMOTE *pRC;
     NAMES *name;
 
-    for (pRC = pRCList; (REMOTE *)0 != pRC; pRC = pRC->pRCnext) {
+    for (pRC = pRCList; NULL != pRC; pRC = pRC->pRCnext) {
 	if (strcasecmp(args, pRC->rserver) == 0)
 	    return pRC;
-	for (name = pRC->aliases; name != (NAMES *)0; name = name->next) {
+	for (name = pRC->aliases; name != NULL; name = name->next) {
 	    if (strcasecmp(args, name->name) == 0)
 		return pRC;
 	}
@@ -212,18 +212,18 @@ CommandCall(CONSCLIENT *pCL, char *args)
     int found;
     REMOTE *pRC, *pRCFound;
     unsigned short prnum = 0;
-    char *ambiguous = (char *)0;
+    char *ambiguous = NULL;
     CONSENT *pCE;
     GRPENT *pGE;
 
     found = 0;
-    pRCFound = (REMOTE *)0;
-    ambiguous = BuildTmpString((char *)0);
+    pRCFound = NULL;
+    ambiguous = BuildTmpString(NULL);
     /* look for a local machine */
-    for (pGE = pGroups; pGE != (GRPENT *)0; pGE = pGE->pGEnext) {
+    for (pGE = pGroups; pGE != NULL; pGE = pGE->pGEnext) {
 	if (pGE->imembers == 0)
 	    continue;
-	if ((pCE = FindConsoleName(pGE->pCElist, args)) != (CONSENT *)0) {
+	if ((pCE = FindConsoleName(pGE->pCElist, args)) != NULL) {
 	    prnum = pGE->port;
 	    ambiguous = BuildTmpString(pCE->server);
 	    ambiguous = BuildTmpString(", ");
@@ -232,7 +232,7 @@ CommandCall(CONSCLIENT *pCL, char *args)
     }
     if (config->redirect == FLAGTRUE ||
 	(config->redirect != FLAGTRUE && found == 0)) {
-	if ((pRC = FindRemoteConsole(args)) != (REMOTE *)0) {
+	if ((pRC = FindRemoteConsole(args)) != NULL) {
 	    ambiguous = BuildTmpString(pRC->rserver);
 	    ambiguous = BuildTmpString(", ");
 	    ++found;
@@ -241,12 +241,12 @@ CommandCall(CONSCLIENT *pCL, char *args)
     }
     if (found == 0 && config->autocomplete == FLAGTRUE) {
 	/* Then look for substring matches */
-	NAMES *name = (NAMES *)0;
+	NAMES *name = NULL;
 	int foundOne = 0;
-	for (pGE = pGroups; pGE != (GRPENT *)0; pGE = pGE->pGEnext) {
+	for (pGE = pGroups; pGE != NULL; pGE = pGE->pGEnext) {
 	    if (0 == pGE->imembers)
 		continue;
-	    for (pCE = pGE->pCElist; pCE != (CONSENT *)0;
+	    for (pCE = pGE->pCElist; pCE != NULL;
 		 pCE = pCE->pCEnext) {
 		foundOne = 0;
 		if (strncasecmp(args, pCE->server, strlen(args)) == 0) {
@@ -255,7 +255,7 @@ CommandCall(CONSCLIENT *pCL, char *args)
 		    ambiguous = BuildTmpString(", ");
 		    ++foundOne;
 		}
-		for (name = pCE->aliases; name != (NAMES *)0;
+		for (name = pCE->aliases; name != NULL;
 		     name = name->next) {
 		    if (strncasecmp(args, name->name, strlen(args))
 			!= 0)
@@ -274,7 +274,7 @@ CommandCall(CONSCLIENT *pCL, char *args)
 	 * console match */
 	if (config->redirect == FLAGTRUE ||
 	    (config->redirect != FLAGTRUE && found != 1)) {
-	    for (pRC = pRCList; (REMOTE *)0 != pRC; pRC = pRC->pRCnext) {
+	    for (pRC = pRCList; NULL != pRC; pRC = pRC->pRCnext) {
 		foundOne = 0;
 		if (strncasecmp(args, pRC->rserver, strlen(args))
 		    == 0) {
@@ -283,7 +283,7 @@ CommandCall(CONSCLIENT *pCL, char *args)
 		    ambiguous = BuildTmpString(", ");
 		    ++foundOne;
 		}
-		for (name = pRC->aliases; name != (NAMES *)0;
+		for (name = pRC->aliases; name != NULL;
 		     name = name->next) {
 		    if (strncasecmp(args, name->name, strlen(args))
 			!= 0)
@@ -304,7 +304,7 @@ CommandCall(CONSCLIENT *pCL, char *args)
 		      args);
 	    break;
 	case 1:
-	    if ((REMOTE *)0 != pRCFound) {
+	    if (NULL != pRCFound) {
 		if (config->redirect != FLAGTRUE) {
 		    FilePrint(pCL->fd, FLAGFALSE,
 			      "automatic redirection disabled - console on master `%s'\r\n",
@@ -325,8 +325,8 @@ CommandCall(CONSCLIENT *pCL, char *args)
 		      args, ambiguous);
 	    break;
     }
-    BuildTmpString((char *)0);	/* we're done - clean up */
-    ambiguous = (char *)0;
+    BuildTmpString(NULL);	/* we're done - clean up */
+    ambiguous = NULL;
 }
 
 void
@@ -350,7 +350,7 @@ DropMasterClient(CONSCLIENT *pCLServing, FLAG force)
     pCLServing->ioState = ISDISCONNECTED;
 
     /* remove from the "all" list */
-    if ((CONSCLIENT *)0 != pCLServing->pCLscan) {
+    if (NULL != pCLServing->pCLscan) {
 	pCLServing->pCLscan->ppCLbscan = pCLServing->ppCLbscan;
     }
     *(pCLServing->ppCLbscan) = pCLServing->pCLscan;
@@ -402,25 +402,25 @@ DoNormalRead(CONSCLIENT *pCLServing)
 		    != AUTH_SUCCESS) {
 		    FileWrite(pCLServing->fd, FLAGFALSE,
 			      "invalid password\r\n", -1);
-		    BuildString((char *)0, pCLServing->accmd);
+		    BuildString(NULL, pCLServing->accmd);
 		    DropMasterClient(pCLServing, FLAGFALSE);
 		    return;
 		}
 		Verbose("<master> login %s", pCLServing->acid->string);
 		FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", 4);
 		pCLServing->iState = S_NORMAL;
-		BuildString((char *)0, pCLServing->accmd);
+		BuildString(NULL, pCLServing->accmd);
 		continue;
 	    }
 
-	    if ((char *)0 !=
+	    if (NULL !=
 		(pcArgs = strchr(pCLServing->accmd->string, ':'))) {
 		*pcArgs++ = '\000';
-	    } else if ((char *)0 !=
+	    } else if (NULL !=
 		       (pcArgs = strchr(pCLServing->accmd->string, ' '))) {
 		*pcArgs++ = '\000';
 	    }
-	    if (pcArgs != (char *)0)
+	    if (pcArgs != NULL)
 		pcArgs = PruneSpace(pcArgs);
 	    pcCmd = PruneSpace(pCLServing->accmd->string);
 	    if (strcmp(pcCmd, "help") == 0) {
@@ -434,7 +434,7 @@ DoNormalRead(CONSCLIENT *pCLServing)
 #if HAVE_GSSAPI
 		    "gssapi log in with gssapi\r\n",
 #endif
-		    (char *)0
+		    NULL
 		};
 		static char *apcHelp2[] = {
 		    "call       provide port for given console\r\n",
@@ -450,15 +450,15 @@ DoNormalRead(CONSCLIENT *pCLServing)
 		    "version    provide version info for server\r\n",
 		    "up*        bring up all downed consoles (SIGUSR1)\r\n",
 		    "* = requires admin privileges\r\n",
-		    (char *)0
+		    NULL
 		};
 		char **ppc;
 		for (ppc =
 		     (pCLServing->iState == S_IDENT ? apcHelp1 : apcHelp2);
-		     (char *)0 != *ppc; ++ppc) {
+		     NULL != *ppc; ++ppc) {
 		    FileWrite(pCLServing->fd, FLAGTRUE, *ppc, -1);
 		}
-		FileWrite(pCLServing->fd, FLAGFALSE, (char *)0, 0);
+		FileWrite(pCLServing->fd, FLAGFALSE, NULL, 0);
 	    } else if (strcmp(pcCmd, "exit") == 0) {
 		FileWrite(pCLServing->fd, FLAGFALSE, "goodbye\r\n", -1);
 		DropMasterClient(pCLServing, FLAGFALSE);
@@ -489,12 +489,12 @@ DoNormalRead(CONSCLIENT *pCLServing)
 			      "encryption required\r\n", -1);
 		} else {
 #endif
-		    if (pcArgs == (char *)0) {
+		    if (pcArgs == NULL) {
 			FileWrite(pCLServing->fd, FLAGFALSE,
 				  "login requires argument\r\n", -1);
 		    } else {
-			BuildString((char *)0, pCLServing->username);
-			BuildString((char *)0, pCLServing->acid);
+			BuildString(NULL, pCLServing->username);
+			BuildString(NULL, pCLServing->acid);
 			BuildString(pcArgs, pCLServing->username);
 			BuildString(pcArgs, pCLServing->acid);
 			BuildStringChar('@', pCLServing->acid);
@@ -521,7 +521,7 @@ DoNormalRead(CONSCLIENT *pCLServing)
 		       strcmp(pcCmd, "master") == 0) {
 		int iSep = 1;
 
-		if ((GRPENT *)0 != pGroups) {
+		if (NULL != pGroups) {
 #if USE_IPV6 || !USE_UNIX_DOMAIN_SOCKETS
 		    SOCKADDR_STYPE lcl;
 
@@ -561,7 +561,7 @@ DoNormalRead(CONSCLIENT *pCLServing)
 		    if (config->redirect == FLAGTRUE) {
 			REMOTE *pRC;
 			char *s;
-			for (pRC = pRCUniq; (REMOTE *)0 != pRC;
+			for (pRC = pRCUniq; NULL != pRC;
 			     pRC = pRC->pRCuniq) {
 			    s = ":@%s";
 			    s += iSep;
@@ -647,7 +647,7 @@ DoNormalRead(CONSCLIENT *pCLServing)
 		GRPENT *pGE;
 		char *s;
 
-		for (pGE = pGroups; pGE != (GRPENT *)0; pGE = pGE->pGEnext) {
+		for (pGE = pGroups; pGE != NULL; pGE = pGE->pGEnext) {
 		    if (0 == pGE->imembers)
 			continue;
 		    s = ":%hu";
@@ -658,7 +658,7 @@ DoNormalRead(CONSCLIENT *pCLServing)
 		FileWrite(pCLServing->fd, FLAGFALSE, "\r\n", 2);
 	    } else if (pCLServing->iState == S_NORMAL &&
 		       strcmp(pcCmd, "call") == 0) {
-		if (pcArgs == (char *)0)
+		if (pcArgs == NULL)
 		    FileWrite(pCLServing->fd, FLAGFALSE,
 			      "call requires argument\r\n", -1);
 		else
@@ -667,7 +667,7 @@ DoNormalRead(CONSCLIENT *pCLServing)
 		FileWrite(pCLServing->fd, FLAGFALSE, "unknown command\r\n",
 			  -1);
 	    }
-	    BuildString((char *)0, pCLServing->accmd);
+	    BuildString(NULL, pCLServing->accmd);
 	}
 	nr -= l;
 	MemMove(acIn, acIn + l, nr);
@@ -694,11 +694,11 @@ Master(void)
 # endif
 #else
     struct sockaddr_un master_port;
-    static STRING *portPath = (STRING *)0;
+    static STRING *portPath = NULL;
 #endif
     FILE *fp;
-    CONSCLIENT *pCLServing = (CONSCLIENT *)0;
-    CONSCLIENT *pCL = (CONSCLIENT *)0;
+    CONSCLIENT *pCLServing = NULL;
+    CONSCLIENT *pCL = NULL;
 
 
     /* set up signal handler */
@@ -725,7 +725,7 @@ Master(void)
 
     /* prime the free connection slots */
     if ((pCLmfree = (CONSCLIENT *)calloc(1, sizeof(CONSCLIENT)))
-	== (CONSCLIENT *)0)
+	== NULL)
 	OutOfMem();
     pCLmfree->accmd = AllocString();
     pCLmfree->peername = AllocString();
@@ -774,7 +774,7 @@ Master(void)
 #elif USE_UNIX_DOMAIN_SOCKETS
     master_port.sun_family = AF_UNIX;
 
-    if (portPath == (STRING *)0)
+    if (portPath == NULL)
 	portPath = AllocString();
     BuildStringPrint(portPath, "%s/0", interface);
     if (portPath->used > sizeof(master_port.sun_path)) {
@@ -872,7 +872,7 @@ Master(void)
 	    ReReadCfg(msfd, msfd);
 	    /* fix up the client descriptors since ReReadCfg() doesn't
 	     * see them like it can in the child processes */
-	    for (pCL = pCLmall; pCL != (CONSCLIENT *)0; pCL = pCL->pCLscan) {
+	    for (pCL = pCLmall; pCL != NULL; pCL = pCL->pCLscan) {
 		FD_SET(FileFDNum(pCL->fd), &rinit);
 		if (maxfd < FileFDNum(pCL->fd) + 1)
 		    maxfd = FileFDNum(pCL->fd) + 1;
@@ -900,8 +900,8 @@ Master(void)
 	wmask = winit;
 
 	if (-1 ==
-	    select(maxfd, &rmask, &wmask, (fd_set *)0,
-		   (struct timeval *)0)) {
+	    select(maxfd, &rmask, &wmask, NULL,
+		   NULL)) {
 	    if (errno != EINTR) {
 		Error("Master(): select(): %s", strerror(errno));
 		break;
@@ -910,7 +910,7 @@ Master(void)
 	}
 
 	/* anything on a connection? */
-	for (pCLServing = pCLmall; (CONSCLIENT *)0 != pCLServing;
+	for (pCLServing = pCLmall; NULL != pCLServing;
 	     pCLServing = pCLServing->pCLscan) {
 	    switch (pCLServing->ioState) {
 #if HAVE_OPENSSL
@@ -945,7 +945,7 @@ Master(void)
 			CONDDEBUG((1, "Master(): flushing fd %d",
 				   FileFDNum(pCLServing->fd)));
 			if (FileWrite
-			    (pCLServing->fd, FLAGFALSE, (char *)0,
+			    (pCLServing->fd, FLAGFALSE, NULL,
 			     0) < 0) {
 			    DropMasterClient(pCLServing, FLAGTRUE);
 			    break;
@@ -998,9 +998,9 @@ Master(void)
 	    pCLmfree->fd = FileOpenFD(cfd, simpleSocket);
 	    FileSetQuoteIAC(pCLmfree->fd, FLAGTRUE);
 	} else
-	    pCLmfree->fd = (CONSFILE *)0;
+	    pCLmfree->fd = NULL;
 
-	if ((CONSFILE *)0 == pCLmfree->fd) {
+	if (NULL == pCLmfree->fd) {
 	    Error("Master(): FileOpenFD(%u): %s", cfd, strerror(errno));
 #if HAVE_DMALLOC && DMALLOC_MARK_CLIENT_CONNECTION
 	    CONDDEBUG((1, "Master(): dmalloc / MarkClientConnection"));
@@ -1014,9 +1014,9 @@ Master(void)
 	pCLmfree = pCL->pCLnext;
 
 	/* add another if we ran out */
-	if (pCLmfree == (CONSCLIENT *)0) {
+	if (pCLmfree == NULL) {
 	    if ((pCLmfree = (CONSCLIENT *)calloc(1, sizeof(CONSCLIENT)))
-		== (CONSCLIENT *)0)
+		== NULL)
 		OutOfMem();
 	    pCLmfree->accmd = AllocString();
 	    pCLmfree->peername = AllocString();
@@ -1027,7 +1027,7 @@ Master(void)
 	/* link into all clients list */
 	pCL->pCLscan = pCLmall;
 	pCL->ppCLbscan = &pCLmall;
-	if ((CONSCLIENT *)0 != pCL->pCLscan) {
+	if (NULL != pCL->pCLscan) {
 	    pCL->pCLscan->ppCLbscan = &pCL->pCLscan;
 	}
 	pCLmall = pCL;
@@ -1038,10 +1038,10 @@ Master(void)
 
 	/* init the fsm */
 	pCL->iState = S_IDENT;
-	BuildString((char *)0, pCL->accmd);
-	BuildString((char *)0, pCL->peername);
-	BuildString((char *)0, pCL->username);
-	BuildString((char *)0, pCL->acid);
+	BuildString(NULL, pCL->accmd);
+	BuildString(NULL, pCL->peername);
+	BuildString(NULL, pCL->username);
+	BuildString(NULL, pCL->acid);
 
 	if (ClientAccessOk(pCL)) {
 	    pCL->ioState = ISNORMAL;
@@ -1057,7 +1057,7 @@ Master(void)
 #endif
 
     /* clean up the free list */
-    while (pCLmfree != (CONSCLIENT *)0) {
+    while (pCLmfree != NULL) {
 	pCL = pCLmfree->pCLnext;
 	DestroyClient(pCLmfree);
 	pCLmfree = pCL;

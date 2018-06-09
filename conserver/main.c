@@ -61,23 +61,23 @@ unsigned short bindPort;
 unsigned short bindBasePort;
 struct sockaddr_in in_port;
 #endif
-static STRING *startedMsg = (STRING *)0;
-CONFIG *optConf = (CONFIG *)0;
-CONFIG *config = (CONFIG *)0;
-char *interface = (char *)0;
+static STRING *startedMsg = NULL;
+CONFIG *optConf = NULL;
+CONFIG *config = NULL;
+char *interface = NULL;
 CONFIG defConfig =
-    { (STRING *)0, FLAGTRUE, 'r', FLAGFALSE, LOGFILEPATH, PASSWDFILE,
+    { NULL, FLAGTRUE, 'r', FLAGFALSE, LOGFILEPATH, PASSWDFILE,
     DEFPORT,
-    FLAGTRUE, FLAGTRUE, 0, DEFBASEPORT, (char *)0, 0
+    FLAGTRUE, FLAGTRUE, 0, DEFBASEPORT, NULL, 0
 #if HAVE_SETPROCTITLE
 	, FLAGFALSE
 #endif
 #if HAVE_OPENSSL
-	, (char *)0, FLAGTRUE, FLAGFALSE, (char *)0
+	, NULL, FLAGTRUE, FLAGFALSE, NULL
 #endif
 };
 
-CONSFILE *unifiedlog = (CONSFILE *)0;
+CONSFILE *unifiedlog = NULL;
 
 #if HAVE_DMALLOC && DMALLOC_MARK_MAIN
 unsigned long dmallocMarkMain = 0;
@@ -115,11 +115,11 @@ int DH_set0_pqg(DH *dh, BIGNUM *p, BIGNUM *q, BIGNUM *g)
 }
 #endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
 
-SSL_CTX *ctx = (SSL_CTX *)0;
-DH *dh512 = (DH *)0;
-DH *dh1024 = (DH *)0;
-DH *dh2048 = (DH *)0;
-DH *dh4096 = (DH *)0;
+SSL_CTX *ctx = NULL;
+DH *dh512 = NULL;
+DH *dh1024 = NULL;
+DH *dh2048 = NULL;
+DH *dh4096 = NULL;
 
 DH *
 DHFromArray(unsigned char *dh_p, size_t dh_p_size, unsigned char *dh_g, size_t dh_g_size) {
@@ -306,19 +306,19 @@ TmpDHCallback(SSL *ssl, int is_export, int keylength)
 	       keylength));
     switch (keylength) {
 	case 512:
-	    if (dh512 == (DH *)0)
+	    if (dh512 == NULL)
 		dh512 = GetDH512();
 	    return dh512;
 	case 1024:
-	    if (dh1024 == (DH *)0)
+	    if (dh1024 == NULL)
 		dh1024 = GetDH1024();
 	    return dh1024;
 	case 2048:
-	    if (dh2048 == (DH *)0)
+	    if (dh2048 == NULL)
 		dh2048 = GetDH2048();
 	    return dh2048;
 	default:
-	    if (dh4096 == (DH *)0)
+	    if (dh4096 == NULL)
 		dh4096 = GetDH4096();
 	    return dh4096;
     }
@@ -327,7 +327,7 @@ TmpDHCallback(SSL *ssl, int is_export, int keylength)
 void
 SetupSSL(void)
 {
-    if (ctx == (SSL_CTX *)0) {
+    if (ctx == NULL) {
 	char *ciphers;
 	int verifymode;
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
@@ -337,7 +337,7 @@ SetupSSL(void)
 	    Bye(EX_SOFTWARE);
 	}
 #endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
-	if ((ctx = SSL_CTX_new(TLS_method())) == (SSL_CTX *)0) {
+	if ((ctx = SSL_CTX_new(TLS_method())) == NULL) {
 	    Error("SetupSSL(): SSL_CTX_new() failed");
 	    Bye(EX_SOFTWARE);
 	}
@@ -346,7 +346,7 @@ SetupSSL(void)
 		("SetupSSL(): could not load SSL default CA file and/or directory");
 	    Bye(EX_SOFTWARE);
 	}
-	if (config->sslcredentials != (char *)0) {
+	if (config->sslcredentials != NULL) {
 	    if (SSL_CTX_use_certificate_chain_file
 		(ctx, config->sslcredentials) != 1) {
 		Error
@@ -365,7 +365,7 @@ SetupSSL(void)
 	} else {
 	    ciphers = "ALL:aNULL:!LOW:!EXP:!MD5:@STRENGTH" CIPHER_SEC0;
 	}
-	if (config->sslcacertificatefile != (char *)0) {
+	if (config->sslcacertificatefile != NULL) {
 	    STACK_OF(X509_NAME) * cert_names;
 
 	    cert_names =
@@ -464,7 +464,7 @@ ReopenLogfile(void)
      * returning (in case the logfile was set and then unset [config
      * file change]).
      */
-    if (config->logfile == (char *)0) {
+    if (config->logfile == NULL) {
 	close(2);
 	return;
     }
@@ -488,17 +488,17 @@ void
 ReopenUnifiedlog(void)
 {
     /* close any existing */
-    if (unifiedlog != (CONSFILE *)0)
+    if (unifiedlog != NULL)
 	FileClose(&unifiedlog);
 
     /* return if we aren't opening again */
-    if (config->unifiedlog == (char *)0)
+    if (config->unifiedlog == NULL)
 	return;
 
     /* open a new one */
     if ((unifiedlog =
 	 FileOpen(config->unifiedlog, O_WRONLY | O_CREAT | O_APPEND,
-		  0644)) == (CONSFILE *)0) {
+		  0644)) == NULL) {
 	Error("ReopenUnifiedlog(): open(%s): %s", config->unifiedlog,
 	      strerror(errno));
 	return;
@@ -559,7 +559,7 @@ Daemonize(void)
     /* lose our controlling terminal
      */
     if (-1 != (td = open("/dev/tty", O_RDWR, 0600))) {
-	ioctl(td, TIOCNOTTY, (char *)0);
+	ioctl(td, TIOCNOTTY, NULL);
 	close(td);
     }
 #endif
@@ -615,12 +615,12 @@ Usage(int wantfull)
 	"U logfile  copy all console data to the \"unified\" logfile",
 	"v          be verbose on startup",
 	"V          output version info",
-	(char *)0
+	NULL
     };
     fprintf(stderr, "usage: %s %s\n", progname, u_terse);
     if (wantfull) {
 	int i;
-	for (i = 0; full[i] != (char *)0; i++)
+	for (i = 0; full[i] != NULL; i++)
 	    fprintf(stderr, "\t%s\n", full[i]);
     }
 }
@@ -630,8 +630,8 @@ Usage(int wantfull)
 static void
 Version(void)
 {
-    static STRING *acA1 = (STRING *)0;
-    static STRING *acA2 = (STRING *)0;
+    static STRING *acA1 = NULL;
+    static STRING *acA2 = NULL;
     int i;
     char *optionlist[] = {
 #if HAVE_DMALLOC
@@ -655,12 +655,12 @@ Version(void)
 #if USE_UNIX_DOMAIN_SOCKETS
 	"uds",
 #endif
-	(char *)0
+	NULL
     };
 
-    if (acA1 == (STRING *)0)
+    if (acA1 == NULL)
 	acA1 = AllocString();
-    if (acA2 == (STRING *)0)
+    if (acA2 == NULL)
 	acA2 = AllocString();
 
     isMultiProc = 0;
@@ -683,10 +683,10 @@ Version(void)
 	defConfig.secondaryport);
 #endif
 
-    BuildString((char *)0, acA1);
-    if (optionlist[0] == (char *)0)
+    BuildString(NULL, acA1);
+    if (optionlist[0] == NULL)
 	BuildString("none", acA1);
-    for (i = 0; optionlist[i] != (char *)0; i++) {
+    for (i = 0; optionlist[i] != NULL; i++) {
 	if (i == 0)
 	    BuildString(optionlist[i], acA1);
 	else {
@@ -696,7 +696,7 @@ Version(void)
     }
     Msg("options: %s", acA1->string);
 #if HAVE_DMALLOC
-    BuildString((char *)0, acA1);
+    BuildString(NULL, acA1);
     BuildStringChar('0' + DMALLOC_VERSION_MAJOR, acA1);
     BuildStringChar('.', acA1);
     BuildStringChar('0' + DMALLOC_VERSION_MINOR, acA1);
@@ -711,7 +711,7 @@ Version(void)
     Msg("dmalloc version: %s", acA1->string);
 #endif
 #if HAVE_FREEIPMI
-    BuildString((char *)0, acA1);
+    BuildString(NULL, acA1);
     BuildStringChar('0' + LIBIPMICONSOLE_VERSION_MAJOR, acA1);
     BuildStringChar('.', acA1);
     BuildStringChar('0' + LIBIPMICONSOLE_VERSION_MINOR, acA1);
@@ -736,19 +736,19 @@ DestroyDataStructures(void)
     REMOTE *pRC;
     ACCESS *pAC;
 
-    while (pGroups != (GRPENT *)0) {
+    while (pGroups != NULL) {
 	pGE = pGroups->pGEnext;
 	DestroyGroup(pGroups);
 	pGroups = pGE;
     }
 
-    while (pRCList != (REMOTE *)0) {
+    while (pRCList != NULL) {
 	pRC = pRCList->pRCnext;
 	DestroyRemoteConsole(pRCList);
 	pRCList = pRC;
     }
 
-    while (pACList != (ACCESS *)0) {
+    while (pACList != NULL) {
 	pAC = pACList->pACnext;
 	DestroyAccessList(pACList);
 	pACList = pAC;
@@ -761,15 +761,15 @@ DestroyDataStructures(void)
     DestroyConfig(config);
 
 #if HAVE_OPENSSL
-    if (ctx != (SSL_CTX *)0)
+    if (ctx != NULL)
 	SSL_CTX_free(ctx);
-    if (dh512 != (DH *)0)
+    if (dh512 != NULL)
 	DH_free(dh512);
-    if (dh1024 != (DH *)0)
+    if (dh1024 != NULL)
 	DH_free(dh1024);
-    if (dh2048 != (DH *)0)
+    if (dh2048 != NULL)
 	DH_free(dh2048);
-    if (dh4096 != (DH *)0)
+    if (dh4096 != NULL)
 	DH_free(dh4096);
 #endif
 
@@ -778,7 +778,7 @@ DestroyDataStructures(void)
     freeaddrinfo(bindAddr);
     freeaddrinfo(bindBaseAddr);
 #else
-    if (myAddrs != (struct in_addr *)0)
+    if (myAddrs != NULL)
 	free(myAddrs);
 #endif
 
@@ -786,7 +786,7 @@ DestroyDataStructures(void)
     DestroyTaskList();
     DestroyStrings();
     DestroyUserList();
-    if (substData != (SUBST *)0)
+    if (substData != NULL)
 	free(substData);
 }
 
@@ -807,71 +807,71 @@ SummarizeDataStructures(void)
     if (!fDebug)
 	return;
 
-    for (size = 0, count = 0, pGE = pGroups; pGE != (GRPENT *)0;
+    for (size = 0, count = 0, pGE = pGroups; pGE != NULL;
 	 pGE = pGE->pGEnext, count++) {
 	size += sizeof(GRPENT);
     }
     CONDDEBUG((1, "Memory Usage (GRPENT objects): %ld (%d)", size, count));
     total += size;
 
-    for (size = 0, count = 0, pGE = pGroups; pGE != (GRPENT *)0;
+    for (size = 0, count = 0, pGE = pGroups; pGE != NULL;
 	 pGE = pGE->pGEnext) {
-	for (pCE = pGE->pCElist; pCE != (CONSENT *)0;
+	for (pCE = pGE->pCElist; pCE != NULL;
 	     pCE = pCE->pCEnext, count++) {
 	    size += strlen(pCE->server) + sizeof(CONSENT);
-	    if (pCE->host != (char *)0)
+	    if (pCE->host != NULL)
 		size += strlen(pCE->server);
-	    if (pCE->device != (char *)0)
+	    if (pCE->device != NULL)
 		size += strlen(pCE->device);
-	    if (pCE->exec != (char *)0)
+	    if (pCE->exec != NULL)
 		size += strlen(pCE->exec);
-	    if (pCE->master != (char *)0)
+	    if (pCE->master != NULL)
 		size += strlen(pCE->master);
-	    if (pCE->logfile != (char *)0)
+	    if (pCE->logfile != NULL)
 		size += strlen(pCE->logfile);
-	    if (pCE->initcmd != (char *)0)
+	    if (pCE->initcmd != NULL)
 		size += strlen(pCE->initcmd);
-	    if (pCE->execSlave != (char *)0)
+	    if (pCE->execSlave != NULL)
 		size += strlen(pCE->execSlave);
-	    if (pCE->motd != (char *)0)
+	    if (pCE->motd != NULL)
 		size += strlen(pCE->motd);
-	    if (pCE->idlestring != (char *)0)
+	    if (pCE->idlestring != NULL)
 		size += strlen(pCE->idlestring);
-	    if (pCE->replstring != (char *)0)
+	    if (pCE->replstring != NULL)
 		size += strlen(pCE->replstring);
-	    if (pCE->tasklist != (char *)0)
+	    if (pCE->tasklist != NULL)
 		size += strlen(pCE->tasklist);
-	    if (pCE->breaklist != (char *)0)
+	    if (pCE->breaklist != NULL)
 		size += strlen(pCE->breaklist);
 #if HAVE_FREEIPMI
-	    if (pCE->username != (char *)0)
+	    if (pCE->username != NULL)
 		size += strlen(pCE->username);
-	    if (pCE->password != (char *)0)
+	    if (pCE->password != NULL)
 		size += strlen(pCE->password);
 #endif
-	    if (pCE->fdlog != (CONSFILE *)0)
+	    if (pCE->fdlog != NULL)
 		size += sizeof(CONSFILE);
-	    if (pCE->cofile != (CONSFILE *)0)
+	    if (pCE->cofile != NULL)
 		size += sizeof(CONSFILE);
-	    if (pCE->initfile != (CONSFILE *)0)
+	    if (pCE->initfile != NULL)
 		size += sizeof(CONSFILE);
-	    if (pCE->taskfile != (CONSFILE *)0)
+	    if (pCE->taskfile != NULL)
 		size += sizeof(CONSFILE);
-	    if (pCE->aliases != (NAMES *)0) {
+	    if (pCE->aliases != NULL) {
 		NAMES *n;
-		for (n = pCE->aliases; n != (NAMES *)0; n = n->next) {
+		for (n = pCE->aliases; n != NULL; n = n->next) {
 		    size += sizeof(NAMES) + strlen(n->name);
 		}
 	    }
 	    if (pCE->ro) {
 		CONSENTUSERS *u;
-		for (u = pCE->ro; u != (CONSENTUSERS *)0; u = u->next) {
+		for (u = pCE->ro; u != NULL; u = u->next) {
 		    size += sizeof(CONSENTUSERS) + strlen(u->user->name);
 		}
 	    }
 	    if (pCE->rw) {
 		CONSENTUSERS *u;
-		for (u = pCE->rw; u != (CONSENTUSERS *)0; u = u->next) {
+		for (u = pCE->rw; u != NULL; u = u->next) {
 		    size += sizeof(CONSENTUSERS) + strlen(u->user->name);
 		}
 	    }
@@ -881,12 +881,12 @@ SummarizeDataStructures(void)
 	       count));
     total += size;
 
-    for (size = 0, count = 0, pRC = pRCList; pRC != (REMOTE *)0;
+    for (size = 0, count = 0, pRC = pRCList; pRC != NULL;
 	 pRC = pRC->pRCnext, count++) {
 	size += strlen(pRC->rserver) + strlen(pRC->rhost) + sizeof(REMOTE);
-	if (pRC->aliases != (NAMES *)0) {
+	if (pRC->aliases != NULL) {
 	    NAMES *n;
-	    for (n = pRC->aliases; n != (NAMES *)0; n = n->next) {
+	    for (n = pRC->aliases; n != NULL; n = n->next) {
 		size += sizeof(NAMES) + strlen(n->name);
 	    }
 	}
@@ -894,21 +894,21 @@ SummarizeDataStructures(void)
     CONDDEBUG((1, "Memory Usage (REMOTE objects): %ld (%d)", size, count));
     total += size;
 
-    for (size = 0, count = 0, pAC = pACList; pAC != (ACCESS *)0;
+    for (size = 0, count = 0, pAC = pACList; pAC != NULL;
 	 pAC = pAC->pACnext, count++) {
 	size += strlen(pAC->pcwho) + sizeof(ACCESS);
     }
     CONDDEBUG((1, "Memory Usage (ACCESS objects): %ld (%d)", size, count));
     total += size;
 
-    for (size = 0, count = 0, str = allStrings; str != (STRING *)0;
+    for (size = 0, count = 0, str = allStrings; str != NULL;
 	 str = str->next, count++) {
 	size += str->allocated + sizeof(STRING);
     }
     CONDDEBUG((1, "Memory Usage (STRING objects): %ld (%d)", size, count));
     total += size;
 
-    for (size = 0, count = 0, usr = userList; usr != (NAMES *)0;
+    for (size = 0, count = 0, usr = userList; usr != NULL;
 	 usr = usr->next, count++) {
 	size += strlen(usr->name) + sizeof(NAMES);
     }
@@ -928,8 +928,8 @@ DumpDataStructures(void)
     int i;
     TASKS *t;
 #if HAVE_FREEIPMI
-    static STRING *tmpString = (STRING *)0;
-    if (tmpString == (STRING *)0)
+    static STRING *tmpString = NULL;
+    if (tmpString == NULL)
 	tmpString = AllocString();
 #endif
 
@@ -937,20 +937,20 @@ DumpDataStructures(void)
     CONDDEBUG((1, "DumpDataStructures(): dmalloc / MarkMain"));
     dmalloc_log_changed(dmallocMarkMain, 1, 0, 1);
 #endif
-#define EMPTYSTR(x) x == (char *)0 ? "(null)" : x
+#define EMPTYSTR(x) x == NULL ? "(null)" : x
 #define FLAGSTR(x) x == FLAGTRUE ? "true" : (x == FLAGFALSE ? "false" : "unset")
     if (!fDebug)
 	return;
 
     SummarizeDataStructures();
 
-    for (pGE = pGroups; pGE != (GRPENT *)0; pGE = pGE->pGEnext) {
+    for (pGE = pGroups; pGE != NULL; pGE = pGE->pGEnext) {
 	CONDDEBUG((1,
 		   "DumpDataStructures(): group: id=%u port=%hu, pid=%lu, imembers=%d",
 		   pGE->id, pGE->port, (unsigned long)pGE->pid,
 		   pGE->imembers));
 
-	for (pCE = pGE->pCElist; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
+	for (pCE = pGE->pCElist; pCE != NULL; pCE = pCE->pCEnext) {
 	    switch (pCE->type) {
 		case DEVICE:
 		    CONDDEBUG((1,
@@ -1023,9 +1023,9 @@ DumpDataStructures(void)
 			       EMPTYSTR(pCE->server)));
 		    break;
 	    }
-	    if (pCE->aliases != (NAMES *)0) {
+	    if (pCE->aliases != NULL) {
 		NAMES *n;
-		for (n = pCE->aliases; n != (NAMES *)0; n = n->next) {
+		for (n = pCE->aliases; n != NULL; n = n->next) {
 		    CONDDEBUG((1, "DumpDataStructures():  alias=%s",
 			       n->name));
 		}
@@ -1077,14 +1077,14 @@ DumpDataStructures(void)
 		       FileFDNum(pCE->taskfile)));
 	    if (pCE->ro) {
 		CONSENTUSERS *u;
-		for (u = pCE->ro; u != (CONSENTUSERS *)0; u = u->next) {
+		for (u = pCE->ro; u != NULL; u = u->next) {
 		    CONDDEBUG((1, "DumpDataStructures():  ro=%s%s",
 			       (u->not ? "!" : ""), u->user->name));
 		}
 	    }
 	    if (pCE->rw) {
 		CONSENTUSERS *u;
-		for (u = pCE->rw; u != (CONSENTUSERS *)0; u = u->next) {
+		for (u = pCE->rw; u != NULL; u = u->next) {
 		    CONDDEBUG((1, "DumpDataStructures():  rw=%s%s",
 			       (u->not ? "!" : ""), u->user->name));
 		}
@@ -1092,12 +1092,12 @@ DumpDataStructures(void)
 	    CONDDEBUG((1, "DumpDataStructures():  ------"));
 	}
     }
-    for (pRC = pRCList; (REMOTE *)0 != pRC; pRC = pRC->pRCnext) {
+    for (pRC = pRCList; NULL != pRC; pRC = pRC->pRCnext) {
 	CONDDEBUG((1, "DumpDataStructures(): remote: rserver=%s, rhost=%s",
 		   EMPTYSTR(pRC->rserver), EMPTYSTR(pRC->rhost)));
-	if (pRC->aliases != (NAMES *)0) {
+	if (pRC->aliases != NULL) {
 	    NAMES *n;
-	    for (n = pRC->aliases; n != (NAMES *)0; n = n->next) {
+	    for (n = pRC->aliases; n != NULL; n = n->next) {
 		CONDDEBUG((1, "DumpDataStructures():  alias=%s", n->name));
 	    }
 	}
@@ -1109,7 +1109,7 @@ DumpDataStructures(void)
 		   EMPTYSTR(breakList[i].seq->string), breakList[i].delay,
 		   FLAGSTR(breakList[i].confirm)));
     }
-    for (t = taskList; t != (TASKS *)0; t = t->next) {
+    for (t = taskList; t != NULL; t = t->next) {
 	CONDDEBUG((1,
 		   "DumpDataStructures(): task: id=%c, cmd=%s, descr=%s, uid=%d, gid=%d, subst=%s, confirm=%s",
 		   t->id, EMPTYSTR(t->cmd->string),
@@ -1129,7 +1129,7 @@ VerifyEmptyDirectory(char *d)
     DIR *dir;
     struct dirent *de;
 # if 0				/* See below */
-    STRING *path = (STRING *)0;
+    STRING *path = NULL;
 # endif
     int retval = 0;
 
@@ -1153,12 +1153,12 @@ VerifyEmptyDirectory(char *d)
     }
 
     /* now make sure it's empty...erase anything you see, etc */
-    if ((dir = opendir(d)) == (DIR *) 0) {
+    if ((dir = opendir(d)) == NULL) {
 	Error("opendir(%s): %s", d, strerror(errno));
 	return -1;
     }
 
-    while ((de = readdir(dir)) != (struct dirent *)0) {
+    while ((de = readdir(dir)) != NULL) {
 	if ((strcmp(de->d_name, ".") == 0) ||
 	    (strcmp(de->d_name, "..") == 0))
 	    continue;
@@ -1172,7 +1172,7 @@ VerifyEmptyDirectory(char *d)
  * shredded with a small typo.
  */
 # if 0
-	if (path == (STRING *)0)
+	if (path == NULL)
 	    path = AllocString();
 	BuildStringPrint(path, "%s/%s", d, de->d_name);
 	if (stat(path->string, &dstat) == -1) {
@@ -1197,7 +1197,7 @@ VerifyEmptyDirectory(char *d)
     }
 
 # if 0				/* See above */
-    if (path != (STRING *)0)
+    if (path != NULL)
 	DestroyString(path);
 # endif
 
@@ -1220,13 +1220,13 @@ int
 main(int argc, char **argv)
 {
     int i;
-    FILE *fpConfig = (FILE *)0;
+    FILE *fpConfig = NULL;
     static char acOpts[] = "7a:b:c:C:dDEFhiL:m:M:noO:p:P:RSuU:Vv";
     struct passwd *pwd;
-    char *origuser = (char *)0;
-    char *curuser = (char *)0;
+    char *origuser = NULL;
+    char *curuser = NULL;
     int curuid = 0;
-    GRPENT *pGE = (GRPENT *)0;
+    GRPENT *pGE = NULL;
 #if !USE_UNIX_DOMAIN_SOCKETS
 # if USE_IPV6
     int s;
@@ -1241,7 +1241,7 @@ main(int argc, char **argv)
     isMultiProc = 1;		/* make sure stuff has the pid */
 
     thepid = getpid();
-    if ((char *)0 == (progname = strrchr(argv[0], '/'))) {
+    if (NULL == (progname = strrchr(argv[0], '/'))) {
 	progname = argv[0];
     } else {
 	++progname;
@@ -1271,10 +1271,10 @@ main(int argc, char **argv)
 
     /* prep the config options */
     if ((optConf = (CONFIG *)calloc(1, sizeof(CONFIG)))
-	== (CONFIG *)0)
+	== NULL)
 	OutOfMem();
     if ((config = (CONFIG *)calloc(1, sizeof(CONFIG)))
-	== (CONFIG *)0)
+	== NULL)
 	OutOfMem();
 
     while (EOF != (i = getopt(argc, argv, acOpts))) {
@@ -1298,13 +1298,13 @@ main(int argc, char **argv)
 		}
 		break;
 	    case 'b':
-		if ((optConf->secondaryport = StrDup(optarg)) == (char *)0)
+		if ((optConf->secondaryport = StrDup(optarg)) == NULL)
 		    OutOfMem();
 		break;
 	    case 'c':
 #if HAVE_OPENSSL
 		if ((optConf->sslcredentials =
-		     StrDup(optarg)) == (char *)0)
+		     StrDup(optarg)) == NULL)
 		    OutOfMem();
 #endif
 		break;
@@ -1332,7 +1332,7 @@ main(int argc, char **argv)
 		fNoinit = 1;
 		break;
 	    case 'L':
-		if ((optConf->logfile = StrDup(optarg)) == (char *)0)
+		if ((optConf->logfile = StrDup(optarg)) == NULL)
 		    OutOfMem();
 		break;
 	    case 'm':
@@ -1358,11 +1358,11 @@ main(int argc, char **argv)
 		optConf->reinitcheck = atoi(optarg);
 		break;
 	    case 'p':
-		if ((optConf->primaryport = StrDup(optarg)) == (char *)0)
+		if ((optConf->primaryport = StrDup(optarg)) == NULL)
 		    OutOfMem();
 		break;
 	    case 'P':
-		if ((optConf->passwdfile = StrDup(optarg)) == (char *)0)
+		if ((optConf->passwdfile = StrDup(optarg)) == NULL)
 		    OutOfMem();
 		break;
 	    case 'R':
@@ -1375,7 +1375,7 @@ main(int argc, char **argv)
 		fAll = 1;
 		break;
 	    case 'U':
-		if ((optConf->unifiedlog = StrDup(optarg)) == (char *)0)
+		if ((optConf->unifiedlog = StrDup(optarg)) == NULL)
 		    OutOfMem();
 		break;
 	    case 'V':
@@ -1405,17 +1405,17 @@ main(int argc, char **argv)
 #endif
     curuid = getuid();
 
-    if ((struct passwd *)0 != (pwd = getpwuid(curuid)))
+    if (NULL != (pwd = getpwuid(curuid)))
 	curuser = pwd->pw_name;
 
     /* chuck any empty username */
-    if (curuser != (char *)0 && curuser[0] == '\000')
-	curuser = (char *)0;
+    if (curuser != NULL && curuser[0] == '\000')
+	curuser = NULL;
 
-    if (startedMsg == (STRING *)0)
+    if (startedMsg == NULL)
 	startedMsg = AllocString();
-    if (curuser == (char *)0)
-	if (origuser == (char *)0)
+    if (curuser == NULL)
+	if (origuser == NULL)
 	    BuildStringPrint(startedMsg, "started as uid %d by uid %d",
 			     curuid, curuid);
 	else
@@ -1423,7 +1423,7 @@ main(int argc, char **argv)
 			     curuid, origuser);
     else
 	BuildStringPrint(startedMsg, "started as `%s' by `%s'", curuser,
-			 (origuser == (char *)0) ? curuser : origuser);
+			 (origuser == NULL) ? curuser : origuser);
     endpwent();
     Msg("%s", startedMsg->string);
 
@@ -1450,7 +1450,7 @@ main(int argc, char **argv)
 	timers[i] = (time_t)0;
 
     /* read the config file */
-    if ((FILE *)0 == (fpConfig = fopen(pcConfig, "r"))) {
+    if (NULL == (fpConfig = fopen(pcConfig, "r"))) {
 	Error("fopen(%s): %s", pcConfig, strerror(errno));
 	Bye(EX_NOINPUT);
     }
@@ -1459,13 +1459,13 @@ main(int argc, char **argv)
 
 #if !USE_UNIX_DOMAIN_SOCKETS
     /* set up the port to bind to */
-    if (optConf->primaryport != (char *)0)
+    if (optConf->primaryport != NULL)
 	config->primaryport = StrDup(optConf->primaryport);
-    else if (pConfig->primaryport != (char *)0)
+    else if (pConfig->primaryport != NULL)
 	config->primaryport = StrDup(pConfig->primaryport);
     else
 	config->primaryport = StrDup(defConfig.primaryport);
-    if (config->primaryport == (char *)0)
+    if (config->primaryport == NULL)
 	OutOfMem();
 
 # if !USE_IPV6
@@ -1480,7 +1480,7 @@ main(int argc, char **argv)
     } else {
 	/* non-numeric only */
 	struct servent *pSE;
-	if ((struct servent *)0 ==
+	if (NULL ==
 	    (pSE = getservbyname(config->primaryport, "tcp"))) {
 	    Error("getservbyname(%s) failed", config->primaryport);
 	    Bye(EX_OSERR);
@@ -1491,13 +1491,13 @@ main(int argc, char **argv)
 # endif
 
     /* set up the secondary port to bind to */
-    if (optConf->secondaryport != (char *)0)
+    if (optConf->secondaryport != NULL)
 	config->secondaryport = StrDup(optConf->secondaryport);
-    else if (pConfig->secondaryport != (char *)0)
+    else if (pConfig->secondaryport != NULL)
 	config->secondaryport = StrDup(pConfig->secondaryport);
     else
 	config->secondaryport = StrDup(defConfig.secondaryport);
-    if (config->secondaryport == (char *)0)
+    if (config->secondaryport == NULL)
 	OutOfMem();
 
 # if !USE_IPV6
@@ -1512,7 +1512,7 @@ main(int argc, char **argv)
     } else {
 	/* non-numeric only */
 	struct servent *pSE;
-	if ((struct servent *)0 ==
+	if (NULL ==
 	    (pSE = getservbyname(config->secondaryport, "tcp"))) {
 	    Error("getservbyname(%s) failed", config->secondaryport);
 	    Bye(EX_OSERR);
@@ -1549,11 +1549,11 @@ main(int argc, char **argv)
      * (but it allows them to see where remote consoles are)
      */
     optConf->redirect = FLAGFALSE;
-    if (interface == (char *)0)
+    if (interface == NULL)
 	interface = UDSDIR;
 #else
     /* set up the address to bind to */
-    if (interface == (char *)0 ||
+    if (interface == NULL ||
 	(interface[0] == '*' && interface[1] == '\000'))
 	bindAddr = INADDR_ANY;
     else {
@@ -1578,22 +1578,22 @@ main(int argc, char **argv)
     }
 #endif
 
-    if (optConf->passwdfile != (char *)0)
+    if (optConf->passwdfile != NULL)
 	config->passwdfile = StrDup(optConf->passwdfile);
-    else if (pConfig->passwdfile != (char *)0)
+    else if (pConfig->passwdfile != NULL)
 	config->passwdfile = StrDup(pConfig->passwdfile);
     else
 	config->passwdfile = StrDup(defConfig.passwdfile);
-    if (config->passwdfile == (char *)0)
+    if (config->passwdfile == NULL)
 	OutOfMem();
 
-    if (optConf->logfile != (char *)0)
+    if (optConf->logfile != NULL)
 	config->logfile = StrDup(optConf->logfile);
-    else if (pConfig->logfile != (char *)0)
+    else if (pConfig->logfile != NULL)
 	config->logfile = StrDup(pConfig->logfile);
     else
 	config->logfile = StrDup(defConfig.logfile);
-    if (config->logfile == (char *)0)
+    if (config->logfile == NULL)
 	OutOfMem();
 
     if (optConf->reinitcheck != 0)
@@ -1638,17 +1638,17 @@ main(int argc, char **argv)
     else
 	config->loghostnames = defConfig.loghostnames;
 
-    if (optConf->unifiedlog != (char *)0) {
+    if (optConf->unifiedlog != NULL) {
 	config->unifiedlog = StrDup(optConf->unifiedlog);
-	if (config->unifiedlog == (char *)0)
+	if (config->unifiedlog == NULL)
 	    OutOfMem();
-    } else if (pConfig->unifiedlog != (char *)0) {
+    } else if (pConfig->unifiedlog != NULL) {
 	config->unifiedlog = StrDup(pConfig->unifiedlog);
-	if (config->unifiedlog == (char *)0)
+	if (config->unifiedlog == NULL)
 	    OutOfMem();
-    } else if (defConfig.unifiedlog != (char *)0) {
+    } else if (defConfig.unifiedlog != NULL) {
 	config->unifiedlog = StrDup(defConfig.unifiedlog);
-	if (config->unifiedlog == (char *)0)
+	if (config->unifiedlog == NULL)
 	    OutOfMem();
     }
 
@@ -1674,17 +1674,17 @@ main(int argc, char **argv)
     else
 	config->sslreqclientcert = defConfig.sslreqclientcert;
 
-    if (optConf->sslcredentials != (char *)0)
+    if (optConf->sslcredentials != NULL)
 	config->sslcredentials = StrDup(optConf->sslcredentials);
-    else if (pConfig->sslcredentials != (char *)0)
+    else if (pConfig->sslcredentials != NULL)
 	config->sslcredentials = StrDup(pConfig->sslcredentials);
     else
 	config->sslcredentials = StrDup(defConfig.sslcredentials);
 
-    if (optConf->sslcacertificatefile != (char *)0)
+    if (optConf->sslcacertificatefile != NULL)
 	config->sslcacertificatefile =
 	    StrDup(optConf->sslcacertificatefile);
-    else if (pConfig->sslcacertificatefile != (char *)0)
+    else if (pConfig->sslcacertificatefile != NULL)
 	config->sslcacertificatefile =
 	    StrDup(pConfig->sslcacertificatefile);
     else
@@ -1705,7 +1705,7 @@ main(int argc, char **argv)
     dmallocMarkMain = dmalloc_mark();
 #endif
 
-    if (pGroups == (GRPENT *)0 && pRCList == (REMOTE *)0) {
+    if (pGroups == NULL && pRCList == NULL) {
 	Error("no consoles found in configuration file");
     } else if (fSyntaxOnly) {
 	/* short-circuit */
@@ -1729,7 +1729,7 @@ main(int argc, char **argv)
 
 	/* if no one can use us we need to come up with a default
 	 */
-	if (pACList == (ACCESS *)0)
+	if (pACList == NULL)
 #if USE_IPV6
 	    SetDefAccess();
 #else
@@ -1738,7 +1738,7 @@ main(int argc, char **argv)
 
 	/* spawn all the children, so fix kids has an initial pid
 	 */
-	for (pGE = pGroups; pGE != (GRPENT *)0; pGE = pGE->pGEnext) {
+	for (pGE = pGroups; pGE != NULL; pGE = pGE->pGEnext) {
 	    if (pGE->imembers == 0)
 		continue;
 
@@ -1752,9 +1752,9 @@ main(int argc, char **argv)
 	    REMOTE *pRC;
 	    GRPENT *pGE;
 	    int local = 0, remote = 0;
-	    for (pGE = pGroups; pGE != (GRPENT *)0; pGE = pGE->pGEnext)
+	    for (pGE = pGroups; pGE != NULL; pGE = pGE->pGEnext)
 		local += pGE->imembers;
-	    for (pRC = pRCList; (REMOTE *)0 != pRC; pRC = pRC->pRCnext)
+	    for (pRC = pRCList; NULL != pRC; pRC = pRC->pRCnext)
 		remote++;
 	    setproctitle("master: port %hu, %d local, %d remote",
 # if USE_IPV6
@@ -1770,7 +1770,7 @@ main(int argc, char **argv)
 
 	if (fVerbose) {
 	    ACCESS *pACtmp;
-	    for (pACtmp = pACList; pACtmp != (ACCESS *)0;
+	    for (pACtmp = pACList; pACtmp != NULL;
 		 pACtmp = pACtmp->pACnext) {
 		Verbose("access type `%c' for `%s'", pACtmp->ctrust,
 			pACtmp->pcwho);
@@ -1783,7 +1783,7 @@ main(int argc, char **argv)
 	 */
 	if (fVerbose) {
 	    REMOTE *pRC;
-	    for (pRC = pRCUniq; (REMOTE *)0 != pRC; pRC = pRC->pRCuniq) {
+	    for (pRC = pRCUniq; NULL != pRC; pRC = pRC->pRCuniq) {
 		Verbose("peer server on `%s'", pRC->rhost);
 	    }
 	}
@@ -1798,7 +1798,7 @@ main(int argc, char **argv)
 	SignalKids(SIGTERM);
     }
 
-    if (unifiedlog != (CONSFILE *)0)
+    if (unifiedlog != NULL)
 	FileClose(&unifiedlog);
 
     DumpDataStructures();

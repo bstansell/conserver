@@ -47,7 +47,7 @@ int deny_severity;
 
 
 SECTION sections[] = {
-    {(char *)0, (void *)0, (void *)0, (void *)0, (void *)0}
+    {NULL, NULL, NULL, NULL, NULL}
 };
 
 void
@@ -59,38 +59,38 @@ char *
 ReadLine2(FILE *fp, STRING *save, int *iLine)
 {
     static char buf[1024];
-    char *wholeline = (char *)0;
-    char *ret = (char *)0;
+    char *wholeline = NULL;
+    char *ret = NULL;
     int i, buflen, peek, commentCheck = 1;
-    static STRING *bufstr = (STRING *)0;
-    static STRING *wholestr = (STRING *)0;
+    static STRING *bufstr = NULL;
+    static STRING *wholestr = NULL;
 
-    if (bufstr == (STRING *)0)
+    if (bufstr == NULL)
 	bufstr = AllocString();
-    if (wholestr == (STRING *)0)
+    if (wholestr == NULL)
 	wholestr = AllocString();
     peek = 0;
-    wholeline = (char *)0;
-    BuildString((char *)0, bufstr);
-    BuildString((char *)0, wholestr);
-    while (save->used || ((ret = fgets(buf, sizeof(buf), fp)) != (char *)0)
+    wholeline = NULL;
+    BuildString(NULL, bufstr);
+    BuildString(NULL, wholestr);
+    while (save->used || ((ret = fgets(buf, sizeof(buf), fp)) != NULL)
 	   || peek) {
 	/* If we have a previously saved line, use it instead */
 	if (save->used) {
 	    StrCpy(buf, save->string, sizeof(buf));
-	    BuildString((char *)0, save);
+	    BuildString(NULL, save);
 	}
 
 	if (peek) {
 	    /* End of file?  Never mind. */
-	    if (ret == (char *)0)
+	    if (ret == NULL)
 		break;
 
 	    /* If we don't have a line continuation and we've seen
 	     * some worthy data
 	     */
-	    if (!isspace((int)buf[0]) && (wholeline != (char *)0)) {
-		BuildString((char *)0, save);
+	    if (!isspace((int)buf[0]) && (wholeline != NULL)) {
+		BuildString(NULL, save);
 		BuildString(buf, save);
 		break;
 	    }
@@ -119,7 +119,7 @@ ReadLine2(FILE *fp, STRING *save, int *iLine)
 	    wholeline = BuildString(bufstr->string, wholestr);
 	    peek = 1;
 	    commentCheck = 1;
-	    BuildString((char *)0, bufstr);
+	    BuildString(NULL, bufstr);
 	} else {
 	    /* Save off the partial chunk */
 	    BuildString(buf, bufstr);
@@ -129,15 +129,15 @@ ReadLine2(FILE *fp, STRING *save, int *iLine)
     /* If we hit the EOF and weren't peeking ahead
      * and it's not a comment
      */
-    if (!peek && (ret == (char *)0)) {
+    if (!peek && (ret == NULL)) {
 	(*iLine)++;
 	wholeline = BuildString(bufstr->string, wholestr);
-	if (wholeline != (char *)0 && wholeline[0] == '\000')
-	    wholeline = (char *)0;
+	if (wholeline != NULL && wholeline[0] == '\000')
+	    wholeline = NULL;
     }
 
     CONDDEBUG((1, "ReadLine2(): returning <%s>",
-	       (wholeline != (char *)0) ? wholeline : "<NULL>"));
+	       (wholeline != NULL) ? wholeline : "<NULL>"));
     return wholeline;
 }
 
@@ -149,27 +149,27 @@ ReadCfg(char *pcFile, FILE *fp)
 {
     int iLine;
     unsigned char *acIn;
-    static STRING *acInSave = (STRING *)0;
+    static STRING *acInSave = NULL;
     char *acStart;
-    static STRING *logDirectory = (STRING *)0;
-    static STRING *defMark = (STRING *)0;
+    static STRING *logDirectory = NULL;
+    static STRING *defMark = NULL;
     int sawACL = 0;
     int printedFull = 0;
 
-    if (defMark == (STRING *)0)
+    if (defMark == NULL)
 	defMark = AllocString();
-    if (logDirectory == (STRING *)0)
+    if (logDirectory == NULL)
 	logDirectory = AllocString();
-    if (acInSave == (STRING *)0)
+    if (acInSave == NULL)
 	acInSave = AllocString();
-    BuildString((char *)0, defMark);
-    BuildString((char *)0, acInSave);
-    BuildString((char *)0, logDirectory);
+    BuildString(NULL, defMark);
+    BuildString(NULL, acInSave);
+    BuildString(NULL, logDirectory);
 
     iLine = 0;
     while ((acIn =
 	    (unsigned char *)ReadLine2(fp, acInSave,
-				       &iLine)) != (unsigned char *)0) {
+				       &iLine)) != NULL) {
 	char *pcLine, *pcMode, *pcLog, *pcRem, *pcStart, *pcMark, *pcBreak;
 	char *pcColon;
 
@@ -186,14 +186,14 @@ ReadCfg(char *pcFile, FILE *fp)
 	if ('%' == acStart[0] && '%' == acStart[1] && '\000' == acStart[2]) {
 	    break;
 	}
-	if ((char *)0 != (pcLine = strchr(acStart, '=')) &&
-	    ((char *)0 == (pcColon = strchr(acStart, ':')) ||
+	if (NULL != (pcLine = strchr(acStart, '=')) &&
+	    (NULL == (pcColon = strchr(acStart, ':')) ||
 	     pcColon > pcLine)) {
 	    *pcLine++ = '\000';
 	    acStart = PruneSpace(acStart);
 	    pcLine = PruneSpace(pcLine);
 	    if (0 == strcmp(acStart, "LOGDIR")) {
-		BuildString((char *)0, logDirectory);
+		BuildString(NULL, logDirectory);
 		BuildString(pcLine, logDirectory);
 		printf("default * {\n");
 		if (logDirectory->used > 1)
@@ -206,7 +206,7 @@ ReadCfg(char *pcFile, FILE *fp)
 		    printf("\ttimestamp \"\";\n");
 		printf("\tinclude full;\n}\n");
 	    } else if (0 == strcmp(acStart, "TIMESTAMP")) {
-		BuildString((char *)0, defMark);
+		BuildString(NULL, defMark);
 		BuildString(pcLine, defMark);
 		printf("default * {\n");
 		if (logDirectory->used > 1)
@@ -229,8 +229,8 @@ ReadCfg(char *pcFile, FILE *fp)
 		} else {
 		    char *q, *p;
 		    p = pcLine;
-		    BuildTmpString((char *)0);
-		    while ((q = strchr(p, '"')) != (char *)0) {
+		    BuildTmpString(NULL);
+		    while ((q = strchr(p, '"')) != NULL) {
 			*q = '\000';
 			BuildTmpString(p);
 			BuildTmpString("\\\"");
@@ -247,9 +247,9 @@ ReadCfg(char *pcFile, FILE *fp)
 	    }
 	    continue;
 	}
-	if ((char *)0 == (pcLine = strchr(acStart, ':')) ||
-	    (char *)0 == (pcMode = strchr(pcLine + 1, ':')) ||
-	    (char *)0 == (pcLog = strchr(pcMode + 1, ':'))) {
+	if (NULL == (pcLine = strchr(acStart, ':')) ||
+	    NULL == (pcMode = strchr(pcLine + 1, ':')) ||
+	    NULL == (pcLog = strchr(pcMode + 1, ':'))) {
 	    Error("%s(%d) bad config line `%s'", pcFile, iLine, acIn);
 	    continue;
 	}
@@ -262,38 +262,38 @@ ReadCfg(char *pcFile, FILE *fp)
 	pcMode = PruneSpace(pcMode);
 	pcLog = PruneSpace(pcLog);
 
-	if ((char *)0 != (pcMark = strchr(pcLog, ':'))) {
+	if (NULL != (pcMark = strchr(pcLog, ':'))) {
 	    *pcMark++ = '\000';
 	    pcLog = PruneSpace(pcLog);
 	    pcMark = PruneSpace(pcMark);
 	    /* Skip null intervals */
 	    if (pcMark[0] == '\000')
-		pcMark = (char *)0;
+		pcMark = NULL;
 	}
 
-	if ((char *)0 == pcMark) {
-	    pcBreak = (char *)0;
+	if (NULL == pcMark) {
+	    pcBreak = NULL;
 	} else {
-	    if ((char *)0 != (pcBreak = strchr(pcMark, ':'))) {
+	    if (NULL != (pcBreak = strchr(pcMark, ':'))) {
 		*pcBreak++ = '\000';
 		pcMark = PruneSpace(pcMark);
 		pcBreak = PruneSpace(pcBreak);
 		/* Ignore null specs */
 		if (pcMark[0] == '\000')
-		    pcMark = (char *)0;
+		    pcMark = NULL;
 		if (pcBreak[0] == '\000')
-		    pcBreak = (char *)0;
+		    pcBreak = NULL;
 	    }
 	}
 
-	if ((char *)0 != (pcRem = strchr(pcLine, '@'))) {
+	if (NULL != (pcRem = strchr(pcLine, '@'))) {
 	    *pcRem++ = '\000';
 	    pcLine = PruneSpace(pcLine);
 	    pcRem = PruneSpace(pcRem);
 	}
 
 	printf("console %s {\n", acStart);
-	if (pcRem == (char *)0) {
+	if (pcRem == NULL) {
 	    printf("\tmaster localhost;\n");
 	} else {
 	    printf("\tmaster %s;\n", pcRem);
@@ -315,19 +315,19 @@ ReadCfg(char *pcFile, FILE *fp)
 	} else {
 	    STRING *lfile;
 	    lfile = AllocString();
-	    BuildString((char *)0, lfile);
+	    BuildString(NULL, lfile);
 	    pcStart = pcLog;
 	    BuildString(pcStart, lfile);
 	    if (logDirectory->used > 1 && lfile->used > 1 &&
 		lfile->string[0] != '/') {
 		char *p;
-		BuildTmpString((char *)0);
+		BuildTmpString(NULL);
 		p = BuildTmpString(lfile->string);
-		BuildString((char *)0, lfile);
+		BuildString(NULL, lfile);
 		BuildString(logDirectory->string, lfile);
 		BuildStringChar('/', lfile);
 		BuildString(p, lfile);
-		BuildTmpString((char *)0);
+		BuildTmpString(NULL);
 	    }
 	    printf("\tlogfile %s;\n", lfile->string);
 	    DestroyString(lfile);
@@ -355,7 +355,7 @@ ReadCfg(char *pcFile, FILE *fp)
 	} else if ('|' == pcLine[0]) {
 	    pcLine = PruneSpace(pcLine + 1);
 	    printf("\ttype exec;\n");
-	    if (pcLine == (char *)0 || pcLine[0] == '\000')
+	    if (pcLine == NULL || pcLine[0] == '\000')
 		printf("\texec \"\";\n");
 	    else
 		printf("\texec %s;\n", pcLine);
@@ -407,7 +407,7 @@ ReadCfg(char *pcFile, FILE *fp)
 
     while ((acIn =
 	    (unsigned char *)ReadLine2(fp, acInSave,
-				       &iLine)) != (unsigned char *)0) {
+				       &iLine)) != NULL) {
 	char *pcNext;
 
 	acStart = PruneSpace((char *)acIn);
@@ -419,7 +419,7 @@ ReadCfg(char *pcFile, FILE *fp)
 	if ('%' == acStart[0] && '%' == acStart[1] && '\000' == acStart[2]) {
 	    break;
 	}
-	if ((char *)0 == (pcNext = strchr(acStart, ':'))) {
+	if (NULL == (pcNext = strchr(acStart, ':'))) {
 	    Error("%s(%d) missing colon?", pcFile, iLine);
 	    continue;
 	}
@@ -480,7 +480,7 @@ main(int argc, char **argv)
     }
 
     pcFile = argv[1];
-    if ((fp = fopen(pcFile, "r")) == (FILE *)0) {
+    if ((fp = fopen(pcFile, "r")) == NULL) {
 	Error("fopen(%s): %s", pcFile, strerror(errno));
 	return 1;
     }

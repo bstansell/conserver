@@ -67,16 +67,16 @@ AddrCmp(struct in_addr *addr, char *pattern)
 {
     in_addr_t hostaddr, pattern_addr, netmask;
     char *p, *slash_posn;
-    static STRING *buf = (STRING *)0;
+    static STRING *buf = NULL;
 # if HAVE_INET_ATON
     struct in_addr inetaddr;
 # endif
 
-    if (buf == (STRING *)0)
+    if (buf == NULL)
 	buf = AllocString();
     slash_posn = strchr(pattern, '/');
     if (slash_posn != NULL) {
-	BuildString((char *)0, buf);
+	BuildString(NULL, buf);
 	BuildString(pattern, buf);
 	buf->string[slash_posn - pattern] = '\0';	/* isolate the address */
 	p = buf->string;
@@ -135,10 +135,10 @@ AccType(INADDR_STYPE *addr, char **peername)
     char host[NI_MAXHOST];
     char ipaddr[NI_MAXHOST];
 #else
-    struct hostent *he = (struct hostent *)0;
+    struct hostent *he = NULL;
     int a;
 # if TRUST_REVERSE_DNS
-    char **revNames = (char **)0;
+    char **revNames = NULL;
 # endif
 
     CONDDEBUG((1, "AccType(): ip=%s", inet_ntoa(*addr)));
@@ -163,7 +163,7 @@ AccType(INADDR_STYPE *addr, char **peername)
     if (!error)
 	CONDDEBUG((1, "AccType(): host=%s", host));
 
-    for (pACtmp = pACList; pACtmp != (ACCESS *)0; pACtmp = pACtmp->pACnext) {
+    for (pACtmp = pACList; pACtmp != NULL; pACtmp = pACtmp->pACnext) {
 	CONDDEBUG((1, "AccType(): who=%s, trust=%c", pACtmp->pcwho,
 		   pACtmp->ctrust));
 
@@ -190,22 +190,22 @@ AccType(INADDR_STYPE *addr, char **peername)
      */
     if ((he =
 	 gethostbyaddr((char *)addr, so,
-		       AF_INET)) == (struct hostent *)0) {
+		       AF_INET)) == NULL) {
 	Error("AccType(): gethostbyaddr(%s): %s", inet_ntoa(*addr),
 	      hstrerror(h_errno));
     } else {
 	char *hname;
-	if (he->h_name != (char *)0) {
+	if (he->h_name != NULL) {
 	    /* count up the number of names */
-	    for (a = 0, hname = he->h_aliases[a]; hname != (char *)0;
+	    for (a = 0, hname = he->h_aliases[a]; hname != NULL;
 		 hname = he->h_aliases[++a]);
-	    a += 2;		/* h_name + (char *)0 */
+	    a += 2;		/* h_name + NULL */
 	    /* now duplicate them */
 	    if ((revNames =
-		 (char **)calloc(a, sizeof(char *))) != (char **)0) {
-		for (hname = he->h_name, a = 0; hname != (char *)0;
+		 (char **)calloc(a, sizeof(char *))) != NULL) {
+		for (hname = he->h_name, a = 0; hname != NULL;
 		     hname = he->h_aliases[a++]) {
-		    if ((revNames[a] = StrDup(hname)) == (char *)0)
+		    if ((revNames[a] = StrDup(hname)) == NULL)
 			break;
 		    CONDDEBUG((1, "AccType(): revNames[%d]='%s'", a,
 			       hname));
@@ -215,7 +215,7 @@ AccType(INADDR_STYPE *addr, char **peername)
     }
 # endif
 
-    for (pACtmp = pACList; pACtmp != (ACCESS *)0; pACtmp = pACtmp->pACnext) {
+    for (pACtmp = pACList; pACtmp != NULL; pACtmp = pACtmp->pACnext) {
 	CONDDEBUG((1, "AccType(): who=%s, trust=%c", pACtmp->pcwho,
 		   pACtmp->ctrust));
 	if (pACtmp->isCIDR != 0) {
@@ -226,7 +226,7 @@ AccType(INADDR_STYPE *addr, char **peername)
 	    continue;
 	}
 
-	if ((he = gethostbyname(pACtmp->pcwho)) == (struct hostent *)0) {
+	if ((he = gethostbyname(pACtmp->pcwho)) == NULL) {
 	    Error("AccType(): gethostbyname(%s): %s", pACtmp->pcwho,
 		  hstrerror(h_errno));
 	} else if (4 != he->h_length || AF_INET != he->h_addrtype) {
@@ -234,7 +234,7 @@ AccType(INADDR_STYPE *addr, char **peername)
 		("AccType(): gethostbyname(%s): wrong address size (4 != %d) or address family (%d != %d)",
 		 pACtmp->pcwho, he->h_length, AF_INET, he->h_addrtype);
 	} else {
-	    for (a = 0; he->h_addr_list[a] != (char *)0; a++) {
+	    for (a = 0; he->h_addr_list[a] != NULL; a++) {
 		CONDDEBUG((1, "AccType(): addr=%s",
 			   inet_ntoa(*(struct in_addr *)
 				     (he->h_addr_list[a]))));
@@ -260,23 +260,23 @@ AccType(INADDR_STYPE *addr, char **peername)
 	 * the .net top-level.  without TRUST_REVERSE_DNS, those names
 	 * better map to ip addresses for them to take effect.
 	 */
-	if (revNames != (char **)0) {
+	if (revNames != NULL) {
 	    char *pcName;
 	    int wlen;
 	    int len;
 	    wlen = strlen(pACtmp->pcwho);
-	    for (a = 0; revNames[a] != (char *)0; a++) {
+	    for (a = 0; revNames[a] != NULL; a++) {
 		for (pcName = revNames[a], len = strlen(pcName);
 		     len >= wlen; len = strlen(++pcName)) {
 		    CONDDEBUG((1, "AccType(): name=%s", pcName));
 		    if (strcasecmp(pcName, pACtmp->pcwho) == 0) {
-			if (peername != (char **)0)
+			if (peername != NULL)
 			    *peername = StrDup(revNames[a]);
 			ret = pACtmp->ctrust;
 			goto common_ret2;
 		    }
 		    pcName = strchr(pcName, '.');
-		    if (pcName == (char *)0)
+		    if (pcName == NULL)
 			break;
 		}
 	    }
@@ -285,22 +285,22 @@ AccType(INADDR_STYPE *addr, char **peername)
     }
 
   common_ret:
-    if (config->loghostnames == FLAGTRUE && peername != (char **)0) {
+    if (config->loghostnames == FLAGTRUE && peername != NULL) {
 # if TRUST_REVERSE_DNS
-	if (revNames != (char **)0 && revNames[0] != (char *)0)
+	if (revNames != NULL && revNames[0] != NULL)
 	    *peername = StrDup(revNames[0]);
 # else
 	if ((he =
 	     gethostbyaddr((char *)addr, so,
-			   AF_INET)) != (struct hostent *)0) {
+			   AF_INET)) != NULL) {
 	    *peername = StrDup(he->h_name);
 	}
 # endif
     }
 # if TRUST_REVERSE_DNS
   common_ret2:
-    if (revNames != (char **)0) {
-	for (a = 0; revNames[a] != (char *)0; a++)
+    if (revNames != NULL) {
+	for (a = 0; revNames[a] != NULL; a++)
 	    free(revNames[a]);
 	free(revNames);
     }
@@ -325,7 +325,7 @@ SetDefAccess(
     struct ifaddrs *myAddrs, *ifa;
 #endif /* USE_IPV6 */
 
-    while (pACList != (ACCESS *)0) {
+    while (pACList != NULL) {
 	a = pACList->pACnext;
 	DestroyAccessList(pACList);
 	pACList = a;
@@ -350,9 +350,9 @@ SetDefAccess(
 	if (error)
 	    continue;
 
-	if ((a = (ACCESS *)calloc(1, sizeof(ACCESS))) == (ACCESS *)0)
+	if ((a = (ACCESS *)calloc(1, sizeof(ACCESS))) == NULL)
 	    OutOfMem();
-	if ((a->pcwho = StrDup(addr)) == (char *)0)
+	if ((a->pcwho = StrDup(addr)) == NULL)
 	    OutOfMem();
 
 	a->ctrust = 'a';
@@ -364,9 +364,9 @@ SetDefAccess(
     }
     freeifaddrs(myAddrs);
 #elif USE_UNIX_DOMAIN_SOCKETS
-    if ((pACList = (ACCESS *)calloc(1, sizeof(ACCESS))) == (ACCESS *)0)
+    if ((pACList = (ACCESS *)calloc(1, sizeof(ACCESS))) == NULL)
 	OutOfMem();
-    if ((pACList->pcwho = StrDup("127.0.0.1")) == (char *)0)
+    if ((pACList->pcwho = StrDup("127.0.0.1")) == NULL)
 	OutOfMem();
     pACList->ctrust = 'a';
     CONDDEBUG((1, "SetDefAccess(): trust=%c, who=%s", pACList->ctrust,
@@ -376,9 +376,9 @@ SetDefAccess(
 	char *addr;
 
 	addr = inet_ntoa(*pAddr);
-	if ((a = (ACCESS *)calloc(1, sizeof(ACCESS))) == (ACCESS *)0)
+	if ((a = (ACCESS *)calloc(1, sizeof(ACCESS))) == NULL)
 	    OutOfMem();
-	if ((a->pcwho = StrDup(addr)) == (char *)0)
+	if ((a->pcwho = StrDup(addr)) == NULL)
 	    OutOfMem();
 	a->ctrust = 'a';
 	a->pACnext = pACList;
@@ -394,9 +394,9 @@ SetDefAccess(
 void
 DestroyAccessList(ACCESS *pACList)
 {
-    if (pACList == (ACCESS *)0)
+    if (pACList == NULL)
 	return;
-    if (pACList->pcwho != (char *)0)
+    if (pACList->pcwho != NULL)
 	free(pACList->pcwho);
     free(pACList);
 }

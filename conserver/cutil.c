@@ -26,17 +26,17 @@ int isMultiProc = 0;
 char *progname = "conserver package";
 pid_t thepid = 0;
 int fDebug = 0;
-STRING *allStrings = (STRING *)0;
+STRING *allStrings = NULL;
 int stringCount = 0;		/* count of allStrings list */
 #if !USE_IPV6
-struct in_addr *myAddrs = (struct in_addr *)0;
+struct in_addr *myAddrs = NULL;
 #endif
 char myHostname[MAXHOSTNAME];	/* staff.cc.purdue.edu                  */
 fd_set rinit;
 fd_set winit;
 int maxfd = 0;
 int debugLineNo = 0;
-char *debugFileName = (char *)0;
+char *debugFileName = NULL;
 int isMaster = 1;
 
 /* in the routines below (the init code) we can bomb if malloc fails	(ksb)
@@ -75,7 +75,7 @@ StrTime(time_t *ltime)
     static char curtime[40];	/* just in case ctime() varies */
     time_t tyme;
 
-    tyme = time((time_t *)0);
+    tyme = time(NULL);
     StrCpy(curtime, ctime(&tyme), sizeof(curtime));
     curtime[24] = '\000';	/* might need to adjust this at some point */
     if (ltime != NULL)
@@ -99,7 +99,7 @@ BuildStringChar(const char ch, STRING *msg)
 	CONDDEBUG((3,
 		   "BuildStringChar(): 0x%lx tried allocating %lu bytes",
 		   (void *)msg, msg->allocated));
-	if (msg->string == (char *)0)
+	if (msg->string == NULL)
 	    OutOfMem();
     }
     if (msg->used) {
@@ -121,9 +121,9 @@ BuildString(const char *str, STRING *msg)
 {
     int len;
 
-    if ((char *)0 == str) {
+    if (NULL == str) {
 	msg->used = 0;
-	if (msg->string != (char *)0)
+	if (msg->string != NULL)
 	    msg->string[0] = '\000';
 	CONDDEBUG((3, "BuildString(): 0x%lx reset", (void *)msg));
 	return msg->string;
@@ -146,7 +146,7 @@ BuildString(const char *str, STRING *msg)
 	}
 	CONDDEBUG((3, "BuildString(): 0x%lx tried allocating %lu bytes",
 		   (void *)msg, msg->allocated));
-	if (msg->string == (char *)0)
+	if (msg->string == NULL)
 	    OutOfMem();
     }
     /* if msg->used, then len = strlen(), so we need to copy len + 1 to
@@ -173,9 +173,9 @@ BuildStringN(const char *str, int n, STRING *msg)
 {
     int len;
 
-    if ((char *)0 == str) {
+    if (NULL == str) {
 	msg->used = 0;
-	if (msg->string != (char *)0)
+	if (msg->string != NULL)
 	    msg->string[0] = '\000';
 	CONDDEBUG((3, "BuildStringN(): 0x%lx reset", (void *)msg));
 	return msg->string;
@@ -200,7 +200,7 @@ BuildStringN(const char *str, int n, STRING *msg)
 	}
 	CONDDEBUG((3, "BuildStringN(): 0x%lx tried allocating %lu bytes",
 		   (void *)msg, msg->allocated));
-	if (msg->string == (char *)0)
+	if (msg->string == NULL)
 	    OutOfMem();
     }
 #if HAVE_MEMCPY
@@ -241,8 +241,8 @@ MemMove(void *dest, void *src, size_t n)
 char *
 ShiftString(STRING *msg, int n)
 {
-    if (msg == (STRING *)0 || n <= 0 || n > msg->used - 1)
-	return (char *)0;
+    if (msg == NULL || n <= 0 || n > msg->used - 1)
+	return NULL;
 
     MemMove(msg->string, msg->string + n, msg->used - n);
 
@@ -253,21 +253,21 @@ ShiftString(STRING *msg, int n)
 void
 InitString(STRING *msg)
 {
-    msg->string = (char *)0;
+    msg->string = NULL;
     msg->used = msg->allocated = 0;
 }
 
 void
 DestroyString(STRING *msg)
 {
-    if (msg->prev == (STRING *)0 && msg->next == (STRING *)0 &&
+    if (msg->prev == NULL && msg->next == NULL &&
 	allStrings != msg) {
 	CONDDEBUG((1, "DestroyString(): 0x%lx non-pooled string destroyed",
 		   (void *)msg, stringCount));
     } else {
-	if (msg->prev != (STRING *)0)
+	if (msg->prev != NULL)
 	    msg->prev->next = msg->next;
-	if (msg->next != (STRING *)0)
+	if (msg->next != NULL)
 	    msg->next->prev = msg->prev;
 	if (msg == allStrings) {
 	    allStrings = msg->next;
@@ -287,9 +287,9 @@ AllocString(void)
 {
     STRING *s;
     if ((s = (STRING *)calloc(1, sizeof(STRING)))
-	== (STRING *)0)
+	== NULL)
 	OutOfMem();
-    if (allStrings != (STRING *)0) {
+    if (allStrings != NULL) {
 	allStrings->prev = s;
 	s->next = allStrings;
     }
@@ -304,17 +304,17 @@ AllocString(void)
 void
 DestroyStrings(void)
 {
-    while (allStrings != (STRING *)0) {
+    while (allStrings != NULL) {
 	DestroyString(allStrings);
     }
 }
 
-static STRING *mymsg = (STRING *)0;
+static STRING *mymsg = NULL;
 
 char *
 BuildTmpString(const char *str)
 {
-    if (mymsg == (STRING *)0)
+    if (mymsg == NULL)
 	mymsg = AllocString();
     return BuildString(str, mymsg);
 }
@@ -322,7 +322,7 @@ BuildTmpString(const char *str)
 char *
 BuildTmpStringChar(const char c)
 {
-    if (mymsg == (STRING *)0)
+    if (mymsg == NULL)
 	mymsg = AllocString();
     return BuildStringChar(c, mymsg);
 }
@@ -331,38 +331,38 @@ char *
 ReadLine(FILE *fp, STRING *save, int *iLine)
 {
     static char buf[1024];
-    char *wholeline = (char *)0;
-    char *ret = (char *)0;
+    char *wholeline = NULL;
+    char *ret = NULL;
     int i, buflen, peek, commentCheck = 1, comment = 0;
-    static STRING *bufstr = (STRING *)0;
-    static STRING *wholestr = (STRING *)0;
+    static STRING *bufstr = NULL;
+    static STRING *wholestr = NULL;
 
-    if (bufstr == (STRING *)0)
+    if (bufstr == NULL)
 	bufstr = AllocString();
-    if (wholestr == (STRING *)0)
+    if (wholestr == NULL)
 	wholestr = AllocString();
     peek = 0;
-    wholeline = (char *)0;
-    BuildString((char *)0, bufstr);
-    BuildString((char *)0, wholestr);
-    while (save->used || ((ret = fgets(buf, sizeof(buf), fp)) != (char *)0)
+    wholeline = NULL;
+    BuildString(NULL, bufstr);
+    BuildString(NULL, wholestr);
+    while (save->used || ((ret = fgets(buf, sizeof(buf), fp)) != NULL)
 	   || peek) {
 	/* If we have a previously saved line, use it instead */
 	if (save->used) {
 	    StrCpy(buf, save->string, sizeof(buf));
-	    BuildString((char *)0, save);
+	    BuildString(NULL, save);
 	}
 
 	if (peek) {
 	    /* End of file?  Never mind. */
-	    if (ret == (char *)0)
+	    if (ret == NULL)
 		break;
 
 	    /* If we don't have a line continuation and we've seen
 	     * some worthy data
 	     */
-	    if (!isspace((int)buf[0]) && (wholeline != (char *)0)) {
-		BuildString((char *)0, save);
+	    if (!isspace((int)buf[0]) && (wholeline != NULL)) {
+		BuildString(NULL, save);
 		BuildString(buf, save);
 		break;
 	    }
@@ -395,7 +395,7 @@ ReadLine(FILE *fp, STRING *save, int *iLine)
 	    peek = 1;
 	    comment = 0;
 	    commentCheck = 1;
-	    BuildString((char *)0, bufstr);
+	    BuildString(NULL, bufstr);
 	} else {
 	    /* Save off the partial chunk */
 	    BuildString(buf, bufstr);
@@ -405,14 +405,14 @@ ReadLine(FILE *fp, STRING *save, int *iLine)
     /* If we hit the EOF and weren't peeking ahead
      * and it's not a comment
      */
-    if (!peek && (ret == (char *)0) && (comment == 0) &&
+    if (!peek && (ret == NULL) && (comment == 0) &&
 	(commentCheck == 0)) {
 	(*iLine)++;
 	wholeline = BuildString(bufstr->string, wholestr);
     }
 
     CONDDEBUG((1, "ReadLine(): returning <%s>",
-	       (wholeline != (char *)0) ? wholeline : "<NULL>"));
+	       (wholeline != NULL) ? wholeline : "<NULL>"));
     return wholeline;
 }
 
@@ -424,7 +424,7 @@ FmtCtl(int ci, STRING *pcIn)
 {
     unsigned char c;
 
-    BuildString((char *)0, pcIn);
+    BuildString(NULL, pcIn);
     c = ci & 0xff;
     if (c > 127) {
 	c -= 128;
@@ -451,9 +451,9 @@ FmtCtlStr(char *pcIn, int len, STRING *pcOut)
 {
     unsigned char c;
 
-    BuildString((char *)0, pcOut);
+    BuildString(NULL, pcOut);
 
-    if (pcIn == (char *)0)
+    if (pcIn == NULL)
 	return;
 
     if (len < 0)
@@ -485,7 +485,7 @@ Debug(int level, char *fmt, ...)
     va_start(ap, fmt);
     if (isMultiProc)
 	fprintf(stderr, "[%s] %s (%lu): DEBUG: [%s:%d] ",
-		StrTime((time_t *)0), progname, (unsigned long)thepid,
+		StrTime(0), progname, (unsigned long)thepid,
 		debugFileName, debugLineNo);
     else
 	fprintf(stderr, "%s: DEBUG: [%s:%d] ", progname, debugFileName,
@@ -501,7 +501,7 @@ Error(char *fmt, ...)
     va_list ap;
     va_start(ap, fmt);
     if (isMultiProc)
-	fprintf(stderr, "[%s] %s (%lu): ERROR: ", StrTime((time_t *)0),
+	fprintf(stderr, "[%s] %s (%lu): ERROR: ", StrTime(0),
 		progname, (unsigned long)thepid);
     else
 	fprintf(stderr, "%s: ", progname);
@@ -517,7 +517,7 @@ Msg(char *fmt, ...)
     va_list ap;
     va_start(ap, fmt);
     if (isMultiProc)
-	fprintf(stdout, "[%s] %s (%lu): ", StrTime((time_t *)0), progname,
+	fprintf(stdout, "[%s] %s (%lu): ", StrTime(0), progname,
 		(unsigned long)thepid);
     else
 	fprintf(stdout, "%s: ", progname);
@@ -536,7 +536,7 @@ Verbose(char *fmt, ...)
 
     va_start(ap, fmt);
     if (isMultiProc)
-	fprintf(stdout, "[%s] %s (%lu): INFO: ", StrTime((time_t *)0),
+	fprintf(stdout, "[%s] %s (%lu): INFO: ", StrTime(0),
 		progname, (unsigned long)thepid);
     else
 	fprintf(stdout, "%s: ", progname);
@@ -605,13 +605,13 @@ FileOpenFD(int fd, enum consFileType type)
     CONSFILE *cfp;
 
     if ((cfp = (CONSFILE *)calloc(1, sizeof(CONSFILE)))
-	== (CONSFILE *)0)
+	== NULL)
 	OutOfMem();
     cfp->ftype = type;
     cfp->fd = fd;
     cfp->wbuf = AllocString();
 #if HAVE_OPENSSL
-    cfp->ssl = (SSL *)0;
+    cfp->ssl = NULL;
     cfp->waitForRead = cfp->waitForWrite = FLAGFALSE;
 #endif
 #if DEBUG_CONSFILE_IO
@@ -622,7 +622,7 @@ FileOpenFD(int fd, enum consFileType type)
 	if ((cfp->debugwfd =
 	     open(buf, O_WRONLY | O_CREAT | O_APPEND, 0644)) != -1) {
 	    sprintf(buf, "[---- STARTED - %s ----]\n",
-		    StrTime((time_t *)0));
+		    StrTime(0));
 	    write(cfp->debugwfd, buf, strlen(buf));
 	}
 	sprintf(buf, "CONSFILE-%s-%lu-%d.r", progname,
@@ -630,7 +630,7 @@ FileOpenFD(int fd, enum consFileType type)
 	if ((cfp->debugrfd =
 	     open(buf, O_WRONLY | O_CREAT | O_APPEND, 0644)) != -1) {
 	    sprintf(buf, "[---- STARTED - %s ----]\n",
-		    StrTime((time_t *)0));
+		    StrTime(0));
 	    write(cfp->debugrfd, buf, strlen(buf));
 	}
     }
@@ -649,14 +649,14 @@ FileOpenPipe(int fd, int fdout)
     CONSFILE *cfp;
 
     if ((cfp = (CONSFILE *)calloc(1, sizeof(CONSFILE)))
-	== (CONSFILE *)0)
+	== NULL)
 	OutOfMem();
     cfp->ftype = simplePipe;
     cfp->fd = fd;
     cfp->fdout = fdout;
     cfp->wbuf = AllocString();
 #if HAVE_OPENSSL
-    cfp->ssl = (SSL *)0;
+    cfp->ssl = NULL;
     cfp->waitForRead = cfp->waitForWrite = FLAGFALSE;
 #endif
 #if DEBUG_CONSFILE_IO
@@ -667,7 +667,7 @@ FileOpenPipe(int fd, int fdout)
 	if ((cfp->debugwfd =
 	     open(buf, O_WRONLY | O_CREAT | O_APPEND, 0644)) != -1) {
 	    sprintf(buf, "[---- STARTED - %s ----]\n",
-		    StrTime((time_t *)0));
+		    StrTime(0));
 	    write(cfp->debugwfd, buf, strlen(buf));
 	}
 	sprintf(buf, "CONSFILE-%s-%lu-%d.r", progname,
@@ -675,7 +675,7 @@ FileOpenPipe(int fd, int fdout)
 	if ((cfp->debugrfd =
 	     open(buf, O_WRONLY | O_CREAT | O_APPEND, 0644)) != -1) {
 	    sprintf(buf, "[---- STARTED - %s ----]\n",
-		    StrTime((time_t *)0));
+		    StrTime(0));
 	    write(cfp->debugrfd, buf, strlen(buf));
 	}
     }
@@ -692,7 +692,7 @@ FileUnopen(CONSFILE *cfp)
 {
     int retval = 0;
 
-    if (cfp == (CONSFILE *)0)
+    if (cfp == NULL)
 	return 0;
 
     switch (cfp->ftype) {
@@ -728,7 +728,7 @@ FileUnopen(CONSFILE *cfp)
 }
 
 /* This opens a file like open(2).  Returns a CONSFILE pointer
- * or a (CONSFILE *)0 on error
+ * or a NULL on error
  */
 CONSFILE *
 FileOpen(const char *path, int flag, int mode)
@@ -738,16 +738,16 @@ FileOpen(const char *path, int flag, int mode)
 
     if (-1 == (fd = open(path, flag, mode))) {
 	CONDDEBUG((2, "FileOpen(): failed to open `%s'", path));
-	return (CONSFILE *)0;
+	return NULL;
     }
     if ((cfp = (CONSFILE *)calloc(1, sizeof(CONSFILE)))
-	== (CONSFILE *)0)
+	== NULL)
 	OutOfMem();
     cfp->ftype = simpleFile;
     cfp->fd = fd;
     cfp->wbuf = AllocString();
 #if HAVE_OPENSSL
-    cfp->ssl = (SSL *)0;
+    cfp->ssl = NULL;
     cfp->waitForRead = cfp->waitForWrite = FLAGFALSE;
 #endif
 #if DEBUG_CONSFILE_IO
@@ -758,7 +758,7 @@ FileOpen(const char *path, int flag, int mode)
 	if ((cfp->debugwfd =
 	     open(buf, O_WRONLY | O_CREAT | O_APPEND, 0644)) != -1) {
 	    sprintf(buf, "[---- STARTED - %s ----]\n",
-		    StrTime((time_t *)0));
+		    StrTime(0));
 	    write(cfp->debugwfd, buf, strlen(buf));
 	}
 	sprintf(buf, "CONSFILE-%s-%lu-%d.r", progname,
@@ -766,7 +766,7 @@ FileOpen(const char *path, int flag, int mode)
 	if ((cfp->debugrfd =
 	     open(buf, O_WRONLY | O_CREAT | O_APPEND, 0644)) != -1) {
 	    sprintf(buf, "[---- STARTED - %s ----]\n",
-		    StrTime((time_t *)0));
+		    StrTime(0));
 	    write(cfp->debugrfd, buf, strlen(buf));
 	}
     }
@@ -790,7 +790,7 @@ FileClose(CONSFILE **pcfp)
 #endif
 
     cfp = *pcfp;
-    if (cfp == (CONSFILE *)0)
+    if (cfp == NULL)
 	return 0;
 
     switch (cfp->ftype) {
@@ -868,7 +868,7 @@ FileClose(CONSFILE **pcfp)
 	close(cfp->debugrfd);
 #endif
     free(cfp);
-    *pcfp = (CONSFILE *)0;
+    *pcfp = NULL;
 
     return retval;
 }
@@ -942,7 +942,7 @@ FileRead(CONSFILE *cfp, void *buf, int len)
 			       "FileRead(): performing a SSL_free() on fd %d",
 			       cfp->fd));
 		    SSL_free(cfp->ssl);
-		    cfp->ssl = (SSL *)0;
+		    cfp->ssl = NULL;
 		    cfp->ftype = simpleSocket;
 		    break;
 	    }
@@ -960,11 +960,11 @@ FileRead(CONSFILE *cfp, void *buf, int len)
     if (retval >= 0) {
 	CONDDEBUG((2, "FileRead(): read %d byte%s from fd %d", retval,
 		   (retval == 1) ? "" : "s", cfp->fd));
-	if (fDebug && buf != (char *)0) {
-	    static STRING *tmpString = (STRING *)0;
-	    if (tmpString == (STRING *)0)
+	if (fDebug && buf != NULL) {
+	    static STRING *tmpString = NULL;
+	    if (tmpString == NULL)
 		tmpString = AllocString();
-	    BuildString((char *)0, tmpString);
+	    BuildString(NULL, tmpString);
 	    if (retval > 30) {
 		FmtCtlStr(buf, 30, tmpString);
 		CONDDEBUG((2, "FileRead(): read `%s'... from fd %d",
@@ -1003,19 +1003,19 @@ FileWrite(CONSFILE *cfp, FLAG bufferonly, char *buf, int len)
 
     if (cfp->errored == FLAGTRUE) {
 	if (cfp->wbuf->used > 1)
-	    BuildString((char *)0, cfp->wbuf);
+	    BuildString(NULL, cfp->wbuf);
 	FD_CLR(fdout, &winit);
 	return -1;
     }
 
-    if (len < 0 && buf != (char *)0)
+    if (len < 0 && buf != NULL)
 	len = strlen(buf);
 
-    if (fDebug && len > 0 && buf != (char *)0) {
-	static STRING *tmpString = (STRING *)0;
-	if (tmpString == (STRING *)0)
+    if (fDebug && len > 0 && buf != NULL) {
+	static STRING *tmpString = NULL;
+	if (tmpString == NULL)
 	    tmpString = AllocString();
-	BuildString((char *)0, tmpString);
+	BuildString(NULL, tmpString);
 	if (len > 30) {
 	    FmtCtlStr(buf, 30, tmpString);
 	    CONDDEBUG((2, "FileWrite(): sending `%s'... to fd %d",
@@ -1028,7 +1028,7 @@ FileWrite(CONSFILE *cfp, FLAG bufferonly, char *buf, int len)
     }
 
     /* save the data */
-    if (len > 0 && buf != (char *)0) {
+    if (len > 0 && buf != NULL) {
 	if (cfp->quoteiac == FLAGTRUE) {
 	    int l, o;
 	    for (o = l = 0; l < len; l++) {
@@ -1052,7 +1052,7 @@ FileWrite(CONSFILE *cfp, FLAG bufferonly, char *buf, int len)
     len = cfp->wbuf->used - 1;
 
     /* if we don't have any, forget it */
-    if (buf == (char *)0 || len <= 0)
+    if (buf == NULL || len <= 0)
 	return 0;
 
     /* so, we could be blocking or non-blocking.  since we may be able
@@ -1134,7 +1134,7 @@ FileWrite(CONSFILE *cfp, FLAG bufferonly, char *buf, int len)
 				   "FileWrite(): performing a SSL_free() on fd %d",
 				   cfp->fd));
 			SSL_free(cfp->ssl);
-			cfp->ssl = (SSL *)0;
+			cfp->ssl = NULL;
 			cfp->ftype = simpleSocket;
 			break;
 		}
@@ -1162,7 +1162,7 @@ FileWrite(CONSFILE *cfp, FLAG bufferonly, char *buf, int len)
 	    if (len > 0) {
 		ShiftString(cfp->wbuf, len_out);
 	    } else {
-		BuildString((char *)0, cfp->wbuf);
+		BuildString(NULL, cfp->wbuf);
 	    }
 	}
 	retval = len_out;
@@ -1170,7 +1170,7 @@ FileWrite(CONSFILE *cfp, FLAG bufferonly, char *buf, int len)
 
     if (retval < 0) {
 	if (cfp->wbuf->used > 1)
-	    BuildString((char *)0, cfp->wbuf);
+	    BuildString(NULL, cfp->wbuf);
 	cfp->errored = FLAGTRUE;
     }
 
@@ -1202,7 +1202,7 @@ FileCanRead(CONSFILE *cfp, fd_set *prfd, fd_set *pwfd)
     int fdout;
 #endif
 
-    if (cfp == (CONSFILE *)0)
+    if (cfp == NULL)
 	return 0;
 
 #if HAVE_OPENSSL
@@ -1227,7 +1227,7 @@ FileCanWrite(CONSFILE *cfp, fd_set *prfd, fd_set *pwfd)
 {
     int fdout;
 
-    if (cfp == (CONSFILE *)0)
+    if (cfp == NULL)
 	return 0;
 
     if (cfp->ftype == simplePipe)
@@ -1247,7 +1247,7 @@ FileCanWrite(CONSFILE *cfp, fd_set *prfd, fd_set *pwfd)
 int
 FileBufEmpty(CONSFILE *cfp)
 {
-    if (cfp == (CONSFILE *)0)
+    if (cfp == NULL)
 	return 1;
     return (cfp->wbuf->used <= 1);
 }
@@ -1261,19 +1261,19 @@ VWrite(CONSFILE *cfp, FLAG bufferonly, STRING *str, char *fmt, va_list ap)
     int fmtpre = 0;
     short padzero = 0;
     short sawdot = 0;
-    static STRING *msg = (STRING *)0;
-    static STRING *output = (STRING *)0;
+    static STRING *msg = NULL;
+    static STRING *output = NULL;
     short flong = 0, fneg = 0, fminus = 0;
 
-    if (fmt == (char *)0 || (cfp == (CONSFILE *)0 && str == (STRING *)0))
+    if (fmt == NULL || (cfp == NULL && str == NULL))
 	return;
 
-    if (msg == (STRING *)0)
+    if (msg == NULL)
 	msg = AllocString();
-    if (output == (STRING *)0)
+    if (output == NULL)
 	output = AllocString();
 
-    BuildString((char *)0, output);
+    BuildString(NULL, output);
 
     for (e = s = l = 0; (c = fmt[s + l]) != '\000'; l++) {
 	if (e == 0 && c == '%') {
@@ -1319,7 +1319,7 @@ VWrite(CONSFILE *cfp, FLAG bufferonly, STRING *str, char *fmt, va_list ap)
 			break;
 		    case 's':
 			p = va_arg(ap, char *);
-			if (p == (char *)0)
+			if (p == NULL)
 			    p = "(null)";
 			{
 			    int l = strlen(p);
@@ -1346,7 +1346,7 @@ VWrite(CONSFILE *cfp, FLAG bufferonly, STRING *str, char *fmt, va_list ap)
 			i = (flong ? va_arg(ap, unsigned long)
 			     : (unsigned long)va_arg(ap, unsigned int));
 		      number:
-			BuildString((char *)0, msg);
+			BuildString(NULL, msg);
 			while (i >= 10) {
 			    BuildStringChar((i % 10) + '0', msg);
 			    i /= 10;
@@ -1393,7 +1393,7 @@ VWrite(CONSFILE *cfp, FLAG bufferonly, STRING *str, char *fmt, va_list ap)
 		    case 'x':
 			i = (flong ? va_arg(ap, unsigned long)
 			     : (unsigned long)va_arg(ap, unsigned int));
-			BuildString((char *)0, msg);
+			BuildString(NULL, msg);
 			while (i >= 16) {
 			    if (i % 16 >= 10)
 				BuildStringChar((i % 16) - 10 +
@@ -1459,13 +1459,13 @@ VWrite(CONSFILE *cfp, FLAG bufferonly, STRING *str, char *fmt, va_list ap)
     if (l)
 	BuildStringN(fmt + s, l, output);
 
-    if (str != (STRING *)0)
-	BuildString((char *)0, str);
+    if (str != NULL)
+	BuildString(NULL, str);
 
     if (output->used > 1) {
-	if (str != (STRING *)0)
+	if (str != NULL)
 	    BuildStringN(output->string, output->used - 1, str);
-	if (cfp != (CONSFILE *)0)
+	if (cfp != NULL)
 	    FileWrite(cfp, bufferonly, output->string, output->used - 1);
     }
 }
@@ -1475,10 +1475,10 @@ BuildStringPrint(STRING *str, char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
-    VWrite((CONSFILE *)0, FLAGFALSE, str, fmt, ap);
+    VWrite(NULL, FLAGFALSE, str, fmt, ap);
     va_end(ap);
-    if (str == (STRING *)0)
-	return (char *)0;
+    if (str == NULL)
+	return NULL;
     else
 	return str->string;
 }
@@ -1488,9 +1488,9 @@ BuildTmpStringPrint(char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
-    if (mymsg == (STRING *)0)
+    if (mymsg == NULL)
 	mymsg = AllocString();
-    VWrite((CONSFILE *)0, FLAGFALSE, mymsg, fmt, ap);
+    VWrite(NULL, FLAGFALSE, mymsg, fmt, ap);
     va_end(ap);
     return mymsg->string;
 }
@@ -1498,7 +1498,7 @@ BuildTmpStringPrint(char *fmt, ...)
 void
 FileVWrite(CONSFILE *cfp, FLAG bufferonly, char *fmt, va_list ap)
 {
-    VWrite(cfp, bufferonly, (STRING *)0, fmt, ap);
+    VWrite(cfp, bufferonly, NULL, fmt, ap);
 }
 
 void
@@ -1586,7 +1586,7 @@ FileFDNum(CONSFILE *cfp)
 {
     int retval = 0;
 
-    if (cfp == (CONSFILE *)0)
+    if (cfp == NULL)
 	return -1;
 
     switch (cfp->ftype) {
@@ -1616,7 +1616,7 @@ FileFDNum(CONSFILE *cfp)
 int
 FileFDOutNum(CONSFILE *cfp)
 {
-    if (cfp == (CONSFILE *)0 || cfp->ftype != simplePipe)
+    if (cfp == NULL || cfp->ftype != simplePipe)
 	return -1;
 
     return cfp->fdout;
@@ -1707,7 +1707,7 @@ FileSetSSL(CONSFILE *cfp, SSL *ssl)
 int
 FileCanSSLAccept(CONSFILE *cfp, fd_set *prfd, fd_set *pwfd)
 {
-    if (cfp == (CONSFILE *)0)
+    if (cfp == NULL)
 	return 0;
 
     return ((FD_ISSET(cfp->fd, prfd) && cfp->waitForRead == FLAGTRUE) ||
@@ -1746,7 +1746,7 @@ FileSSLAccept(CONSFILE *cfp)
 	    /* fall through */
 	case SSL_ERROR_ZERO_RETURN:
 	    SSL_free(cfp->ssl);
-	    cfp->ssl = (SSL *)0;
+	    cfp->ssl = NULL;
 	    cfp->ftype = simpleSocket;
 	    return -1;
     }
@@ -1810,29 +1810,29 @@ char *
 PruneSpace(char *string)
 {
     char *p;
-    char *head = (char *)0;
-    char *tail = (char *)0;
+    char *head = NULL;
+    char *tail = NULL;
 
     /* Don't do much if it's crap */
-    if (string == (char *)0 || *string == '\000')
+    if (string == NULL || *string == '\000')
 	return string;
 
     /* Now for the tricky part - search the string */
     for (p = string; *p != '\000'; p++) {
 	if (isspace((int)(*p))) {
-	    if (tail == (char *)0)
+	    if (tail == NULL)
 		tail = p;	/* possible end of string */
 	} else {
-	    if (head == (char *)0)
+	    if (head == NULL)
 		head = p;	/* found the start */
-	    tail = (char *)0;	/* reset tail */
+	    tail = NULL;	/* reset tail */
 	}
     }
 
-    if (tail != (char *)0)
+    if (tail != NULL)
 	*tail = '\000';
 
-    if (head != (char *)0)
+    if (head != NULL)
 	return head;
     else
 	return string;
@@ -1860,7 +1860,7 @@ ProbeInterfaces(in_addr_t bindAddr)
     /* if we use -M, just fill the array with that interface */
     if (bindAddr != INADDR_ANY) {
 	myAddrs = (struct in_addr *)calloc(2, sizeof(struct in_addr));
-	if (myAddrs == (struct in_addr *)0)
+	if (myAddrs == NULL)
 	    OutOfMem();
 #  if HAVE_MEMCPY
 	memcpy(&(myAddrs[0].s_addr), &bindAddr, sizeof(in_addr_t));
@@ -1883,7 +1883,7 @@ ProbeInterfaces(in_addr_t bindAddr)
     while (bufsize) {
 	ifc.ifc_len = bufsize;
 	ifc.ifc_req = (struct ifreq *)malloc(ifc.ifc_len);
-	if (ifc.ifc_req == (struct ifreq *)0)
+	if (ifc.ifc_req == NULL)
 	    OutOfMem();
 	if (ioctl(sock, SIOCGIFCONF, &ifc) != 0 && errno != EINVAL) {
 	    free(ifc.ifc_req);
@@ -1919,16 +1919,16 @@ ProbeInterfaces(in_addr_t bindAddr)
 	       ifc.ifc_len, count));
 
     /* set up myAddrs array */
-    if (myAddrs != (struct in_addr *)0)
+    if (myAddrs != NULL)
 	free(myAddrs);
-    myAddrs = (struct in_addr *)0;
+    myAddrs = NULL;
     if (count == 0) {
 	free(ifc.ifc_req);
 	close(sock);
 	return;
     }
     myAddrs = (struct in_addr *)calloc(count + 1, sizeof(struct in_addr));
-    if (myAddrs == (struct in_addr *)0)
+    if (myAddrs == NULL)
 	OutOfMem();
 
     for (m = r = 0; r < ifc.ifc_len;) {
@@ -1986,7 +1986,7 @@ ProbeInterfaces(in_addr_t bindAddr)
     }
     if (m == 0) {
 	free(myAddrs);
-	myAddrs = (struct in_addr *)0;
+	myAddrs = NULL;
     }
     close(sock);
     free(ifc.ifc_req);
@@ -1997,7 +1997,7 @@ ProbeInterfaces(in_addr_t bindAddr)
     /* if we use -M, just fill the array with that interface */
     if (bindAddr != INADDR_ANY) {
 	myAddrs = (struct in_addr *)calloc(2, sizeof(struct in_addr));
-	if (myAddrs == (struct in_addr *)0)
+	if (myAddrs == NULL)
 	    OutOfMem();
 #  if HAVE_MEMCPY
 	memcpy(&(myAddrs[0].s_addr), &bindAddr, sizeof(in_addr_t));
@@ -2009,7 +2009,7 @@ ProbeInterfaces(in_addr_t bindAddr)
     }
 
     Verbose("using hostname for interface addresses");
-    if ((struct hostent *)0 == (he = gethostbyname(myHostname))) {
+    if (NULL == (he = gethostbyname(myHostname))) {
 	Error("ProbeInterfaces(): gethostbyname(%s): %s", myHostname,
 	      hstrerror(h_errno));
 	return;
@@ -2021,14 +2021,14 @@ ProbeInterfaces(in_addr_t bindAddr)
 	return;
     }
 
-    for (count = 0; he->h_addr_list[count] != (char *)0; count++);
-    if (myAddrs != (struct in_addr *)0)
+    for (count = 0; he->h_addr_list[count] != NULL; count++);
+    if (myAddrs != NULL)
 	free(myAddrs);
-    myAddrs = (struct in_addr *)0;
+    myAddrs = NULL;
     if (count == 0)
 	return;
     myAddrs = (struct in_addr *)calloc(count + 1, sizeof(struct in_addr));
-    if (myAddrs == (struct in_addr *)0)
+    if (myAddrs == NULL)
 	OutOfMem();
     for (count--; count >= 0; count--) {
 #  if HAVE_MEMCPY
@@ -2130,7 +2130,7 @@ IsMe(char *id)
     if (addr != (in_addr_t) (-1)) {
 # endif
 	for (i = 0;
-	     myAddrs != (struct in_addr *)0 &&
+	     myAddrs != NULL &&
 	     myAddrs[i].s_addr != (in_addr_t) 0; i++) {
 	    if (
 # if HAVE_MEMCMP
@@ -2145,7 +2145,7 @@ IsMe(char *id)
     }
 
     /* check for ip match of hostname */
-    if ((struct hostent *)0 == (he = gethostbyname(id))) {
+    if (NULL == (he = gethostbyname(id))) {
 	Error("IsMe(): gethostbyname(%s): %s", id, hstrerror(h_errno));
 	return 0;
     }
@@ -2156,9 +2156,9 @@ IsMe(char *id)
 	return 0;
     }
 
-    for (j = 0; he->h_addr_list[j] != (char *)0; j++) {
+    for (j = 0; he->h_addr_list[j] != NULL; j++) {
 	for (i = 0;
-	     myAddrs != (struct in_addr *)0 &&
+	     myAddrs != NULL &&
 	     myAddrs[i].s_addr != (in_addr_t) 0; i++) {
 	    if (
 # if HAVE_MEMCMP
@@ -2239,12 +2239,12 @@ StrDup(const char *msg)
     int len;
     char *buf;
 
-    if (msg == (char *)0)
-	return (char *)0;
+    if (msg == NULL)
+	return NULL;
     len = strlen(msg) + 1;
     buf = malloc(len);
-    if (buf == (char *)0)
-	return (char *)0;
+    if (buf == NULL)
+	return NULL;
 #if HAVE_MEMCPY
     memcpy(buf, msg, len);
 #else
@@ -2258,15 +2258,15 @@ StringChar(STRING *msg, int offset, char c)
 {
     int o;
 
-    if (msg == (STRING *)0 || msg->used <= 1 || offset < 0 ||
+    if (msg == NULL || msg->used <= 1 || offset < 0 ||
 	offset > msg->used)
-	return (char *)0;
+	return NULL;
 
     for (o = offset; o != msg->used; o++) {
 	if (msg->string[o] == c)
 	    return &(msg->string[o]);
     }
-    return (char *)0;
+    return NULL;
 }
 
 /* this takes a buffer, and returns the number of characters to use,
@@ -2381,7 +2381,7 @@ typedef enum tokens {
 } TOKEN;
 
 int line = 1;			/* current line number */
-char *file = (char *)0;
+char *file = NULL;
 
 TOKEN
 GetWord(FILE *fp, int *line, short spaceok, STRING *word)
@@ -2400,7 +2400,7 @@ GetWord(FILE *fp, int *line, short spaceok, STRING *word)
      *          == 0, saw "\n#"
      */
 
-    BuildString((char *)0, word);
+    BuildString(NULL, word);
     while ((c = fgetc(fp)) != EOF) {
 	if (c == '\n') {
 	    (*line)++;
@@ -2419,8 +2419,8 @@ GetWord(FILE *fp, int *line, short spaceok, STRING *word)
 		else
 		    checkInc = -2;
 	    } else if (checkInc == -3) {
-		static STRING *fname = (STRING *)0;
-		if (fname == (STRING *)0)
+		static STRING *fname = NULL;
+		if (fname == NULL)
 		    fname = AllocString();
 		if (fname->used != 0 || !isspace(c)) {
 		    if (c == '\n') {
@@ -2437,9 +2437,9 @@ GetWord(FILE *fp, int *line, short spaceok, STRING *word)
 			}
 			checkInc = -2;
 			if (fname->used > 0) {
-			    BuildString((char *)0, word);
+			    BuildString(NULL, word);
 			    BuildString(fname->string, word);
-			    BuildString((char *)0, fname);
+			    BuildString(NULL, fname);
 			    return INCLUDE;
 			}
 		    } else
@@ -2539,7 +2539,7 @@ ParseFile(char *filename, FILE *fp, int level)
 {
     /* things that should be used between recursions */
     static STATES state = START;
-    static STRING *word = (STRING *)0;
+    static STRING *word = NULL;
     static short spaceok = 0;
     static int secIndex = 0;
     static int keyIndex = 0;
@@ -2569,13 +2569,13 @@ ParseFile(char *filename, FILE *fp, int level)
     }
 
     /* initialize local things */
-    if (word == (STRING *)0)
+    if (word == NULL)
 	word = AllocString();
 
     while ((token = GetWord(fp, &nextline, spaceok, word)) != DONE) {
 	if (token == INCLUDE) {
 	    FILE *lfp;
-	    if ((FILE *)0 == (lfp = fopen(word->string, "r"))) {
+	    if (NULL == (lfp = fopen(word->string, "r"))) {
 		if (isMaster)
 		    Error("ParseFile(): fopen(%s): %s", word->string,
 			  strerror(errno));
@@ -2593,7 +2593,7 @@ ParseFile(char *filename, FILE *fp, int level)
 		    switch (token) {
 			case WORD:
 			    for (secIndex = 0;
-				 (p = sections[secIndex].id) != (char *)0;
+				 (p = sections[secIndex].id) != NULL;
 				 secIndex++) {
 				if (strcasecmp(word->string, p) == 0) {
 				    CONDDEBUG((1,
@@ -2677,7 +2677,7 @@ ParseFile(char *filename, FILE *fp, int level)
 			    for (keyIndex = 0;
 				 (p =
 				  sections[secIndex].items[keyIndex].id) !=
-				 (char *)0; keyIndex++) {
+				 NULL; keyIndex++) {
 				if (strcasecmp(word->string, p) == 0) {
 				    CONDDEBUG((1,
 					       "got keyword '%s' [%s:%d]",
@@ -2804,7 +2804,7 @@ ParseFile(char *filename, FILE *fp, int level)
 	}
 
 	/* now clean up all the temporary space used */
-	for (i = 0; sections[i].id != (char *)0; i++) {
+	for (i = 0; sections[i].id != NULL; i++) {
 	    (*sections[i].destroy) ();
 	}
     }
@@ -2840,26 +2840,26 @@ ProcessSubst(SUBST *s, char **repl, char **str, char *name, char *id)
 	REP_END
     } state;
 
-    if (s == (SUBST *)0) {
+    if (s == NULL) {
 	Error("ProcessSubst(): WTF? No substitute support structure?!?!");
 	Bye(EX_SOFTWARE);
     }
 
-    if (str != (char **)0) {
-	if (*str != (char *)0) {
+    if (str != NULL) {
+	if (*str != NULL) {
 	    free(*str);
-	    *str = (char *)0;
+	    *str = NULL;
 	}
     }
 
-    if ((id == (char *)0) || (*id == '\000'))
+    if ((id == NULL) || (*id == '\000'))
 	return;
 
     repnum = 0;
     state = REP_BEGIN;
 
     for (i = 0; i < 256; i++)
-	repfmt[i] = (char *)0;
+	repfmt[i] = NULL;
 
     for (p = id; *p != '\000'; p++) {
 	switch (state) {
@@ -2870,7 +2870,7 @@ ProcessSubst(SUBST *s, char **repl, char **str, char *name, char *id)
 
 		/* make sure we haven't seen this replacement char yet */
 		repnum = (unsigned short)(*p);
-		if (repfmt[repnum] != (char *)0) {
+		if (repfmt[repnum] != NULL) {
 		    if (isMaster)
 			Error
 			    ("substitution characters of `%s' option are the same [%s:%d]",
@@ -2921,23 +2921,23 @@ ProcessSubst(SUBST *s, char **repl, char **str, char *name, char *id)
 	return;
     }
 
-    if (str != (char **)0) {
-	if ((*str = StrDup(id)) == (char *)0)
+    if (str != NULL) {
+	if ((*str = StrDup(id)) == NULL)
 	    OutOfMem();
     }
 
-    if (s != (SUBST *)0 && repl != (char **)0 && *repl != (char *)0) {
-	static STRING *result = (STRING *)0;
+    if (s != NULL && repl != NULL && *repl != NULL) {
+	static STRING *result = NULL;
 
-	if (result == (STRING *)0)
+	if (result == NULL)
 	    result = AllocString();
-	BuildString((char *)0, result);
+	BuildString(NULL, result);
 
 	for (p = *repl; *p != '\000'; p++) {
-	    if (repfmt[(unsigned short)(*p)] != (char *)0) {
+	    if (repfmt[(unsigned short)(*p)] != NULL) {
 		char *r = repfmt[(unsigned short)(*p)];
 		int plen = 0;
-		char *c = (char *)0;
+		char *c = NULL;
 		int o = 0;
 
 		if (s->token(*r) == ISSTRING) {
@@ -2946,7 +2946,7 @@ ProcessSubst(SUBST *s, char **repl, char **str, char *name, char *id)
 			plen = atoi(r + 1);
 
 		    /* this should never return zero, but just in case */
-		    if ((*s->value) (*r, &c, (int *)0) == 0)
+		    if ((*s->value) (*r, &c, NULL) == 0)
 			c = "";
 		    plen -= strlen(c);
 
@@ -2961,14 +2961,14 @@ ProcessSubst(SUBST *s, char **repl, char **str, char *name, char *id)
 		    unsigned short port = 0;
 		    unsigned short base = 0;
 		    int padzero = 0;
-		    static STRING *num = (STRING *)0;
+		    static STRING *num = NULL;
 
-		    if (num == (STRING *)0)
+		    if (num == NULL)
 			num = AllocString();
-		    BuildString((char *)0, num);
+		    BuildString(NULL, num);
 
 		    /* this should never return zero, but just in case */
-		    if ((*s->value) (*r, (char **)0, &i) == 0)
+		    if ((*s->value) (*r, NULL, &i) == 0)
 			port = 0;
 		    else
 			port = (unsigned short)i;
@@ -3039,7 +3039,7 @@ ProcessSubst(SUBST *s, char **repl, char **str, char *name, char *id)
 		BuildStringChar(*p, result);
 	}
 	free(*repl);
-	if ((*repl = StrDup(result->string)) == (char *)0)
+	if ((*repl = StrDup(result->string)) == NULL)
 	    OutOfMem();
     }
 
@@ -3049,8 +3049,8 @@ ProcessSubst(SUBST *s, char **repl, char **str, char *name, char *id)
 char *
 MyVersion(void)
 {
-    static STRING *version = (STRING *)0;
-    if (version != (STRING *)0)
+    static STRING *version = NULL;
+    if (version != NULL)
 	return version->string;
     version = AllocString();
     BuildStringPrint(version, "%s %s", VERSION_TEXT, PACKAGE_VERSION);

@@ -9,7 +9,7 @@ integer variable "iErrs" {
 char* 'c' {
         named "pcCommand"
 	param "cmd"
-        init '(char *)0'
+        init 'NULL'
         help "command to run"
 }
 
@@ -23,21 +23,21 @@ function 'e' {
 char* 'g' {
         named "pcGroup"
 	param "group"
-        init '(char *)0'
+        init 'NULL'
         help "initial group"
 }
 
 char* 'l' {
         named "pcLogin"
 	param "login"
-        init '(char *)0'
+        init 'NULL'
         help "login name"
 }
 
 char* 't' {
         named "pcTty"
 	param "tty"
-        init '(char *)0'
+        init 'NULL'
         help "attach to this terminal"
 }
 

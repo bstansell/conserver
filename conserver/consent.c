@@ -133,7 +133,7 @@ FindBaud(char *pcMode)
 	if (strcmp(pcMode, baud[i].acrate) == 0)
 	    return baud + i;
     }
-    return (BAUD *)0;
+    return NULL;
 }
 
 
@@ -159,7 +159,7 @@ FindParity(char *pcMode)
 	if (strcasecmp(pcMode, parity[i].key) == 0)
 	    return parity + i;
     }
-    return (PARITY *)0;
+    return NULL;
 }
 
 
@@ -289,10 +289,10 @@ TtyDev(CONSENT *pCE)
 void
 StopInit(CONSENT *pCE)
 {
-    if (pCE->initcmd == (char *)0)
+    if (pCE->initcmd == NULL)
 	return;
 
-    if (pCE->initpid != 0 || pCE->initfile != (CONSFILE *)0)
+    if (pCE->initpid != 0 || pCE->initfile != NULL)
 	SendIWaitClientsMsg(pCE,
 			    (pCE->fup &&
 			     pCE->ioState ==
@@ -308,13 +308,13 @@ StopInit(CONSENT *pCE)
 	pCE->initpid = 0;
     }
 
-    if (pCE->initfile != (CONSFILE *)0) {
+    if (pCE->initfile != NULL) {
 	int initfile = FileFDNum(pCE->initfile);
 	FD_CLR(initfile, &rinit);
 	initfile = FileFDOutNum(pCE->initfile);
 	FD_CLR(initfile, &winit);
 	FileClose(&pCE->initfile);
-	pCE->initfile = (CONSFILE *)0;
+	pCE->initfile = NULL;
     }
 }
 
@@ -370,14 +370,14 @@ StartInit(CONSENT *pCE)
     int pin[2];
     int pout[2];
     static char *apcArgv[] = {
-	"/bin/sh", "-ce", (char *)0, (char *)0
+	"/bin/sh", "-ce", NULL, NULL
     };
 
-    if (pCE->initcmd == (char *)0)
+    if (pCE->initcmd == NULL)
 	return;
 
     /* this should never happen, but hey, just in case */
-    if (pCE->initfile != (CONSFILE *)0 || pCE->initpid != 0) {
+    if (pCE->initfile != NULL || pCE->initpid != 0) {
 	Error("[%s] StartInit(): initpid/initfile sync error",
 	      pCE->server);
 	StopInit(pCE);
@@ -412,7 +412,7 @@ StartInit(CONSENT *pCE)
 	    close(pout[0]);
 	    close(pin[1]);
 	    if ((pCE->initfile =
-		 FileOpenPipe(pin[0], pout[1])) == (CONSFILE *)0) {
+		 FileOpenPipe(pin[0], pout[1])) == NULL) {
 		Error("[%s] FileOpenPipe(%d,%d) failed: forcing down",
 		      pCE->server, pin[0], pout[1]);
 		close(pin[0]);
@@ -633,20 +633,20 @@ VirtDev(CONSENT *pCE)
      * if we can't find root's shell run /bin/sh
      */
     pcShell = "/bin/sh";
-    if (pCE->exec == (char *)0) {
+    if (pCE->exec == NULL) {
 	static char *apcArgv[] = {
-	    "-shell", "-i", (char *)0
+	    "-shell", "-i", NULL
 	};
 	struct passwd *pwd;
 
-	if ((struct passwd *)0 != (pwd = getpwuid(0)) &&
+	if (NULL != (pwd = getpwuid(0)) &&
 	    '\000' != pwd->pw_shell[0]) {
 	    pcShell = pwd->pw_shell;
 	}
 	ppcArgv = apcArgv;
     } else {
 	static char *apcArgv[] = {
-	    "/bin/sh", "-ce", (char *)0, (char *)0
+	    "/bin/sh", "-ce", NULL, NULL
 	};
 
 	apcArgv[2] = pCE->exec;
@@ -668,7 +668,7 @@ ConsState(CONSENT *pCE)
     if (!pCE->fup)
 	return "down";
 
-    if (pCE->initfile != (CONSFILE *)0)
+    if (pCE->initfile != NULL)
 	return "initializing";
 
     switch (pCE->ioState) {
@@ -714,7 +714,7 @@ ConsDown(CONSENT *pCE, FLAG downHard, FLAG force)
 	kill(pCE->ipid, SIGHUP);
 	pCE->ipid = 0;
     }
-    if (pCE->cofile != (CONSFILE *)0) {
+    if (pCE->cofile != NULL) {
 	int cofile = FileFDNum(pCE->cofile);
 	FD_CLR(cofile, &rinit);
 	FD_CLR(cofile, &winit);
@@ -728,7 +728,7 @@ ConsDown(CONSENT *pCE, FLAG downHard, FLAG force)
 	pCE->ipmictx = (ipmiconsole_ctx_t) 0;
     }
 #endif
-    if (pCE->fdlog != (CONSFILE *)0) {
+    if (pCE->fdlog != NULL) {
 	if (pCE->nolog) {
 	    TagLogfile(pCE, "Console logging restored");
 	}
@@ -768,13 +768,13 @@ ConsInit(CONSENT *pCE)
 
     if (pCE->spintimer > 0 && pCE->spinmax > 0) {
 #if HAVE_GETTIMEOFDAY
-	if (gettimeofday(&tv, (void *)0) == 0) {
+	if (gettimeofday(&tv, NULL) == 0) {
 	    /* less than pCE->spintimer seconds gone by? */
 	    if ((tv.tv_sec <= pCE->lastInit.tv_sec + pCE->spintimer - 1)
 		|| (tv.tv_sec == pCE->lastInit.tv_sec + 1 &&
 		    tv.tv_usec <= pCE->lastInit.tv_usec)) {
 #else
-	if ((tv = time((time_t *)0)) != (time_t)-1) {
+	if ((tv = time(NULL)) != (time_t)-1) {
 	    /* less than pCE->spintimer seconds gone by? (approx) */
 	    if (tv <= pCE->lastInit + pCE->spintimer) {
 #endif
@@ -810,8 +810,8 @@ ConsInit(CONSENT *pCE)
 
     /* try to open them again
      */
-    if (pCE->logfile != (char *)0) {
-	if ((CONSFILE *)0 ==
+    if (pCE->logfile != NULL) {
+	if (NULL ==
 	    (pCE->fdlog =
 	     FileOpen(pCE->logfile, O_RDWR | O_CREAT | O_APPEND, 0644))) {
 	    Error("[%s] FileOpen(%s): %s: forcing down", pCE->server,
@@ -840,7 +840,7 @@ ConsInit(CONSENT *pCE)
 		return;
 	    }
 	    if ((pCE->cofile =
-		 FileOpenFD(cofile, simpleFile)) == (CONSFILE *)0) {
+		 FileOpenFD(cofile, simpleFile)) == NULL) {
 		Error
 		    ("[%s] FileOpenFD(%d,simpleFile) failed: forcing down",
 		     pCE->server, cofile);
@@ -990,7 +990,7 @@ ConsInit(CONSENT *pCE)
 #endif /* USE_IPV6 */
 	    }
 	    if ((pCE->cofile =
-		 FileOpenFD(cofile, simpleSocket)) == (CONSFILE *)0) {
+		 FileOpenFD(cofile, simpleSocket)) == NULL) {
 		Error
 		    ("[%s] FileOpenFD(%d,simpleSocket) failed: forcing down",
 		     pCE->server, cofile);
@@ -1003,7 +1003,7 @@ ConsInit(CONSENT *pCE)
 		pCE->stateTimer = 0;
 	    } else {
 		pCE->ioState = INCONNECT;
-		pCE->stateTimer = time((time_t *)0) + CONNECTTIMEOUT;
+		pCE->stateTimer = time(NULL) + CONNECTTIMEOUT;
 		if (timers[T_STATE] == (time_t)0 ||
 		    timers[T_STATE] > pCE->stateTimer)
 		    timers[T_STATE] = pCE->stateTimer;
@@ -1061,7 +1061,7 @@ ConsInit(CONSENT *pCE)
 		}
 	    }
 	    if ((pCE->cofile =
-		 FileOpenFD(cofile, simpleSocket)) == (CONSFILE *)0) {
+		 FileOpenFD(cofile, simpleSocket)) == NULL) {
 		Error
 		    ("[%s] FileOpenFD(%d,simpleSocket) failed: forcing down",
 		     pCE->server, cofile);
@@ -1074,7 +1074,7 @@ ConsInit(CONSENT *pCE)
 		pCE->stateTimer = 0;
 	    } else {
 		pCE->ioState = INCONNECT;
-		pCE->stateTimer = time((time_t *)0) + CONNECTTIMEOUT;
+		pCE->stateTimer = time(NULL) + CONNECTTIMEOUT;
 		if (timers[T_STATE] == (time_t)0 ||
 		    timers[T_STATE] > pCE->stateTimer)
 		    timers[T_STATE] = pCE->stateTimer;
@@ -1091,7 +1091,7 @@ ConsInit(CONSENT *pCE)
 		return;
 	    }
 	    if ((pCE->cofile =
-		 FileOpenFD(cofile, simpleFile)) == (CONSFILE *)0) {
+		 FileOpenFD(cofile, simpleFile)) == NULL) {
 		Error
 		    ("[%s] FileOpenFD(%d,simpleFile) failed: forcing down",
 		     pCE->server, cofile);
@@ -1126,7 +1126,7 @@ ConsInit(CONSENT *pCE)
 	    }
 
 	    if ((pCE->cofile =
-		 FileOpenFD(cofile, simpleFile)) == (CONSFILE *)0) {
+		 FileOpenFD(cofile, simpleFile)) == NULL) {
 		Error("[%s] FileOpenFD(simpleFile) failed: forcing down",
 		      pCE->server);
 		ConsDown(pCE, FLAGTRUE, FLAGTRUE);
@@ -1143,7 +1143,7 @@ ConsInit(CONSENT *pCE)
 	    } else {
 		/* Error status cases will be handled in Kiddie() */
 		pCE->ioState = INCONNECT;
-		pCE->stateTimer = time((time_t *)0) + CONNECTTIMEOUT;
+		pCE->stateTimer = time(NULL) + CONNECTTIMEOUT;
 		if (timers[T_STATE] == (time_t)0 ||
 		    timers[T_STATE] > pCE->stateTimer)
 		    timers[T_STATE] = pCE->stateTimer;
@@ -1203,7 +1203,7 @@ ConsInit(CONSENT *pCE)
 	    maxfd = cofile + 1;
     }
 
-    tyme = time((time_t *)0);
+    tyme = time(NULL);
 
     if (pCE->ioState == ISNORMAL) {
 	pCE->lastWrite = tyme;
@@ -1232,10 +1232,10 @@ ConsInit(CONSENT *pCE)
 	    Msg("[%s] console initializing", pCE->server);
     }
 #if HAVE_GETTIMEOFDAY
-    if (gettimeofday(&tv, (void *)0) == 0)
+    if (gettimeofday(&tv, NULL) == 0)
 	pCE->lastInit = tv;
 #else
-    if ((tv = time((time_t *)0)) != (time_t)-1)
+    if ((tv = time(NULL)) != (time_t)-1)
 	pCE->lastInit = tv;
 #endif
 
@@ -1341,7 +1341,7 @@ AddrsMatch(char *addr1, char *addr2)
 	int i, j, c;
 	in_addr_t *addrs;
 
-	if ((he = gethostbyname(addr1)) == (struct hostent *)0) {
+	if ((he = gethostbyname(addr1)) == NULL) {
 	    Error("AddrsMatch(): gethostbyname(%s): %s", addr1,
 		  hstrerror(h_errno));
 	    return 0;
@@ -1352,10 +1352,10 @@ AddrsMatch(char *addr1, char *addr2)
 		 addr1, he->h_length, AF_INET, he->h_addrtype);
 	    return 0;
 	}
-	for (i = 0; he->h_addr_list[i] != (char *)0; i++);
+	for (i = 0; he->h_addr_list[i] != NULL; i++);
 	c = i;
 	addrs = (in_addr_t *) calloc(i, sizeof(in_addr_t));
-	if (addrs == (in_addr_t *) 0)
+	if (addrs == NULL)
 	    OutOfMem();
 	for (i = 0; i < c; i++) {
 # if HAVE_MEMCPY
@@ -1366,7 +1366,7 @@ AddrsMatch(char *addr1, char *addr2)
 	}
 
 	/* now process the second hostname */
-	if ((he = gethostbyname(addr2)) == (struct hostent *)0) {
+	if ((he = gethostbyname(addr2)) == NULL) {
 	    Error("AddrsMatch(): gethostbyname(%s): %s", addr2,
 		  hstrerror(h_errno));
 	    free(addrs);
@@ -1379,7 +1379,7 @@ AddrsMatch(char *addr1, char *addr2)
 	    free(addrs);
 	    return 0;
 	}
-	for (j = 0; he->h_addr_list[j] != (char *)0; j++) {
+	for (j = 0; he->h_addr_list[j] != NULL; j++) {
 	    for (i = 0; i < c; i++) {
 		if (
 # if HAVE_MEMCMP
@@ -1408,7 +1408,7 @@ AddrsMatch(char *addr1, char *addr2)
 	    addr = addr2;
 	    iaddr = &inAddr1;
 	}
-	if ((he = gethostbyname(addr)) == (struct hostent *)0) {
+	if ((he = gethostbyname(addr)) == NULL) {
 	    Error("AddrsMatch(): gethostbyname(%s): %s", addr,
 		  hstrerror(h_errno));
 	    return 0;
@@ -1419,7 +1419,7 @@ AddrsMatch(char *addr1, char *addr2)
 		 he->h_length, AF_INET, he->h_addrtype);
 	    return 0;
 	}
-	for (i = 0; he->h_addr_list[i] != (char *)0; i++) {
+	for (i = 0; he->h_addr_list[i] != NULL; i++) {
 	    if (
 # if HAVE_MEMCMP
 		   memcmp(iaddr, he->h_addr_list[i], he->h_length)
@@ -1445,15 +1445,15 @@ FindUniq(REMOTE *pRCAll)
     /* INV: tail of the list we are building always contains only
      * uniq hosts, or the empty list.
      */
-    if (pRCAll == (REMOTE *)0)
-	return (REMOTE *)0;
+    if (pRCAll == NULL)
+	return NULL;
 
     pRCAll->pRCuniq = FindUniq(pRCAll->pRCnext);
 
     /* if it is in the returned list of uniq hosts, return that list
      * else add us by returning our node
      */
-    for (pRC = pRCAll->pRCuniq; (REMOTE *)0 != pRC; pRC = pRC->pRCuniq) {
+    for (pRC = pRCAll->pRCuniq; NULL != pRC; pRC = pRC->pRCuniq) {
 	if (AddrsMatch(pRC->rhost, pRCAll->rhost))
 	    return pRCAll->pRCuniq;
     }
@@ -1463,17 +1463,17 @@ FindUniq(REMOTE *pRCAll)
 void
 DestroyRemoteConsole(REMOTE *pRCList)
 {
-    NAMES *name = (NAMES *)0;
+    NAMES *name = NULL;
 
-    if (pRCList == (REMOTE *)0)
+    if (pRCList == NULL)
 	return;
-    if (pRCList->rserver != (char *)0)
+    if (pRCList->rserver != NULL)
 	free(pRCList->rserver);
-    if (pRCList->rhost != (char *)0)
+    if (pRCList->rhost != NULL)
 	free(pRCList->rhost);
-    while (pRCList->aliases != (NAMES *)0) {
+    while (pRCList->aliases != NULL) {
 	name = pRCList->aliases->next;
-	if (pRCList->aliases->name != (char *)0)
+	if (pRCList->aliases->name != NULL)
 	    free(pRCList->aliases->name);
 	free(pRCList->aliases);
 	pRCList->aliases = name;

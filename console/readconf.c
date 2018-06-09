@@ -9,32 +9,32 @@
 #include "cutil.h"
 #include "readconf.h"
 
-CONFIG *parserConfigTemp = (CONFIG *)0;
-CONFIG *parserConfigDefault = (CONFIG *)0;
-CONFIG *pConfig = (CONFIG *)0;
-TERM *parserTermTemp = (TERM *)0;
-TERM *parserTermDefault = (TERM *)0;
-TERM *pTerm = (TERM *)0;
+CONFIG *parserConfigTemp = NULL;
+CONFIG *parserConfigDefault = NULL;
+CONFIG *pConfig = NULL;
+TERM *parserTermTemp = NULL;
+TERM *parserTermDefault = NULL;
+TERM *pTerm = NULL;
 
 void
 DestroyConfig(CONFIG *c)
 {
-    if (c == (CONFIG *)0)
+    if (c == NULL)
 	return;
-    if (c->username != (char *)0)
+    if (c->username != NULL)
 	free(c->username);
-    if (c->master != (char *)0)
+    if (c->master != NULL)
 	free(c->master);
-    if (c->port != (char *)0)
+    if (c->port != NULL)
 	free(c->port);
-    if (c->escape != (char *)0)
+    if (c->escape != NULL)
 	free(c->escape);
 #if HAVE_OPENSSL
-    if (c->sslcredentials != (char *)0)
+    if (c->sslcredentials != NULL)
 	free(c->sslcredentials);
-    if (c->sslcacertificatefile != (char *)0)
+    if (c->sslcacertificatefile != NULL)
 	free(c->sslcacertificatefile);
-    if (c->sslcacertificatepath != (char *)0)
+    if (c->sslcacertificatepath != NULL)
 	free(c->sslcacertificatepath);
 #endif
     free(c);
@@ -43,32 +43,32 @@ DestroyConfig(CONFIG *c)
 void
 ApplyConfigDefault(CONFIG *c)
 {
-    if (parserConfigDefault == (CONFIG *)0)
+    if (parserConfigDefault == NULL)
 	return;
 
-    if (parserConfigDefault->username != (char *)0) {
-	if (c->username != (char *)0)
+    if (parserConfigDefault->username != NULL) {
+	if (c->username != NULL)
 	    free(c->username);
 	if ((c->username =
-	     StrDup(parserConfigDefault->username)) == (char *)0)
+	     StrDup(parserConfigDefault->username)) == NULL)
 	    OutOfMem();
     }
-    if (parserConfigDefault->master != (char *)0) {
-	if (c->master != (char *)0)
+    if (parserConfigDefault->master != NULL) {
+	if (c->master != NULL)
 	    free(c->master);
-	if ((c->master = StrDup(parserConfigDefault->master)) == (char *)0)
+	if ((c->master = StrDup(parserConfigDefault->master)) == NULL)
 	    OutOfMem();
     }
-    if (parserConfigDefault->port != (char *)0) {
-	if (c->port != (char *)0)
+    if (parserConfigDefault->port != NULL) {
+	if (c->port != NULL)
 	    free(c->port);
-	if ((c->port = StrDup(parserConfigDefault->port)) == (char *)0)
+	if ((c->port = StrDup(parserConfigDefault->port)) == NULL)
 	    OutOfMem();
     }
-    if (parserConfigDefault->escape != (char *)0) {
-	if (c->escape != (char *)0)
+    if (parserConfigDefault->escape != NULL) {
+	if (c->escape != NULL)
 	    free(c->escape);
-	if ((c->escape = StrDup(parserConfigDefault->escape)) == (char *)0)
+	if ((c->escape = StrDup(parserConfigDefault->escape)) == NULL)
 	    OutOfMem();
     }
     if (parserConfigDefault->striphigh != FLAGUNKNOWN)
@@ -78,27 +78,27 @@ ApplyConfigDefault(CONFIG *c)
     if (parserConfigDefault->playback != FLAGUNKNOWN)
 	c->playback = parserConfigDefault->playback;
 #if HAVE_OPENSSL
-    if (parserConfigDefault->sslcredentials != (char *)0) {
-	if (c->sslcredentials != (char *)0)
+    if (parserConfigDefault->sslcredentials != NULL) {
+	if (c->sslcredentials != NULL)
 	    free(c->sslcredentials);
 	if ((c->sslcredentials =
-	     StrDup(parserConfigDefault->sslcredentials)) == (char *)0)
+	     StrDup(parserConfigDefault->sslcredentials)) == NULL)
 	    OutOfMem();
     }
-    if (parserConfigDefault->sslcacertificatefile != (char *)0) {
-	if (c->sslcacertificatefile != (char *)0)
+    if (parserConfigDefault->sslcacertificatefile != NULL) {
+	if (c->sslcacertificatefile != NULL)
 	    free(c->sslcacertificatefile);
 	if ((c->sslcacertificatefile =
 	     StrDup(parserConfigDefault->sslcacertificatefile)) ==
-	    (char *)0)
+	    NULL)
 	    OutOfMem();
     }
-    if (parserConfigDefault->sslcacertificatepath != (char *)0) {
-	if (c->sslcacertificatepath != (char *)0)
+    if (parserConfigDefault->sslcacertificatepath != NULL) {
+	if (c->sslcacertificatepath != NULL)
 	    free(c->sslcacertificatepath);
 	if ((c->sslcacertificatepath =
 	     StrDup(parserConfigDefault->sslcacertificatepath)) ==
-	    (char *)0)
+	    NULL)
 	    OutOfMem();
     }
     if (parserConfigDefault->sslrequired != FLAGUNKNOWN)
@@ -112,14 +112,14 @@ void
 ConfigBegin(char *id)
 {
     CONDDEBUG((1, "ConfigBegin(%s) [%s:%d]", id, file, line));
-    if (id == (char *)0 || id[0] == '\000') {
+    if (id == NULL || id[0] == '\000') {
 	Error("empty config name [%s:%d]", file, line);
 	return;
     }
-    if (parserConfigTemp != (CONFIG *)0)
+    if (parserConfigTemp != NULL)
 	DestroyConfig(parserConfigTemp);
     if ((parserConfigTemp = (CONFIG *)calloc(1, sizeof(CONFIG)))
-	== (CONFIG *)0)
+	== NULL)
 	OutOfMem();
     ApplyConfigDefault(parserConfigTemp);
     parserConfigTemp->name = AllocString();
@@ -131,7 +131,7 @@ ConfigEnd(void)
 {
     CONDDEBUG((1, "ConfigEnd() [%s:%d]", file, line));
 
-    if (parserConfigTemp == (CONFIG *)0)
+    if (parserConfigTemp == NULL)
 	return;
 
     if (parserConfigTemp->name->used > 1) {
@@ -140,23 +140,23 @@ ConfigEnd(void)
 	    IsMe(parserConfigTemp->name->string)) {
 	    DestroyConfig(parserConfigDefault);
 	    parserConfigDefault = parserConfigTemp;
-	    parserConfigTemp = (CONFIG *)0;
+	    parserConfigTemp = NULL;
 	}
     }
 
     DestroyConfig(parserConfigTemp);
-    parserConfigTemp = (CONFIG *)0;
+    parserConfigTemp = NULL;
 }
 
 void
 ConfigAbort(void)
 {
     CONDDEBUG((1, "ConfigAbort() [%s:%d]", file, line));
-    if (parserConfigTemp == (CONFIG *)0)
+    if (parserConfigTemp == NULL)
 	return;
 
     DestroyConfig(parserConfigTemp);
-    parserConfigTemp = (CONFIG *)0;
+    parserConfigTemp = NULL;
 }
 
 void
@@ -164,30 +164,30 @@ ConfigDestroy(void)
 {
     CONDDEBUG((1, "ConfigDestroy() [%s:%d]", file, line));
 
-    if (parserConfigTemp != (CONFIG *)0) {
+    if (parserConfigTemp != NULL) {
 	DestroyConfig(parserConfigTemp);
-	parserConfigTemp = (CONFIG *)0;
+	parserConfigTemp = NULL;
     }
 
-    if (parserConfigDefault != (CONFIG *)0) {
+    if (parserConfigDefault != NULL) {
 	DestroyConfig(pConfig);
 	pConfig = parserConfigDefault;
-	parserConfigDefault = (CONFIG *)0;
+	parserConfigDefault = NULL;
     }
 }
 
 void
 DestroyTerminal(TERM *t)
 {
-    if (t == (TERM *)0)
+    if (t == NULL)
 	return;
-    if (t->attach != (char *)0)
+    if (t->attach != NULL)
 	free(t->attach);
-    if (t->attachsubst != (char *)0)
+    if (t->attachsubst != NULL)
 	free(t->attachsubst);
-    if (t->detach != (char *)0)
+    if (t->detach != NULL)
 	free(t->detach);
-    if (t->detachsubst != (char *)0)
+    if (t->detachsubst != NULL)
 	free(t->detachsubst);
     free(t);
 }
@@ -195,33 +195,33 @@ DestroyTerminal(TERM *t)
 void
 ApplyTermDefault(TERM *t)
 {
-    if (parserTermDefault == (TERM *)0)
+    if (parserTermDefault == NULL)
 	return;
 
-    if (parserTermDefault->attach != (char *)0) {
-	if (t->attach != (char *)0)
+    if (parserTermDefault->attach != NULL) {
+	if (t->attach != NULL)
 	    free(t->attach);
-	if ((t->attach = StrDup(parserTermDefault->attach)) == (char *)0)
+	if ((t->attach = StrDup(parserTermDefault->attach)) == NULL)
 	    OutOfMem();
     }
-    if (parserTermDefault->attachsubst != (char *)0) {
-	if (t->attachsubst != (char *)0)
+    if (parserTermDefault->attachsubst != NULL) {
+	if (t->attachsubst != NULL)
 	    free(t->attachsubst);
 	if ((t->attachsubst =
-	     StrDup(parserTermDefault->attachsubst)) == (char *)0)
+	     StrDup(parserTermDefault->attachsubst)) == NULL)
 	    OutOfMem();
     }
-    if (parserTermDefault->detach != (char *)0) {
-	if (t->detach != (char *)0)
+    if (parserTermDefault->detach != NULL) {
+	if (t->detach != NULL)
 	    free(t->detach);
-	if ((t->detach = StrDup(parserTermDefault->detach)) == (char *)0)
+	if ((t->detach = StrDup(parserTermDefault->detach)) == NULL)
 	    OutOfMem();
     }
-    if (parserTermDefault->detachsubst != (char *)0) {
-	if (t->detachsubst != (char *)0)
+    if (parserTermDefault->detachsubst != NULL) {
+	if (t->detachsubst != NULL)
 	    free(t->detachsubst);
 	if ((t->detachsubst =
-	     StrDup(parserTermDefault->detachsubst)) == (char *)0)
+	     StrDup(parserTermDefault->detachsubst)) == NULL)
 	    OutOfMem();
     }
 }
@@ -230,14 +230,14 @@ void
 TerminalBegin(char *id)
 {
     CONDDEBUG((1, "TerminalBegin(%s) [%s:%d]", id, file, line));
-    if (id == (char *)0 || id[0] == '\000') {
+    if (id == NULL || id[0] == '\000') {
 	Error("empty terminal name [%s:%d]", file, line);
 	return;
     }
-    if (parserTermTemp != (TERM *)0)
+    if (parserTermTemp != NULL)
 	DestroyTerminal(parserTermTemp);
     if ((parserTermTemp = (TERM *)calloc(1, sizeof(TERM)))
-	== (TERM *)0)
+	== NULL)
 	OutOfMem();
     ApplyTermDefault(parserTermTemp);
     parserTermTemp->name = AllocString();
@@ -247,15 +247,15 @@ TerminalBegin(char *id)
 void
 TerminalEnd(void)
 {
-    static char *term = (char *)0;
+    static char *term = NULL;
 
     CONDDEBUG((1, "TerminalEnd() [%s:%d]", file, line));
 
-    if (parserTermTemp == (TERM *)0)
+    if (parserTermTemp == NULL)
 	return;
 
-    if (term == (char *)0) {
-	if ((term = getenv("TERM")) == (char *)0) {
+    if (term == NULL) {
+	if ((term = getenv("TERM")) == NULL) {
 	    term = "";
 	}
     }
@@ -266,23 +266,23 @@ TerminalEnd(void)
 	    strcmp(parserTermTemp->name->string, term) == 0) {
 	    DestroyTerminal(parserTermDefault);
 	    parserTermDefault = parserTermTemp;
-	    parserTermTemp = (TERM *)0;
+	    parserTermTemp = NULL;
 	}
     }
 
     DestroyTerminal(parserTermTemp);
-    parserTermTemp = (TERM *)0;
+    parserTermTemp = NULL;
 }
 
 void
 TerminalAbort(void)
 {
     CONDDEBUG((1, "TerminalAbort() [%s:%d]", file, line));
-    if (parserTermTemp == (TERM *)0)
+    if (parserTermTemp == NULL)
 	return;
 
     DestroyTerminal(parserTermTemp);
-    parserTermTemp = (TERM *)0;
+    parserTermTemp = NULL;
 }
 
 void
@@ -290,22 +290,22 @@ TerminalDestroy(void)
 {
     CONDDEBUG((1, "TerminalDestroy() [%s:%d]", file, line));
 
-    if (parserTermTemp != (TERM *)0) {
+    if (parserTermTemp != NULL) {
 	DestroyTerminal(parserTermTemp);
-	parserTermTemp = (TERM *)0;
+	parserTermTemp = NULL;
     }
 
-    if (parserTermDefault != (TERM *)0) {
+    if (parserTermDefault != NULL) {
 	DestroyTerminal(pTerm);
 	pTerm = parserTermDefault;
-	parserTermDefault = (TERM *)0;
+	parserTermDefault = NULL;
     }
 }
 
 void
 ProcessYesNo(char *id, FLAG *flag)
 {
-    if (id == (char *)0 || id[0] == '\000')
+    if (id == NULL || id[0] == '\000')
 	*flag = FLAGFALSE;
     else if (strcasecmp("yes", id) == 0 || strcasecmp("true", id) == 0 ||
 	     strcasecmp("on", id) == 0)
@@ -320,14 +320,14 @@ ConfigItemEscape(char *id)
 {
     CONDDEBUG((1, "ConfigItemEscape(%s) [%s:%d]", id, file, line));
 
-    if (parserConfigTemp->escape != (char *)0)
+    if (parserConfigTemp->escape != NULL)
 	free(parserConfigTemp->escape);
 
-    if ((id == (char *)0) || (*id == '\000')) {
-	parserConfigTemp->escape = (char *)0;
+    if ((id == NULL) || (*id == '\000')) {
+	parserConfigTemp->escape = NULL;
 	return;
     }
-    if ((parserConfigTemp->escape = StrDup(id)) == (char *)0)
+    if ((parserConfigTemp->escape = StrDup(id)) == NULL)
 	OutOfMem();
 }
 
@@ -336,14 +336,14 @@ ConfigItemMaster(char *id)
 {
     CONDDEBUG((1, "ConfigItemMaster(%s) [%s:%d]", id, file, line));
 
-    if (parserConfigTemp->master != (char *)0)
+    if (parserConfigTemp->master != NULL)
 	free(parserConfigTemp->master);
 
-    if ((id == (char *)0) || (*id == '\000')) {
-	parserConfigTemp->master = (char *)0;
+    if ((id == NULL) || (*id == '\000')) {
+	parserConfigTemp->master = NULL;
 	return;
     }
-    if ((parserConfigTemp->master = StrDup(id)) == (char *)0)
+    if ((parserConfigTemp->master = StrDup(id)) == NULL)
 	OutOfMem();
 }
 
@@ -354,7 +354,7 @@ ConfigItemPlayback(char *id)
 
     CONDDEBUG((1, "ConfigItemPlayback(%s) [%s:%d]", id, file, line));
 
-    if ((id == (char *)0) || (*id == '\000')) {
+    if ((id == NULL) || (*id == '\000')) {
 	parserConfigTemp->playback = 0;
 	return;
     }
@@ -376,14 +376,14 @@ ConfigItemPort(char *id)
 {
     CONDDEBUG((1, "ConfigItemPort(%s) [%s:%d]", id, file, line));
 
-    if (parserConfigTemp->port != (char *)0)
+    if (parserConfigTemp->port != NULL)
 	free(parserConfigTemp->port);
 
-    if ((id == (char *)0) || (*id == '\000')) {
-	parserConfigTemp->port = (char *)0;
+    if ((id == NULL) || (*id == '\000')) {
+	parserConfigTemp->port = NULL;
 	return;
     }
-    if ((parserConfigTemp->port = StrDup(id)) == (char *)0)
+    if ((parserConfigTemp->port = StrDup(id)) == NULL)
 	OutOfMem();
 }
 
@@ -394,7 +394,7 @@ ConfigItemReplay(char *id)
 
     CONDDEBUG((1, "ConfigItemReplay(%s) [%s:%d]", id, file, line));
 
-    if ((id == (char *)0) || (*id == '\000')) {
+    if ((id == NULL) || (*id == '\000')) {
 	parserConfigTemp->replay = 0;
 	return;
     }
@@ -416,14 +416,14 @@ ConfigItemSslcredentials(char *id)
 {
     CONDDEBUG((1, "ConfigItemSslcredentials(%s) [%s:%d]", id, file, line));
 #if HAVE_OPENSSL
-    if (parserConfigTemp->sslcredentials != (char *)0)
+    if (parserConfigTemp->sslcredentials != NULL)
 	free(parserConfigTemp->sslcredentials);
 
-    if ((id == (char *)0) || (*id == '\000')) {
-	parserConfigTemp->sslcredentials = (char *)0;
+    if ((id == NULL) || (*id == '\000')) {
+	parserConfigTemp->sslcredentials = NULL;
 	return;
     }
-    if ((parserConfigTemp->sslcredentials = StrDup(id)) == (char *)0)
+    if ((parserConfigTemp->sslcredentials = StrDup(id)) == NULL)
 	OutOfMem();
 #else
     Error
@@ -438,14 +438,14 @@ ConfigItemSslcacertificatefile(char *id)
     CONDDEBUG((1, "ConfigItemSslcacertificatefile(%s) [%s:%d]", id, file,
 	       line));
 #if HAVE_OPENSSL
-    if (parserConfigTemp->sslcacertificatefile != (char *)0)
+    if (parserConfigTemp->sslcacertificatefile != NULL)
 	free(parserConfigTemp->sslcacertificatefile);
 
-    if ((id == (char *)0) || (*id == '\000')) {
-	parserConfigTemp->sslcacertificatefile = (char *)0;
+    if ((id == NULL) || (*id == '\000')) {
+	parserConfigTemp->sslcacertificatefile = NULL;
 	return;
     }
-    if ((parserConfigTemp->sslcacertificatefile = StrDup(id)) == (char *)0)
+    if ((parserConfigTemp->sslcacertificatefile = StrDup(id)) == NULL)
 	OutOfMem();
 #else
     Error
@@ -460,14 +460,14 @@ ConfigItemSslcacertificatepath(char *id)
     CONDDEBUG((1, "ConfigItemSslcacertificatepath(%s) [%s:%d]", id, file,
 	       line));
 #if HAVE_OPENSSL
-    if (parserConfigTemp->sslcacertificatepath != (char *)0)
+    if (parserConfigTemp->sslcacertificatepath != NULL)
 	free(parserConfigTemp->sslcacertificatepath);
 
-    if ((id == (char *)0) || (*id == '\000')) {
-	parserConfigTemp->sslcacertificatepath = (char *)0;
+    if ((id == NULL) || (*id == '\000')) {
+	parserConfigTemp->sslcacertificatepath = NULL;
 	return;
     }
-    if ((parserConfigTemp->sslcacertificatepath = StrDup(id)) == (char *)0)
+    if ((parserConfigTemp->sslcacertificatepath = StrDup(id)) == NULL)
 	OutOfMem();
 #else
     Error
@@ -513,18 +513,18 @@ ConfigItemUsername(char *id)
 {
     CONDDEBUG((1, "ConfigItemUsername(%s) [%s:%d]", id, file, line));
 
-    if (parserConfigTemp->username != (char *)0)
+    if (parserConfigTemp->username != NULL)
 	free(parserConfigTemp->username);
 
-    if ((id == (char *)0) || (*id == '\000')) {
-	parserConfigTemp->username = (char *)0;
+    if ((id == NULL) || (*id == '\000')) {
+	parserConfigTemp->username = NULL;
 	return;
     }
-    if ((parserConfigTemp->username = StrDup(id)) == (char *)0)
+    if ((parserConfigTemp->username = StrDup(id)) == NULL)
 	OutOfMem();
 }
 
-SUBST *substData = (SUBST *)0;
+SUBST *substData = NULL;
 
 SUBSTTOKEN
 SubstToken(char c)
@@ -543,9 +543,9 @@ SubstValue(char c, char **s, int *i)
 {
     int retval = 0;
 
-    if (s != (char **)0) {
+    if (s != NULL) {
 	CONFIG *pc;
-	if (substData->data == (void *)0)
+	if (substData->data == NULL)
 	    return 0;
 
 	pc = (CONFIG *)(substData->data);
@@ -564,8 +564,8 @@ SubstValue(char c, char **s, int *i)
 void
 InitSubstCallback(void)
 {
-    if (substData == (SUBST *)0) {
-	if ((substData = (SUBST *)calloc(1, sizeof(SUBST))) == (SUBST *)0)
+    if (substData == NULL) {
+	if ((substData = (SUBST *)calloc(1, sizeof(SUBST))) == NULL)
 	    OutOfMem();
 	substData->value = &SubstValue;
 	substData->token = &SubstToken;
@@ -578,14 +578,14 @@ TerminalItemAttach(char *id)
 {
     CONDDEBUG((1, "TerminalItemAttach(%s) [%s:%d]", id, file, line));
 
-    if (parserTermTemp->attach != (char *)0)
+    if (parserTermTemp->attach != NULL)
 	free(parserTermTemp->attach);
 
-    if ((id == (char *)0) || (*id == '\000')) {
-	parserTermTemp->attach = (char *)0;
+    if ((id == NULL) || (*id == '\000')) {
+	parserTermTemp->attach = NULL;
 	return;
     }
-    if ((parserTermTemp->attach = StrDup(id)) == (char *)0)
+    if ((parserTermTemp->attach = StrDup(id)) == NULL)
 	OutOfMem();
 }
 
@@ -593,7 +593,7 @@ void
 TerminalItemAttachsubst(char *id)
 {
     CONDDEBUG((1, "TerminalItemAttachsubst(%s) [%s:%d]", id, file, line));
-    ProcessSubst(substData, (char **)0, &(parserTermTemp->attachsubst),
+    ProcessSubst(substData, NULL, &(parserTermTemp->attachsubst),
 		 "attachsubst", id);
 }
 
@@ -602,14 +602,14 @@ TerminalItemDetach(char *id)
 {
     CONDDEBUG((1, "TerminalItemDetach(%s) [%s:%d]", id, file, line));
 
-    if (parserTermTemp->detach != (char *)0)
+    if (parserTermTemp->detach != NULL)
 	free(parserTermTemp->detach);
 
-    if ((id == (char *)0) || (*id == '\000')) {
-	parserTermTemp->detach = (char *)0;
+    if ((id == NULL) || (*id == '\000')) {
+	parserTermTemp->detach = NULL;
 	return;
     }
-    if ((parserTermTemp->detach = StrDup(id)) == (char *)0)
+    if ((parserTermTemp->detach = StrDup(id)) == NULL)
 	OutOfMem();
 }
 
@@ -617,7 +617,7 @@ void
 TerminalItemDetachsubst(char *id)
 {
     CONDDEBUG((1, "TerminalItemDetachsubst(%s) [%s:%d]", id, file, line));
-    ProcessSubst(substData, (char **)0, &(parserTermTemp->detachsubst),
+    ProcessSubst(substData, NULL, &(parserTermTemp->detachsubst),
 		 "detachsubst", id);
 }
 
@@ -634,7 +634,7 @@ ITEM keyConfig[] = {
     {"sslenabled", ConfigItemSslenabled},
     {"striphigh", ConfigItemStriphigh},
     {"username", ConfigItemUsername},
-    {(char *)0, (void *)0}
+    {NULL, NULL}
 };
 
 ITEM keyTerminal[] = {
@@ -642,7 +642,7 @@ ITEM keyTerminal[] = {
     {"attachsubst", TerminalItemAttachsubst},
     {"detach", TerminalItemDetach},
     {"detachsubst", TerminalItemDetachsubst},
-    {(char *)0, (void *)0}
+    {NULL, NULL}
 };
 
 SECTION sections[] = {
@@ -650,7 +650,7 @@ SECTION sections[] = {
      keyConfig},
     {"terminal", TerminalBegin, TerminalEnd, TerminalAbort,
      TerminalDestroy, keyTerminal},
-    {(char *)0, (void *)0, (void *)0, (void *)0, (void *)0}
+    {NULL, NULL, NULL, NULL, NULL}
 };
 
 void
@@ -658,7 +658,7 @@ ReadConf(char *filename, FLAG verbose)
 {
     FILE *fp;
 
-    if ((FILE *)0 == (fp = fopen(filename, "r"))) {
+    if (NULL == (fp = fopen(filename, "r"))) {
 	if (verbose == FLAGTRUE)
 	    Error("could not open `%s'", filename);
 	return;
@@ -668,30 +668,30 @@ ReadConf(char *filename, FLAG verbose)
     InitSubstCallback();
 
     parserConfigDefault = pConfig;
-    pConfig = (CONFIG *)0;
+    pConfig = NULL;
 
     parserTermDefault = pTerm;
-    pTerm = (TERM *)0;
+    pTerm = NULL;
 
     ParseFile(filename, fp, 0);
 
     /* shouldn't really happen, but in case i screw up the stuff
      * ParseFile calls...
      */
-    if (pConfig == (CONFIG *)0) {
+    if (pConfig == NULL) {
 	if ((pConfig = (CONFIG *)calloc(1, sizeof(CONFIG)))
-	    == (CONFIG *)0)
+	    == NULL)
 	    OutOfMem();
     }
 
-    if (pTerm == (TERM *)0) {
+    if (pTerm == NULL) {
 	if ((pTerm = (TERM *)calloc(1, sizeof(TERM)))
-	    == (TERM *)0)
+	    == NULL)
 	    OutOfMem();
     }
 
     if (fDebug) {
-#define EMPTYSTR(x) x == (char *)0 ? "(null)" : x
+#define EMPTYSTR(x) x == NULL ? "(null)" : x
 #define FLAGSTR(x) x == FLAGTRUE ? "true" : (x == FLAGFALSE ? "false" : "unset")
 	CONDDEBUG((1, "pConfig->username = %s",
 		   EMPTYSTR(pConfig->username)));

@@ -52,15 +52,15 @@ int chAttn = -1, chEsc = -1;
 unsigned short bindPort;
 CONSFILE *cfstdout;
 int disconnectCount = 0;
-STRING *execCmd = (STRING *)0;
-CONSFILE *execCmdFile = (CONSFILE *)0;
+STRING *execCmd = NULL;
+CONSFILE *execCmdFile = NULL;
 pid_t execCmdPid = 0;
-CONSFILE *gotoConsole = (CONSFILE *)0;
-CONSFILE *prevConsole = (CONSFILE *)0;
-char *gotoName = (char *)0;
-char *prevName = (char *)0;
-CONFIG *optConf = (CONFIG *)0;
-CONFIG *config = (CONFIG *)0;
+CONSFILE *gotoConsole = NULL;
+CONSFILE *prevConsole = NULL;
+char *gotoName = NULL;
+char *prevName = NULL;
+CONFIG *optConf = NULL;
+CONFIG *config = NULL;
 FLAG interact = FLAGFALSE;
 unsigned int sversion = 0;
 #if defined(TIOCGWINSZ)
@@ -68,12 +68,12 @@ struct winsize ws;
 #endif
 
 #if HAVE_OPENSSL
-SSL_CTX *ctx = (SSL_CTX *)0;
+SSL_CTX *ctx = NULL;
 
 void
 SetupSSL(void)
 {
-    if (ctx == (SSL_CTX *)0) {
+    if (ctx == NULL) {
 	char *ciphers;
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
 	SSL_load_error_strings();
@@ -82,7 +82,7 @@ SetupSSL(void)
 	    Bye(EX_UNAVAILABLE);
 	}
 #endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
-	if ((ctx = SSL_CTX_new(TLS_method())) == (SSL_CTX *)0) {
+	if ((ctx = SSL_CTX_new(TLS_method())) == NULL) {
 	    Error("Creating SSL context failed");
 	    Bye(EX_UNAVAILABLE);
 	}
@@ -90,21 +90,21 @@ SetupSSL(void)
 	    Error("Could not load SSL default CA file and/or directory");
 	    Bye(EX_UNAVAILABLE);
 	}
-	if (config->sslcacertificatefile != (char *)0 ||
-	    config->sslcacertificatepath != (char *)0) {
+	if (config->sslcacertificatefile != NULL ||
+	    config->sslcacertificatepath != NULL) {
 	    if (SSL_CTX_load_verify_locations
 		(ctx, config->sslcacertificatefile,
 		 config->sslcacertificatepath) != 1) {
-		if (config->sslcacertificatefile != (char *)0)
+		if (config->sslcacertificatefile != NULL)
 		    Error("Could not setup ca certificate file to '%s'",
 			  config->sslcacertificatefile);
-		if (config->sslcacertificatepath != (char *)0)
+		if (config->sslcacertificatepath != NULL)
 		    Error("Could not setup ca certificate path to '%s'",
 			  config->sslcacertificatepath);
 		Bye(EX_UNAVAILABLE);
 	    }
 	}
-	if (config->sslcredentials != (char *)0) {
+	if (config->sslcredentials != NULL) {
 	    if (SSL_CTX_use_certificate_chain_file
 		(ctx, config->sslcredentials) != 1) {
 		Error("Could not load SSL certificate from '%s'",
@@ -145,7 +145,7 @@ AttemptSSL(CONSFILE *pcf)
 {
     SSL *ssl;
 
-    if (ctx == (SSL_CTX *)0) {
+    if (ctx == NULL) {
 	Error("WTF?  The SSL context disappeared?!?!?");
 	Bye(EX_UNAVAILABLE);
     }
@@ -306,7 +306,7 @@ Usage(int wantfull)
 	"w(W)      show who is on which console (on master)",
 	"x         examine ports and baud rates",
 	"z(Z) cmd  send a command to the (master) server (think 'z'ap)",
-	(char *)0
+	NULL
     };
 
     fprintf(stderr, "usage: %s [generic-args] [-aAfFsS] [-e esc] console\n\
@@ -319,7 +319,7 @@ Usage(int wantfull)
     if (wantfull) {
 	int i;
 	fprintf(stderr, "\n");
-	for (i = 0; full[i] != (char *)0; i++)
+	for (i = 0; full[i] != NULL; i++)
 	    fprintf(stderr, "\t%s\n", full[i]);
     }
 }
@@ -330,8 +330,8 @@ static void
 Version(void)
 {
     int i;
-    static STRING *acA1 = (STRING *)0;
-    static STRING *acA2 = (STRING *)0;
+    static STRING *acA1 = NULL;
+    static STRING *acA2 = NULL;
     char *optionlist[] = {
 #if HAVE_DMALLOC
 	"dmalloc",
@@ -348,12 +348,12 @@ Version(void)
 #if USE_UNIX_DOMAIN_SOCKETS
 	"uds",
 #endif
-	(char *)0
+	NULL
     };
 
-    if (acA1 == (STRING *)0)
+    if (acA1 == NULL)
 	acA1 = AllocString();
-    if (acA2 == (STRING *)0)
+    if (acA2 == NULL)
 	acA2 = AllocString();
 
     Msg(MyVersion());
@@ -368,10 +368,10 @@ Version(void)
     Msg("default site-wide configuration in `%s'", CLIENTCONFIGFILE);
     Msg("default per-user configuration in `%s'", "$HOME/.consolerc");
 
-    BuildString((char *)0, acA1);
-    if (optionlist[0] == (char *)0)
+    BuildString(NULL, acA1);
+    if (optionlist[0] == NULL)
 	BuildString("none", acA1);
-    for (i = 0; optionlist[i] != (char *)0; i++) {
+    for (i = 0; optionlist[i] != NULL; i++) {
 	if (i == 0)
 	    BuildString(optionlist[i], acA1);
 	else {
@@ -381,7 +381,7 @@ Version(void)
     }
     Msg("options: %s", acA1->string);
 #if HAVE_DMALLOC
-    BuildString((char *)0, acA1);
+    BuildString(NULL, acA1);
     BuildStringChar('0' + DMALLOC_VERSION_MAJOR, acA1);
     BuildStringChar('.', acA1);
     BuildStringChar('0' + DMALLOC_VERSION_MINOR, acA1);
@@ -444,7 +444,7 @@ ParseChar(char **ppcSrc, char *pcOut)
 	cvt |= n;
     }
 
-    if ((char *)0 != pcOut) {
+    if (NULL != pcOut) {
 	*pcOut = cvt;
     }
     *ppcSrc = pcScan;
@@ -512,9 +512,9 @@ GetPort(char *pcToHost, unsigned short sPort)
     struct addrinfo *ai, *rp, hints;
 #elif USE_UNIX_DOMAIN_SOCKETS
     struct sockaddr_un port;
-    static STRING *portPath = (STRING *)0;
+    static STRING *portPath = NULL;
 #else
-    struct hostent *hp = (struct hostent *)0;
+    struct hostent *hp = NULL;
     struct sockaddr_in port;
 #endif
 #if HAVE_SETSOCKOPT
@@ -543,7 +543,7 @@ GetPort(char *pcToHost, unsigned short sPort)
     error = getaddrinfo(pcToHost, serv, &hints, &ai);
     if (error) {
 	Error("getaddrinfo(%s): %s", pcToHost, gai_strerror(error));
-	return (CONSFILE *)0;
+	return NULL;
     }
 
     rp = ai;
@@ -577,17 +577,17 @@ GetPort(char *pcToHost, unsigned short sPort)
 	rp = rp->ai_next;
     }
     Error("Unable to connect to %s:%s", host, serv);
-    return (CONSFILE *)0;
+    return NULL;
   success:
     freeaddrinfo(ai);
 #elif USE_UNIX_DOMAIN_SOCKETS
-    if (portPath == (STRING *)0)
+    if (portPath == NULL)
 	portPath = AllocString();
     BuildStringPrint(portPath, "%s/%hu", config->master, sPort);
     port.sun_family = AF_UNIX;
     if (portPath->used > sizeof(port.sun_path)) {
 	Error("GetPort: path to socket too long: %s", portPath->string);
-	return (CONSFILE *)0;
+	return NULL;
     }
     StrCpy(port.sun_path, portPath->string, sizeof(port.sun_path));
 
@@ -598,12 +598,12 @@ GetPort(char *pcToHost, unsigned short sPort)
      */
     if ((s = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
 	Error("socket(AF_UNIX,SOCK_STREAM): %s", strerror(errno));
-	return (CONSFILE *)0;
+	return NULL;
     }
 
     if (connect(s, (struct sockaddr *)(&port), sizeof(port)) < 0) {
 	Error("connect(): %s: %s", port.sun_path, strerror(errno));
-	return (CONSFILE *)0;
+	return NULL;
     }
 #else
 # if HAVE_INET_ATON
@@ -613,7 +613,7 @@ GetPort(char *pcToHost, unsigned short sPort)
     if ((in_addr_t) (-1) == port.sin_addr.s_addr)
 # endif
     {
-	if ((struct hostent *)0 != (hp = gethostbyname(pcToHost))) {
+	if (NULL != (hp = gethostbyname(pcToHost))) {
 # if HAVE_MEMCPY
 	    memcpy((char *)&port.sin_addr.s_addr, (char *)hp->h_addr,
 		   hp->h_length);
@@ -623,14 +623,14 @@ GetPort(char *pcToHost, unsigned short sPort)
 # endif
 	} else {
 	    Error("gethostbyname(%s): %s", pcToHost, hstrerror(h_errno));
-	    return (CONSFILE *)0;
+	    return NULL;
 	}
     }
     port.sin_port = sPort;
     port.sin_family = AF_INET;
 
     if (fDebug) {
-	if ((struct hostent *)0 != hp && (char *)0 != hp->h_name) {
+	if (NULL != hp && NULL != hp->h_name) {
 	    CONDDEBUG((1, "GetPort: hostname=%s (%s), ip=%s, port=%hu",
 		       hp->h_name, pcToHost, inet_ntoa(port.sin_addr),
 		       ntohs(sPort)));
@@ -646,14 +646,14 @@ GetPort(char *pcToHost, unsigned short sPort)
      */
     if ((s = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 	Error("socket(AF_INET,SOCK_STREAM): %s", strerror(errno));
-	return (CONSFILE *)0;
+	return NULL;
     }
 # if HAVE_SETSOCKOPT
     if (setsockopt(s, SOL_SOCKET, SO_KEEPALIVE, (char *)&one, sizeof(one))
 	< 0) {
 	Error("setsockopt(SO_KEEPALIVE): %s", strerror(errno));
 	close(s);
-	return (CONSFILE *)0;
+	return NULL;
     }
 # endif
 
@@ -661,7 +661,7 @@ GetPort(char *pcToHost, unsigned short sPort)
 	Error("connect(): %hu@%s: %s", ntohs(port.sin_port), pcToHost,
 	      strerror(errno));
 	close(s);
-	return (CONSFILE *)0;
+	return NULL;
     }
 #endif
 
@@ -722,18 +722,18 @@ void
 DestroyDataStructures(void)
 {
     C2Cooked();
-    if (cfstdout != (CONSFILE *)0)
+    if (cfstdout != NULL)
 	FileUnopen(cfstdout);
     DestroyConfig(pConfig);
     DestroyConfig(optConf);
     DestroyConfig(config);
     DestroyTerminal(pTerm);
 #if !USE_IPV6
-    if (myAddrs != (struct in_addr *)0)
+    if (myAddrs != NULL)
 	free(myAddrs);
 #endif
     DestroyStrings();
-    if (substData != (SUBST *)0)
+    if (substData != NULL)
 	free(substData);
 }
 
@@ -742,12 +742,12 @@ ReadReply(CONSFILE *fd, FLAG toEOF)
 {
     int nr;
     static char buf[1024];
-    static STRING *result = (STRING *)0;
+    static STRING *result = NULL;
 
-    if (result == (STRING *)0)
+    if (result == NULL)
 	result = AllocString();
     else
-	BuildString((char *)0, result);
+	BuildString(NULL, result);
 
     while (1) {
 	int l;
@@ -772,17 +772,17 @@ ReadReply(CONSFILE *fd, FLAG toEOF)
 		if (toEOF == FLAGTRUE)	/* if toEOF, read until EOF */
 		    continue;
 		if ((result->used > 1) &&
-		    strchr(result->string, '\n') != (char *)0)
+		    strchr(result->string, '\n') != NULL)
 		    break;
 		continue;
 	}
 	break;
     }
     if (fDebug) {
-	static STRING *tmpString = (STRING *)0;
-	if (tmpString == (STRING *)0)
+	static STRING *tmpString = NULL;
+	if (tmpString == NULL)
 	    tmpString = AllocString();
-	BuildString((char *)0, tmpString);
+	BuildString(NULL, tmpString);
 	FmtCtlStr(result->string, result->used - 1, tmpString);
 	CONDDEBUG((1, "ReadReply: `%s'", tmpString->string));
     }
@@ -848,10 +848,10 @@ ExecCmd(void)
     int pin[2];
     int pout[2];
     static char *apcArgv[] = {
-	"/bin/sh", "-ce", (char *)0, (char *)0
+	"/bin/sh", "-ce", NULL, NULL
     };
 
-    if (execCmd == (STRING *)0 || execCmd->used <= 1)
+    if (execCmd == NULL || execCmd->used <= 1)
 	return;
 
     CONDDEBUG((1, "ExecCmd(): `%s'", execCmd->string));
@@ -882,7 +882,7 @@ ExecCmd(void)
 	    close(pout[0]);
 	    close(pin[1]);
 	    if ((execCmdFile =
-		 FileOpenPipe(pin[0], pout[1])) == (CONSFILE *)0) {
+		 FileOpenPipe(pin[0], pout[1])) == NULL) {
 		Error("ExecCmd(): FileOpenPipe(%d,%d) failed", pin[0],
 		      pout[1]);
 		close(pin[0]);
@@ -950,10 +950,10 @@ GetUserInput(STRING *str)
 {
     char c;
 
-    if (str == (STRING *)0)
+    if (str == NULL)
 	return;
 
-    BuildString((char *)0, str);
+    BuildString(NULL, str);
 
     for (;;) {
 	if (read(0, &c, 1) == 0)
@@ -1000,10 +1000,10 @@ DoExec(CONSFILE *pcf)
     GetUserInput(execCmd);
     FileWrite(cfstdout, FLAGFALSE, "]\r\n", 3);
 
-    if (execCmd != (STRING *)0 && execCmd->used > 1) {
+    if (execCmd != NULL && execCmd->used > 1) {
 	ExecCmd();
-	BuildString((char *)0, execCmd);
-	if (execCmdFile == (CONSFILE *)0) {	/* exec failed */
+	BuildString(NULL, execCmd);
+	if (execCmdFile == NULL) {	/* exec failed */
 	    /* say forget it */
 	    FileSetQuoteIAC(pcf, FLAGFALSE);
 	    FilePrint(pcf, FLAGFALSE, "%c%c", OB_IAC, OB_ABRT);
@@ -1049,15 +1049,15 @@ ExpandString(char *str, CONSFILE *c)
     short cntrl = 0;
     char oct = '\000';
     short octs = 0;
-    static STRING *exp = (STRING *)0;
+    static STRING *exp = NULL;
 
-    if (str == (char *)0 || c == (CONSFILE *)0)
+    if (str == NULL || c == NULL)
 	return;
 
-    if (exp == (STRING *)0)
+    if (exp == NULL)
 	exp = AllocString();
 
-    BuildString((char *)0, exp);
+    BuildString(NULL, exp);
 
     backslash = 0;
     cntrl = 0;
@@ -1134,16 +1134,16 @@ ExpandString(char *str, CONSFILE *c)
 void
 PrintSubst(CONSFILE *pcf, char *pcMach, char *string, char *subst)
 {
-    if (string == (char *)0)
+    if (string == NULL)
 	return;
 
-    if (subst != (char *)0) {
+    if (subst != NULL) {
 	char *str;
-	if ((str = StrDup(string)) == (char *)0)
+	if ((str = StrDup(string)) == NULL)
 	    OutOfMem();
 	substData->data = (void *)config;
 	config->console = pcMach;
-	ProcessSubst(substData, &str, (char **)0, (char *)0, subst);
+	ProcessSubst(substData, &str, NULL, NULL, subst);
 	ExpandString(str, pcf);
 	free(str);
     } else
@@ -1162,18 +1162,18 @@ Interact(CONSFILE *pcf, char *pcMach)
     /* if this is true, it means we successfully moved to a new console
      * so we need to close the old one.
      */
-    if (prevConsole != (CONSFILE *)0) {
+    if (prevConsole != NULL) {
 	FileClose(&prevConsole);
 	PrintSubst(cfstdout, prevName, pTerm->detach, pTerm->detachsubst);
     }
-    if (prevName != (char *)0) {
+    if (prevName != NULL) {
 	free(prevName);
-	prevName = (char *)0;
+	prevName = NULL;
     }
 
     /* this is only true in other parts of the code iff pcf == gotoConsole */
-    if (gotoConsole != (CONSFILE *)0) {
-	gotoConsole = (CONSFILE *)0;
+    if (gotoConsole != NULL) {
+	gotoConsole = NULL;
 	FilePrint(cfstdout, FLAGFALSE, "[returning to `%s'", pcMach);
 	FileWrite(pcf, FLAGFALSE, "\n", 1);
     }
@@ -1207,8 +1207,8 @@ Interact(CONSFILE *pcf, char *pcMach)
 	rmask = rinit;
 	wmask = winit;
 	if (-1 ==
-	    select(maxfd, &rmask, &wmask, (fd_set *)0,
-		   (struct timeval *)0)) {
+	    select(maxfd, &rmask, &wmask, NULL,
+		   NULL)) {
 	    if (errno != EINTR) {
 		Error("Master(): select(): %s", strerror(errno));
 		break;
@@ -1217,7 +1217,7 @@ Interact(CONSFILE *pcf, char *pcMach)
 	}
 
 	/* anything from execCmd */
-	if (execCmdFile != (CONSFILE *)0) {
+	if (execCmdFile != NULL) {
 	    if (FileCanRead(execCmdFile, &rmask, &wmask)) {
 		if ((nc =
 		     FileRead(execCmdFile, acMesg, sizeof(acMesg))) < 0) {
@@ -1238,7 +1238,7 @@ Interact(CONSFILE *pcf, char *pcMach)
 		       FileCanWrite(execCmdFile, &rmask, &wmask)) {
 		CONDDEBUG((1, "Interact(): flushing fd %d",
 			   FileFDNum(execCmdFile)));
-		if (FileWrite(execCmdFile, FLAGFALSE, (char *)0, 0) < 0) {
+		if (FileWrite(execCmdFile, FLAGFALSE, NULL, 0) < 0) {
 		    /* -bryan */
 		    break;
 		}
@@ -1258,7 +1258,7 @@ Interact(CONSFILE *pcf, char *pcMach)
 	    }
 	    while ((l = ParseIACBuf(pcf, acMesg, &nc)) >= 0) {
 		if (l == 0) {
-		    if (execCmdFile == (CONSFILE *)0) {
+		    if (execCmdFile == NULL) {
 			if (FileSawQuoteExec(pcf) == FLAGTRUE)
 			    DoExec(pcf);
 			else if (FileSawQuoteSusp(pcf) == FLAGTRUE) {
@@ -1282,9 +1282,9 @@ Interact(CONSFILE *pcf, char *pcMach)
 #endif
 			} else if (FileSawQuoteGoto(pcf) == FLAGTRUE) {
 			    gotoConsole = pcf;
-			    if (gotoName != (char *)0)
+			    if (gotoName != NULL)
 				free(gotoName);
-			    if ((gotoName = StrDup(pcMach)) == (char *)0)
+			    if ((gotoName = StrDup(pcMach)) == NULL)
 				OutOfMem();
 			    C2Cooked();
 			    return;
@@ -1303,7 +1303,7 @@ Interact(CONSFILE *pcf, char *pcMach)
 		    for (i = 0; i < l; ++i)
 			acMesg[i] &= 127;
 		}
-		if (execCmdFile != (CONSFILE *)0) {
+		if (execCmdFile != NULL) {
 		    FileWrite(execCmdFile, FLAGFALSE, acMesg, l);
 		    if (showExecData)
 			FileWrite(cfstdout, FLAGFALSE, acMesg, l);
@@ -1314,7 +1314,7 @@ Interact(CONSFILE *pcf, char *pcMach)
 	    }
 	} else if (!FileBufEmpty(pcf) && FileCanWrite(pcf, &rmask, &wmask)) {
 	    CONDDEBUG((1, "Interact(): flushing fd %d", FileFDNum(pcf)));
-	    if (FileWrite(pcf, FLAGFALSE, (char *)0, 0) < 0) {
+	    if (FileWrite(pcf, FLAGFALSE, NULL, 0) < 0) {
 		/* -bryan */
 		break;
 	    }
@@ -1330,7 +1330,7 @@ Interact(CONSFILE *pcf, char *pcMach)
 		    continue;
 		}
 	    }
-	    if (execCmdFile == (CONSFILE *)0) {
+	    if (execCmdFile == NULL) {
 		if (config->striphigh == FLAGTRUE) {
 		    for (i = 0; i < nc; ++i)
 			acMesg[i] &= 127;
@@ -1378,7 +1378,7 @@ CallUp(CONSFILE *pcf, char *pcMaster, char *pcMach, char *pcHow,
        char *result)
 {
     int fIn = '-';
-    char *r = (char *)0;
+    char *r = NULL;
 
     if (fVerbose) {
 	Msg("%s to %s (on %s)", pcHow, pcMach, pcMaster);
@@ -1548,9 +1548,9 @@ CallUp(CONSFILE *pcf, char *pcMaster, char *pcMach, char *pcHow,
  * console -i foo: call, info              (interact==FLAGFALSE)
  *
  */
-char *cmds[4] = { (char *)0, (char *)0, (char *)0, (char *)0 };
+char *cmds[4] = { NULL, NULL, NULL, NULL };
 
-char *cmdarg = (char *)0;
+char *cmdarg = NULL;
 
 /* call a machine master for group master ports and machine master ports
  * take a list like "1782@localhost:@mentor.cc.purdue.edu:@pop.stat.purdue.edu"
@@ -1566,7 +1566,7 @@ DoCmds(char *master, char *pports, int cmdi)
     char *next;
     char *server;
     unsigned short port;
-    char *result = (char *)0;
+    char *result = NULL;
     int len;
     char *ports;
     char *pcopy;
@@ -1575,7 +1575,7 @@ DoCmds(char *master, char *pports, int cmdi)
     int toksize;
 #endif
 
-    if ((pcopy = ports = StrDup(pports)) == (char *)0)
+    if ((pcopy = ports = StrDup(pports)) == NULL)
 	OutOfMem();
 
     len = strlen(ports);
@@ -1584,12 +1584,12 @@ DoCmds(char *master, char *pports, int cmdi)
     ports[len] = '\000';
 
     for ( /* param */ ; *ports != '\000'; ports = next) {
-	if ((next = strchr(ports, ':')) == (char *)0)
+	if ((next = strchr(ports, ':')) == NULL)
 	    next = "";
 	else
 	    *next++ = '\000';
 
-	if ((server = strchr(ports, '@')) != (char *)0) {
+	if ((server = strchr(ports, '@')) != NULL) {
 	    *server++ = '\000';
 	    if (*server == '\000')
 		server = master;
@@ -1624,7 +1624,7 @@ DoCmds(char *master, char *pports, int cmdi)
 	}
 
       attemptLogin:
-	if ((pcf = GetPort(server, port)) == (CONSFILE *)0)
+	if ((pcf = GetPort(server, port)) == NULL)
 	    continue;
 
 	FileSetQuoteIAC(pcf, FLAGTRUE);
@@ -1672,8 +1672,8 @@ DoCmds(char *master, char *pports, int cmdi)
 	t = ReadReply(pcf, FLAGFALSE);
 	if (strncmp(t, "passwd?", 7) == 0) {
 	    static int count = 0;
-	    static STRING *tmpString = (STRING *)0;
-	    char *hostname = (char *)0;
+	    static STRING *tmpString = NULL;
+	    char *hostname = NULL;
 
 	    if (t[7] == ' ') {
 		hostname = PruneSpace(t + 7);
@@ -1681,20 +1681,20 @@ DoCmds(char *master, char *pports, int cmdi)
 		    hostname = serverName;
 	    } else
 		hostname = serverName;
-	    if (tmpString == (STRING *)0)
+	    if (tmpString == NULL)
 		tmpString = AllocString();
 	    if (tmpString->used <= 1) {
 		char *pass;
 		BuildStringPrint(tmpString, "Enter %s@%s's password: ",
 				 config->username, hostname);
 		pass = GetPassword(tmpString->string);
-		if (pass == (char *)0) {
+		if (pass == NULL) {
 		    Error("could not get password from tty for `%s'",
 			  serverName);
 		    FileClose(&pcf);
 		    continue;
 		}
-		BuildString((char *)0, tmpString);
+		BuildString(NULL, tmpString);
 		BuildString(pass, tmpString);
 		BuildString("\r\n", tmpString);
 	    }
@@ -1704,7 +1704,7 @@ DoCmds(char *master, char *pports, int cmdi)
 	    if (strcmp(t, "ok\r\n") != 0) {
 		FilePrint(cfstdout, FLAGFALSE, "%s: %s", serverName, t);
 		if (++count < 3) {
-		    BuildString((char *)0, tmpString);
+		    BuildString(NULL, tmpString);
 		    goto attemptLogin;
 		}
 		Error("too many bad passwords for `%s'", serverName);
@@ -1726,7 +1726,7 @@ DoCmds(char *master, char *pports, int cmdi)
 	/* if we're on the last cmd or the command is 'call' and we
 	 * have an arg (always true if it's 'call'), then send the arg
 	 */
-	if ((cmdi == 0 || cmds[cmdi][0] == 'c') && cmdarg != (char *)0)
+	if ((cmdi == 0 || cmds[cmdi][0] == 'c') && cmdarg != NULL)
 	    FilePrint(pcf, FLAGFALSE, "%s %s\r\n", cmds[cmdi], cmdarg);
 	else
 	    FilePrint(pcf, FLAGFALSE, "%s\r\n", cmds[cmdi]);
@@ -1738,9 +1738,9 @@ DoCmds(char *master, char *pports, int cmdi)
 	if (cmdi != 0) {
 	    t = ReadReply(pcf, FLAGFALSE);
 	    /* save the result */
-	    if (result != (char *)0)
+	    if (result != NULL)
 		free(result);
-	    if ((result = StrDup(t)) == (char *)0)
+	    if ((result = StrDup(t)) == NULL)
 		OutOfMem();
 	}
 
@@ -1817,9 +1817,9 @@ DoCmds(char *master, char *pports, int cmdi)
 	    if (cmdi == 0) {
 		int len;
 		/* if we hit bottom, this is where we get our results */
-		if (result != (char *)0)
+		if (result != NULL)
 		    free(result);
-		if ((result = StrDup(t)) == (char *)0)
+		if ((result = StrDup(t)) == NULL)
 		    OutOfMem();
 		/* strip off the goodbye from the tail of the result */
 		len = strlen(result);
@@ -1845,7 +1845,7 @@ DoCmds(char *master, char *pports, int cmdi)
 		    /* did a 'master' before this or doing a 'disconnect',
 		     * 'reconfig', 'newlogs', or 'up'
 		     */
-		    if ((cmds[1] != (char *)0 && cmds[1][0] == 'm') ||
+		    if ((cmds[1] != NULL && cmds[1][0] == 'm') ||
 			cmds[0][0] == 'd' || cmds[0][0] == 'r' ||
 			cmds[0][0] == 'n' || cmds[0][0] == 'u') {
 			FileWrite(cfstdout, FLAGTRUE, serverName, -1);
@@ -1863,12 +1863,12 @@ DoCmds(char *master, char *pports, int cmdi)
 	    DoCmds(server, result, cmdi);
 	else if (cmdi > 0)
 	    DoCmds(server, result, cmdi - 1);
-	if (result != (char *)0)
+	if (result != NULL)
 	    free(result);
-	result = (char *)0;
+	result = NULL;
     }
 
-    if (result != (char *)0)
+    if (result != NULL)
 	free(result);
     free(pcopy);
     return 0;
@@ -1886,17 +1886,17 @@ int
 main(int argc, char **argv)
 {
     char *pcCmd;
-    struct passwd *pwdMe = (struct passwd *)0;
+    struct passwd *pwdMe = NULL;
     int opt;
     int fLocal;
-    static STRING *acPorts = (STRING *)0;
+    static STRING *acPorts = NULL;
     static char acOpts[] =
 	"7aAb:B:c:C:d:De:EfFhiIl:M:np:PqQrRsSt:uUvVwWxz:Z:";
-    static STRING *textMsg = (STRING *)0;
+    static STRING *textMsg = NULL;
     int cmdi;
-    static STRING *consoleName = (STRING *)0;
+    static STRING *consoleName = NULL;
     short readSystemConf = 1;
-    char *userConf = (char *)0;
+    char *userConf = NULL;
     typedef struct zaps {
 	char *opt;
 	char *cmd;
@@ -1904,7 +1904,7 @@ main(int argc, char **argv)
     } ZAPS;
     ZAPS zap[] = {
 	{"bringup, SIGUSR1", "up", "bring up any consoles that are down"},
-	{"help", (char *)0, "this help message"},
+	{"help", NULL, "this help message"},
 	{"pid", "pid", "display master process ids"},
 	{"quit, SIGTERM", "quit", "terminate the server"},
 	{"reconfig, SIGHUP", "reconfig",
@@ -1919,31 +1919,31 @@ main(int argc, char **argv)
 
     thepid = getpid();
 
-    if (textMsg == (STRING *)0)
+    if (textMsg == NULL)
 	textMsg = AllocString();
-    if (acPorts == (STRING *)0)
+    if (acPorts == NULL)
 	acPorts = AllocString();
 
-    if ((char *)0 == (progname = strrchr(argv[0], '/'))) {
+    if (NULL == (progname = strrchr(argv[0], '/'))) {
 	progname = argv[0];
     } else {
 	++progname;
     }
 
     /* prep the config options */
-    if ((optConf = (CONFIG *)calloc(1, sizeof(CONFIG))) == (CONFIG *)0)
+    if ((optConf = (CONFIG *)calloc(1, sizeof(CONFIG))) == NULL)
 	OutOfMem();
-    if ((config = (CONFIG *)calloc(1, sizeof(CONFIG))) == (CONFIG *)0)
+    if ((config = (CONFIG *)calloc(1, sizeof(CONFIG))) == NULL)
 	OutOfMem();
-    if ((pConfig = (CONFIG *)calloc(1, sizeof(CONFIG))) == (CONFIG *)0)
+    if ((pConfig = (CONFIG *)calloc(1, sizeof(CONFIG))) == NULL)
 	OutOfMem();
     /* and the terminal options */
-    if ((pTerm = (TERM *)calloc(1, sizeof(TERM))) == (TERM *)0)
+    if ((pTerm = (TERM *)calloc(1, sizeof(TERM))) == NULL)
 	OutOfMem();
 
     /* command line parsing
      */
-    pcCmd = (char *)0;
+    pcCmd = NULL;
     fLocal = 0;
     while ((opt = getopt(argc, argv, acOpts)) != EOF) {
 	switch (opt) {
@@ -1963,9 +1963,9 @@ main(int argc, char **argv)
 		/* fall through */
 	    case 'b':
 		pcCmd = "broadcast";
-		if (cmdarg != (char *)0)
+		if (cmdarg != NULL)
 		    free(cmdarg);
-		if ((cmdarg = StrDup(optarg)) == (char *)0)
+		if ((cmdarg = StrDup(optarg)) == NULL)
 		    OutOfMem();
 		break;
 
@@ -1976,7 +1976,7 @@ main(int argc, char **argv)
 	    case 'c':
 #if HAVE_OPENSSL
 		if ((optConf->sslcredentials =
-		     StrDup(optarg)) == (char *)0)
+		     StrDup(optarg)) == NULL)
 		    OutOfMem();
 #endif
 		break;
@@ -1987,9 +1987,9 @@ main(int argc, char **argv)
 
 	    case 'd':
 		pcCmd = "disconnect";
-		if (cmdarg != (char *)0)
+		if (cmdarg != NULL)
 		    free(cmdarg);
-		if ((cmdarg = StrDup(optarg)) == (char *)0)
+		if ((cmdarg = StrDup(optarg)) == NULL)
 		    OutOfMem();
 		break;
 
@@ -2000,7 +2000,7 @@ main(int argc, char **argv)
 		break;
 
 	    case 'e':		/* set escape chars */
-		if ((optConf->escape = StrDup(optarg)) == (char *)0)
+		if ((optConf->escape = StrDup(optarg)) == NULL)
 		    OutOfMem();
 		break;
 
@@ -2019,12 +2019,12 @@ main(int argc, char **argv)
 		break;
 
 	    case 'l':
-		if ((optConf->username = StrDup(optarg)) == (char *)0)
+		if ((optConf->username = StrDup(optarg)) == NULL)
 		    OutOfMem();
 		break;
 
 	    case 'M':
-		if ((optConf->master = StrDup(optarg)) == (char *)0)
+		if ((optConf->master = StrDup(optarg)) == NULL)
 		    OutOfMem();
 		break;
 
@@ -2033,7 +2033,7 @@ main(int argc, char **argv)
 		break;
 
 	    case 'p':
-		if ((optConf->port = StrDup(optarg)) == (char *)0)
+		if ((optConf->port = StrDup(optarg)) == NULL)
 		    OutOfMem();
 		break;
 
@@ -2063,11 +2063,11 @@ main(int argc, char **argv)
 		break;
 
 	    case 't':
-		BuildString((char *)0, textMsg);
-		if (optarg == (char *)0 || *optarg == '\000') {
+		BuildString(NULL, textMsg);
+		if (optarg == NULL || *optarg == '\000') {
 		    Error("no destination specified for -t", optarg);
 		    Bye(EX_UNAVAILABLE);
-		} else if (strchr(optarg, ' ') != (char *)0) {
+		} else if (strchr(optarg, ' ') != NULL) {
 		    Error("-t option cannot contain a space: `%s'",
 			  optarg);
 		    Bye(EX_UNAVAILABLE);
@@ -2110,16 +2110,16 @@ main(int argc, char **argv)
 		fLocal = 1;
 		/*fallthough */
 	    case 'z':		/* send a command to the server   */
-		pcCmd = (char *)0;
+		pcCmd = NULL;
 		for (isZap = sizeof(zap) / sizeof(ZAPS) - 1; isZap >= 0;
 		     isZap--) {
-		    char *token = (char *)0;
-		    char *str = (char *)0;
-		    if (zap[isZap].cmd == (char *)0)	/* skip non-action ones */
+		    char *token = NULL;
+		    char *str = NULL;
+		    if (zap[isZap].cmd == NULL)	/* skip non-action ones */
 			continue;
-		    BuildTmpString((char *)0);
+		    BuildTmpString(NULL);
 		    str = BuildTmpString(zap[isZap].opt);
-		    for (token = strtok(str, ", "); token != (char *)0;
+		    for (token = strtok(str, ", "); token != NULL;
 			 token = strtok(NULL, ", ")) {
 			if (strcasecmp(optarg, token) == 0) {
 			    pcCmd = zap[isZap].cmd;
@@ -2138,7 +2138,7 @@ main(int argc, char **argv)
 			for (isZap = 0; isZap < sizeof(zap) / sizeof(ZAPS);
 			     isZap++) {
 			    char *str;
-			    BuildTmpString((char *)0);
+			    BuildTmpString(NULL);
 			    str =
 				BuildTmpStringPrint("    %16s   %s\n",
 						    zap[isZap].opt,
@@ -2178,17 +2178,17 @@ main(int argc, char **argv)
     if (readSystemConf)
 	ReadConf(CLIENTCONFIGFILE, FLAGFALSE);
 
-    if (userConf == (char *)0) {
+    if (userConf == NULL) {
 	/* read the config files */
-	char *h = (char *)0;
+	char *h = NULL;
 
-	if (((h = getenv("HOME")) == (char *)0) &&
-	    ((pwdMe = getpwuid(getuid())) == (struct passwd *)0)) {
+	if (((h = getenv("HOME")) == NULL) &&
+	    ((pwdMe = getpwuid(getuid())) == NULL)) {
 	    Error("$HOME does not exist and getpwuid fails: %d: %s",
 		  (int)(getuid()), strerror(errno));
 	} else {
-	    if (h == (char *)0) {
-		if (pwdMe->pw_dir == (char *)0 ||
+	    if (h == NULL) {
+		if (pwdMe->pw_dir == NULL ||
 		    pwdMe->pw_dir[0] == '\000') {
 		    Error("Home directory for uid %d is not defined",
 			  (int)(getuid()));
@@ -2198,12 +2198,12 @@ main(int argc, char **argv)
 		}
 	    }
 	}
-	if (h != (char *)0) {
-	    BuildTmpString((char *)0);
+	if (h != NULL) {
+	    BuildTmpString(NULL);
 	    BuildTmpString(h);
 	    h = BuildTmpString("/.consolerc");
 	    ReadConf(h, FLAGFALSE);
-	    BuildTmpString((char *)0);
+	    BuildTmpString(NULL);
 	}
     } else
 	ReadConf(userConf, FLAGTRUE);
@@ -2215,21 +2215,21 @@ main(int argc, char **argv)
     else
 	config->striphigh = FLAGFALSE;
 
-    if (optConf->escape != (char *)0)
+    if (optConf->escape != NULL)
 	ParseEsc(optConf->escape);
-    else if (pConfig->escape != (char *)0)
+    else if (pConfig->escape != NULL)
 	ParseEsc(pConfig->escape);
 
-    if (optConf->username != (char *)0)
+    if (optConf->username != NULL)
 	config->username = StrDup(optConf->username);
-    else if (pConfig->username != (char *)0)
+    else if (pConfig->username != NULL)
 	config->username = StrDup(pConfig->username);
     else
-	config->username = (char *)0;
+	config->username = NULL;
 
-    if (optConf->master != (char *)0 && optConf->master[0] != '\000')
+    if (optConf->master != NULL && optConf->master[0] != '\000')
 	config->master = StrDup(optConf->master);
-    else if (pConfig->master != (char *)0 && pConfig->master[0] != '\000')
+    else if (pConfig->master != NULL && pConfig->master[0] != '\000')
 	config->master = StrDup(pConfig->master);
     else
 	config->master = StrDup(
@@ -2239,16 +2239,16 @@ main(int argc, char **argv)
 				   MASTERHOST	/* which machine is current */
 #endif
 	    );
-    if (config->master == (char *)0)
+    if (config->master == NULL)
 	OutOfMem();
 
-    if (optConf->port != (char *)0 && optConf->port[0] != '\000')
+    if (optConf->port != NULL && optConf->port[0] != '\000')
 	config->port = StrDup(optConf->port);
-    else if (pConfig->port != (char *)0 && pConfig->port[0] != '\000')
+    else if (pConfig->port != NULL && pConfig->port[0] != '\000')
 	config->port = StrDup(pConfig->port);
     else
 	config->port = StrDup(DEFPORT);
-    if (config->port == (char *)0)
+    if (config->port == NULL)
 	OutOfMem();
 
     if (optConf->replay != 0)
@@ -2266,26 +2266,26 @@ main(int argc, char **argv)
 	config->playback = 0;
 
 #if HAVE_OPENSSL
-    if (optConf->sslcredentials != (char *)0 &&
+    if (optConf->sslcredentials != NULL &&
 	optConf->sslcredentials[0] != '\000')
 	config->sslcredentials = StrDup(optConf->sslcredentials);
-    else if (pConfig->sslcredentials != (char *)0 &&
+    else if (pConfig->sslcredentials != NULL &&
 	     pConfig->sslcredentials[0] != '\000')
 	config->sslcredentials = StrDup(pConfig->sslcredentials);
     else
-	config->sslcredentials = (char *)0;
-    if (pConfig->sslcacertificatefile != (char *)0 &&
+	config->sslcredentials = NULL;
+    if (pConfig->sslcacertificatefile != NULL &&
 	pConfig->sslcacertificatefile[0] != '\000')
 	config->sslcacertificatefile =
 	    StrDup(pConfig->sslcacertificatefile);
     else
-	config->sslcacertificatefile = (char *)0;
-    if (pConfig->sslcacertificatepath != (char *)0 &&
+	config->sslcacertificatefile = NULL;
+    if (pConfig->sslcacertificatepath != NULL &&
 	pConfig->sslcacertificatepath[0] != '\000')
 	config->sslcacertificatepath =
 	    StrDup(pConfig->sslcacertificatepath);
     else
-	config->sslcacertificatepath = (char *)0;
+	config->sslcacertificatepath = NULL;
     if (optConf->sslenabled != FLAGUNKNOWN)
 	config->sslenabled = optConf->sslenabled;
     else if (pConfig->sslenabled != FLAGUNKNOWN)
@@ -2302,7 +2302,7 @@ main(int argc, char **argv)
 #endif
 
     /* finish resolving the command to do */
-    if (pcCmd == (char *)0) {
+    if (pcCmd == NULL) {
 	pcCmd = "attach";
     }
 
@@ -2312,9 +2312,9 @@ main(int argc, char **argv)
 	    Error("missing console name");
 	    Bye(EX_UNAVAILABLE);
 	}
-	if (cmdarg != (char *)0)
+	if (cmdarg != NULL)
 	    free(cmdarg);
-	if ((cmdarg = StrDup(argv[optind++])) == (char *)0)
+	if ((cmdarg = StrDup(argv[optind++])) == NULL)
 	    OutOfMem();
     } else if (*pcCmd == 't') {
 	/* text message */
@@ -2322,17 +2322,17 @@ main(int argc, char **argv)
 	    Error("missing message text");
 	    Bye(EX_UNAVAILABLE);
 	}
-	if (cmdarg != (char *)0)
+	if (cmdarg != NULL)
 	    free(cmdarg);
-	if ((cmdarg = StrDup(argv[optind++])) == (char *)0)
+	if ((cmdarg = StrDup(argv[optind++])) == NULL)
 	    OutOfMem();
     } else if (*pcCmd == 'i' || *pcCmd == 'e' || *pcCmd == 'h' ||
 	       *pcCmd == 'g') {
 	/* info, e(x)amine, hosts (u), groups (w) */
 	if (optind < argc) {
-	    if (cmdarg != (char *)0)
+	    if (cmdarg != NULL)
 		free(cmdarg);
-	    if ((cmdarg = StrDup(argv[optind++])) == (char *)0)
+	    if ((cmdarg = StrDup(argv[optind++])) == NULL)
 		OutOfMem();
 	}
     }
@@ -2354,7 +2354,7 @@ main(int argc, char **argv)
 	/* non-numeric only */
 	struct servent *pSE;
 	if ((pSE =
-	     getservbyname(config->port, "tcp")) == (struct servent *)0) {
+	     getservbyname(config->port, "tcp")) == NULL) {
 	    Error("getservbyname(%s) failed", config->port);
 	    Bye(EX_UNAVAILABLE);
 	} else {
@@ -2363,19 +2363,19 @@ main(int argc, char **argv)
     }
 #endif
 
-    if (config->username == (char *)0 || config->username[0] == '\000') {
-	if (config->username != (char *)0)
+    if (config->username == NULL || config->username[0] == '\000') {
+	if (config->username != NULL)
 	    free(config->username);
-	if (((config->username = getenv("LOGNAME")) == (char *)0) &&
-	    ((config->username = getenv("USER")) == (char *)0) &&
-	    ((pwdMe = getpwuid(getuid())) == (struct passwd *)0)) {
+	if (((config->username = getenv("LOGNAME")) == NULL) &&
+	    ((config->username = getenv("USER")) == NULL) &&
+	    ((pwdMe = getpwuid(getuid())) == NULL)) {
 	    Error
 		("$LOGNAME and $USER do not exist and getpwuid fails: %d: %s",
 		 (int)(getuid()), strerror(errno));
 	    Bye(EX_UNAVAILABLE);
 	}
-	if (config->username == (char *)0) {
-	    if (pwdMe->pw_name == (char *)0 || pwdMe->pw_name[0] == '\000') {
+	if (config->username == NULL) {
+	    if (pwdMe->pw_name == NULL || pwdMe->pw_name[0] == '\000') {
 		Error("Username for uid %d does not exist",
 		      (int)(getuid()));
 		Bye(EX_UNAVAILABLE);
@@ -2383,18 +2383,18 @@ main(int argc, char **argv)
 		config->username = pwdMe->pw_name;
 	    }
 	}
-	if ((config->username = StrDup(config->username)) == (char *)0)
+	if ((config->username = StrDup(config->username)) == NULL)
 	    OutOfMem();
     }
 
-    if (execCmd == (STRING *)0)
+    if (execCmd == NULL)
 	execCmd = AllocString();
 
     SimpleSignal(SIGPIPE, SIG_IGN);
 
     cfstdout = FileOpenFD(1, simpleFile);
 
-    BuildString((char *)0, acPorts);
+    BuildString(NULL, acPorts);
     BuildStringChar('@', acPorts);
     BuildString(config->master, acPorts);
 
@@ -2414,7 +2414,7 @@ main(int argc, char **argv)
 	ValidateEsc();
 	cmds[++cmdi] = "call";
 	interact = FLAGTRUE;
-    } else if (cmdarg != (char *)0 &&
+    } else if (cmdarg != NULL &&
 	       (*pcCmd == 'i' || *pcCmd == 'e' || *pcCmd == 'h' ||
 		*pcCmd == 'g')) {
 	cmds[++cmdi] = "call";
@@ -2447,19 +2447,19 @@ main(int argc, char **argv)
     }
 
     for (;;) {
-	if (gotoConsole == (CONSFILE *)0)
+	if (gotoConsole == NULL)
 	    DoCmds(config->master, acPorts->string, cmdi);
 	else
 	    Interact(gotoConsole, gotoName);
 
 	/* if we didn't ask for another console, done */
-	if (gotoConsole == (CONSFILE *)0 && prevConsole == (CONSFILE *)0)
+	if (gotoConsole == NULL && prevConsole == NULL)
 	    break;
 
-	if (consoleName == (STRING *)0)
+	if (consoleName == NULL)
 	    consoleName = AllocString();
 	C2Raw();
-	if (prevConsole == (CONSFILE *)0)
+	if (prevConsole == NULL)
 	    FileWrite(cfstdout, FLAGFALSE, "console: ", 9);
 	else
 	    FileWrite(cfstdout, FLAGFALSE, "[console: ", 10);
@@ -2467,27 +2467,27 @@ main(int argc, char **argv)
 	FileWrite(cfstdout, FLAGFALSE, "]\r\n", 3);
 	C2Cooked();
 	if (consoleName->used > 1) {
-	    if (cmdarg != (char *)0)
+	    if (cmdarg != NULL)
 		free(cmdarg);
-	    if ((cmdarg = StrDup(consoleName->string)) == (char *)0)
+	    if ((cmdarg = StrDup(consoleName->string)) == NULL)
 		OutOfMem();
-	    if (prevConsole == (CONSFILE *)0) {
+	    if (prevConsole == NULL) {
 		prevConsole = gotoConsole;
-		gotoConsole = (CONSFILE *)0;
+		gotoConsole = NULL;
 		prevName = gotoName;
-		gotoName = (char *)0;
+		gotoName = NULL;
 	    }
 	} else {
-	    if (prevConsole != (CONSFILE *)0) {
+	    if (prevConsole != NULL) {
 		gotoConsole = prevConsole;
-		prevConsole = (CONSFILE *)0;
+		prevConsole = NULL;
 		gotoName = prevName;
-		prevName = (char *)0;
+		prevName = NULL;
 	    }
 	}
     }
 
-    if (cmdarg != (char *)0)
+    if (cmdarg != NULL)
 	free(cmdarg);
 
     if (*pcCmd == 'd')

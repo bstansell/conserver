@@ -89,11 +89,11 @@ SendIWaitClientsMsg(CONSENT *pCE, char *message)
 {
     CONSCLIENT *pCL;
 
-    if ((CONSENT *)0 == pCE) {
+    if (NULL == pCE) {
 	return;
     }
 
-    for (pCL = pCE->pCLon; (CONSCLIENT *)0 != pCL; pCL = pCL->pCLnext) {
+    for (pCL = pCE->pCLon; NULL != pCL; pCL = pCL->pCLnext) {
 	if (pCL->fcon && pCL->fiwait) {
 	    pCL->fiwait = 0;
 	    FileWrite(pCL->fd, FLAGFALSE, message, -1);
@@ -106,11 +106,11 @@ SendClientsMsg(CONSENT *pCE, char *message)
 {
     CONSCLIENT *pCL;
 
-    if ((CONSENT *)0 == pCE) {
+    if (NULL == pCE) {
 	return;
     }
 
-    for (pCL = pCE->pCLon; (CONSCLIENT *)0 != pCL; pCL = pCL->pCLnext) {
+    for (pCL = pCE->pCLon; NULL != pCL; pCL = pCL->pCLnext) {
 	if (pCL->fcon) {
 	    FileWrite(pCL->fd, FLAGFALSE, message, -1);
 	}
@@ -121,23 +121,23 @@ void
 SendCertainClientsMsg(GRPENT *pGE, char *who, char *message)
 {
     CONSCLIENT *pCL;
-    char *console = (char *)0;
+    char *console = NULL;
 
-    if ((GRPENT *)0 == pGE || who == (char *)0 || message == (char *)0) {
+    if (NULL == pGE || who == NULL || message == NULL) {
 	return;
     }
 
-    if ((console = strrchr(who, '@')) != (char *)0) {
+    if ((console = strrchr(who, '@')) != NULL) {
 	*console++ = '\000';
 	if (*console == '\000')
-	    console = (char *)0;
+	    console = NULL;
     }
 
-    for (pCL = pGE->pCLall; (CONSCLIENT *)0 != pCL; pCL = pCL->pCLscan) {
+    for (pCL = pGE->pCLall; NULL != pCL; pCL = pCL->pCLscan) {
 	if (pCL->fcon) {
 	    if (*who != '\000' && strcmp(pCL->username->string, who) != 0)
 		continue;
-	    if (console != (char *)0 &&
+	    if (console != NULL &&
 		strcmp(pCL->pCEto->server, console) != 0)
 		continue;
 	    FileWrite(pCL->fd, FLAGFALSE, message, -1);
@@ -150,11 +150,11 @@ SendAllClientsMsg(GRPENT *pGE, char *message)
 {
     CONSCLIENT *pCL;
 
-    if ((GRPENT *)0 == pGE) {
+    if (NULL == pGE) {
 	return;
     }
 
-    for (pCL = pGE->pCLall; (CONSCLIENT *)0 != pCL; pCL = pCL->pCLscan) {
+    for (pCL = pGE->pCLall; NULL != pCL; pCL = pCL->pCLscan) {
 	if (pCL->fcon) {
 	    FileWrite(pCL->fd, FLAGFALSE, message, -1);
 	}
@@ -182,11 +182,11 @@ StopTask(CONSENT *pCE)
 		   (unsigned long)pCE->taskpid, SIGHUP));
     }
 
-    if (pCE->taskfile != (CONSFILE *)0) {
+    if (pCE->taskfile != NULL) {
 	int taskfile = FileFDNum(pCE->taskfile);
 	FD_CLR(taskfile, &rinit);
 	FileClose(&pCE->taskfile);
-	pCE->taskfile = (CONSFILE *)0;
+	pCE->taskfile = NULL;
     }
 }
 
@@ -195,7 +195,7 @@ ClientWantsWrite(CONSCLIENT *pCL)
 {
     CONSENT *pCE;
 
-    if ((CONSCLIENT *)0 == pCL)
+    if (NULL == pCL)
 	return;
     if (pCL->fwr)
 	return;
@@ -203,7 +203,7 @@ ClientWantsWrite(CONSCLIENT *pCL)
     pCL->fwr = 0;
     pCL->fwantwr = 1;
     pCE = pCL->pCEto;
-    if ((CONSENT *)0 == pCE)
+    if (NULL == pCE)
 	return;
 
     /* promote the client to the top of the list
@@ -211,7 +211,7 @@ ClientWantsWrite(CONSCLIENT *pCL)
      * aquiring read-write access)
      *   first by extracting...
      */
-    if ((CONSCLIENT *)0 != pCL->pCLnext) {
+    if (NULL != pCL->pCLnext) {
 	pCL->pCLnext->ppCLbnext = pCL->ppCLbnext;
     }
     *(pCL->ppCLbnext) = pCL->pCLnext;
@@ -220,7 +220,7 @@ ClientWantsWrite(CONSCLIENT *pCL)
      */
     pCL->pCLnext = pCE->pCLon;
     pCL->ppCLbnext = &pCE->pCLon;
-    if ((CONSCLIENT *)0 != pCL->pCLnext) {
+    if (NULL != pCL->pCLnext) {
 	pCL->pCLnext->ppCLbnext = &pCL->pCLnext;
     }
     pCE->pCLon = pCL;
@@ -231,7 +231,7 @@ DisconnectClient(GRPENT *pGE, CONSCLIENT *pCL, char *message, FLAG force)
 {
     CONSENT *pCEServing;
 
-    if (pGE == (GRPENT *)0 || pCL == (CONSCLIENT *)0) {
+    if (pGE == NULL || pCL == NULL) {
 	return;
     }
 
@@ -257,7 +257,7 @@ DisconnectClient(GRPENT *pGE, CONSCLIENT *pCL, char *message, FLAG force)
 	Verbose("<group> logout %s", pCL->acid->string);
 
     if (pCEServing->ondemand == FLAGTRUE &&
-	pCEServing->pCLon->pCLnext == (CONSCLIENT *)0)
+	pCEServing->pCLon->pCLnext == NULL)
 	ConsDown(pCEServing, FLAGFALSE, FLAGFALSE);
 
     FD_CLR(FileFDNum(pCL->fd), &rinit);
@@ -268,7 +268,7 @@ DisconnectClient(GRPENT *pGE, CONSCLIENT *pCL, char *message, FLAG force)
      * and turn logging back on...
      */
     if (pCL->fwr) {
-	BumpClient(pCEServing, (char *)0);
+	BumpClient(pCEServing, NULL);
 	TagLogfileAct(pCEServing, "%s detached", pCL->acid->string);
 	if (pCEServing->nolog) {
 	    pCEServing->nolog = 0;
@@ -281,11 +281,11 @@ DisconnectClient(GRPENT *pGE, CONSCLIENT *pCL, char *message, FLAG force)
      * lists (all clients, and this console)
      */
     pCL->fcon = 0;
-    if ((CONSCLIENT *)0 != pCL->pCLnext) {
+    if (NULL != pCL->pCLnext) {
 	pCL->pCLnext->ppCLbnext = pCL->ppCLbnext;
     }
     *(pCL->ppCLbnext) = pCL->pCLnext;
-    if ((CONSCLIENT *)0 != pCL->pCLscan) {
+    if (NULL != pCL->pCLscan) {
 	pCL->pCLscan->ppCLbscan = pCL->ppCLbscan;
     }
     *(pCL->ppCLbscan) = pCL->pCLscan;
@@ -307,21 +307,21 @@ int
 DisconnectCertainClients(GRPENT *pGE, char *admin, char *who)
 {
     CONSCLIENT *pCL;
-    char *console = (char *)0;
+    char *console = NULL;
     int count = 0;
-    char *msg = (char *)0;
+    char *msg = NULL;
 
-    if ((GRPENT *)0 == pGE || who == (char *)0) {
+    if (NULL == pGE || who == NULL) {
 	return 0;
     }
 
-    if ((console = strrchr(who, '@')) != (char *)0) {
+    if ((console = strrchr(who, '@')) != NULL) {
 	*console++ = '\000';
 	if (*console == '\000')
-	    console = (char *)0;
+	    console = NULL;
     }
 
-    for (pCL = pGE->pCLall; (CONSCLIENT *)0 != pCL; pCL = pCL->pCLscan) {
+    for (pCL = pGE->pCLall; NULL != pCL; pCL = pCL->pCLscan) {
 	/* skip folks not connected to a console 
 	 * we check for 'fcon' in other code, but that skips users
 	 * that are suspended as well, we don't want that here
@@ -330,11 +330,11 @@ DisconnectCertainClients(GRPENT *pGE, char *admin, char *who)
 	    continue;
 	if (*who != '\000' && strcmp(pCL->username->string, who) != 0)
 	    continue;
-	if (console != (char *)0 &&
+	if (console != NULL &&
 	    strcmp(pCL->pCEto->server, console) != 0)
 	    continue;
-	if (msg == (char *)0) {
-	    BuildTmpString((char *)0);
+	if (msg == NULL) {
+	    BuildTmpString(NULL);
 	    BuildTmpString("[-- Disconnected by admin `");
 	    BuildTmpString(admin);
 	    msg = BuildTmpString("' --]\r\n");
@@ -351,11 +351,11 @@ DisconnectAllClients(GRPENT *pGE, char *message)
 {
     CONSCLIENT *pCL;
 
-    if ((GRPENT *)0 == pGE) {
+    if (NULL == pGE) {
 	return;
     }
 
-    for (pCL = pGE->pCLall; (CONSCLIENT *)0 != pCL; pCL = pCL->pCLscan) {
+    for (pCL = pGE->pCLall; NULL != pCL; pCL = pCL->pCLscan) {
 	DisconnectClient(pGE, pCL, message, FLAGTRUE);
     }
 }
@@ -363,15 +363,15 @@ DisconnectAllClients(GRPENT *pGE, char *message)
 void
 DestroyClient(CONSCLIENT *pCL)
 {
-    if (pCL == (CONSCLIENT *)0)
+    if (pCL == NULL)
 	return;
-    if (pCL->acid != (STRING *)0)
+    if (pCL->acid != NULL)
 	DestroyString(pCL->acid);
-    if (pCL->peername != (STRING *)0)
+    if (pCL->peername != NULL)
 	DestroyString(pCL->peername);
-    if (pCL->accmd != (STRING *)0)
+    if (pCL->accmd != NULL)
 	DestroyString(pCL->accmd);
-    if (pCL->username != (STRING *)0)
+    if (pCL->username != NULL)
 	DestroyString(pCL->username);
     FileClose(&pCL->fd);
     free(pCL);
@@ -380,12 +380,12 @@ DestroyClient(CONSCLIENT *pCL)
 void
 DestroyConsentUsers(CONSENTUSERS **cu)
 {
-    CONSENTUSERS *n = (CONSENTUSERS *)0;
+    CONSENTUSERS *n = NULL;
 
-    if (cu == (CONSENTUSERS **)0)
+    if (cu == NULL)
 	return;
 
-    while ((*cu) != (CONSENTUSERS *)0) {
+    while ((*cu) != NULL) {
 	n = (*cu)->next;
 	free(*cu);
 	(*cu) = n;
@@ -396,10 +396,10 @@ CONSENTUSERS *
 ConsentFindUser(CONSENTUSERS *pCU, char *id)
 {
     short close = 0;
-    struct group *g = (struct group *)0;
-    struct passwd *pwd = (struct passwd *)0;
+    struct group *g = NULL;
+    struct passwd *pwd = NULL;
 
-    for (; pCU != (CONSENTUSERS *)0; pCU = pCU->next) {
+    for (; pCU != NULL; pCU = pCU->next) {
 	if (pCU->user->name[0] == '@' && pCU->user->name[1] != '\000') {
 	    if (close == 0) {
 		close = 1;
@@ -408,15 +408,15 @@ ConsentFindUser(CONSENTUSERS *pCU, char *id)
 	    }
 
 	    /* grab the group info */
-	    if ((g = getgrnam(pCU->user->name + 1)) == (struct group *)0) {
+	    if ((g = getgrnam(pCU->user->name + 1)) == NULL) {
 		Error("ConsentFindUser(): unknown group name `%s'",
 		      pCU->user->name + 1);
-	    } else if (pwd != (struct passwd *)0 &&
+	    } else if (pwd != NULL &&
 		       pwd->pw_gid == g->gr_gid) {
 		goto donehunting;
-	    } else if (g->gr_mem != (char **)0) {
+	    } else if (g->gr_mem != NULL) {
 		char **m;
-		for (m = g->gr_mem; *m != (char *)0; m++)
+		for (m = g->gr_mem; *m != NULL; m++)
 		    if (strcmp(*m, id) == 0)
 			goto donehunting;
 	    }
@@ -437,9 +437,9 @@ ConsentUserOk(CONSENTUSERS *pCU, char *id)
 {
     CONSENTUSERS *c;
 
-    if ((c = ConsentFindUser(pCU, id)) != (CONSENTUSERS *)0)
+    if ((c = ConsentFindUser(pCU, id)) != NULL)
 	return !c->not;
-    if ((c = ConsentFindUser(pCU, "*")) != (CONSENTUSERS *)0)
+    if ((c = ConsentFindUser(pCU, "*")) != NULL)
 	return !c->not;
     return -1;
 }
@@ -464,7 +464,7 @@ ClientAccess(CONSENT *pCE, char *user)
 	char *shortname;
 	int ret = -1;
 
-	if ((at = strrchr(user, '@')) != (char *)0) {
+	if ((at = strrchr(user, '@')) != NULL) {
 	    shortname = StrDup(user);
 	    *(shortname + (at - user)) = '\000';
 
@@ -491,7 +491,7 @@ DestroyConsent(GRPENT *pGE, CONSENT *pCE)
     CONSENT **ppCE;
     NAMES *name;
 
-    if (pCE == (CONSENT *)0 || pGE == (GRPENT *)0)
+    if (pCE == NULL || pGE == NULL)
 	return;
 
     CONDDEBUG((1, "DestroyConsent(): destroying `%s'", pCE->server));
@@ -500,7 +500,7 @@ DestroyConsent(GRPENT *pGE, CONSENT *pCE)
      * drop: code.  this is basically the same set of code, but modified
      * since we know we're going to nuke the console itself.
      */
-    for (pCL = pGE->pCLall; pCL != (CONSCLIENT *)0; pCL = pCL->pCLscan) {
+    for (pCL = pGE->pCLall; pCL != NULL; pCL = pCL->pCLscan) {
 	if (pCL->pCEto != pCE)
 	    continue;
 	AbortAnyClientExec(pCL);
@@ -514,7 +514,7 @@ DestroyConsent(GRPENT *pGE, CONSENT *pCE)
 	FD_CLR(FileFDNum(pCL->fd), &winit);
 	FileClose(&pCL->fd);
 	if (pCL->fwr) {
-	    BumpClient(pCE, (char *)0);
+	    BumpClient(pCE, NULL);
 	    TagLogfileAct(pCE, "%s detached", pCL->acid->string);
 	    if (pCE->nolog) {
 		pCE->nolog = 0;
@@ -524,11 +524,11 @@ DestroyConsent(GRPENT *pGE, CONSENT *pCE)
 	/* mark as unconnected and remove from both
 	 * lists (all clients, and this console)
 	 */
-	if ((CONSCLIENT *)0 != pCL->pCLnext) {
+	if (NULL != pCL->pCLnext) {
 	    pCL->pCLnext->ppCLbnext = pCL->ppCLbnext;
 	}
 	*(pCL->ppCLbnext) = pCL->pCLnext;
-	if ((CONSCLIENT *)0 != pCL->pCLscan) {
+	if (NULL != pCL->pCLscan) {
 	    pCL->pCLscan->ppCLbscan = pCL->ppCLbscan;
 	}
 	*(pCL->ppCLbscan) = pCL->pCLscan;
@@ -540,7 +540,7 @@ DestroyConsent(GRPENT *pGE, CONSENT *pCE)
     StopTask(pCE);
     ConsDown(pCE, FLAGFALSE, FLAGTRUE);
 
-    for (ppCE = &(pGE->pCElist); *ppCE != (CONSENT *)0;
+    for (ppCE = &(pGE->pCElist); *ppCE != NULL;
 	 ppCE = &((*ppCE)->pCEnext)) {
 	if (*ppCE == pCE) {
 	    *ppCE = pCE->pCEnext;
@@ -551,47 +551,47 @@ DestroyConsent(GRPENT *pGE, CONSENT *pCE)
     DestroyConsentUsers(&(pCE->ro));
     DestroyConsentUsers(&(pCE->rw));
 
-    if (pCE->server != (char *)0)
+    if (pCE->server != NULL)
 	free(pCE->server);
-    if (pCE->host != (char *)0)
+    if (pCE->host != NULL)
 	free(pCE->host);
-    if (pCE->master != (char *)0)
+    if (pCE->master != NULL)
 	free(pCE->master);
-    if (pCE->exec != (char *)0)
+    if (pCE->exec != NULL)
 	free(pCE->exec);
-    if (pCE->device != (char *)0)
+    if (pCE->device != NULL)
 	free(pCE->device);
-    if (pCE->devicesubst != (char *)0)
+    if (pCE->devicesubst != NULL)
 	free(pCE->devicesubst);
-    if (pCE->execsubst != (char *)0)
+    if (pCE->execsubst != NULL)
 	free(pCE->execsubst);
-    if (pCE->initsubst != (char *)0)
+    if (pCE->initsubst != NULL)
 	free(pCE->initsubst);
-    if (pCE->logfile != (char *)0)
+    if (pCE->logfile != NULL)
 	free(pCE->logfile);
-    if (pCE->initcmd != (char *)0)
+    if (pCE->initcmd != NULL)
 	free(pCE->initcmd);
-    if (pCE->motd != (char *)0)
+    if (pCE->motd != NULL)
 	free(pCE->motd);
-    if (pCE->idlestring != (char *)0)
+    if (pCE->idlestring != NULL)
 	free(pCE->idlestring);
-    if (pCE->replstring != (char *)0)
+    if (pCE->replstring != NULL)
 	free(pCE->replstring);
-    if (pCE->tasklist != (char *)0)
+    if (pCE->tasklist != NULL)
 	free(pCE->tasklist);
-    if (pCE->breaklist != (char *)0)
+    if (pCE->breaklist != NULL)
 	free(pCE->breaklist);
-    if (pCE->execSlave != (char *)0)
+    if (pCE->execSlave != NULL)
 	free(pCE->execSlave);
-    while (pCE->aliases != (NAMES *)0) {
+    while (pCE->aliases != NULL) {
 	name = pCE->aliases->next;
-	if (pCE->aliases->name != (char *)0)
+	if (pCE->aliases->name != NULL)
 	    free(pCE->aliases->name);
 	free(pCE->aliases);
 	pCE->aliases = name;
     }
     FileClose(&pCE->fdlog);
-    if (pCE->wbuf != (STRING *)0)
+    if (pCE->wbuf != NULL)
 	DestroyString(pCE->wbuf);
     free(pCE);
 
@@ -604,7 +604,7 @@ DestroyGroup(GRPENT *pGE)
     CONSENT *pCEtmp, *pCE;
     CONSCLIENT *pCLtmp, *pCL;
 
-    if (pGE == (GRPENT *)0)
+    if (pGE == NULL)
 	return;
 
     CONDDEBUG((1, "DestroyGroup(): destroying group #%d (%d members)",
@@ -613,7 +613,7 @@ DestroyGroup(GRPENT *pGE)
     /* nuke each console (which kicks off clients) */
     DestroyConsent(pGE, pGE->pCEctl);
     pCE = pGE->pCElist;
-    while (pCE != (CONSENT *)0) {
+    while (pCE != NULL) {
 	pCEtmp = pCE->pCEnext;
 	DestroyConsent(pGE, pCE);
 	pCE = pCEtmp;
@@ -621,13 +621,13 @@ DestroyGroup(GRPENT *pGE)
 
     /* now we can nuke the client structures */
     pCL = pGE->pCLall;
-    while (pCL != (CONSCLIENT *)0) {
+    while (pCL != NULL) {
 	pCLtmp = pCL->pCLscan;
 	DestroyClient(pCL);
 	pCL = pCLtmp;
     }
     pCL = pGE->pCLfree;
-    while (pCL != (CONSCLIENT *)0) {
+    while (pCL != NULL) {
 	pCLtmp = pCL->pCLnext;
 	DestroyClient(pCL);
 	pCL = pCLtmp;
@@ -655,7 +655,7 @@ QuietConv(int num_msg, struct pam_message **msg,
 	(struct pam_response *)calloc(num_msg,
 				      sizeof(struct pam_response));
 
-    if (response == (struct pam_response *)0)
+    if (response == NULL)
 	return PAM_CONV_ERR;
 
     for (i = 0; i < num_msg; i++) {
@@ -663,12 +663,12 @@ QuietConv(int num_msg, struct pam_message **msg,
 	switch (msg[i]->msg_style) {
 	    case PAM_PROMPT_ECHO_ON:
 		response[i].resp =
-		    (pcUser != (char *)0 ? StrDup(pcUser) : (char *)0);
+		    (pcUser != NULL ? StrDup(pcUser) : NULL);
 		break;
 
 	    case PAM_PROMPT_ECHO_OFF:
 		response[i].resp =
-		    (pcWord != (char *)0 ? StrDup(pcWord) : (char *)0);
+		    (pcWord != NULL ? StrDup(pcWord) : NULL);
 		break;
 
 	    case PAM_TEXT_INFO:
@@ -696,7 +696,7 @@ QuietConv(int num_msg, struct pam_message **msg,
 int
 CheckPass(char *pcUser, char *pcWord, FLAG empty_check)
 {
-    if (pcWord == (char *)0) {
+    if (pcWord == NULL) {
 	pcWord = "";
     }
 #if HAVE_PAM
@@ -704,7 +704,7 @@ CheckPass(char *pcUser, char *pcWord, FLAG empty_check)
 	return AUTH_INVALID;
     int pam_error;
     char *appdata[2];
-    static pam_handle_t *pamh = (pam_handle_t *)0;
+    static pam_handle_t *pamh = NULL;
     struct pam_conv conv;
     appdata[0] = pcUser;
     appdata[1] = pcWord;
@@ -753,7 +753,7 @@ CheckPass(char *pcUser, char *pcWord, FLAG empty_check)
     struct spwd *spwd;
 # endif
 
-    if ((pwd = getpwnam(pcUser)) == (struct passwd *)0) {
+    if ((pwd = getpwnam(pcUser)) == NULL) {
 	CONDDEBUG((1, "CheckPass(): getpwnam(%s): %s", pcUser,
 		   strerror(errno)));
 	retval = AUTH_NOUSER;
@@ -764,7 +764,7 @@ CheckPass(char *pcUser, char *pcWord, FLAG empty_check)
 # if HAVE_ISCOMSEC && HAVE_GETPRPWNAM
     if (iscomsec()) {
 	CONDDEBUG((1, "CheckPass(): trusted password check"));
-	if ((prpwd = getprpwnam(pcUser)) == (struct pr_passwd *)0) {
+	if ((prpwd = getprpwnam(pcUser)) == NULL) {
 	    CONDDEBUG((1, "CheckPass(): getprpwnam(%s): %s", pcUser,
 		       strerror(errno)));
 	    retval = AUTH_NOUSER;
@@ -777,7 +777,7 @@ CheckPass(char *pcUser, char *pcWord, FLAG empty_check)
 # if HAVE_GETSPNAM
     if ('x' == pass[0] && '\000' == pass[1]) {
 	CONDDEBUG((1, "CheckPass(): shadow password check"));
-	if ((spwd = getspnam(pcUser)) == (struct spwd *)0) {
+	if ((spwd = getspnam(pcUser)) == NULL) {
 	    CONDDEBUG((1, "CheckPass(): getspnam(%s): %s", pcUser,
 		       strerror(errno)));
 	    retval = AUTH_NOUSER;
@@ -870,16 +870,16 @@ ReOpen(GRPENT *pGE)
 {
     CONSENT *pCE;
 
-    if ((GRPENT *)0 == pGE) {
+    if (NULL == pGE) {
 	return;
     }
 
-    for (pCE = pGE->pCElist; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
-	if ((CONSFILE *)0 == pCE->fdlog) {
+    for (pCE = pGE->pCElist; pCE != NULL; pCE = pCE->pCEnext) {
+	if (NULL == pCE->fdlog) {
 	    continue;
 	}
 	FileClose(&pCE->fdlog);
-	if ((CONSFILE *)0 ==
+	if (NULL ==
 	    (pCE->fdlog =
 	     FileOpen(pCE->logfile, O_RDWR | O_CREAT | O_APPEND, 0644))) {
 	    Error("[%s] FileOpen(%s): %s: forcing down", pCE->server,
@@ -903,7 +903,7 @@ static struct delay {
     char *host;
     time_t last;
     struct delay *next;
-} *delays = (struct delay *)0;
+} *delays = NULL;
 
 /* returns zero if the delay has been reached, otherwise returns
  * the time when the next init should happen
@@ -914,14 +914,14 @@ InitDelay(CONSENT *pCE)
     char *l;
     struct delay *d;
 
-    if (pCE->host != (char *)0)
+    if (pCE->host != NULL)
 	l = pCE->host;
     else
 	l = "";
 
-    for (d = delays; d != (struct delay *)0; d = d->next) {
+    for (d = delays; d != NULL; d = d->next) {
 	if (strcmp(l, d->host) == 0) {
-	    if ((time((time_t *)0) - d->last) >= config->initdelay) {
+	    if ((time(NULL) - d->last) >= config->initdelay) {
 		return (time_t)0;
 	    } else
 		return d->last + config->initdelay;
@@ -936,24 +936,24 @@ UpdateDelay(CONSENT *pCE)
     char *l;
     struct delay *d;
 
-    if (pCE->host != (char *)0)
+    if (pCE->host != NULL)
 	l = pCE->host;
     else
 	l = "";
 
-    for (d = delays; d != (struct delay *)0; d = d->next) {
+    for (d = delays; d != NULL; d = d->next) {
 	if (strcmp(l, d->host) == 0) {
-	    d->last = time((time_t *)0);
+	    d->last = time(NULL);
 	    return;
 	}
     }
     if ((d =
 	 (struct delay *)malloc(sizeof(struct delay))) ==
-	(struct delay *)0)
+	NULL)
 	OutOfMem();
-    if ((d->host = StrDup(l)) == (char *)0)
+    if ((d->host = StrDup(l)) == NULL)
 	OutOfMem();
-    d->last = time((time_t *)0);
+    d->last = time(NULL);
     d->next = delays;
     delays = d;
 }
@@ -968,10 +968,10 @@ ReUp(GRPENT *pGE, short automatic)
     static short autoup = 0;
     short wasAuto = 0;
 
-    if ((GRPENT *)0 == pGE)
+    if (NULL == pGE)
 	return;
 
-    tyme = time((time_t *)0);
+    tyme = time(NULL);
     if ((automatic == 1) && (tyme < timers[T_AUTOUP]))
 	return;
     if ((automatic == 2) &&
@@ -990,7 +990,7 @@ ReUp(GRPENT *pGE, short automatic)
      */
     do {
 	retry = 0;
-	for (pCE = pGE->pCElist; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
+	for (pCE = pGE->pCElist; pCE != NULL; pCE = pCE->pCEnext) {
 	    short updateDelay = 0;
 
 	    if (pCE->fup || pCE->ondemand == FLAGTRUE ||
@@ -1035,12 +1035,12 @@ TagLogfile(const CONSENT *pCE, char *fmt, ...)
     va_list ap;
     va_start(ap, fmt);
 
-    if ((pCE == (CONSENT *)0) || (pCE->fdlog == (CONSFILE *)0))
+    if ((pCE == NULL) || (pCE->fdlog == NULL))
 	return;
 
     FileWrite(pCE->fdlog, FLAGTRUE, "[-- ", -1);
     FileVWrite(pCE->fdlog, FLAGTRUE, fmt, ap);
-    FilePrint(pCE->fdlog, FLAGFALSE, " -- %s]\r\n", StrTime((time_t *)0));
+    FilePrint(pCE->fdlog, FLAGFALSE, " -- %s]\r\n", StrTime(0));
     va_end(ap);
 }
 
@@ -1050,13 +1050,13 @@ TagLogfileAct(const CONSENT *pCE, char *fmt, ...)
     va_list ap;
     va_start(ap, fmt);
 
-    if ((pCE == (CONSENT *)0) || (pCE->fdlog == (CONSFILE *)0) ||
+    if ((pCE == NULL) || (pCE->fdlog == NULL) ||
 	(pCE->activitylog != FLAGTRUE))
 	return;
 
     FileWrite(pCE->fdlog, FLAGTRUE, "[-- ", -1);
     FileVWrite(pCE->fdlog, FLAGTRUE, fmt, ap);
-    FilePrint(pCE->fdlog, FLAGFALSE, " -- %s]\r\n", StrTime((time_t *)0));
+    FilePrint(pCE->fdlog, FLAGFALSE, " -- %s]\r\n", StrTime(0));
     va_end(ap);
 }
 
@@ -1065,7 +1065,7 @@ RollLogs(GRPENT *pGE)
 {
     CONSENT *pCE;
     struct stat stLog;
-    char *t = (char *)0;
+    char *t = NULL;
     char timestr[40];
     time_t tyme = (time_t)0;
     short maxset = 0;
@@ -1074,14 +1074,14 @@ RollLogs(GRPENT *pGE)
     int r = 0;
     CONSFILE *old;
 
-    if ((GRPENT *)0 == pGE)
+    if (NULL == pGE)
 	return;
 
-    for (pCE = pGE->pCElist; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
+    for (pCE = pGE->pCElist; pCE != NULL; pCE = pCE->pCEnext) {
 	if (pCE->logfilemax == 0)
 	    continue;
 	maxset = 1;
-	if (pCE->fdlog == (CONSFILE *)0)
+	if (pCE->fdlog == NULL)
 	    continue;
 	if (FileStat(pCE->fdlog, &stLog) != 0) {
 	    CONDDEBUG((1, "RollLogs(): FileStat(%d) failed",
@@ -1119,11 +1119,11 @@ RollLogs(GRPENT *pGE)
 	}
 
 	if (tyme == (time_t)0) {
-	    tyme = time((time_t *)0);
+	    tyme = time(NULL);
 	    strftime(timestr, sizeof(timestr), "-%Y%m%d-%H%M%S",
 		     gmtime(&tyme));
 	}
-	BuildTmpString((char *)0);
+	BuildTmpString(NULL);
 	t = BuildTmpStringPrint("%s%s", pCE->logfile, timestr);
 
 	if (rename(pCE->logfile, t) != 0) {
@@ -1136,7 +1136,7 @@ RollLogs(GRPENT *pGE)
 
 	if ((pCE->fdlog =
 	     FileOpen(pCE->logfile, O_RDWR | O_CREAT | O_APPEND,
-		      0644)) == (CONSFILE *)0) {
+		      0644)) == NULL) {
 	    FileClose(&old);
 	    Error("[%s] RollLogs(): open(%s): %s: forcing down",
 		  pCE->server, pCE->logfile, strerror(errno));
@@ -1152,16 +1152,16 @@ RollLogs(GRPENT *pGE)
     }
 
     if (tyme != (time_t)0)
-	BuildTmpString((char *)0);
+	BuildTmpString(NULL);
 
     if (maxset == 0)
 	timers[T_ROLL] = (time_t)0;
     else {
 	if (timers[T_ROLL] == (time_t)0)
 	    /* try and spread processes out a bit */
-	    timers[T_ROLL] = time((time_t *)0) + 300 + (pGE->id * 7) % 60;
+	    timers[T_ROLL] = time(NULL) + 300 + (pGE->id * 7) % 60;
 	else
-	    timers[T_ROLL] = time((time_t *)0) + 300;
+	    timers[T_ROLL] = time(NULL) + 300;
     }
 }
 
@@ -1170,25 +1170,25 @@ Mark(GRPENT *pGE)
 {
     time_t tyme;
     CONSENT *pCE;
-    static STRING *out = (STRING *)0;
+    static STRING *out = NULL;
 
-    if ((GRPENT *)0 == pGE)
+    if (NULL == pGE)
 	return;
 
-    if (out == (STRING *)0)
+    if (out == NULL)
 	out = AllocString();
 
-    BuildString((char *)0, out);
+    BuildString(NULL, out);
 
     /* [-- MARK -- `date`] */
     BuildStringPrint(out, "[-- MARK -- %s]\r\n", StrTime(&tyme));
 
     timers[T_MARK] = (time_t)0;
 
-    for (pCE = pGE->pCElist; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
+    for (pCE = pGE->pCElist; pCE != NULL; pCE = pCE->pCEnext) {
 	if (pCE->nextMark > 0) {
 	    if (tyme >= pCE->nextMark) {
-		if ((CONSFILE *)0 != pCE->fdlog) {
+		if (NULL != pCE->fdlog) {
 		    CONDDEBUG((1, "Mark(): [-- MARK --] stamp added to %s",
 			       pCE->logfile));
 		    FileWrite(pCE->fdlog, FLAGFALSE, out->string,
@@ -1212,9 +1212,9 @@ WriteLog(CONSENT *pCE, char *s, int len)
 {
     int i = 0;
     int j;
-    static STRING *buf = (STRING *)0;
+    static STRING *buf = NULL;
 
-    if ((CONSFILE *)0 == pCE->fdlog) {
+    if (NULL == pCE->fdlog) {
 	return;
     }
     if (pCE->mark >= 0) {	/* no line marking */
@@ -1222,9 +1222,9 @@ WriteLog(CONSENT *pCE, char *s, int len)
 	return;
     }
 
-    if (buf == (STRING *)0)
+    if (buf == NULL)
 	buf = AllocString();
-    BuildString((char *)0, buf);
+    BuildString(NULL, buf);
 
     for (j = 0; j < len; j++) {
 	if (pCE->nextMark == 0) {
@@ -1232,7 +1232,7 @@ WriteLog(CONSENT *pCE, char *s, int len)
 	    i = j;
 
 	    if (buf->used <= 1)
-		BuildStringPrint(buf, "[%s]", StrTime((time_t *)0));
+		BuildStringPrint(buf, "[%s]", StrTime(0));
 
 	    FileWrite(pCE->fdlog, FLAGTRUE, buf->string, buf->used - 1);
 	    pCE->nextMark = pCE->mark;
@@ -1247,7 +1247,7 @@ WriteLog(CONSENT *pCE, char *s, int len)
     if (i < j) {
 	FileWrite(pCE->fdlog, FLAGTRUE, s + i, j - i);
     }
-    FileWrite(pCE->fdlog, FLAGFALSE, (char *)0, 0);
+    FileWrite(pCE->fdlog, FLAGFALSE, NULL, 0);
 }
 
 static RETSIGTYPE
@@ -1296,16 +1296,16 @@ DeUtmp(GRPENT *pGE, int sfd)
     close(sfd);
 
     /* say Bye to all connections */
-    if ((GRPENT *)0 != pGE) {
+    if (NULL != pGE) {
 	DisconnectAllClients(pGE,
 			     "[-- Console server shutting down --]\r\n");
 
-	for (pCE = pGE->pCElist; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
+	for (pCE = pGE->pCElist; pCE != NULL; pCE = pCE->pCEnext) {
 	    ConsDown(pCE, FLAGFALSE, FLAGTRUE);
 	}
     }
 
-    if (unifiedlog != (CONSFILE *)0)
+    if (unifiedlog != NULL)
 	FileClose(&unifiedlog);
 
     DumpDataStructures();
@@ -1337,11 +1337,11 @@ ReapVirt(GRPENT *pGE)
 	    continue;
 	}
 
-	if ((GRPENT *)0 == pGE) {
+	if (NULL == pGE) {
 	    continue;
 	}
 
-	for (pCE = pGE->pCElist; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
+	for (pCE = pGE->pCElist; pCE != NULL; pCE = pCE->pCEnext) {
 	    if (pid == pCE->initpid) {
 		if (WIFEXITED(UWbuf))
 		    Msg("[%s] initcmd terminated: pid %lu: exit(%d)",
@@ -1364,7 +1364,7 @@ ReapVirt(GRPENT *pGE)
 				   "task terminated: pid %lu: exit(%d)",
 				   pid, WEXITSTATUS(UWbuf));
 		    /* tell all how it ended */
-		    for (pCL = pCE->pCLon; (CONSCLIENT *)0 != pCL;
+		    for (pCL = pCE->pCLon; NULL != pCL;
 			 pCL = pCL->pCLnext) {
 			if (pCL->fcon) {
 			    FilePrint(pCL->fd, FLAGFALSE,
@@ -1381,7 +1381,7 @@ ReapVirt(GRPENT *pGE)
 				   "task terminated: pid %lu: signal(%d)",
 				   pid, WTERMSIG(UWbuf));
 		    /* tell all how it ended */
-		    for (pCL = pCE->pCLon; (CONSCLIENT *)0 != pCL;
+		    for (pCL = pCE->pCLon; NULL != pCL;
 			 pCL = pCL->pCLnext) {
 			if (pCL->fcon) {
 			    FilePrint(pCL->fd, FLAGFALSE,
@@ -1441,7 +1441,7 @@ CheckPasswd(CONSCLIENT *pCL, char *pw_string, FLAG empty_check)
 	      strerror(err));
     } else if (client_cred.pid != 0) {
 	/* Does pCL->username->string and client_cred.uid match ? */
-	struct passwd *pwd = (struct passwd *)0;
+	struct passwd *pwd = NULL;
 
 	/* we allow root to impersonate anyone */
 	if (client_cred.UDS_CRED_UID == 0)
@@ -1457,7 +1457,7 @@ CheckPasswd(CONSCLIENT *pCL, char *pw_string, FLAG empty_check)
 # endif
 #endif
 
-    if ((fp = fopen(config->passwdfile, "r")) == (FILE *)0) {
+    if ((fp = fopen(config->passwdfile, "r")) == NULL) {
 	if (CheckPass(pCL->username->string, pw_string, empty_check) ==
 	    AUTH_SUCCESS) {
 	    Verbose("user %s authenticated", pCL->acid->string);
@@ -1465,19 +1465,19 @@ CheckPasswd(CONSCLIENT *pCL, char *pw_string, FLAG empty_check)
 	}
     } else {
 	char *wholeLine;
-	static STRING *saveLine = (STRING *)0;
+	static STRING *saveLine = NULL;
 
-	if (saveLine == (STRING *)0)
+	if (saveLine == NULL)
 	    saveLine = AllocString();
-	BuildString((char *)0, saveLine);
+	BuildString(NULL, saveLine);
 
-	while ((wholeLine = ReadLine(fp, saveLine, &iLine)) != (char *)0) {
+	while ((wholeLine = ReadLine(fp, saveLine, &iLine)) != NULL) {
 	    PruneSpace(wholeLine);
 	    /*printf("whole=<%s>\n", wholeLine); */
 	    if (wholeLine[0] == '\000')
 		continue;
 
-	    if ((char *)0 == (this_pw = strchr(wholeLine, ':'))) {
+	    if (NULL == (this_pw = strchr(wholeLine, ':'))) {
 		Error("CheckPasswd(): %s(%d) bad password line `%s'",
 		      config->passwdfile, iLine, wholeLine);
 		continue;
@@ -1519,16 +1519,16 @@ static char *
 IdleTyme(long tyme)
 {
     long hours, minutes;
-    static STRING *timestr = (STRING *)0;
+    static STRING *timestr = NULL;
 
-    if (timestr == (STRING *)0)
+    if (timestr == NULL)
 	timestr = AllocString();
 
     minutes = tyme / 60;
     hours = minutes / 60;
     minutes = minutes % 60;
 
-    BuildString((char *)0, timestr);
+    BuildString(NULL, timestr);
     if (hours < 24)
 	BuildStringPrint(timestr, " %2ld:%02ld", hours, minutes);
     else if (hours < 24 * 2)
@@ -1593,7 +1593,7 @@ ExpandString(char *str, CONSENT *pCE, short breaknum)
     char oct = '\000';
     short octs = 0;
 
-    if (str == (char *)0 || pCE == (CONSENT *)0)
+    if (str == NULL || pCE == NULL)
 	return;
 
     backslash = 0;
@@ -1719,7 +1719,7 @@ SendBreak(CONSCLIENT *pCLServing, CONSENT *pCEServing, short bt)
     FileWrite(pCLServing->fd, FLAGFALSE, "sent]\r\n", -1);
 
     /* tell all who sent it */
-    for (pCL = pCEServing->pCLon; (CONSCLIENT *)0 != pCL;
+    for (pCL = pCEServing->pCLon; NULL != pCL;
 	 pCL = pCL->pCLnext) {
 	if (pCL == pCLServing)
 	    continue;
@@ -1747,7 +1747,7 @@ StartTask(CONSENT *pCE, char *cmd, uid_t uid, gid_t gid)
 {
     int i;
     char *pcShell, **ppcArgv;
-    char *execSlave = (char *)0;	/* pseudo-device slave side             */
+    char *execSlave = NULL;	/* pseudo-device slave side             */
     int execSlaveFD;		/* fd of slave side                     */
     int cofile;
 
@@ -1756,7 +1756,7 @@ StartTask(CONSENT *pCE, char *cmd, uid_t uid, gid_t gid)
 	      pCE->server, strerror(errno));
 	return -1;
     }
-    if (execSlave != (char *)0)
+    if (execSlave != NULL)
 	free(execSlave);
 
     fflush(stdout);
@@ -1771,7 +1771,7 @@ StartTask(CONSENT *pCE, char *cmd, uid_t uid, gid_t gid)
 	default:		/* server */
 	    close(execSlaveFD);
 	    if ((pCE->taskfile =
-		 FileOpenFD(cofile, simpleFile)) == (CONSFILE *)0) {
+		 FileOpenFD(cofile, simpleFile)) == NULL) {
 		close(cofile);
 		Error("[%s] FileOpenFD(%d,simpleFile) failed", pCE->server,
 		      cofile);
@@ -1825,7 +1825,7 @@ StartTask(CONSENT *pCE, char *cmd, uid_t uid, gid_t gid)
 
     pcShell = "/bin/sh";
     static char *apcArgv[] = {
-	"/bin/sh", "-ce", (char *)0, (char *)0
+	"/bin/sh", "-ce", NULL, NULL
     };
 
     apcArgv[2] = cmd;
@@ -1840,7 +1840,7 @@ StartTask(CONSENT *pCE, char *cmd, uid_t uid, gid_t gid)
 void
 InvokeTask(CONSCLIENT *pCLServing, CONSENT *pCEServing, char id)
 {
-    TASKS *t = (TASKS *)0;
+    TASKS *t = NULL;
     char *cmd;
 
     if ((id < '0' || id > '9') && (id < 'a' || id > 'z')) {
@@ -1854,15 +1854,15 @@ InvokeTask(CONSCLIENT *pCLServing, CONSENT *pCEServing, char id)
 	return;
     }
 
-    if ((char *)0 != strchr(pCEServing->tasklist, id) ||
-	(char *)0 != strchr(pCEServing->tasklist, '*')) {
-	for (t = taskList; t != (TASKS *)0; t = t->next) {
+    if (NULL != strchr(pCEServing->tasklist, id) ||
+	NULL != strchr(pCEServing->tasklist, '*')) {
+	for (t = taskList; t != NULL; t = t->next) {
 	    if (t->id == id)
 		break;
 	}
     }
 
-    if (t == (TASKS *)0) {
+    if (t == NULL) {
 	FileWrite(pCLServing->fd, FLAGFALSE, "undefined]\r\n", -1);
 	return;
     }
@@ -1886,12 +1886,12 @@ InvokeTask(CONSCLIENT *pCLServing, CONSENT *pCEServing, char id)
 	}
     }
 
-    if ((cmd = StrDup(t->cmd->string)) == (char *)0)
+    if ((cmd = StrDup(t->cmd->string)) == NULL)
 	OutOfMem();
 
-    if (t->subst != (char *)0) {
+    if (t->subst != NULL) {
 	substData->data = (void *)pCEServing;
-	ProcessSubst(substData, &cmd, (char **)0, (char *)0, t->subst);
+	ProcessSubst(substData, &cmd, NULL, NULL, t->subst);
     }
 
     if (StartTask(pCEServing, cmd, t->uid, t->gid) == 0) {
@@ -1902,7 +1902,7 @@ InvokeTask(CONSCLIENT *pCLServing, CONSENT *pCEServing, char id)
 	detail = t->descr->used > 1 ? t->descr->string : cmd;
 
 	/* tell all who started it */
-	for (pCL = pCEServing->pCLon; (CONSCLIENT *)0 != pCL;
+	for (pCL = pCEServing->pCLon; NULL != pCL;
 	     pCL = pCL->pCLnext) {
 	    if (pCL == pCLServing)
 		continue;
@@ -1932,7 +1932,7 @@ AttemptSSL(CONSCLIENT *pCL)
     int retval;
 
     fdnum = FileFDNum(pCL->fd);
-    if (ctx == (SSL_CTX *)0) {
+    if (ctx == NULL) {
 	Error("AttemptSSL(): WTF?  The SSL context disappeared?!?!?");
 	Bye(EX_SOFTWARE);
     }
@@ -1981,8 +1981,8 @@ AttemptGSSAPI(CONSCLIENT *pCL)
 	    FileSetQuoteIAC(pCL->fd, FLAGTRUE);
 	    pCL->iState = S_NORMAL;
 	    gss_release_buffer(NULL, &sendtok);
-	    BuildString((char *)0, pCL->username);
-	    BuildString((char *)0, pCL->acid);
+	    BuildString(NULL, pCL->username);
+	    BuildString(NULL, pCL->acid);
 	    stmaj = gss_display_name(&stmin, user, &dbuf, NULL);
 
 	    BuildStringN(dbuf.value, dbuf.length, pCL->username);
@@ -2015,33 +2015,33 @@ HuntForConsole(GRPENT *pGE, char *name)
      * were already done by the master process, so
      * the first match should be what the user wants
      */
-    CONSENT *pCE = (CONSENT *)0;
+    CONSENT *pCE = NULL;
 
-    if (name == (char *)0)
+    if (name == NULL)
 	return pCE;
 
-    for (pCE = pGE->pCElist; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
-	NAMES *n = (NAMES *)0;
+    for (pCE = pGE->pCElist; pCE != NULL; pCE = pCE->pCEnext) {
+	NAMES *n = NULL;
 	if (strcasecmp(name, pCE->server) == 0)
 	    break;
-	for (n = pCE->aliases; n != (NAMES *)0; n = n->next) {
+	for (n = pCE->aliases; n != NULL; n = n->next) {
 	    if (strcasecmp(name, n->name) == 0)
 		break;
 	}
-	if (n != (NAMES *)0)
+	if (n != NULL)
 	    break;
     }
-    if (pCE == (CONSENT *)0 && config->autocomplete == FLAGTRUE) {
-	NAMES *n = (NAMES *)0;
+    if (pCE == NULL && config->autocomplete == FLAGTRUE) {
+	NAMES *n = NULL;
 	int len = strlen(name);
-	for (pCE = pGE->pCElist; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
+	for (pCE = pGE->pCElist; pCE != NULL; pCE = pCE->pCEnext) {
 	    if (strncasecmp(name, pCE->server, len) == 0)
 		break;
-	    for (n = pCE->aliases; n != (NAMES *)0; n = n->next) {
+	    for (n = pCE->aliases; n != NULL; n = n->next) {
 		if (strncasecmp(name, n->name, len) == 0)
 		    break;
 	    }
-	    if (n != (NAMES *)0)
+	    if (n != NULL)
 		break;
 	}
     }
@@ -2061,7 +2061,7 @@ CommandAttach(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
 		  -1);
     } else if (pCLServing->fro) {
 	FileWrite(pCLServing->fd, FLAGFALSE, "read-only]\r\n", -1);
-    } else if ((CONSCLIENT *)0 == (pCL = pCEServing->pCLwr)) {
+    } else if (NULL == (pCL = pCEServing->pCLwr)) {
 	pCEServing->pCLwr = pCLServing;
 	pCLServing->fwr = 1;
 	if (pCEServing->nolog) {
@@ -2141,7 +2141,7 @@ CommandDown(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
     FileWrite(pCLServing->fd, FLAGFALSE, "line down]\r\n", -1);
 
     /* tell all who closed it */
-    for (pCL = pCEServing->pCLon; (CONSCLIENT *)0 != pCL;
+    for (pCL = pCEServing->pCLon; NULL != pCL;
 	 pCL = pCL->pCLnext) {
 	if (pCL == pCLServing)
 	    continue;
@@ -2158,14 +2158,14 @@ CommandExamine(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
 {
     CONSENT *pCE;
 
-    if (args == (char *)0)
+    if (args == NULL)
 	pCE = pGE->pCElist;
     else
 	pCE = HuntForConsole(pGE, args);
 
-    for (; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
-	char *d = (char *)0;
-	char *b = (char *)0;
+    for (; pCE != NULL; pCE = pCE->pCEnext) {
+	char *d = NULL;
+	char *b = NULL;
 	char p = '\000';
 	switch (pCE->type) {
 	    case EXEC:
@@ -2206,7 +2206,7 @@ CommandExamine(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
 	FilePrint(pCLServing->fd, FLAGFALSE,
 		  " %-24.24s on %-32.32s at %6.6s%c\r\n", pCE->server, d,
 		  b, p);
-	if (args != (char *)0)
+	if (args != NULL)
 	    break;
     }
 }
@@ -2227,7 +2227,7 @@ CommandForce(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
 		  -1);
 	return;
     }
-    if ((CONSCLIENT *)0 != (pCL = pCEServing->pCLwr)) {
+    if (NULL != (pCL = pCEServing->pCLwr)) {
 	if (pCL == pCLServing) {
 	    if (pCEServing->nolog) {
 		FileWrite(pCLServing->fd, FLAGFALSE, "ok (nologging)]\r\n",
@@ -2245,7 +2245,7 @@ CommandForce(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
 		      pCL->acid->string);
 	}
 	AbortAnyClientExec(pCL);
-	BumpClient(pCEServing, (char *)0);
+	BumpClient(pCEServing, NULL);
 	ClientWantsWrite(pCL);
 	if (pCL->fcon)
 	    FilePrint(pCL->fd, FLAGFALSE,
@@ -2278,10 +2278,10 @@ CommandGroup(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
     /* we do not show the ctl console
      * else we'd get the client always
      */
-    for (pCL = pGE->pCLall; (CONSCLIENT *)0 != pCL; pCL = pCL->pCLscan) {
+    for (pCL = pGE->pCLall; NULL != pCL; pCL = pCL->pCLscan) {
 	if (pGE->pCEctl == pCL->pCEto)
 	    continue;
-	if (pCE != (CONSENT *)0 && pCL->pCEto != pCE)
+	if (pCE != NULL && pCL->pCEto != pCE)
 	    continue;
 	FilePrint(pCLServing->fd, FLAGFALSE,
 		  " %-32.32s %c %-7.7s %6s %s\r\n", pCL->acid->string,
@@ -2297,12 +2297,12 @@ CommandHosts(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
 {
     CONSENT *pCE;
 
-    if (args == (char *)0)
+    if (args == NULL)
 	pCE = pGE->pCElist;
     else
 	pCE = HuntForConsole(pGE, args);
 
-    for (; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
+    for (; pCE != NULL; pCE = pCE->pCEnext) {
 	FilePrint(pCLServing->fd, FLAGFALSE,
 		  " %-24.24s %c %-4.4s %-.40s\r\n", pCE->server,
 		  pCE == pCEServing ? '*' : ' ', (pCE->fup &&
@@ -2311,7 +2311,7 @@ CommandHosts(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
 		     0 ? "up" : "init") : "down",
 		  pCE->pCLwr ? pCE->pCLwr->acid->
 		  string : pCE->pCLon ? "<spies>" : "<none>");
-	if (args != (char *)0)
+	if (args != NULL)
 	    break;
     }
 }
@@ -2323,20 +2323,20 @@ CommandInfo(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
     CONSENT *pCE;
     CONSCLIENT *pCL;
 
-    if (args == (char *)0)
+    if (args == NULL)
 	pCE = pGE->pCElist;
     else
 	pCE = HuntForConsole(pGE, args);
 
-    for (; pCE != (CONSENT *)0; pCE = pCE->pCEnext) {
+    for (; pCE != NULL; pCE = pCE->pCEnext) {
 	int comma = 0;
-	char *s = (char *)0;
+	char *s = NULL;
 	FilePrint(pCLServing->fd, FLAGTRUE, "%s:%s,%lu,%hu:", pCE->server,
 		  myHostname, (unsigned long)thepid, pGE->port);
 	switch (pCE->type) {
 	    case EXEC:
 		FilePrint(pCLServing->fd, FLAGTRUE, "|:%s,%lu,%s,%d:",
-			  (pCE->exec != (char *)0 ? pCE->exec : "/bin/sh"),
+			  (pCE->exec != NULL ? pCE->exec : "/bin/sh"),
 			  (unsigned long)pCE->ipid, pCE->execSlave,
 			  FileFDNum(pCE->cofile));
 		break;
@@ -2376,7 +2376,7 @@ CommandInfo(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
 	    comma = 1;
 	}
 
-	for (pCL = pCE->pCLon; (CONSCLIENT *)0 != pCL; pCL = pCL->pCLnext) {
+	for (pCL = pCE->pCLon; NULL != pCL; pCL = pCL->pCLnext) {
 	    if (pCL == pCE->pCLwr)
 		continue;
 	    if (comma)
@@ -2396,28 +2396,28 @@ CommandInfo(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
 		  ":%s:%s:%s,%s,%s,%s,%s,%d,%d:%d:%s:",
 		  ((pCE->fup &&
 		    pCE->ioState == ISNORMAL) ? (pCE->initfile ==
-						 (CONSFILE *)0 ? "up" :
+						 NULL ? "up" :
 						 "init")
 		   : "down"), (pCE->fronly ? "ro" : "rw"),
-		  (pCE->logfile == (char *)0 ? "" : pCE->logfile),
+		  (pCE->logfile == NULL ? "" : pCE->logfile),
 		  (pCE->nolog ? "nolog" : "log"),
 		  (pCE->activitylog == FLAGTRUE ? "act" : "noact"),
 		  (pCE->breaklog == FLAGTRUE ? "brk" : "nobrk"),
 		  (pCE->tasklog == FLAGTRUE ? "task" : "notask"),
 		  pCE->mark, (pCE->fdlog ? pCE->fdlog->fd : -1),
 		  pCE->breakNum, (pCE->autoReUp ? "autoup" : "noautoup"));
-	if (pCE->aliases != (NAMES *)0) {
+	if (pCE->aliases != NULL) {
 	    NAMES *n;
 	    comma = 0;
-	    for (n = pCE->aliases; n != (NAMES *)0; n = n->next) {
+	    for (n = pCE->aliases; n != NULL; n = n->next) {
 		if (comma)
 		    FilePrint(pCLServing->fd, FLAGTRUE, ",");
 		FilePrint(pCLServing->fd, FLAGTRUE, "%s", n->name);
 		comma = 1;
 	    }
 	}
-	BuildTmpString((char *)0);
-	s = (char *)0;
+	BuildTmpString(NULL);
+	s = NULL;
 	if (pCE->type == DEVICE) {
 	    if (pCE->hupcl == FLAGTRUE)
 		s = BuildTmpString(",hupcl");
@@ -2449,12 +2449,12 @@ CommandInfo(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
 	if (pCE->login == FLAGTRUE)
 	    s = BuildTmpString(",login");
 	FilePrint(pCLServing->fd, FLAGFALSE, ":%s:%s:%d:%s\r\n",
-		  (s == (char *)0 ? "" : s + 1),
-		  (pCE->initcmd == (char *)0 ? "" : pCE->initcmd),
+		  (s == NULL ? "" : s + 1),
+		  (pCE->initcmd == NULL ? "" : pCE->initcmd),
 		  pCE->idletimeout,
-		  (pCE->idlestring == (char *)0 ? "" : pCE->idlestring));
-	BuildTmpString((char *)0);
-	if (args != (char *)0)
+		  (pCE->idlestring == NULL ? "" : pCE->idlestring));
+	BuildTmpString(NULL);
+	if (args != NULL)
 	    break;
     }
 }
@@ -2495,14 +2495,14 @@ CommandOpen(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
      */
     ConsInit(pCEServing);
     if (pCEServing->fup &&
-	(pCEServing->initfile != (CONSFILE *)0 ||
+	(pCEServing->initfile != NULL ||
 	 pCEServing->ioState == INCONNECT)) {
 	FileWrite(pCLServing->fd, FLAGFALSE, "connecting...", -1);
 	pCLServing->fiwait = 1;
     } else if (pCEServing->fronly) {
 	FilePrint(pCLServing->fd, FLAGFALSE, "%s -- read-only]\r\n",
 		  pCEServing->fup ? "up" : "down");
-    } else if ((CONSCLIENT *)0 == (pCL = pCEServing->pCLwr)) {
+    } else if (NULL == (pCL = pCEServing->pCLwr)) {
 	pCEServing->pCLwr = pCLServing;
 	pCLServing->fwr = 1;
 	FilePrint(pCLServing->fd, FLAGFALSE, "%s -- attached]\r\n",
@@ -2524,7 +2524,7 @@ CommandWho(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
 {
     CONSCLIENT *pCL;
 
-    for (pCL = pCEServing->pCLon; (CONSCLIENT *)0 != pCL;
+    for (pCL = pCEServing->pCLon; NULL != pCL;
 	 pCL = pCL->pCLnext) {
 	FilePrint(pCLServing->fd, FLAGFALSE,
 		  " %-32.32s %c %-7.7s %6s %s\r\n", pCL->acid->string,
@@ -2585,7 +2585,7 @@ DoConsoleRead(CONSENT *pCEServing)
 	       cofile));
 
     if (nr > 0) {
-	pCEServing->lastWrite = time((time_t *)0);
+	pCEServing->lastWrite = time(NULL);
 	if (pCEServing->idletimeout != (time_t)0 &&
 	    (timers[T_CIDLE] == (time_t)0 ||
 	     timers[T_CIDLE] >
@@ -2715,14 +2715,14 @@ DoConsoleRead(CONSENT *pCEServing)
     /* if we have a command running, interface with it and then
      * allow the normal stuff to happen (so folks can watch)
      */
-    if (pCEServing->initfile != (CONSFILE *)0)
+    if (pCEServing->initfile != NULL)
 	FileWrite(pCEServing->initfile, FLAGFALSE, (char *)acIn, nr);
 
     /* output all console info nobody is attached
      * or output to unifiedlog if it's open
      */
-    if (unifiedlog != (CONSFILE *)0 ||
-	(pCEServing->pCLwr == (CONSCLIENT *)0 &&
+    if (unifiedlog != NULL ||
+	(pCEServing->pCLwr == NULL &&
 	 pCEServing->unloved == FLAGTRUE)) {
 	/* run through the console ouptut,
 	 * add each character to the output line
@@ -2736,7 +2736,7 @@ DoConsoleRead(CONSENT *pCEServing)
 		continue;
 
 	    /* unloved */
-	    if (pCEServing->pCLwr == (CONSCLIENT *)0 &&
+	    if (pCEServing->pCLwr == NULL &&
 		pCEServing->unloved == FLAGTRUE) {
 		write(1, pCEServing->server, strlen(pCEServing->server));
 		write(1, ": ", 2);
@@ -2744,9 +2744,9 @@ DoConsoleRead(CONSENT *pCEServing)
 	    }
 
 	    /* unified */
-	    if (unifiedlog != (CONSFILE *)0) {
+	    if (unifiedlog != NULL) {
 		FileWrite(unifiedlog, FLAGTRUE, pCEServing->server, -1);
-		if (pCEServing->pCLwr == (CONSCLIENT *)0)
+		if (pCEServing->pCLwr == NULL)
 		    FileWrite(unifiedlog, FLAGTRUE, ": ", 2);
 		else
 		    FileWrite(unifiedlog, FLAGTRUE, "*: ", 3);
@@ -2760,7 +2760,7 @@ DoConsoleRead(CONSENT *pCEServing)
 
     /* write console info to clients (not suspended)
      */
-    for (pCL = pCEServing->pCLon; (CONSCLIENT *)0 != pCL;
+    for (pCL = pCEServing->pCLon; NULL != pCL;
 	 pCL = pCL->pCLnext) {
 	if (pCL->fcon || pCL->iState == S_CEXEC)
 	    FileWrite(pCL->fd, FLAGFALSE, (char *)acIn, nr);
@@ -2774,7 +2774,7 @@ DoTaskRead(CONSENT *pCEServing)
     int nr, fd;
     CONSCLIENT *pCL;
 
-    if (pCEServing->taskfile == (CONSFILE *)0)
+    if (pCEServing->taskfile == NULL)
 	return;
 
     fd = FileFDNum(pCEServing->taskfile);
@@ -2790,7 +2790,7 @@ DoTaskRead(CONSENT *pCEServing)
 
     /* write console info to clients (not suspended)
      */
-    for (pCL = pCEServing->pCLon; (CONSCLIENT *)0 != pCL;
+    for (pCL = pCEServing->pCLon; NULL != pCL;
 	 pCL = pCL->pCLnext) {
 	if (pCL->fcon)
 	    FileWrite(pCL->fd, FLAGFALSE, (char *)acInOrig, nr);
@@ -2803,7 +2803,7 @@ DoCommandRead(CONSENT *pCEServing)
     unsigned char acInOrig[BUFSIZ];
     int nr, i, fd;
 
-    if (pCEServing->initfile == (CONSFILE *)0)
+    if (pCEServing->initfile == NULL)
 	return;
 
     fd = FileFDNum(pCEServing->initfile);
@@ -2854,12 +2854,12 @@ unsigned char *
 Challenge(void)
 {
     int i;
-    static unsigned char **n = (unsigned char **)0;
+    static unsigned char **n = NULL;
     static int cnt = 0;
     static int cur = 0;
     static int rnd = 0;
 
-    if (n == (unsigned char **)0) {
+    if (n == NULL) {
 	int j;
 	for (i = 0; i < sizeof(CM); i++) {
 	    if (CM[i] == 0xff)
@@ -2868,7 +2868,7 @@ Challenge(void)
 	n = (unsigned char **)calloc(cnt, sizeof(unsigned char *));
 	j = 0;
 	for (i = 0; i < sizeof(CM); i++) {
-	    if (n[j] == (unsigned char *)0)
+	    if (n[j] == NULL)
 		n[j] = &(CM[i]);
 	    if (CM[i] == 0xff) {
 		j++;
@@ -2935,20 +2935,20 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
     int nr, i, l;
     unsigned char acIn[BUFSIZ], acInOrig[BUFSIZ];
     time_t tyme;
-    static STRING *bcast = (STRING *)0;
-    static STRING *acA1 = (STRING *)0;
-    static STRING *acA2 = (STRING *)0;
+    static STRING *bcast = NULL;
+    static STRING *acA1 = NULL;
+    static STRING *acA2 = NULL;
 
-    if (bcast == (STRING *)0)
+    if (bcast == NULL)
 	bcast = AllocString();
-    if (acA1 == (STRING *)0)
+    if (acA1 == NULL)
 	acA1 = AllocString();
-    if (acA2 == (STRING *)0)
+    if (acA2 == NULL)
 	acA2 = AllocString();
 
     /* read connection */
     if ((nr = FileRead(pCLServing->fd, acIn, sizeof(acIn))) < 0) {
-	DisconnectClient(pGE, pCLServing, (char *)0, FLAGFALSE);
+	DisconnectClient(pGE, pCLServing, NULL, FLAGFALSE);
 	return;
     }
 
@@ -2956,7 +2956,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 	return;
 
     /* update last keystroke time */
-    pCLServing->typetym = tyme = time((time_t *)0);
+    pCLServing->typetym = tyme = time(NULL);
 
     while ((l = ParseIACBuf(pCLServing->fd, acIn, &nr)) >= 0) {
 	if (l == 0) {
@@ -3018,24 +3018,24 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 			!= AUTH_SUCCESS) {
 			FileWrite(pCLServing->fd, FLAGFALSE,
 				  "invalid password\r\n", -1);
-			BuildString((char *)0, pCLServing->accmd);
-			DisconnectClient(pGE, pCLServing, (char *)0,
+			BuildString(NULL, pCLServing->accmd);
+			DisconnectClient(pGE, pCLServing, NULL,
 					 FLAGFALSE);
 			return;
 		    }
 		    Verbose("<group> login %s", pCLServing->acid->string);
 		    FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", -1);
 		    pCLServing->iState = S_NORMAL;
-		    BuildString((char *)0, pCLServing->accmd);
+		    BuildString(NULL, pCLServing->accmd);
 		    continue;
 		}
 
 		if ((pcArgs =
 		     strchr(pCLServing->accmd->string,
-			    ' ')) != (char *)0) {
+			    ' ')) != NULL) {
 		    *pcArgs++ = '\000';
 		}
-		if (pcArgs != (char *)0)
+		if (pcArgs != NULL)
 		    pcArgs = PruneSpace(pcArgs);
 		pcCmd = PruneSpace(pCLServing->accmd->string);
 
@@ -3050,7 +3050,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 #if HAVE_GSSAPI
 			"gssapi log in with gssapi\r\n",
 #endif
-			(char *)0
+			NULL
 		    };
 		    static char *apcHelp2[] = {
 			"broadcast    send broadcast message\r\n",
@@ -3064,20 +3064,20 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 			"info         show console information\r\n",
 			"textmsg      send a text message\r\n",
 			"* = requires admin privileges\r\n",
-			(char *)0
+			NULL
 		    };
 		    char **ppc;
 		    for (ppc =
 			 (pCLServing->iState ==
 			  S_IDENT ? apcHelp1 : apcHelp2);
-			 (char *)0 != *ppc; ++ppc) {
+			 NULL != *ppc; ++ppc) {
 			FileWrite(pCLServing->fd, FLAGTRUE, *ppc, -1);
 		    }
-		    FileWrite(pCLServing->fd, FLAGFALSE, (char *)0, 0);
+		    FileWrite(pCLServing->fd, FLAGFALSE, NULL, 0);
 		} else if (strcmp(pcCmd, "exit") == 0) {
 		    FileWrite(pCLServing->fd, FLAGFALSE, "goodbye\r\n",
 			      -1);
-		    DisconnectClient(pGE, pCLServing, (char *)0,
+		    DisconnectClient(pGE, pCLServing, NULL,
 				     FLAGFALSE);
 		    return;
 #if HAVE_OPENSSL
@@ -3085,7 +3085,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 			   strcmp(pcCmd, "ssl") == 0) {
 		    FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", -1);
 		    if (!AttemptSSL(pCLServing)) {
-			DisconnectClient(pGE, pCLServing, (char *)0,
+			DisconnectClient(pGE, pCLServing, NULL,
 					 FLAGFALSE);
 			return;
 		    }
@@ -3107,12 +3107,12 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 				  "encryption required\r\n", -1);
 		    } else {
 #endif
-			if (pcArgs == (char *)0) {
+			if (pcArgs == NULL) {
 			    FileWrite(pCLServing->fd, FLAGFALSE,
 				      "login requires argument\r\n", -1);
 			} else {
-			    BuildString((char *)0, pCLServing->username);
-			    BuildString((char *)0, pCLServing->acid);
+			    BuildString(NULL, pCLServing->username);
+			    BuildString(NULL, pCLServing->acid);
 			    BuildString(pcArgs, pCLServing->username);
 			    BuildString(pcArgs, pCLServing->acid);
 			    BuildStringChar('@', pCLServing->acid);
@@ -3137,18 +3137,18 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 #endif
 		} else if (pCLServing->iState == S_NORMAL &&
 			   strcmp(pcCmd, "call") == 0) {
-		    if (pcArgs == (char *)0)
+		    if (pcArgs == NULL)
 			FileWrite(pCLServing->fd, FLAGFALSE,
 				  "call requires argument\r\n", -1);
 		    else {
-			CONSENT *pCEwant = (CONSENT *)0;
+			CONSENT *pCEwant = NULL;
 
 			pCEwant = HuntForConsole(pGE, pcArgs);
 
-			if (pCEwant == (CONSENT *)0) {
+			if (pCEwant == NULL) {
 			    FilePrint(pCLServing->fd, FLAGFALSE,
 				      "%s: no such console\r\n", pcArgs);
-			    DisconnectClient(pGE, pCLServing, (char *)0,
+			    DisconnectClient(pGE, pCLServing, NULL,
 					     FLAGFALSE);
 			    return;
 			}
@@ -3159,13 +3159,13 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 			if (pCLServing->fro == -1) {
 			    FilePrint(pCLServing->fd, FLAGFALSE,
 				      "%s: permission denied\r\n", pcArgs);
-			    DisconnectClient(pGE, pCLServing, (char *)0,
+			    DisconnectClient(pGE, pCLServing, NULL,
 					     FLAGFALSE);
 			    return;
 			}
 
 			if (pCEwant->login != FLAGTRUE) {
-			    if (pCEwant->motd == (char *)0) {
+			    if (pCEwant->motd == NULL) {
 				FilePrint(pCLServing->fd, FLAGFALSE,
 					  "%s: no logins allowed at this time\r\n",
 					  pcArgs);
@@ -3174,13 +3174,13 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 					  "%s: %s\r\n", pcArgs,
 					  pCEwant->motd);
 			    }
-			    DisconnectClient(pGE, pCLServing, (char *)0,
+			    DisconnectClient(pGE, pCLServing, NULL,
 					     FLAGFALSE);
 			    return;
 			}
 
 			/* remove from current host */
-			if ((CONSCLIENT *)0 != pCLServing->pCLnext) {
+			if (NULL != pCLServing->pCLnext) {
 			    pCLServing->pCLnext->ppCLbnext =
 				pCLServing->ppCLbnext;
 			}
@@ -3190,7 +3190,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 			    pCLServing->fwantwr = 0;
 			    TagLogfileAct(pCEServing, "%s detached",
 					  pCLServing->acid->string);
-			    pCEServing->pCLwr = (CONSCLIENT *)0;
+			    pCEServing->pCLwr = NULL;
 			    FindWrite(pCEServing);
 			}
 
@@ -3207,7 +3207,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 			pCLServing->pCEto = pCEServing;
 			pCLServing->pCLnext = pCEServing->pCLon;
 			pCLServing->ppCLbnext = &pCEServing->pCLon;
-			if ((CONSCLIENT *)0 != pCLServing->pCLnext) {
+			if (NULL != pCLServing->pCLnext) {
 			    pCLServing->pCLnext->ppCLbnext =
 				&pCLServing->pCLnext;
 			}
@@ -3225,7 +3225,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 			if (pCEServing->fronly) {
 			    FileWrite(pCLServing->fd, FLAGFALSE,
 				      "[console is read-only]\r\n", -1);
-			} else if (((CONSCLIENT *)0 == pCEServing->pCLwr)
+			} else if ((NULL == pCEServing->pCLwr)
 				   && !pCLServing->fro) {
 			    pCEServing->pCLwr = pCLServing;
 			    pCLServing->fwr = 1;
@@ -3260,11 +3260,11 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 				 pcArgs);
 		} else if (pCLServing->iState == S_NORMAL &&
 			   strcmp(pcCmd, "broadcast") == 0) {
-		    if (pcArgs == (char *)0) {
+		    if (pcArgs == NULL) {
 			FileWrite(pCLServing->fd, FLAGFALSE,
 				  "broadcast requires argument\r\n", -1);
 		    } else {
-			BuildString((char *)0, bcast);
+			BuildString(NULL, bcast);
 			BuildStringChar('[', bcast);
 			BuildString(pCLServing->acid->string, bcast);
 			BuildString(": ", bcast);
@@ -3276,22 +3276,22 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 		} else if (pCLServing->iState == S_NORMAL &&
 			   strcmp(pcCmd, "textmsg") == 0) {
 		    char *pcMsg;
-		    if (pcArgs == (char *)0) {
+		    if (pcArgs == NULL) {
 			FileWrite(pCLServing->fd, FLAGFALSE,
 				  "textmsg requires two arguments\r\n",
 				  -1);
 		    } else {
-			if ((pcMsg = strchr(pcArgs, ' ')) != (char *)0) {
+			if ((pcMsg = strchr(pcArgs, ' ')) != NULL) {
 			    *pcMsg++ = '\000';
 			}
-			if (pcMsg == (char *)0) {
+			if (pcMsg == NULL) {
 			    FileWrite(pCLServing->fd, FLAGFALSE,
 				      "textmsg requires two arguments\r\n",
 				      -1);
 			} else {
 			    pcMsg = PruneSpace(pcMsg);
 
-			    BuildString((char *)0, bcast);
+			    BuildString(NULL, bcast);
 			    BuildStringChar('[', bcast);
 			    BuildString(pCLServing->acid->string, bcast);
 			    BuildString(": ", bcast);
@@ -3306,7 +3306,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 		    }
 		} else if (pCLServing->iState == S_NORMAL &&
 			   strcmp(pcCmd, "disconnect") == 0) {
-		    if (pcArgs == (char *)0) {
+		    if (pcArgs == NULL) {
 			FileWrite(pCLServing->fd, FLAGFALSE,
 				  "disconnect requires argument\r\n", -1);
 		    } else {
@@ -3336,7 +3336,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 		    CONDDEBUG((1, "command %s state %d", pcCmd,
 			       pCLServing->iState));
 		}
-		BuildString((char *)0, pCLServing->accmd);
+		BuildString(NULL, pCLServing->accmd);
 	    } else
 	      statestart:
 		switch (pCLServing->iState) {
@@ -3349,13 +3349,13 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 			if (GatherLine(acIn[i], 0, G_TEXT, pCLServing)) {
 			    FileWrite(pCLServing->fd, FLAGFALSE, "]\r\n",
 				      3);
-			    BuildString((char *)0, bcast);
+			    BuildString(NULL, bcast);
 			    BuildString("NOTE -- ", bcast);
 			    BuildString(pCLServing->acid->string, bcast);
 			    BuildString(": ", bcast);
 			    BuildString(pCLServing->accmd->string, bcast);
 			    TagLogfile(pCEServing, bcast->string);
-			    BuildString((char *)0, pCLServing->accmd);
+			    BuildString(NULL, pCLServing->accmd);
 			    pCLServing->iState = S_NORMAL;
 			}
 			continue;
@@ -3364,7 +3364,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 			if (GatherLine(acIn[i], 0, G_TEXT, pCLServing)) {
 			    FileWrite(pCLServing->fd, FLAGFALSE, "]\r\n",
 				      3);
-			    BuildString((char *)0, bcast);
+			    BuildString(NULL, bcast);
 			    BuildStringChar('[', bcast);
 			    BuildString(pCLServing->acid->string, bcast);
 			    BuildString(": ", bcast);
@@ -3372,7 +3372,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 			    BuildString("]\r\n", bcast);
 			    SendClientsMsg(pCEServing, bcast->string);
 
-			    BuildString((char *)0, pCLServing->accmd);
+			    BuildString(NULL, pCLServing->accmd);
 			    pCLServing->iState = S_NORMAL;
 			}
 			continue;
@@ -3443,7 +3443,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 				(pCLServing->accmd->string[2] - '0');
 			    PutConsole(pCEServing,
 				       pCLServing->accmd->string[0], 1);
-			    BuildString((char *)0, pCLServing->accmd);
+			    BuildString(NULL, pCLServing->accmd);
 			} else {
 			    FileWrite(pCLServing->fd, FLAGFALSE,
 				      " aborted]\r\n", -1);
@@ -3458,7 +3458,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 			} else if (pCEServing->fronly) {
 			    FileWrite(pCLServing->fd, FLAGFALSE,
 				      " -- read-only]\r\n", -1);
-			} else if (((CONSCLIENT *)0 == pCEServing->pCLwr)
+			} else if ((NULL == pCEServing->pCLwr)
 				   && !pCLServing->fro) {
 			    pCEServing->pCLwr = pCLServing;
 			    pCLServing->fwr = 1;
@@ -3495,7 +3495,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 			/* if we can write, write to slave tty
 			 */
 			if (pCEServing->fup &&
-			    pCEServing->initfile == (CONSFILE *)0 &&
+			    pCEServing->initfile == NULL &&
 			    pCEServing->ioState == ISNORMAL &&
 			    pCLServing->fwr && !pCLServing->fiwait) {
 			    PutConsole(pCEServing, acIn[i], 1);
@@ -3538,11 +3538,11 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 			    i = pCEServing->breakNum;
 			    mod = i > 9 ? BREAKALPHAOFFSET : 0;
 			    if (i == 0 || breakList[i - 1].seq->used <= 1
-				|| pCEServing->breaklist == (char *)0 ||
-				((char *)0 ==
+				|| pCEServing->breaklist == NULL ||
+				(NULL ==
 				 strchr(pCEServing->breaklist,
 					'0' + i + mod)
-				 && (char *)0 ==
+				 && NULL ==
 				 strchr(pCEServing->breaklist, '*')))
 				FileWrite(pCLServing->fd, FLAGTRUE,
 					  " 0 -   0ms, <undefined>\r\n",
@@ -3556,14 +3556,14 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 					  breakList[i - 1].delay,
 					  acA1->string);
 			    }
-			    if (pCEServing->breaklist != (char *)0) {
+			    if (pCEServing->breaklist != NULL) {
 				for (i = 0; i < BREAKLISTSIZE; i++) {
 				    char btc;
 				    mod = i > 8 ? BREAKALPHAOFFSET : 0;
 				    btc = '1' + i + mod;
-				    if ((char *)0 ==
+				    if (NULL ==
 					strchr(pCEServing->breaklist, btc)
-					&& (char *)0 ==
+					&& NULL ==
 					strchr(pCEServing->breaklist, '*'))
 					continue;
 				    if (breakList[i].seq->used > 1) {
@@ -3577,7 +3577,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 				    }
 				}
 			    }
-			    FileWrite(pCLServing->fd, FLAGFALSE, (char *)0,
+			    FileWrite(pCLServing->fd, FLAGFALSE, NULL,
 				      0);
 			} else {
 			    if (pCLServing->fwr) {
@@ -3625,13 +3625,13 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 			    } else {
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "list]\r\n", -1);
-				if (pCEServing->tasklist != (char *)0) {
-				    for (t = taskList; t != (TASKS *)0;
+				if (pCEServing->tasklist != NULL) {
+				    for (t = taskList; t != NULL;
 					 t = t->next) {
-					if ((char *)0 ==
+					if (NULL ==
 					    strchr(pCEServing->tasklist,
 						   t->id)
-					    && (char *)0 ==
+					    && NULL ==
 					    strchr(pCEServing->tasklist,
 						   '*'))
 					    continue;
@@ -3656,7 +3656,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 				    FileWrite(pCLServing->fd, FLAGTRUE,
 					      " <undefined>\r\n", -1);
 				FileWrite(pCLServing->fd, FLAGFALSE,
-					  (char *)0, 0);
+					  NULL, 0);
 			    }
 			} else {
 			    if (pCLServing->fwr) {
@@ -3777,7 +3777,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 			    case 'b':	/* broadcast message */
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "Enter message: ", -1);
-				BuildString((char *)0, pCLServing->accmd);
+				BuildString(NULL, pCLServing->accmd);
 				pCLServing->iState = S_BCAST;
 				break;
 
@@ -3813,7 +3813,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 					  "group %s]\r\n",
 					  pGE->pCEctl->server);
 				CommandGroup(pGE, pCLServing, pCEServing,
-					     tyme, (char *)0);
+					     tyme, NULL);
 				break;
 
 			    case 'h':	/* help                 */
@@ -3825,7 +3825,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "info]\r\n", -1);
 				CommandInfo(pGE, pCLServing, pCEServing,
-					    tyme, (char *)0);
+					    tyme, NULL);
 				break;
 
 			    case 'L':
@@ -3852,7 +3852,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 				break;
 
 			    case 'm':	/* message of the day */
-				if (pCEServing->motd == (char *)0)
+				if (pCEServing->motd == NULL)
 				    FileWrite(pCLServing->fd, FLAGFALSE,
 					      "-- MOTD --]\r\n", -1);
 				else
@@ -3862,14 +3862,14 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 				break;
 
 			    case 'n':	/* note message to log file */
-				if (pCEServing->fdlog == (CONSFILE *)0) {
+				if (pCEServing->fdlog == NULL) {
 				    FileWrite(pCLServing->fd, FLAGFALSE,
 					      "no log file on this console]\r\n",
 					      -1);
 				} else {
 				    FileWrite(pCLServing->fd, FLAGFALSE,
 					      "Enter note: ", -1);
-				    BuildString((char *)0,
+				    BuildString(NULL,
 						pCLServing->accmd);
 				    pCLServing->iState = S_NOTE;
 				}
@@ -3884,7 +3884,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 				FilePrint(pCLServing->fd, FLAGFALSE,
 					  "set playback (%d): ",
 					  pCLServing->playback);
-				BuildString((char *)0, pCLServing->accmd);
+				BuildString(NULL, pCLServing->accmd);
 				pCLServing->iState = S_PLAYBACK;
 				break;
 
@@ -3905,7 +3905,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 				FilePrint(pCLServing->fd, FLAGFALSE,
 					  "set replay (%d): ",
 					  pCLServing->replay);
-				BuildString((char *)0, pCLServing->accmd);
+				BuildString(NULL, pCLServing->accmd);
 				pCLServing->iState = S_REPLAY;
 				break;
 
@@ -3921,7 +3921,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 				    goto unknownchar;
 				}
 				pCLServing->fwantwr = 0;
-				BumpClient(pCEServing, (char *)0);
+				BumpClient(pCEServing, NULL);
 				TagLogfileAct(pCEServing, "%s detached",
 					      pCLServing->acid->string);
 				FindWrite(pCEServing);
@@ -3933,7 +3933,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "hosts]\r\n", -1);
 				CommandHosts(pGE, pCLServing, pCEServing,
-					     tyme, (char *)0);
+					     tyme, NULL);
 				break;
 
 			    case 'v':	/* version */
@@ -3954,7 +3954,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "examine]\r\n", -1);
 				CommandExamine(pGE, pCLServing, pCEServing,
-					       tyme, (char *)0);
+					       tyme, NULL);
 				break;
 
 			    case 'z':	/* suspend the client */
@@ -3971,7 +3971,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 				pCLServing->fcon = 0;
 				pCLServing->iState = S_SUSP;
 				if (pCEServing->pCLwr == pCLServing) {
-				    BumpClient(pCEServing, (char *)0);
+				    BumpClient(pCEServing, NULL);
 				    TagLogfileAct(pCEServing,
 						  "%s detached",
 						  pCLServing->
@@ -4009,7 +4009,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "disconnect]\r\n", -1);
 				DisconnectClient(pGE, pCLServing,
-						 (char *)0, FLAGFALSE);
+						 NULL, FLAGFALSE);
 				return;
 
 			    case ' ':	/* abort escape sequence */
@@ -4032,7 +4032,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 					      -1);
 				    continue;
 				}
-				BuildString((char *)0, pCLServing->accmd);
+				BuildString(NULL, pCLServing->accmd);
 				pCLServing->iState = S_QUOTE;
 				FileWrite(pCLServing->fd, FLAGFALSE,
 					  "quote \\", -1);
@@ -4072,7 +4072,7 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 void
 FlushConsole(CONSENT *pCEServing)
 {
-    static STRING *buf = (STRING *)0;
+    static STRING *buf = NULL;
     int offset = 0;
     /* we buffered console data in PutConsole() so that we can
      * send more than 1-byte payloads, if we get more than 1-byte
@@ -4085,14 +4085,14 @@ FlushConsole(CONSENT *pCEServing)
     }
     if (!(pCEServing->fup && pCEServing->ioState == ISNORMAL)) {
 	/* if we have data but aren't up, drop it */
-	BuildString((char *)0, pCEServing->wbuf);
+	BuildString(NULL, pCEServing->wbuf);
 	pCEServing->wbufIAC = 0;
 	return;
     }
 
-    if (buf == (STRING *)0)
+    if (buf == NULL)
 	buf = AllocString();
-    BuildString((char *)0, buf);
+    BuildString(NULL, buf);
 
     /* while wbuf
      *    if wbufIAC == 1, yikes
@@ -4109,9 +4109,9 @@ FlushConsole(CONSENT *pCEServing)
      */
     {
 	static STRING *s;
-	if (s == (STRING *)0)
+	if (s == NULL)
 	    s = AllocString();
-	BuildString((char *)0, s);
+	BuildString(NULL, s);
 	FmtCtlStr(pCEServing->wbuf->string, pCEServing->wbuf->used, s);
 	CONDDEBUG((1, "Kiddie(): wbuf=%s", s->string));
     }
@@ -4165,10 +4165,10 @@ FlushConsole(CONSENT *pCEServing)
 			 buf->used - 1) < 0) {
 			Error("[%s] write failure", pCEServing->server);
 			ConsoleError(pCEServing);
-			BuildString((char *)0, buf);
+			BuildString(NULL, buf);
 			break;
 		    }
-		    BuildString((char *)0, buf);
+		    BuildString(NULL, buf);
 		}
 		/* if we didn't flush everything, bail and get
 		 * it the next time around (hopefully it'll have
@@ -4218,7 +4218,7 @@ FlushConsole(CONSENT *pCEServing)
 		    if (pCEServing->type == IPMI) {
 			if (ipmiconsole_ctx_generate_break
 			    (pCEServing->ipmictx) == -1) {
-			    if (pCEServing->pCLwr != (CONSCLIENT *)0)
+			    if (pCEServing->pCLwr != NULL)
 				FilePrint(pCEServing->pCLwr->fd, FLAGFALSE,
 					  "[ipmiconsole_ctx_generate_break() failed: %s]\r\n",
 					  ipmiconsole_ctx_errormsg
@@ -4230,7 +4230,7 @@ FlushConsole(CONSENT *pCEServing)
 
 			if (tcsendbreak(FileFDNum(pCEServing->cofile), 0)
 			    == -1) {
-			    if (pCEServing->pCLwr != (CONSCLIENT *)0)
+			    if (pCEServing->pCLwr != NULL)
 				FileWrite(pCEServing->pCLwr->fd, FLAGFALSE,
 					  "[tcsendbreak() failed]\r\n",
 					  -1);
@@ -4279,7 +4279,7 @@ FlushConsole(CONSENT *pCEServing)
 	    char *iac = StringChar(pCEServing->wbuf, offset, (char)IAC);
 	    CONDDEBUG((1, "Kiddie(): hunting for new IAC for [%s]",
 		       pCEServing->server));
-	    if (iac == (char *)0)
+	    if (iac == NULL)
 		pCEServing->wbufIAC = 0;
 	    else
 		pCEServing->wbufIAC =
@@ -4298,12 +4298,12 @@ FlushConsole(CONSENT *pCEServing)
 	    ConsoleError(pCEServing);
 	    return;
 	}
-	BuildString((char *)0, buf);
+	BuildString(NULL, buf);
     }
 
     /* nuke the data alread sent */
     if (offset >= pCEServing->wbuf->used - 1) {
-	BuildString((char *)0, pCEServing->wbuf);
+	BuildString(NULL, pCEServing->wbuf);
     } else if (offset > 0) {
 	ShiftString(pCEServing->wbuf, offset);
     }
@@ -4312,7 +4312,7 @@ FlushConsole(CONSENT *pCEServing)
 	char *iac = StringChar(pCEServing->wbuf, 0, (char)IAC);
 	CONDDEBUG((1, "Kiddie(): hunting for new IAC for [%s]",
 		   pCEServing->server));
-	if (iac == (char *)0)
+	if (iac == NULL)
 	    pCEServing->wbufIAC = 0;
 	else
 	    pCEServing->wbufIAC = (iac - pCEServing->wbuf->string) + 2;
@@ -4329,7 +4329,7 @@ FlushConsole(CONSENT *pCEServing)
 	    FD_CLR(FileFDNum(pCEServing->cofile), &winit);
 	}
     }
-    pCEServing->lastWrite = time((time_t *)0);
+    pCEServing->lastWrite = time(NULL);
     if (pCEServing->idletimeout != (time_t)0 &&
 	(timers[T_CIDLE] == (time_t)0 ||
 	 timers[T_CIDLE] >
@@ -4385,24 +4385,24 @@ Kiddie(GRPENT *pGE, int sfd)
 
 
     /* nuke the other group lists - of no use in the child */
-    while (pGroups != (GRPENT *)0) {
+    while (pGroups != NULL) {
 	pGEtmp = pGroups->pGEnext;
 	if (pGroups != pGE)
 	    DestroyGroup(pGroups);
 	pGroups = pGEtmp;
     }
     pGroups = pGE;
-    pGE->pGEnext = (GRPENT *)0;
+    pGE->pGEnext = NULL;
 
     /* nuke the remote consoles - of no use in the child */
-    while (pRCList != (REMOTE *)0) {
+    while (pRCList != NULL) {
 	pRCtmp = pRCList->pRCnext;
 	DestroyRemoteConsole(pRCList);
 	pRCList = pRCtmp;
     }
 
     if ((pGE->pCEctl = (CONSENT *)calloc(1, sizeof(CONSENT)))
-	== (CONSENT *)0)
+	== NULL)
 	OutOfMem();
 
     /* turn off signals that master() might have turned on
@@ -4426,10 +4426,10 @@ Kiddie(GRPENT *pGE, int sfd)
     SimpleSignal(SIGCHLD, FlagReapVirt);
     SimpleSignal(SIGINT, FlagGoAwayAlso);
 
-    BuildTmpString((char *)0);
+    BuildTmpString(NULL);
     if ((pGE->pCEctl->server =
 	 StrDup(BuildTmpStringPrint("ctl_%hu", pGE->port)))
-	== (char *)0)
+	== NULL)
 	OutOfMem();
 
     /* set up stuff for the select() call once, then just copy it
@@ -4452,7 +4452,7 @@ Kiddie(GRPENT *pGE, int sfd)
     /* prime the list of free connection slots
      */
     if ((pGE->pCLfree = (CONSCLIENT *)calloc(1, sizeof(CONSCLIENT)))
-	== (CONSCLIENT *)0)
+	== NULL)
 	OutOfMem();
     pGE->pCLfree->acid = AllocString();
     pGE->pCLfree->username = AllocString();
@@ -4477,7 +4477,7 @@ Kiddie(GRPENT *pGE, int sfd)
 
     /* the MAIN loop a group server
      */
-    pGE->pCLall = (CONSCLIENT *)0;
+    pGE->pCLall = NULL;
     while (1) {
 	/* check signal flags */
 	if (fSawGoAway) {
@@ -4511,12 +4511,12 @@ Kiddie(GRPENT *pGE, int sfd)
 
 	/* check for timeouts with consoles */
 	tymer = (time_t)0;
-	tyme = time((time_t *)0);
+	tyme = time(NULL);
 
 	/* check for state timeouts (currently connect() timeouts) */
 	if (timers[T_STATE] != (time_t)0 && tyme >= timers[T_STATE]) {
 	    timers[T_STATE] = (time_t)0;
-	    for (pCEServing = pGE->pCElist; pCEServing != (CONSENT *)0;
+	    for (pCEServing = pGE->pCElist; pCEServing != NULL;
 		 pCEServing = pCEServing->pCEnext) {
 		if (pCEServing->stateTimer == (time_t)0)
 		    continue;
@@ -4543,7 +4543,7 @@ Kiddie(GRPENT *pGE, int sfd)
 	/* process any idle timeouts */
 	if (timers[T_CIDLE] != (time_t)0 && tyme >= timers[T_CIDLE]) {
 	    timers[T_CIDLE] = (time_t)0;
-	    for (pCEServing = pGE->pCElist; pCEServing != (CONSENT *)0;
+	    for (pCEServing = pGE->pCElist; pCEServing != NULL;
 		 pCEServing = pCEServing->pCEnext) {
 		/* if we aren't in a normal state, skip it */
 		if (!(pCEServing->fup && pCEServing->ioState == ISNORMAL))
@@ -4584,27 +4584,27 @@ Kiddie(GRPENT *pGE, int sfd)
 	 * in case one of the subroutines actually takes a long time
 	 * to complete */
 	if (timers[T_MARK] != (time_t)0 &&
-	    time((time_t *)0) >= timers[T_MARK])
+	    time(NULL) >= timers[T_MARK])
 	    Mark(pGE);
 
 	if (timers[T_INITDELAY] != (time_t)0 &&
-	    time((time_t *)0) >= timers[T_INITDELAY]) {
+	    time(NULL) >= timers[T_INITDELAY]) {
 	    timers[T_INITDELAY] = (time_t)0;
 	    ReUp(pGE, -1);
 	}
 
 	if (timers[T_REINIT] != (time_t)0 &&
-	    time((time_t *)0) >= timers[T_REINIT])
+	    time(NULL) >= timers[T_REINIT])
 	    ReUp(pGE, 2);
 
 	/* must do ReUp(,1) last for timers to work right */
 	if (timers[T_AUTOUP] != (time_t)0 &&
-	    time((time_t *)0) >= timers[T_AUTOUP])
+	    time(NULL) >= timers[T_AUTOUP])
 	    ReUp(pGE, 1);
 
 	/* do we need to check on log file sizes? */
 	if (timers[T_ROLL] != (time_t)0 &&
-	    time((time_t *)0) >= timers[T_ROLL])
+	    time(NULL) >= timers[T_ROLL])
 	    RollLogs(pGE);
 
 	/* check on various timers and set the appropriate timeout */
@@ -4619,7 +4619,7 @@ Kiddie(GRPENT *pGE, int sfd)
 
 	/* if we have a timer, figure out the delay left */
 	if (tymer != (time_t)0) {
-	    tyme = time((time_t *)0);
+	    tyme = time(NULL);
 	    if (tymer > tyme)	/* in the future */
 		tv.tv_sec = tymer - tyme;
 	    else		/* now or in the past */
@@ -4627,8 +4627,8 @@ Kiddie(GRPENT *pGE, int sfd)
 	    tv.tv_usec = 0;
 	    tvp = &tv;
 	} else			/* no timeout */
-	    tvp = (struct timeval *)0;
-	if (tvp == (struct timeval *)0) {
+	    tvp = NULL;
+	if (tvp == NULL) {
 	    CONDDEBUG((1, "Kiddie(): no select timeout"));
 	} else {
 	    CONDDEBUG((1, "Kiddie(): select timeout of %d seconds",
@@ -4638,7 +4638,7 @@ Kiddie(GRPENT *pGE, int sfd)
 	rmask = rinit;
 	wmask = winit;
 
-	if ((ret = select(maxfd, &rmask, &wmask, (fd_set *)0, tvp)) == -1) {
+	if ((ret = select(maxfd, &rmask, &wmask, NULL, tvp)) == -1) {
 	    if (errno != EINTR) {
 		Error("Kiddie(): select(): %s", strerror(errno));
 		break;
@@ -4650,7 +4650,7 @@ Kiddie(GRPENT *pGE, int sfd)
 	    continue;
 
 	/* anything on a console? */
-	for (pCEServing = pGE->pCElist; pCEServing != (CONSENT *)0;
+	for (pCEServing = pGE->pCElist; pCEServing != NULL;
 	     pCEServing = pCEServing->pCEnext) {
 	    if (!pCEServing->fup || pCEServing->type == NOOP)
 		continue;
@@ -4730,12 +4730,12 @@ Kiddie(GRPENT *pGE, int sfd)
 #endif
 
 		    pCEServing->ioState = ISNORMAL;
-		    pCEServing->lastWrite = time((time_t *)0);
+		    pCEServing->lastWrite = time(NULL);
 #if HAVE_GETTIMEOFDAY
-		    if (gettimeofday(&tv, (void *)0) == 0)
+		    if (gettimeofday(&tv, NULL) == 0)
 			pCEServing->lastInit = tv;
 #else
-		    if ((tv = time((time_t *)0)) != (time_t)-1)
+		    if ((tv = time(NULL)) != (time_t)-1)
 			pCEServing->lastInit = tv;
 #endif
 		    if (pCEServing->idletimeout != (time_t)0 &&
@@ -4767,7 +4767,7 @@ Kiddie(GRPENT *pGE, int sfd)
 			CONDDEBUG((1, "Master(): flushing fd %d",
 				   FileFDNum(pCEServing->cofile)));
 			if (FileWrite
-			    (pCEServing->cofile, FLAGFALSE, (char *)0,
+			    (pCEServing->cofile, FLAGFALSE, NULL,
 			     0) < 0) {
 			    Error("[%s] write failure",
 				  pCEServing->server);
@@ -4781,7 +4781,7 @@ Kiddie(GRPENT *pGE, int sfd)
 			CONDDEBUG((1, "Kiddie(): flushing fd %d",
 				   FileFDNum(pCEServing->fdlog)));
 			if (FileWrite
-			    (pCEServing->fdlog, FLAGFALSE, (char *)0,
+			    (pCEServing->fdlog, FLAGFALSE, NULL,
 			     0) < 0) {
 			    Error("[%s] write failure",
 				  pCEServing->server);
@@ -4796,7 +4796,7 @@ Kiddie(GRPENT *pGE, int sfd)
 			CONDDEBUG((1, "Kiddie(): flushing fd %d",
 				   FileFDNum(pCEServing->initfile)));
 			if (FileWrite
-			    (pCEServing->initfile, FLAGFALSE, (char *)0,
+			    (pCEServing->initfile, FLAGFALSE, NULL,
 			     0) < 0) {
 			    Error("[%s] write failure",
 				  pCEServing->server);
@@ -4824,7 +4824,7 @@ Kiddie(GRPENT *pGE, int sfd)
 	}
 
 	/* anything on a client? */
-	for (pCLServing = pGE->pCLall; (CONSCLIENT *)0 != pCLServing;
+	for (pCLServing = pGE->pCLall; NULL != pCLServing;
 	     pCLServing = pCLServing->pCLscan) {
 	    switch (pCLServing->ioState) {
 #if HAVE_OPENSSL
@@ -4832,7 +4832,7 @@ Kiddie(GRPENT *pGE, int sfd)
 		    if (FileCanSSLAccept(pCLServing->fd, &rmask, &wmask)) {
 			int r;
 			if ((r = FileSSLAccept(pCLServing->fd)) < 0)
-			    DisconnectClient(pGE, pCLServing, (char *)0,
+			    DisconnectClient(pGE, pCLServing, NULL,
 					     FLAGFALSE);
 			else if (r == 1)
 			    pCLServing->ioState = ISNORMAL;
@@ -4844,7 +4844,7 @@ Kiddie(GRPENT *pGE, int sfd)
 		    {
 			int r;
 			if ((r = AttemptGSSAPI(pCLServing)) < 0)
-			    DisconnectClient(pGE, pCLServing, (char *)0,
+			    DisconnectClient(pGE, pCLServing, NULL,
 					     FLAGFALSE);
 			else if (r == 1)
 			    pCLServing->ioState = ISNORMAL;
@@ -4861,16 +4861,16 @@ Kiddie(GRPENT *pGE, int sfd)
 			CONDDEBUG((1, "Kiddie(): flushing fd %d",
 				   FileFDNum(pCLServing->fd)));
 			if (FileWrite
-			    (pCLServing->fd, FLAGFALSE, (char *)0,
+			    (pCLServing->fd, FLAGFALSE, NULL,
 			     0) < 0) {
-			    DisconnectClient(pGE, pCLServing, (char *)0,
+			    DisconnectClient(pGE, pCLServing, NULL,
 					     FLAGTRUE);
 			    break;
 			}
 		    }
 		    if ((pCLServing->ioState == ISFLUSHING) &&
 			FileBufEmpty(pCLServing->fd))
-			DisconnectClient(pGE, pCLServing, (char *)0,
+			DisconnectClient(pGE, pCLServing, NULL,
 					 FLAGFALSE);
 		    break;
 		default:
@@ -4878,7 +4878,7 @@ Kiddie(GRPENT *pGE, int sfd)
 		    Error
 			("Kiddie(): client socket state == %d -- THIS IS A BUG",
 			 pCLServing->ioState);
-		    DisconnectClient(pGE, pCLServing, (char *)0,
+		    DisconnectClient(pGE, pCLServing, NULL,
 				     FLAGFALSE);
 		    break;
 	    }
@@ -4890,7 +4890,7 @@ Kiddie(GRPENT *pGE, int sfd)
 	 * possibly putting it into the write buffer (but we don't really
 	 * need to worry about that here).
 	 */
-	for (pCEServing = pGE->pCElist; pCEServing != (CONSENT *)0;
+	for (pCEServing = pGE->pCElist; pCEServing != NULL;
 	     pCEServing = pCEServing->pCEnext)
 	    FlushConsole(pCEServing);
 
@@ -4920,9 +4920,9 @@ Kiddie(GRPENT *pGE, int sfd)
 	    pGE->pCLfree->fd = FileOpenFD(fd, simpleSocket);
 	    FileSetQuoteIAC(pGE->pCLfree->fd, FLAGTRUE);
 	} else
-	    pGE->pCLfree->fd = (CONSFILE *)0;
+	    pGE->pCLfree->fd = NULL;
 
-	if ((CONSFILE *)0 == pGE->pCLfree->fd) {
+	if (NULL == pGE->pCLfree->fd) {
 	    Error("Kiddie(): FileOpenFD(): %s", strerror(errno));
 	    close(fd);
 #if HAVE_DMALLOC && DMALLOC_MARK_CLIENT_CONNECTION
@@ -4939,10 +4939,10 @@ Kiddie(GRPENT *pGE, int sfd)
 
 	/* init the identification stuff
 	 */
-	BuildString((char *)0, pCL->peername);
-	BuildString((char *)0, pCL->acid);
+	BuildString(NULL, pCL->peername);
+	BuildString(NULL, pCL->acid);
 	BuildString("<unknown>@", pCL->acid);
-	BuildString((char *)0, pCL->username);
+	BuildString(NULL, pCL->username);
 	BuildString("<unknown>", pCL->username);
 	StrCpy(pCL->actym, StrTime(&(pCL->tym)), sizeof(pCL->actym));
 	pCL->typetym = pCL->tym;
@@ -4952,7 +4952,7 @@ Kiddie(GRPENT *pGE, int sfd)
 	pCL->pCEto = pGE->pCEctl;
 	pCL->pCLnext = pGE->pCEctl->pCLon;
 	pCL->ppCLbnext = &pGE->pCEctl->pCLon;
-	if ((CONSCLIENT *)0 != pCL->pCLnext) {
+	if (NULL != pCL->pCLnext) {
 	    pCL->pCLnext->ppCLbnext = &pCL->pCLnext;
 	}
 	pGE->pCEctl->pCLon = pCL;
@@ -4961,7 +4961,7 @@ Kiddie(GRPENT *pGE, int sfd)
 	 */
 	pCL->pCLscan = pGE->pCLall;
 	pCL->ppCLbscan = &pGE->pCLall;
-	if ((CONSCLIENT *)0 != pCL->pCLscan) {
+	if (NULL != pCL->pCLscan) {
 	    pCL->pCLscan->ppCLbscan = &pCL->pCLscan;
 	}
 	pGE->pCLall = pCL;
@@ -4978,7 +4978,7 @@ Kiddie(GRPENT *pGE, int sfd)
 	pCL->ic[1] = DEFESC;
 	pCL->replay = DEFREPLAY;
 	pCL->playback = DEFPLAYBACK;
-	BuildString((char *)0, pCL->accmd);
+	BuildString(NULL, pCL->accmd);
 
 	/* mark as stopped (no output from console)
 	 * and spy only (on chars to console)
@@ -4990,10 +4990,10 @@ Kiddie(GRPENT *pGE, int sfd)
 	/* remove from the free list
 	 * if we ran out of free slots, calloc one...
 	 */
-	if ((CONSCLIENT *)0 == pGE->pCLfree) {
+	if (NULL == pGE->pCLfree) {
 	    if ((pGE->pCLfree =
 		 (CONSCLIENT *)calloc(1, sizeof(CONSCLIENT)))
-		== (CONSCLIENT *)0)
+		== NULL)
 		OutOfMem();
 	    pGE->pCLfree->acid = AllocString();
 	    pGE->pCLfree->username = AllocString();
@@ -5009,7 +5009,7 @@ Kiddie(GRPENT *pGE, int sfd)
 	    CONDDEBUG((1, "Kiddie(): client acid initialized to `%s'",
 		       pCL->acid->string));
 	} else
-	    DisconnectClient(pGE, pCL, (char *)0, FLAGFALSE);
+	    DisconnectClient(pGE, pCL, NULL, FLAGFALSE);
     }
 }
 
@@ -5038,7 +5038,7 @@ Spawn(GRPENT *pGE, int msfd)
     unsigned short portInc = 0;
 #else
     struct sockaddr_un lstn_port;
-    static STRING *portPath = (STRING *)0;
+    static STRING *portPath = NULL;
 #endif
 
 #if !USE_IPV6
@@ -5146,7 +5146,7 @@ Spawn(GRPENT *pGE, int msfd)
 #elif USE_UNIX_DOMAIN_SOCKETS
     lstn_port.sun_family = AF_UNIX;
 
-    if (portPath == (STRING *)0)
+    if (portPath == NULL)
 	portPath = AllocString();
     BuildStringPrint(portPath, "%s/%u", interface, pGE->id);
     if (portPath->used > sizeof(lstn_port.sun_path)) {
@@ -5268,12 +5268,12 @@ Spawn(GRPENT *pGE, int msfd)
      * cause extra file descriptors and memory allocation to lie around,
      * not a very good thing!
      */
-    while (pCLmall != (CONSCLIENT *)0) {
+    while (pCLmall != NULL) {
 	CONSCLIENT *pCL;
-	if (pCLmall->fd != (CONSFILE *)0) {
+	if (pCLmall->fd != NULL) {
 	    int fd;
 	    fd = FileUnopen(pCLmall->fd);
-	    pCLmall->fd = (CONSFILE *)0;
+	    pCLmall->fd = NULL;
 	    CONDDEBUG((1, "Spawn(): closing Master() client fd %d", fd));
 	    close(fd);
 	    FD_CLR(fd, &rinit);
@@ -5283,7 +5283,7 @@ Spawn(GRPENT *pGE, int msfd)
 	DestroyClient(pCLmall);
 	pCLmall = pCL;
     }
-    while (pCLmfree != (CONSCLIENT *)0) {
+    while (pCLmfree != NULL) {
 	CONSCLIENT *pCL;
 	pCL = pCLmfree->pCLnext;
 	DestroyClient(pCLmfree);

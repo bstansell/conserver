@@ -18,7 +18,7 @@ static int
 
 /* get option letter from argument vector, also does -number correctly
  * for nice, xargs, and stuff (these extras by ksb)
- * does +arg if you give a last argument of "+", else give (char *)0
+ * does +arg if you give a last argument of "+", else give NULL
  */
 static int
 getopt(int nargc, char **nargv, char *ostr)
@@ -48,9 +48,9 @@ getopt(int nargc, char **nargv, char *ostr)
      * or a digit to match a # in the list
      */
     if ((optopt = *place++) == ':' ||
-	((char *)0 == (oli = strchr(ostr, optopt)) &&
+	(NULL == (oli = strchr(ostr, optopt)) &&
 	 (!(isdigit(optopt) || '-' == optopt) ||
-	  (char *)0 == (oli = strchr(ostr, '#'))))) {
+	  NULL == (oli = strchr(ostr, '#'))))) {
 	if (!*place)
 	    ++optind;
 	return ('?');
@@ -86,7 +86,7 @@ char
     " [-u] [-c cmd] [-e env=value] [-g group] [-l login] [-t tty]",
     " -h",
     " -V",
-    (char *)0
+    NULL
 }, *u_help[] = {
 "c cmd       command to run",
 	"e env=value environment variable to set",
@@ -95,9 +95,9 @@ char
 	"l login     login name",
 	"t tty       attach to this terminal",
 	"u           do no make utmp entry",
-	"V           show version information", (char *)0}, *pcCommand =
-    (char *)0, *pcGroup = (char *)0, *pcLogin = (char *)0, *pcTty =
-    (char *)0;
+	"V           show version information", NULL}, *pcCommand =
+    NULL, *pcGroup = NULL, *pcLogin = NULL, *pcTty =
+    NULL;
 int
   fMakeUtmp = 1, iErrs = 0;
 
@@ -112,13 +112,13 @@ int
 main(int argc, char **argv)
 {
     static char
-      sbOpt[] = "c:e:g:hl:t:uV", *u_pch = (char *)0;
+      sbOpt[] = "c:e:g:hl:t:uV", *u_pch = NULL;
     static int
       u_loop = 0;
     register int u_curopt;
 
     progname = strrchr(argv[0], '/');
-    if ((char *)0 == progname)
+    if (NULL == progname)
 	progname = argv[0];
     else
 	++progname;
@@ -147,7 +147,7 @@ main(int argc, char **argv)
 		pcGroup = optarg;
 		continue;
 	    case 'h':
-		for (u_loop = 0; (char *)0 != (u_pch = au_terse[u_loop]);
+		for (u_loop = 0; NULL != (u_pch = au_terse[u_loop]);
 		     ++u_loop) {
 		    if ('\000' == *u_pch) {
 			fprintf(stdout, "%s: with no parameters\n",
@@ -156,7 +156,7 @@ main(int argc, char **argv)
 		    }
 		    fprintf(stdout, "%s: usage%s\n", progname, u_pch);
 		}
-		for (u_loop = 0; (char *)0 != (u_pch = u_help[u_loop]);
+		for (u_loop = 0; NULL != (u_pch = u_help[u_loop]);
 		     ++u_loop) {
 		    fprintf(stdout, "%s\n", u_pch);
 		}

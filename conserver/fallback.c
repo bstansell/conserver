@@ -65,12 +65,12 @@ GetPseudoTTY(STRING *slave, int *slaveFD)
 	    close(sfd);
 	return -1;
     }
-    if ((char *)0 == (pcName = ttyname(sfd))) {
+    if (NULL == (pcName = ttyname(sfd))) {
 	close(fd);
 	close(sfd);
 	return -1;
     }
-    BuildString((char *)0, slave);
+    BuildString(NULL, slave);
     BuildString(pcName, slave);
 
     *slaveFD = sfd;
@@ -92,11 +92,11 @@ GetPseudoTTY(STRING *slave, int *slaveFD)
 	"/dev/ptm/clone",	/* HPUX */
 	"/dev/ptc",		/* AIX */
 	"/dev/ptmx_bsd",	/* Tru64 */
-	(char *)0
+	NULL
     };
 
     /* try to find the pty allocator */
-    for (c = 0; clones[c] != (char *)0; c++) {
+    for (c = 0; clones[c] != NULL; c++) {
 	if ((fd = open(clones[c], O_RDWR, 0)) >= 0)
 	    break;
     }
@@ -130,13 +130,13 @@ GetPseudoTTY(STRING *slave, int *slaveFD)
 #  endif
 
 #  if defined(_AIX)
-    if ((pcName = ttyname(fd)) == (char *)0) {
+    if ((pcName = ttyname(fd)) == NULL) {
 	close(fd);
 	return -1;
     }
 #  else
 #   if HAVE_PTSNAME
-    if ((pcName = ptsname(fd)) == (char *)0) {
+    if ((pcName = ptsname(fd)) == NULL) {
 	close(fd);
 	return -1;
     }
@@ -153,7 +153,7 @@ GetPseudoTTY(STRING *slave, int *slaveFD)
 	return -1;
     }
 
-    BuildString((char *)0, slave);
+    BuildString(NULL, slave);
     BuildString(pcName, slave);
 
     *slaveFD = sfd;
@@ -221,7 +221,7 @@ GetPseudoTTY(STRING *slave, int *slaveFD)
 	return -1;
     }
 
-    BuildString((char *)0, slave);
+    BuildString(NULL, slave);
     BuildString(acSlave, slave);
 
     *slaveFD = sfd;
@@ -237,18 +237,18 @@ int
 FallBack(char **slave, int *sfd)
 {
     int fd;
-    static STRING *pcTSlave = (STRING *)0;
+    static STRING *pcTSlave = NULL;
 
-    if (pcTSlave == (STRING *)0)
+    if (pcTSlave == NULL)
 	pcTSlave = AllocString();
 
     if ((fd = GetPseudoTTY(pcTSlave, sfd)) == -1) {
 	return -1;
     }
-    if ((*slave) != (char *)0)
+    if ((*slave) != NULL)
 	free(*slave);
     if (((*slave) = StrDup(pcTSlave->string))
-	== (char *)0)
+	== NULL)
 	OutOfMem();
     return fd;
 }

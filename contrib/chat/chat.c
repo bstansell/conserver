@@ -161,11 +161,11 @@ int report        = 0;
 int use_env       = 0;
 int exit_code     = 0;
 int do_set_tty    = 1;
-FILE* report_fp   = (FILE *) 0;
-char *report_file = (char *) 0;
-char *chat_file   = (char *) 0;
-char *phone_num   = (char *) 0;
-char *phone_num2  = (char *) 0;
+FILE* report_fp   = NULL;
+char *report_file = NULL;
+char *chat_file   = NULL;
+char *phone_num   = NULL;
+char *phone_num2  = NULL;
 int timeout       = DEFAULT_CHAT_TIMEOUT;
 
 int have_tty_parameters = 0;
@@ -184,7 +184,7 @@ struct termio saved_tty_parameters;
 struct termios saved_tty_parameters;
 #endif
 
-char *abort_string[MAX_ABORTS], *fail_reason = (char *)0,
+char *abort_string[MAX_ABORTS], *fail_reason = NULL,
 	fail_buffer[50];
 int n_aborts = 0, abort_next = 0, timeout_next = 0, echo_next = 0;
 int clear_abort_next = 0;
@@ -630,7 +630,7 @@ void terminate(int status)
 	report_buffer[rep_len] = 0;
 	fprintf (report_fp, "chat:  %s\n", report_buffer);
     }
-    if (report_file != (char *) 0 && report_fp != (FILE *) NULL) {
+    if (report_file != NULL && report_fp != (FILE *) NULL) {
 	if (verbose)
 	    fprintf (report_fp, "Closing \"%s\".\n", report_file);
 	fclose (report_fp);
@@ -840,7 +840,7 @@ char *expect_strtok (char *s, char *term)
     if (*str)
 	result = str;
     else
-	result = (char *) 0;
+	result = NULL;
 
     while (*str) {
 	if (escape_flag) {
@@ -858,7 +858,7 @@ char *expect_strtok (char *s, char *term)
 /*
  * If this is not in the termination string, continue.
  */
-	if (strchr (term, *str) == (char *) 0) {
+	if (strchr (term, *str) == NULL) {
 	    ++str;
 	    continue;
 	}
@@ -926,9 +926,9 @@ void chat_expect(char *s)
  */
     for (;;) {
 	expect = expect_strtok (s, "-");
-	s      = (char *) 0;
+	s      = NULL;
 
-	if (expect == (char *) 0)
+	if (expect == NULL)
 	    return;
 
 	reply = expect_strtok (s, "-");
@@ -943,7 +943,7 @@ void chat_expect(char *s)
  * If there is a sub-reply string then send it. Otherwise any condition
  * is terminal.
  */
-	if (reply == (char *) 0 || exit_code != 3)
+	if (reply == NULL || exit_code != 3)
 	    break;
 
 	chat_send (reply);
@@ -1330,7 +1330,7 @@ int get_string(char *string)
     register char *s = temp, *end = s + STR_LEN;
     char *logged = temp;
 
-    fail_reason = (char *)0;
+    fail_reason = NULL;
     string = clean(string, 0);
     len = strlen(string);
     minlen = (len > sizeof(fail_buffer)? len: sizeof(fail_buffer)) - 1;
@@ -1505,7 +1505,7 @@ int usleep(long usec)
     delay.tv_sec  = usec / 1000000L;
     delay.tv_usec = usec % 1000000L;
 
-    return select(0, (long *)0, (long *)0, (long *)0, &delay);
+    return select(0, NULL, NULL, NULL, &delay);
 }
 #endif
 

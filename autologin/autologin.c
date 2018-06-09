@@ -91,7 +91,7 @@ Process(void)
     int i, iNewGrp;
     gid_t wGid;
     uid_t wUid;
-    char *pcCmd = (char *)0, *pcDevTty = (char *)0;
+    char *pcCmd = NULL, *pcDevTty = NULL;
 #ifdef	HAVE_GETUSERATTR
     char *pcGrps;
 #endif
@@ -111,8 +111,8 @@ Process(void)
 	/* NOTREACHED */
     }
 #endif
-    if ((char *)0 != pcCommand) {
-	if ((char *)0 == (pcCmd = (char *)malloc(strlen(pcCommand) + 4))) {
+    if (NULL != pcCommand) {
+	if (NULL == (pcCmd = (char *)malloc(strlen(pcCommand) + 4))) {
 	    (void)fprintf(stderr, "%s: malloc: %s\n", progname,
 			  strerror(errno));
 	    exit(1);
@@ -122,20 +122,20 @@ Process(void)
 	(void)strcat(pcCmd, pcCommand);
     }
 
-    if ((char *)0 != pcGroup) {
+    if (NULL != pcGroup) {
 	iErrs += addgroup(pcGroup);
     }
 
-    if ((char *)0 == pcLogin) {
+    if (NULL == pcLogin) {
 	static char acLogin[17];
-	if ((struct passwd *)0 == (pwd = getpwuid(geteuid()))) {
+	if (NULL == (pwd = getpwuid(geteuid()))) {
 	    (void)fprintf(stderr, "%s: %d: uid unknown\n", progname,
 			  geteuid());
 	    exit(1);
 	    /* NOTREACHED */
 	}
 	pcLogin = strcpy(acLogin, pwd->pw_name);
-    } else if ((struct passwd *)0 == (pwd = getpwnam(pcLogin))) {
+    } else if (NULL == (pwd = getpwnam(pcLogin))) {
 	(void)fprintf(stderr, "%s: %s: login name unknown\n", progname,
 		      pcLogin);
 	exit(1);
@@ -160,11 +160,11 @@ Process(void)
 #endif /* HAVE_GETUSERATTR */
     (void)endgrent();
 
-    if ((char *)0 != pcTty) {
+    if (NULL != pcTty) {
 	if ('/' == *pcTty) {
 	    pcDevTty = pcTty;
 	} else {
-	    if ((char *)0 ==
+	    if (NULL ==
 		(pcDevTty = (char *)malloc(strlen(pcTty) + 5 + 1))) {
 		(void)fprintf(stderr, "%s: malloc: %s\n", progname,
 			      strerror(errno));
@@ -186,7 +186,7 @@ Process(void)
 #endif
 	}
     } else {
-	pcDevTty = (char *)0;
+	pcDevTty = NULL;
     }
 
     if (iErrs) {
@@ -208,7 +208,7 @@ Process(void)
 
     /* Close open files
      */
-    for (i = (char *)0 == pcTty ? 3 : 0; i < getdtablesize(); ++i) {
+    for (i = NULL == pcTty ? 3 : 0; i < getdtablesize(); ++i) {
 	(void)close(i);
     }
 
@@ -249,7 +249,7 @@ Process(void)
 			      &audit_info.ai_termid.at_addr[0],
 			      &audit_info.ai_termid.at_type);
 # else
-	if ((char *)0 != (hp = gethostbyname(my_hostname))
+	if (NULL != (hp = gethostbyname(my_hostname))
 	    && AF_INET == hp->h_addrtype) {
 	    (void)memcpy(&audit_info.ai_termid.machine, hp->h_addr,
 			 sizeof(audit_info.ai_termid.machine));
@@ -286,7 +286,7 @@ Process(void)
 		(void)au_write(iAuditFile, ptAuditToken);
 	    ptAuditToken = au_to_text(gettext("successful login"));
 	    (void)au_write(iAuditFile, ptAuditToken);
-	    if ((char *)0 != pcCmd) {
+	    if (NULL != pcCmd) {
 		ptAuditToken = au_to_text(pcCmd);
 		(void)au_write(iAuditFile, ptAuditToken);
 	    }
@@ -306,12 +306,12 @@ Process(void)
 
     /* Open the TTY for stdin, stdout and stderr
      */
-    if ((char *)0 != pcDevTty) {
+    if (NULL != pcDevTty) {
 #ifdef TIOCNOTTY
 	if (-1 != (i = open("/dev/tty", 2, 0))) {
-	    if (ioctl(i, TIOCNOTTY, (char *)0))
+	    if (ioctl(i, TIOCNOTTY, NULL))
 		(void)fprintf(stderr,
-			      "%s: ioctl(%d, TIOCNOTTY, (char *)0): %s\n",
+			      "%s: ioctl(%d, TIOCNOTTY, NULL): %s\n",
 			      progname, i, strerror(errno));
 	    (void)close(i);
 	}
@@ -391,19 +391,19 @@ Process(void)
 #endif
 
     if (fMakeUtmp) {
-	make_utmp(pcLogin, (char *)0 != pcTty ? pcTty : ttyname(0));
+	make_utmp(pcLogin, NULL != pcTty ? pcTty : ttyname(0));
     }
     /* Change ownership and modes on the tty.
      */
-    if ((char *)0 != pcDevTty) {
+    if (NULL != pcDevTty) {
 	(void)chown(pcDevTty, wUid, wGid);
 	(void)chmod(pcDevTty, (mode_t) TTYMODE);
     }
 
-    if ((char *)0 != pcCmd) {
-	execl(PATH_SU, "su", "-", pcLogin, pcCmd, (char *)0);
+    if (NULL != pcCmd) {
+	execl(PATH_SU, "su", "-", pcLogin, pcCmd, NULL);
     } else {
-	execl(PATH_SU, "su", "-", pcLogin, (char *)0);
+	execl(PATH_SU, "su", "-", pcLogin, NULL);
     }
 }
 
@@ -413,7 +413,7 @@ putenv(char *pcAssign)
 {
     register char *pcEq;
 
-    if ((char *)0 != (pcEq = strchr(pcAssign, '='))) {
+    if (NULL != (pcEq = strchr(pcAssign, '='))) {
 	*pcEq++ = '\000';
 	(void)setenv(pcAssign, pcEq, 1);
 	*--pcEq = '=';
@@ -429,7 +429,7 @@ addgroup(char *pcGrp)
     struct group *grp;
 
     grp = getgrnam(pcGrp);
-    if ((struct group *)0 == grp) {
+    if (NULL == grp) {
 	(void)fprintf(stderr, "%s: Unknown group: %s\n", progname, pcGrp);
 	return (1);
     }
@@ -456,7 +456,7 @@ make_utmp(char *pclogin, char *pctty)
     auto struct utmp utmp;
 
 
-    if ((char *)0 == pctty) {
+    if (NULL == pctty) {
 	return;
     }
 
@@ -472,7 +472,7 @@ make_utmp(char *pclogin, char *pctty)
      * all digits.  Then back up and include the previous part
      * /dev/pty/02  -> pty/02 (not just 02)
      */
-    if ((char *)0 != (pcDev = strrchr(pctty, '/'))) {
+    if (NULL != (pcDev = strrchr(pctty, '/'))) {
 	if (!*(pcDev + strspn(pcDev, "/0123456789"))) {
 	    while (pcDev != pctty && *--pcDev != '/') {
 	    }
@@ -542,7 +542,7 @@ make_utmp(char *pclogin, char *pctty)
     (void)strncpy(utmp.ut_name, pclogin, sizeof(utmp.ut_name));
 # endif
 #endif
-    utmp.ut_time = time((time_t *)0);
+    utmp.ut_time = time(NULL);
 
     if (0 == iFound) {
 	fprintf(stderr, "%s: %s: no ttyslot\n", progname, pctty);
@@ -561,10 +561,10 @@ usage(void)
     char *u_pch;
     int u_loop;
 
-    for (u_loop = 0; (char *)0 != (u_pch = au_terse[u_loop]); ++u_loop) {
+    for (u_loop = 0; NULL != (u_pch = au_terse[u_loop]); ++u_loop) {
 	fprintf(stdout, "%s: usage%s\n", progname, u_pch);
     }
-    for (u_loop = 0; (char *)0 != (u_pch = u_help[u_loop]); ++u_loop) {
+    for (u_loop = 0; NULL != (u_pch = u_help[u_loop]); ++u_loop) {
 	fprintf(stdout, "%s\n", u_pch);
     }
 

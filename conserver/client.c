@@ -59,22 +59,22 @@ int deny_severity = LOG_WARNING;
 void
 FindWrite(CONSENT *pCE)
 {
-    CONSCLIENT *pCLfound = (CONSCLIENT *)0;
+    CONSCLIENT *pCLfound = NULL;
     CONSCLIENT *pCL;
 
     /* make the first guy (last on the list) to have the `want write' bit set
      * the writer (tell him of the promotion, too)  we could look for the most
      * recent or some such... I guess it doesn't matter that much.
      */
-    if (pCE->pCLwr != (CONSCLIENT *)0 || pCE->fronly)
+    if (pCE->pCLwr != NULL || pCE->fronly)
 	return;
 
-    for (pCL = pCE->pCLon; (CONSCLIENT *)0 != pCL; pCL = pCL->pCLnext) {
+    for (pCL = pCE->pCLon; NULL != pCL; pCL = pCL->pCLnext) {
 	if (pCL->fwantwr && !pCL->fro)
 	    pCLfound = pCL;
     }
 
-    if (pCLfound != (CONSCLIENT *)0) {
+    if (pCLfound != NULL) {
 	pCLfound->fwantwr = 0;
 	pCLfound->fwr = 1;
 	if (pCE->nolog) {
@@ -91,14 +91,14 @@ FindWrite(CONSENT *pCE)
 void
 BumpClient(CONSENT *pCE, char *message)
 {
-    if ((CONSCLIENT *)0 == pCE->pCLwr)
+    if (NULL == pCE->pCLwr)
 	return;
 
-    if ((char *)0 != message)
+    if (NULL != message)
 	FileWrite(pCE->pCLwr->fd, FLAGFALSE, message, -1);
     pCE->pCLwr->fwantwr = 0;
     pCE->pCLwr->fwr = 0;
-    pCE->pCLwr = (CONSCLIENT *)0;
+    pCE->pCLwr = NULL;
 }
 
 /* replay last 'back' lines of the log file upon connect to console	(ksb)
@@ -112,12 +112,12 @@ BumpClient(CONSENT *pCE, char *message)
 void
 Replay(CONSENT *pCE, CONSFILE *fdOut, unsigned short back)
 {
-    CONSFILE *fdLog = (CONSFILE *)0;
-    STRING *line = (STRING *)0;
+    CONSFILE *fdLog = NULL;
+    STRING *line = NULL;
     off_t file_pos;
     off_t buf_pos;
-    char *buf = (char *)0;
-    char *bp = (char *)0;
+    char *buf = NULL;
+    char *bp = NULL;
     int ch;
     struct stat stLog;
     int ln;
@@ -126,10 +126,10 @@ Replay(CONSENT *pCE, CONSFILE *fdOut, unsigned short back)
     unsigned long dmallocMarkReplay = 0;
 #endif
 
-    if (pCE != (CONSENT *)0 && pCE->logfile != (char *)0)
+    if (pCE != NULL && pCE->logfile != NULL)
 	fdLog = FileOpen(pCE->logfile, O_RDONLY, 0644);
 
-    if (fdLog == (CONSFILE *)0) {
+    if (fdLog == NULL) {
 	FileWrite(fdOut, FLAGFALSE, "[no log file on this console]\r\n",
 		  -1);
 	return;
@@ -146,7 +146,7 @@ Replay(CONSENT *pCE, CONSFILE *fdOut, unsigned short back)
     file_pos = stLog.st_size - 1;	/* point at last byte */
     buf_pos = file_pos + 1;
 
-    if ((char *)0 == (buf = malloc(REPLAYBUFFER)))
+    if (NULL == (buf = malloc(REPLAYBUFFER)))
 	OutOfMem();
     bp = buf + 1;		/* just give it something - it resets below */
 
@@ -220,7 +220,7 @@ Replay(CONSENT *pCE, CONSFILE *fdOut, unsigned short back)
 	    /* advance to the next line and break if we have enough
 	     */
 	    ln++;
-	    BuildString((char *)0, line);
+	    BuildString(NULL, line);
 	    if (ln >= back) {
 		break;
 	    }
@@ -254,14 +254,14 @@ Replay(CONSENT *pCE, CONSFILE *fdOut, unsigned short back)
 	int eof = 0;
 	int i = 0;
 	int r = 0;
-	STRING *mark_beg = (STRING *)0;
-	STRING *mark_end = (STRING *)0;
+	STRING *mark_beg = NULL;
+	STRING *mark_end = NULL;
 
 	mark_beg = AllocString();
 	mark_end = AllocString();
 
 	ln = 0;			/* number of lines output */
-	BuildString((char *)0, line);
+	BuildString(NULL, line);
 
 	while (ln < back && !eof) {
 	    if (r <= 0) {
@@ -286,7 +286,7 @@ Replay(CONSENT *pCE, CONSFILE *fdOut, unsigned short back)
 		}
 		if (is_mark) {
 		    if (mark_beg->used > 1) {
-			BuildString((char *)0, mark_end);
+			BuildString(NULL, mark_end);
 			BuildString(line->string, mark_end);
 		    } else
 			BuildString(line->string, mark_beg);
@@ -297,7 +297,7 @@ Replay(CONSENT *pCE, CONSFILE *fdOut, unsigned short back)
 
 			    /* output the start of the range, stopping at the ']' */
 			    s = strrchr(mark_beg->string, ']');
-			    if ((char *)0 != s)
+			    if (NULL != s)
 				*s = '\000';
 			    FileWrite(fdOut, FLAGTRUE, mark_beg->string,
 				      -1);
@@ -307,7 +307,7 @@ Replay(CONSENT *pCE, CONSFILE *fdOut, unsigned short back)
 			     * and replacing "]\r\n" on the end with " -- MARK --]\r\n"
 			     */
 			    s = strrchr(mark_end->string, ']');
-			    if ((char *)0 != s)
+			    if (NULL != s)
 				*s = '\000';
 			    FileWrite(fdOut, FLAGTRUE,
 				      mark_end->string +
@@ -318,8 +318,8 @@ Replay(CONSENT *pCE, CONSFILE *fdOut, unsigned short back)
 			    FileWrite(fdOut, FLAGFALSE, mark_beg->string,
 				      mark_beg->used - 1);
 			}
-			BuildString((char *)0, mark_beg);
-			BuildString((char *)0, mark_end);
+			BuildString(NULL, mark_beg);
+			BuildString(NULL, mark_end);
 			ln++;
 			if (ln >= back)
 			    break;
@@ -328,7 +328,7 @@ Replay(CONSENT *pCE, CONSFILE *fdOut, unsigned short back)
 			      line->used - 1);
 		    ln++;
 		}
-		BuildString((char *)0, line);
+		BuildString(NULL, line);
 	    }
 
 	    /* move the counters */
@@ -341,11 +341,11 @@ Replay(CONSENT *pCE, CONSFILE *fdOut, unsigned short back)
 
   common_exit:
 
-    if (line != (STRING *)0)
+    if (line != NULL)
 	DestroyString(line);
-    if (buf != (char *)0)
+    if (buf != NULL)
 	free(buf);
-    if (fdLog != (CONSFILE *)0)
+    if (fdLog != NULL)
 	FileClose(&fdLog);
 
 #if HAVE_DMALLOC && DMALLOC_MARK_REPLAY
@@ -415,9 +415,9 @@ HelpUser(CONSCLIENT *pCL)
     static char
       acH1[] = "help]\r\n", acH2[] = "help spy mode]\r\n", acEoln[] =
 	"\r\n";
-    static STRING *acLine = (STRING *)0;
+    static STRING *acLine = NULL;
 
-    if (acLine == (STRING *)0)
+    if (acLine == NULL)
 	acLine = AllocString();
 
     iCmp = WHEN_ALWAYS | WHEN_SPY;
@@ -428,7 +428,7 @@ HelpUser(CONSCLIENT *pCL)
 	FileWrite(pCL->fd, FLAGTRUE, acH2, sizeof(acH2) - 1);
     }
 
-    BuildString((char *)0, acLine);
+    BuildString(NULL, acLine);
     for (i = 0; i < sizeof(aHLTable) / sizeof(HELP); ++i) {
 	char *text;
 
@@ -441,10 +441,10 @@ HelpUser(CONSCLIENT *pCL)
 
 	text = aHLTable[i].actext;
 	if (text[0] == 'p') {
-	    BuildTmpString((char *)0);
+	    BuildTmpString(NULL);
 	    text = BuildTmpStringPrint(text, pCL->playback);
 	} else if (text[0] == 'r') {
-	    BuildTmpString((char *)0);
+	    BuildTmpString(NULL);
 	    text = BuildTmpStringPrint(text, pCL->replay);
 	}
 
@@ -457,13 +457,13 @@ HelpUser(CONSCLIENT *pCL)
 		BuildString(acEoln, acLine);
 		FileWrite(pCL->fd, FLAGTRUE, acLine->string,
 			  acLine->used - 1);
-		BuildString((char *)0, acLine);
+		BuildString(NULL, acLine);
 		continue;
 	    } else {
 		BuildString(acEoln, acLine);
 		FileWrite(pCL->fd, FLAGTRUE, acLine->string,
 			  acLine->used - 1);
-		BuildString((char *)0, acLine);
+		BuildString(NULL, acLine);
 	    }
 	}
 	if (acLine->used == 0) {	/* at new line */
@@ -473,7 +473,7 @@ HelpUser(CONSCLIENT *pCL)
 		BuildString(acEoln, acLine);
 		FileWrite(pCL->fd, FLAGTRUE, acLine->string,
 			  acLine->used - 1);
-		BuildString((char *)0, acLine);
+		BuildString(NULL, acLine);
 	    }
 	}
     }
@@ -481,13 +481,13 @@ HelpUser(CONSCLIENT *pCL)
 	BuildString(acEoln, acLine);
 	FileWrite(pCL->fd, FLAGTRUE, acLine->string, acLine->used - 1);
     }
-    FileWrite(pCL->fd, FLAGFALSE, (char *)0, 0);
+    FileWrite(pCL->fd, FLAGFALSE, NULL, 0);
 }
 
 int
 ClientAccessOk(CONSCLIENT *pCL)
 {
-    char *peername = (char *)0;
+    char *peername = NULL;
     int retval = 1;
 
 #if USE_IPV6 || !USE_UNIX_DOMAIN_SOCKETS
@@ -553,9 +553,9 @@ ClientAccessOk(CONSCLIENT *pCL)
     }
 #endif
 
-    if (pCL->peername != (STRING *)0) {
-	BuildString((char *)0, pCL->peername);
-	if (peername != (char *)0)
+    if (pCL->peername != NULL) {
+	BuildString(NULL, pCL->peername);
+	if (peername != NULL)
 	    BuildString(peername, pCL->peername);
 #if USE_IPV6
 	else if (getpeer != -1) {
@@ -583,7 +583,7 @@ ClientAccessOk(CONSCLIENT *pCL)
 	    BuildString("<unknown>", pCL->peername);
 #endif
     }
-    if (peername != (char *)0)
+    if (peername != NULL)
 	free(peername);
     return retval;
 }

@@ -18,7 +18,7 @@
 static int screwy = 0;
 static struct termios o_tios;
 /* this holds the password given to us by the user */
-static STRING *pass = (STRING *)0;
+static STRING *pass = NULL;
 
 
 /*
@@ -71,15 +71,15 @@ GetPassword(char *prompt)
     char buf[BUFSIZ];
     int done = 0;
 
-    if (prompt == (char *)0)
+    if (prompt == NULL)
 	prompt = "";
-    if ((pass = AllocString()) == (STRING *)0)
+    if ((pass = AllocString()) == NULL)
 	OutOfMem();
-    BuildString((char *)0, pass);
+    BuildString(NULL, pass);
 
     if ((fd = open("/dev/tty", O_RDWR)) == -1) {
 	Error("could not open `/dev/tty': %s", strerror(errno));
-	return (char *)0;
+	return NULL;
     }
 
     C2Raw(fd);
@@ -100,8 +100,8 @@ GetPassword(char *prompt)
     C2Normal(fd);
     /*
        {
-       static STRING *c = (STRING *) 0;
-       if ((c = AllocString()) == (STRING *) 0)
+       static STRING *c = NULL;
+       if ((c = AllocString()) == NULL)
        OutOfMem();
        write(fd, "\n'", 2);
        if (pass->used) {
@@ -114,7 +114,7 @@ GetPassword(char *prompt)
     write(fd, "\n", 1);
     close(fd);
     /* this way a (char*)0 is only returned on error */
-    if (pass->string == (char *)0)
+    if (pass->string == NULL)
 	return "";
     else
 	return pass->string;
@@ -123,7 +123,7 @@ GetPassword(char *prompt)
 void
 ClearPassword(void)
 {
-    if (pass == (STRING *)0 || pass->allocated == 0)
+    if (pass == NULL || pass->allocated == 0)
 	return;
 
 #if HAVE_MEMSET
@@ -132,5 +132,5 @@ ClearPassword(void)
     bzero((char *)(pass->string), pass->allocated);
 #endif
 
-    BuildString((char *)0, pass);
+    BuildString(NULL, pass);
 }

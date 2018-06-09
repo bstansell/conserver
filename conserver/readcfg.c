@@ -35,34 +35,34 @@
 #include "main.h"
 
 /*****  external things *****/
-NAMES *userList = (NAMES *)0;
-GRPENT *pGroups = (GRPENT *)0;
-REMOTE *pRCList = (REMOTE *)0;
-ACCESS *pACList = (ACCESS *)0;
-CONSENTUSERS *pADList = (CONSENTUSERS *)0;
-CONSENTUSERS *pLUList = (CONSENTUSERS *)0;
-REMOTE *pRCUniq = (REMOTE *)0;
-CONFIG *pConfig = (CONFIG *)0;
+NAMES *userList = NULL;
+GRPENT *pGroups = NULL;
+REMOTE *pRCList = NULL;
+ACCESS *pACList = NULL;
+CONSENTUSERS *pADList = NULL;
+CONSENTUSERS *pLUList = NULL;
+REMOTE *pRCUniq = NULL;
+CONFIG *pConfig = NULL;
 BREAKS breakList[BREAKLISTSIZE];
 
-TASKS *taskList = (TASKS *)0;
-SUBST *taskSubst = (SUBST *)0;
+TASKS *taskList = NULL;
+SUBST *taskSubst = NULL;
 
 /***** internal things *****/
 #define ALLWORDSEP ", \f\v\t\n\r"
 
 int isStartup = 0;
-GRPENT *pGroupsOld = (GRPENT *)0;
-GRPENT *pGEstage = (GRPENT *)0;
-GRPENT *pGE = (GRPENT *)0;
+GRPENT *pGroupsOld = NULL;
+GRPENT *pGEstage = NULL;
+GRPENT *pGE = NULL;
 static unsigned int groupID = 1;
-REMOTE **ppRC = (REMOTE **)0;
+REMOTE **ppRC = NULL;
 
 /* 'task' handling (plus) */
 void
 ProcessYesNo(char *id, FLAG *flag)
 {
-    if (id == (char *)0 || id[0] == '\000')
+    if (id == NULL || id[0] == '\000')
 	*flag = FLAGFALSE;
     else if (strcasecmp("yes", id) == 0 || strcasecmp("true", id) == 0 ||
 	     strcasecmp("on", id) == 0)
@@ -77,15 +77,15 @@ ProcessYesNo(char *id, FLAG *flag)
 void
 DestroyTask(TASKS *task)
 {
-    if (task->cmd != (STRING *)0) {
+    if (task->cmd != NULL) {
 	DestroyString(task->cmd);
-	task->cmd = (STRING *)0;
+	task->cmd = NULL;
     }
-    if (task->descr != (STRING *)0) {
+    if (task->descr != NULL) {
 	DestroyString(task->descr);
-	task->descr = (STRING *)0;
+	task->descr = NULL;
     }
-    if (task->subst != (char *)0)
+    if (task->subst != NULL)
 	free(task->subst);
     free(task);
 }
@@ -94,14 +94,14 @@ void
 DestroyTaskList(void)
 {
     TASKS *n;
-    while (taskList != (TASKS *)0) {
+    while (taskList != NULL) {
 	n = taskList->next;
 	DestroyTask(taskList);
 	taskList = n;
     }
-    if (taskSubst != (SUBST *)0) {
+    if (taskSubst != NULL) {
 	free(taskSubst);
-	taskSubst = (SUBST *)0;
+	taskSubst = NULL;
     }
 }
 
@@ -111,7 +111,7 @@ InitBreakList(void)
     int i;
 
     for (i = 0; i < BREAKLISTSIZE; i++) {
-	breakList[i].seq = (STRING *)0;
+	breakList[i].seq = NULL;
 	breakList[i].delay = 0;
 	breakList[i].confirm = FLAGUNKNOWN;
     }
@@ -123,9 +123,9 @@ DestroyBreakList(void)
     int i;
 
     for (i = 0; i < BREAKLISTSIZE; i++) {
-	if (breakList[i].seq != (STRING *)0) {
+	if (breakList[i].seq != NULL) {
 	    DestroyString(breakList[i].seq);
-	    breakList[i].seq = (STRING *)0;
+	    breakList[i].seq = NULL;
 	}
     }
 }
@@ -134,9 +134,9 @@ void
 DestroyUserList(void)
 {
     NAMES *n;
-    while (userList != (NAMES *)0) {
+    while (userList != NULL) {
 	n = userList->next;
-	if (userList->name != (char *)0)
+	if (userList->name != NULL)
 	    free(userList->name);
 	free(userList);
 	userList = n;
@@ -147,7 +147,7 @@ NAMES *
 FindUserList(char *id)
 {
     NAMES *u;
-    for (u = userList; u != (NAMES *)0; u = u->next) {
+    for (u = userList; u != NULL; u = u->next) {
 	if (strcmp(u->name, id) == 0)
 	    return u;
     }
@@ -159,12 +159,12 @@ AddUserList(char *id)
 {
     NAMES *u;
 
-    if ((u = FindUserList(id)) == (NAMES *)0) {
+    if ((u = FindUserList(id)) == NULL) {
 	if ((u = (NAMES *)calloc(1, sizeof(NAMES)))
-	    == (NAMES *)0)
+	    == NULL)
 	    OutOfMem();
 	if ((u->name = StrDup(id))
-	    == (char *)0)
+	    == NULL)
 	    OutOfMem();
 	u->next = userList;
 	userList = u;
@@ -173,7 +173,7 @@ AddUserList(char *id)
 }
 
 /* 'break' handling */
-STRING *parserBreak = (STRING *)0;
+STRING *parserBreak = NULL;
 int parserBreakDelay = 0;
 int parserBreakNum = 0;
 FLAG parserBreakConfirm = FLAGFALSE;
@@ -181,14 +181,14 @@ FLAG parserBreakConfirm = FLAGFALSE;
 CONSENTUSERS *
 ConsentAddUser(CONSENTUSERS **ppCU, char *id, short not)
 {
-    CONSENTUSERS *u = (CONSENTUSERS *)0;
-    CONSENTUSERS *p = (CONSENTUSERS *)0;
+    CONSENTUSERS *u = NULL;
+    CONSENTUSERS *p = NULL;
 
-    for (u = *ppCU; u != (CONSENTUSERS *)0; u = u->next) {
+    for (u = *ppCU; u != NULL; u = u->next) {
 	if (strcmp(u->user->name, id) == 0) {
 	    u->not = not;
 	    /* at head of list already? */
-	    if (p != (CONSENTUSERS *)0) {
+	    if (p != NULL) {
 		/* move it */
 		p->next = u->next;
 		u->next = *ppCU;
@@ -200,7 +200,7 @@ ConsentAddUser(CONSENTUSERS **ppCU, char *id, short not)
     }
 
     if ((u = (CONSENTUSERS *)calloc(1, sizeof(CONSENTUSERS)))
-	== (CONSENTUSERS *)0)
+	== NULL)
 	OutOfMem();
     u->user = AddUserList(id);
     u->not = not;
@@ -213,7 +213,7 @@ void
 BreakBegin(char *id)
 {
     CONDDEBUG((1, "BreakBegin(%s) [%s:%d]", id, file, line));
-    if ((id == (char *)0) || (*id == '\000') ||
+    if ((id == NULL) || (*id == '\000') ||
 	((id[0] < '1' || id[0] > '9')
 	 && (id[0] < 'a' || id[0] > 'z')) || id[1] != '\000') {
 	if (isMaster)
@@ -222,10 +222,10 @@ BreakBegin(char *id)
     } else {
 	parserBreakNum =
 	    id[0] - '0' - (id[0] > '9' ? BREAKALPHAOFFSET : 0);
-	if (parserBreak == (STRING *)0)
+	if (parserBreak == NULL)
 	    parserBreak = AllocString();
 	else
-	    BuildString((char *)0, parserBreak);
+	    BuildString(NULL, parserBreak);
 	parserBreakDelay = BREAKDELAYDEFAULT;
 	parserBreakConfirm = FLAGFALSE;
     }
@@ -239,7 +239,7 @@ BreakEnd(void)
     if (parserBreakNum == 0)
 	return;
 
-    BuildString((char *)0, breakList[parserBreakNum - 1].seq);
+    BuildString(NULL, breakList[parserBreakNum - 1].seq);
     BuildString(parserBreak->string, breakList[parserBreakNum - 1].seq);
     breakList[parserBreakNum - 1].delay = parserBreakDelay;
     breakList[parserBreakNum - 1].confirm = parserBreakConfirm;
@@ -257,9 +257,9 @@ void
 BreakDestroy(void)
 {
     CONDDEBUG((1, "BreakDestroy() [%s:%d]", file, line));
-    if (parserBreak != (STRING *)0) {
+    if (parserBreak != NULL) {
 	DestroyString(parserBreak);
-	parserBreak = (STRING *)0;
+	parserBreak = NULL;
     }
 #if DUMPDATA
     {
@@ -267,7 +267,7 @@ BreakDestroy(void)
 	for (i = 0; i < BREAKLISTSIZE; i++) {
 	    Msg("Break[%d] = `%s', delay=%d", i,
 		breakList[i].seq ==
-		(STRING *)0 ? "(null)" : (breakList[i].
+		NULL ? "(null)" : (breakList[i].
 					  seq->string ? breakList[i].
 					  seq->string : "(null)"),
 		breakList[i].delay);
@@ -280,8 +280,8 @@ void
 BreakItemString(char *id)
 {
     CONDDEBUG((1, "BreakItemString(%s) [%s:%d]", id, file, line));
-    BuildString((char *)0, parserBreak);
-    if ((id == (char *)0) || (*id == '\000'))
+    BuildString(NULL, parserBreak);
+    if ((id == NULL) || (*id == '\000'))
 	return;
     BuildString(id, parserBreak);
 }
@@ -294,7 +294,7 @@ BreakItemDelay(char *id)
 
     CONDDEBUG((1, "BreakItemDelay(%s) [%s:%d]", id, file, line));
 
-    if ((id == (char *)0) || (*id == '\000')) {
+    if ((id == NULL) || (*id == '\000')) {
 	parserBreakDelay = 0;
 	return;
     }
@@ -325,20 +325,20 @@ typedef struct parserGroup {
     struct parserGroup *next;
 } PARSERGROUP;
 
-PARSERGROUP *parserGroups = (PARSERGROUP *)0;
-PARSERGROUP *parserGroupTemp = (PARSERGROUP *)0;
+PARSERGROUP *parserGroups = NULL;
+PARSERGROUP *parserGroupTemp = NULL;
 
 void
 DestroyParserGroup(PARSERGROUP *pg)
 {
     PARSERGROUP **ppg = &parserGroups;
 
-    if (pg == (PARSERGROUP *)0)
+    if (pg == NULL)
 	return;
 
     CONDDEBUG((2, "DestroyParserGroup(): %s", pg->name->string));
 
-    while (*ppg != (PARSERGROUP *)0) {
+    while (*ppg != NULL) {
 	if (*ppg == pg) {
 	    break;
 	} else {
@@ -346,7 +346,7 @@ DestroyParserGroup(PARSERGROUP *pg)
 	}
     }
 
-    if (*ppg != (PARSERGROUP *)0)
+    if (*ppg != NULL)
 	*ppg = pg->next;
 
     DestroyString(pg->name);
@@ -360,7 +360,7 @@ PARSERGROUP *
 GroupFind(char *id)
 {
     PARSERGROUP *pg;
-    for (pg = parserGroups; pg != (PARSERGROUP *)0; pg = pg->next) {
+    for (pg = parserGroups; pg != NULL; pg = pg->next) {
 	if (strcmp(id, pg->name->string) == 0)
 	    return pg;
     }
@@ -371,15 +371,15 @@ void
 GroupBegin(char *id)
 {
     CONDDEBUG((1, "GroupBegin(%s) [%s:%d]", id, file, line));
-    if (id == (char *)0 || id[0] == '\000') {
+    if (id == NULL || id[0] == '\000') {
 	if (isMaster)
 	    Error("empty group name [%s:%d]", file, line);
 	return;
     }
-    if (parserGroupTemp != (PARSERGROUP *)0)
+    if (parserGroupTemp != NULL)
 	DestroyParserGroup(parserGroupTemp);
     if ((parserGroupTemp = (PARSERGROUP *)calloc(1, sizeof(PARSERGROUP)))
-	== (PARSERGROUP *)0)
+	== NULL)
 	OutOfMem();
     parserGroupTemp->name = AllocString();
     BuildString(id, parserGroupTemp->name);
@@ -388,25 +388,25 @@ GroupBegin(char *id)
 void
 GroupEnd(void)
 {
-    PARSERGROUP *pg = (PARSERGROUP *)0;
+    PARSERGROUP *pg = NULL;
 
     CONDDEBUG((1, "GroupEnd() [%s:%d]", file, line));
 
     if (parserGroupTemp->name->used <= 1) {
 	DestroyParserGroup(parserGroupTemp);
-	parserGroupTemp = (PARSERGROUP *)0;
+	parserGroupTemp = NULL;
 	return;
     }
 
     /* if we're overriding an existing group, nuke it */
     if ((pg =
-	 GroupFind(parserGroupTemp->name->string)) != (PARSERGROUP *)0) {
+	 GroupFind(parserGroupTemp->name->string)) != NULL) {
 	DestroyParserGroup(pg);
     }
     /* add the temp to the head of the list */
     parserGroupTemp->next = parserGroups;
     parserGroups = parserGroupTemp;
-    parserGroupTemp = (PARSERGROUP *)0;
+    parserGroupTemp = NULL;
 }
 
 void
@@ -414,7 +414,7 @@ GroupAbort(void)
 {
     CONDDEBUG((1, "GroupAbort() [%s:%d]", file, line));
     DestroyParserGroup(parserGroupTemp);
-    parserGroupTemp = (PARSERGROUP *)0;
+    parserGroupTemp = NULL;
 }
 
 void
@@ -425,24 +425,24 @@ GroupDestroy(void)
     {
 	PARSERGROUP *pg;
 	NAMES *u;
-	for (pg = parserGroups; pg != (PARSERGROUP *)0; pg = pg->next) {
+	for (pg = parserGroups; pg != NULL; pg = pg->next) {
 	    CONSENTUSERS *pcu;
 	    Msg("Group = %s", pg->name->string);
-	    for (pcu = pg->users; pcu != (CONSENTUSERS *)0;
+	    for (pcu = pg->users; pcu != NULL;
 		 pcu = pcu->next) {
 		Msg("    User = %s", pcu->user->name);
 	    }
 	}
 	Msg("UserList...");
-	for (u = userList; u != (NAMES *)0; u = u->next) {
+	for (u = userList; u != NULL; u = u->next) {
 	    Msg("    User = %s", u->name);
 	}
     }
 #endif
-    while (parserGroups != (PARSERGROUP *)0)
+    while (parserGroups != NULL)
 	DestroyParserGroup(parserGroups);
     DestroyParserGroup(parserGroupTemp);
-    parserGroups = parserGroupTemp = (PARSERGROUP *)0;
+    parserGroups = parserGroupTemp = NULL;
 }
 
 CONSENTUSERS *
@@ -455,7 +455,7 @@ void
 CopyConsentUserList(CONSENTUSERS *s, CONSENTUSERS **d, short not)
 {
     /* we have to add things backwards, since it's an ordered list */
-    if (s == (CONSENTUSERS *)0 || d == (CONSENTUSERS **)0)
+    if (s == NULL || d == NULL)
 	return;
 
     CopyConsentUserList(s->next, d, not);
@@ -467,17 +467,17 @@ CopyConsentUserList(CONSENTUSERS *s, CONSENTUSERS **d, short not)
 void
 GroupItemUsers(char *id)
 {
-    char *token = (char *)0;
-    PARSERGROUP *pg = (PARSERGROUP *)0;
+    char *token = NULL;
+    PARSERGROUP *pg = NULL;
 
     CONDDEBUG((1, "GroupItemUsers(%s) [%s:%d]", id, file, line));
 
-    if ((id == (char *)0) || (*id == '\000')) {
+    if ((id == NULL) || (*id == '\000')) {
 	DestroyConsentUsers(&(parserGroupTemp->users));
 	return;
     }
 
-    for (token = strtok(id, ALLWORDSEP); token != (char *)0;
+    for (token = strtok(id, ALLWORDSEP); token != NULL;
 	 token = strtok(NULL, ALLWORDSEP)) {
 	short not;
 	if (token[0] == '!') {
@@ -485,7 +485,7 @@ GroupItemUsers(char *id)
 	    not = 1;
 	} else
 	    not = 0;
-	if ((pg = GroupFind(token)) == (PARSERGROUP *)0)
+	if ((pg = GroupFind(token)) == NULL)
 	    GroupAddUser(parserGroupTemp, token, not);
 	else
 	    CopyConsentUserList(pg->users, &(parserGroupTemp->users), not);
@@ -493,20 +493,20 @@ GroupItemUsers(char *id)
 }
 
 /* 'default' handling */
-CONSENT *parserDefaults = (CONSENT *)0;
+CONSENT *parserDefaults = NULL;
 CONSENT **parserDefaultsTail = &parserDefaults;
-CONSENT *parserDefaultTemp = (CONSENT *)0;
+CONSENT *parserDefaultTemp = NULL;
 
 void
 DestroyParserDefaultOrConsole(CONSENT *c, CONSENT **ph, CONSENT ***pt)
 {
-    if (c == (CONSENT *)0)
+    if (c == NULL)
 	return;
 
     CONDDEBUG((2, "DestroyParserDefaultOrConsole(): %s", c->server));
 
-    if (ph != (CONSENT **)0) {
-	while (*ph != (CONSENT *)0) {
+    if (ph != NULL) {
+	while (*ph != NULL) {
 	    if (*ph == c) {
 		break;
 	    } else {
@@ -515,11 +515,11 @@ DestroyParserDefaultOrConsole(CONSENT *c, CONSENT **ph, CONSENT ***pt)
 	}
 
 	/* if we were in a chain... */
-	if (*ph != (CONSENT *)0) {
+	if (*ph != NULL) {
 	    /* unlink from the chain */
 	    *ph = c->pCEnext;
 	    /* and possibly fix tail ptr... */
-	    if (c->pCEnext == (CONSENT *)0)
+	    if (c->pCEnext == NULL)
 		(*pt) = ph;
 	}
     }
@@ -527,59 +527,59 @@ DestroyParserDefaultOrConsole(CONSENT *c, CONSENT **ph, CONSENT ***pt)
     DestroyConsentUsers(&(c->ro));
     DestroyConsentUsers(&(c->rw));
 
-    if (c->server != (char *)0)
+    if (c->server != NULL)
 	free(c->server);
-    if (c->host != (char *)0)
+    if (c->host != NULL)
 	free(c->host);
-    if (c->uds != (char *)0)
+    if (c->uds != NULL)
 	free(c->uds);
-    if (c->udssubst != (char *)0)
+    if (c->udssubst != NULL)
 	free(c->udssubst);
-    if (c->master != (char *)0)
+    if (c->master != NULL)
 	free(c->master);
-    if (c->exec != (char *)0)
+    if (c->exec != NULL)
 	free(c->exec);
-    if (c->device != (char *)0)
+    if (c->device != NULL)
 	free(c->device);
-    if (c->devicesubst != (char *)0)
+    if (c->devicesubst != NULL)
 	free(c->devicesubst);
-    if (c->execsubst != (char *)0)
+    if (c->execsubst != NULL)
 	free(c->execsubst);
-    if (c->initsubst != (char *)0)
+    if (c->initsubst != NULL)
 	free(c->initsubst);
-    if (c->logfile != (char *)0)
+    if (c->logfile != NULL)
 	free(c->logfile);
-    if (c->initcmd != (char *)0)
+    if (c->initcmd != NULL)
 	free(c->initcmd);
-    if (c->motd != (char *)0)
+    if (c->motd != NULL)
 	free(c->motd);
-    if (c->idlestring != (char *)0)
+    if (c->idlestring != NULL)
 	free(c->idlestring);
-    if (c->replstring != (char *)0)
+    if (c->replstring != NULL)
 	free(c->replstring);
-    if (c->tasklist != (char *)0)
+    if (c->tasklist != NULL)
 	free(c->tasklist);
-    if (c->breaklist != (char *)0)
+    if (c->breaklist != NULL)
 	free(c->breaklist);
-    if (c->execSlave != (char *)0)
+    if (c->execSlave != NULL)
 	free(c->execSlave);
 #if HAVE_FREEIPMI
-    if (c->username != (char *)0)
+    if (c->username != NULL)
 	free(c->username);
-    if (c->password != (char *)0)
+    if (c->password != NULL)
 	free(c->password);
-    if (c->ipmikg != (STRING *)0)
+    if (c->ipmikg != NULL)
 	DestroyString(c->ipmikg);
 #endif
-    while (c->aliases != (NAMES *)0) {
+    while (c->aliases != NULL) {
 	NAMES *name;
 	name = c->aliases->next;
-	if (c->aliases->name != (char *)0)
+	if (c->aliases->name != NULL)
 	    free(c->aliases->name);
 	free(c->aliases);
 	c->aliases = name;
     }
-    if (c->wbuf != (STRING *)0)
+    if (c->wbuf != NULL)
 	DestroyString(c->wbuf);
     free(c);
 }
@@ -587,7 +587,7 @@ DestroyParserDefaultOrConsole(CONSENT *c, CONSENT **ph, CONSENT ***pt)
 CONSENT *
 FindParserDefaultOrConsole(CONSENT *c, char *id)
 {
-    for (; c != (CONSENT *)0; c = c->pCEnext) {
+    for (; c != NULL; c = c->pCEnext) {
 	if (strcasecmp(id, c->server) == 0)
 	    return c;
     }
@@ -601,9 +601,9 @@ ApplyDefault(CONSENT *d, CONSENT *c)
 	c->type = d->type;
     if (d->breakNum != 0)
 	c->breakNum = d->breakNum;
-    if (d->baud != (BAUD *)0)
+    if (d->baud != NULL)
 	c->baud = d->baud;
-    if (d->parity != (PARITY *)0)
+    if (d->parity != NULL)
 	c->parity = d->parity;
     if (d->idletimeout != 0)
 	c->idletimeout = d->idletimeout;
@@ -667,100 +667,100 @@ ApplyDefault(CONSENT *d, CONSENT *c)
 	c->unloved = d->unloved;
     if (d->login != FLAGUNKNOWN)
 	c->login = d->login;
-    if (d->host != (char *)0) {
-	if (c->host != (char *)0)
+    if (d->host != NULL) {
+	if (c->host != NULL)
 	    free(c->host);
-	if ((c->host = StrDup(d->host)) == (char *)0)
+	if ((c->host = StrDup(d->host)) == NULL)
 	    OutOfMem();
     }
-    if (d->uds != (char *)0) {
-	if (c->uds != (char *)0)
+    if (d->uds != NULL) {
+	if (c->uds != NULL)
 	    free(c->uds);
-	if ((c->uds = StrDup(d->uds)) == (char *)0)
+	if ((c->uds = StrDup(d->uds)) == NULL)
 	    OutOfMem();
     }
-    if (d->udssubst != (char *)0) {
-	if (c->udssubst != (char *)0)
+    if (d->udssubst != NULL) {
+	if (c->udssubst != NULL)
 	    free(c->udssubst);
-	if ((c->udssubst = StrDup(d->udssubst)) == (char *)0)
+	if ((c->udssubst = StrDup(d->udssubst)) == NULL)
 	    OutOfMem();
     }
-    if (d->master != (char *)0) {
-	if (c->master != (char *)0)
+    if (d->master != NULL) {
+	if (c->master != NULL)
 	    free(c->master);
-	if ((c->master = StrDup(d->master)) == (char *)0)
+	if ((c->master = StrDup(d->master)) == NULL)
 	    OutOfMem();
     }
-    if (d->exec != (char *)0) {
-	if (c->exec != (char *)0)
+    if (d->exec != NULL) {
+	if (c->exec != NULL)
 	    free(c->exec);
-	if ((c->exec = StrDup(d->exec)) == (char *)0)
+	if ((c->exec = StrDup(d->exec)) == NULL)
 	    OutOfMem();
     }
-    if (d->device != (char *)0) {
-	if (c->device != (char *)0)
+    if (d->device != NULL) {
+	if (c->device != NULL)
 	    free(c->device);
-	if ((c->device = StrDup(d->device)) == (char *)0)
+	if ((c->device = StrDup(d->device)) == NULL)
 	    OutOfMem();
     }
-    if (d->devicesubst != (char *)0) {
-	if (c->devicesubst != (char *)0)
+    if (d->devicesubst != NULL) {
+	if (c->devicesubst != NULL)
 	    free(c->devicesubst);
-	if ((c->devicesubst = StrDup(d->devicesubst)) == (char *)0)
+	if ((c->devicesubst = StrDup(d->devicesubst)) == NULL)
 	    OutOfMem();
     }
-    if (d->execsubst != (char *)0) {
-	if (c->execsubst != (char *)0)
+    if (d->execsubst != NULL) {
+	if (c->execsubst != NULL)
 	    free(c->execsubst);
-	if ((c->execsubst = StrDup(d->execsubst)) == (char *)0)
+	if ((c->execsubst = StrDup(d->execsubst)) == NULL)
 	    OutOfMem();
     }
-    if (d->initsubst != (char *)0) {
-	if (c->initsubst != (char *)0)
+    if (d->initsubst != NULL) {
+	if (c->initsubst != NULL)
 	    free(c->initsubst);
-	if ((c->initsubst = StrDup(d->initsubst)) == (char *)0)
+	if ((c->initsubst = StrDup(d->initsubst)) == NULL)
 	    OutOfMem();
     }
-    if (d->logfile != (char *)0) {
-	if (c->logfile != (char *)0)
+    if (d->logfile != NULL) {
+	if (c->logfile != NULL)
 	    free(c->logfile);
-	if ((c->logfile = StrDup(d->logfile)) == (char *)0)
+	if ((c->logfile = StrDup(d->logfile)) == NULL)
 	    OutOfMem();
     }
-    if (d->initcmd != (char *)0) {
-	if (c->initcmd != (char *)0)
+    if (d->initcmd != NULL) {
+	if (c->initcmd != NULL)
 	    free(c->initcmd);
-	if ((c->initcmd = StrDup(d->initcmd)) == (char *)0)
+	if ((c->initcmd = StrDup(d->initcmd)) == NULL)
 	    OutOfMem();
     }
-    if (d->motd != (char *)0) {
-	if (c->motd != (char *)0)
+    if (d->motd != NULL) {
+	if (c->motd != NULL)
 	    free(c->motd);
-	if ((c->motd = StrDup(d->motd)) == (char *)0)
+	if ((c->motd = StrDup(d->motd)) == NULL)
 	    OutOfMem();
     }
-    if (d->idlestring != (char *)0) {
-	if (c->idlestring != (char *)0)
+    if (d->idlestring != NULL) {
+	if (c->idlestring != NULL)
 	    free(c->idlestring);
-	if ((c->idlestring = StrDup(d->idlestring)) == (char *)0)
+	if ((c->idlestring = StrDup(d->idlestring)) == NULL)
 	    OutOfMem();
     }
-    if (d->replstring != (char *)0) {
-	if (c->replstring != (char *)0)
+    if (d->replstring != NULL) {
+	if (c->replstring != NULL)
 	    free(c->replstring);
-	if ((c->replstring = StrDup(d->replstring)) == (char *)0)
+	if ((c->replstring = StrDup(d->replstring)) == NULL)
 	    OutOfMem();
     }
-    if (d->tasklist != (char *)0) {
-	if (c->tasklist != (char *)0)
+    if (d->tasklist != NULL) {
+	if (c->tasklist != NULL)
 	    free(c->tasklist);
-	if ((c->tasklist = StrDup(d->tasklist)) == (char *)0)
+	if ((c->tasklist = StrDup(d->tasklist)) == NULL)
 	    OutOfMem();
     }
-    if (d->breaklist != (char *)0) {
-	if (c->breaklist != (char *)0)
+    if (d->breaklist != NULL) {
+	if (c->breaklist != NULL)
 	    free(c->breaklist);
-	if ((c->breaklist = StrDup(d->breaklist)) == (char *)0)
+	if ((c->breaklist = StrDup(d->breaklist)) == NULL)
 	    OutOfMem();
     }
 #if HAVE_FREEIPMI
@@ -772,21 +772,21 @@ ApplyDefault(CONSENT *d, CONSENT *c)
 	c->ipmiciphersuite = d->ipmiciphersuite;
     if (d->ipmiprivlevel != IPMIL_UNKNOWN)
 	c->ipmiprivlevel = d->ipmiprivlevel;
-    if (d->username != (char *)0) {
-	if (c->username != (char *)0)
+    if (d->username != NULL) {
+	if (c->username != NULL)
 	    free(c->username);
-	if ((c->username = StrDup(d->username)) == (char *)0)
+	if ((c->username = StrDup(d->username)) == NULL)
 	    OutOfMem();
     }
-    if (d->password != (char *)0) {
-	if (c->password != (char *)0)
+    if (d->password != NULL) {
+	if (c->password != NULL)
 	    free(c->password);
-	if ((c->password = StrDup(d->password)) == (char *)0)
+	if ((c->password = StrDup(d->password)) == NULL)
 	    OutOfMem();
     }
-    if (d->ipmikg != (STRING *)0) {
-	if (c->ipmikg != (STRING *)0)
-	    BuildString((char *)0, c->ipmikg);
+    if (d->ipmikg != NULL) {
+	if (c->ipmikg != NULL)
+	    BuildString(NULL, c->ipmikg);
 	else
 	    c->ipmikg = AllocString();
 	BuildStringN(d->ipmikg->string, d->ipmikg->used - 1, c->ipmikg);
@@ -800,34 +800,34 @@ void
 DefaultBegin(char *id)
 {
     CONDDEBUG((1, "DefaultBegin(%s) [%s: %d]", id, file, line));
-    if (id == (char *)0 || id[0] == '\000') {
+    if (id == NULL || id[0] == '\000') {
 	if (isMaster)
 	    Error("empty default name [%s:%d]", file, line);
 	return;
     }
-    if (parserDefaultTemp != (CONSENT *)0)
-	DestroyParserDefaultOrConsole(parserDefaultTemp, (CONSENT **)0,
-				      (CONSENT ***)0);
+    if (parserDefaultTemp != NULL)
+	DestroyParserDefaultOrConsole(parserDefaultTemp, NULL,
+				      NULL);
     if ((parserDefaultTemp = (CONSENT *)calloc(1, sizeof(CONSENT)))
-	== (CONSENT *)0)
+	== NULL)
 	OutOfMem();
 
     if ((parserDefaultTemp->server = StrDup(id))
-	== (char *)0)
+	== NULL)
 	OutOfMem();
 }
 
 void
 DefaultEnd(void)
 {
-    CONSENT *c = (CONSENT *)0;
+    CONSENT *c = NULL;
 
     CONDDEBUG((1, "DefaultEnd() [%s:%d]", file, line));
 
-    if (parserDefaultTemp->server == (char *)0) {
-	DestroyParserDefaultOrConsole(parserDefaultTemp, (CONSENT **)0,
-				      (CONSENT ***)0);
-	parserDefaultTemp = (CONSENT *)0;
+    if (parserDefaultTemp->server == NULL) {
+	DestroyParserDefaultOrConsole(parserDefaultTemp, NULL,
+				      NULL);
+	parserDefaultTemp = NULL;
 	return;
     }
 
@@ -835,7 +835,7 @@ DefaultEnd(void)
     if ((c =
 	 FindParserDefaultOrConsole(parserDefaults,
 				    parserDefaultTemp->server)) !=
-	(CONSENT *)0) {
+	NULL) {
 	DestroyParserDefaultOrConsole(c, &parserDefaults,
 				      &parserDefaultsTail);
     }
@@ -843,16 +843,16 @@ DefaultEnd(void)
     /* add the temp to the tail of the list */
     *parserDefaultsTail = parserDefaultTemp;
     parserDefaultsTail = &(parserDefaultTemp->pCEnext);
-    parserDefaultTemp = (CONSENT *)0;
+    parserDefaultTemp = NULL;
 }
 
 void
 DefaultAbort(void)
 {
     CONDDEBUG((1, "DefaultAbort() [%s:%d]", file, line));
-    DestroyParserDefaultOrConsole(parserDefaultTemp, (CONSENT **)0,
-				  (CONSENT ***)0);
-    parserDefaultTemp = (CONSENT *)0;
+    DestroyParserDefaultOrConsole(parserDefaultTemp, NULL,
+				  NULL);
+    parserDefaultTemp = NULL;
 }
 
 void
@@ -860,23 +860,23 @@ DefaultDestroy(void)
 {
     CONDDEBUG((1, "DefaultDestroy() [%s:%d]", file, line));
 
-    while (parserDefaults != (CONSENT *)0)
+    while (parserDefaults != NULL)
 	DestroyParserDefaultOrConsole(parserDefaults, &parserDefaults,
 				      &parserDefaultsTail);
-    DestroyParserDefaultOrConsole(parserDefaultTemp, (CONSENT **)0,
-				  (CONSENT ***)0);
-    parserDefaults = parserDefaultTemp = (CONSENT *)0;
+    DestroyParserDefaultOrConsole(parserDefaultTemp, NULL,
+				  NULL);
+    parserDefaults = parserDefaultTemp = NULL;
 }
 
 void
 ProcessBaud(CONSENT *c, char *id)
 {
-    if ((id == (char *)0) || (*id == '\000')) {
-	c->baud = (BAUD *)0;
+    if ((id == NULL) || (*id == '\000')) {
+	c->baud = NULL;
 	return;
     }
     c->baud = FindBaud(id);
-    if (c->baud == (BAUD *)0) {
+    if (c->baud == NULL) {
 	if (isMaster)
 	    Error("invalid baud rate `%s' [%s:%d]", id, file, line);
     }
@@ -892,7 +892,7 @@ DefaultItemBaud(char *id)
 void
 ProcessBreak(CONSENT *c, char *id)
 {
-    if ((id == (char *)0) || (*id == '\000')) {
+    if ((id == NULL) || (*id == '\000')) {
 	c->breakNum = 0;
 	return;
     }
@@ -915,14 +915,14 @@ DefaultItemBreak(char *id)
 void
 ProcessDevice(CONSENT *c, char *id)
 {
-    if (c->device != (char *)0) {
+    if (c->device != NULL) {
 	free(c->device);
-	c->device = (char *)0;
+	c->device = NULL;
     }
-    if ((id == (char *)0) || (*id == '\000'))
+    if ((id == NULL) || (*id == '\000'))
 	return;
     if ((c->device = StrDup(id))
-	== (char *)0)
+	== NULL)
 	OutOfMem();
 }
 
@@ -934,7 +934,7 @@ DefaultItemDevice(char *id)
 }
 
 /* substitution support */
-SUBST *substData = (SUBST *)0;
+SUBST *substData = NULL;
 int substTokenCount[255];
 
 int
@@ -961,27 +961,27 @@ SubstValue(char c, char **s, int *i)
     CONSENT *pCE;
     static char *empty = "";
 
-    if (substData->data == (void *)0)
+    if (substData->data == NULL)
 	return 0;
     pCE = (CONSENT *)(substData->data);
 
-    if (s != (char **)0) {
+    if (s != NULL) {
 	if (c == 'h') {
-	    if (pCE->host == (char *)0) {
+	    if (pCE->host == NULL) {
 		(*s) = empty;
 	    } else {
 		(*s) = pCE->host;
 	    }
 	    retval = 1;
 	} else if (c == 'c') {
-	    if (pCE->server == (char *)0) {
+	    if (pCE->server == NULL) {
 		(*s) = empty;
 	    } else {
 		(*s) = pCE->server;
 	    }
 	    retval = 1;
 	} else if (c == 'r') {
-	    if (pCE->replstring == (char *)0) {
+	    if (pCE->replstring == NULL) {
 		(*s) = empty;
 	    } else {
 		(*s) = pCE->replstring;
@@ -990,7 +990,7 @@ SubstValue(char c, char **s, int *i)
 	}
     }
 
-    if (i != (int *)0) {
+    if (i != NULL) {
 	if (c == 'p') {
 	    (*i) = pCE->port;
 	    retval = 1;
@@ -1024,8 +1024,8 @@ SubstToken(char c)
 void
 InitSubstCallback(void)
 {
-    if (substData == (SUBST *)0) {
-	if ((substData = (SUBST *)calloc(1, sizeof(SUBST))) == (SUBST *)0)
+    if (substData == NULL) {
+	if ((substData = (SUBST *)calloc(1, sizeof(SUBST))) == NULL)
 	    OutOfMem();
 	substData->value = &SubstValue;
 	substData->token = &SubstToken;
@@ -1037,7 +1037,7 @@ void
 DefaultItemDevicesubst(char *id)
 {
     CONDDEBUG((1, "DefaultItemDevicesubst(%s) [%s:%d]", id, file, line));
-    ProcessSubst(substData, (char **)0, &(parserDefaultTemp->devicesubst),
+    ProcessSubst(substData, NULL, &(parserDefaultTemp->devicesubst),
 		 "devicesubst", id);
 }
 
@@ -1045,7 +1045,7 @@ void
 DefaultItemExecsubst(char *id)
 {
     CONDDEBUG((1, "DefaultItemExecsubst(%s) [%s:%d]", id, file, line));
-    ProcessSubst(substData, (char **)0, &(parserDefaultTemp->execsubst),
+    ProcessSubst(substData, NULL, &(parserDefaultTemp->execsubst),
 		 "execsubst", id);
 }
 
@@ -1053,7 +1053,7 @@ void
 DefaultItemUdssubst(char *id)
 {
     CONDDEBUG((1, "DefaultItemUdssubst(%s) [%s:%d]", id, file, line));
-    ProcessSubst(substData, (char **)0, &(parserDefaultTemp->udssubst),
+    ProcessSubst(substData, NULL, &(parserDefaultTemp->udssubst),
 		 "udssubst", id);
 }
 
@@ -1061,25 +1061,25 @@ void
 DefaultItemInitsubst(char *id)
 {
     CONDDEBUG((1, "DefaultItemInitsubst(%s) [%s:%d]", id, file, line));
-    ProcessSubst(substData, (char **)0, &(parserDefaultTemp->initsubst),
+    ProcessSubst(substData, NULL, &(parserDefaultTemp->initsubst),
 		 "initsubst", id);
 }
 
 void
 ProcessUidGid(uid_t * uid, gid_t * gid, char *id)
 {
-    char *colon = (char *)0;
+    char *colon = NULL;
     int i;
 
     CONDDEBUG((1, "ProcessUidGid(%s) [%s:%d]", id, file, line));
 
     *uid = *gid = 0;
 
-    if (id == (char *)0 || id[0] == '\000')
+    if (id == NULL || id[0] == '\000')
 	return;
 
     /* hunt for colon */
-    if ((colon = strchr(id, ':')) != (char *)0)
+    if ((colon = strchr(id, ':')) != NULL)
 	*colon = '\000';
 
     if (id[0] != '\000') {
@@ -1090,8 +1090,8 @@ ProcessUidGid(uid_t * uid, gid_t * gid, char *id)
 	if (id[i] == '\000') {
 	    *uid = (uid_t) atoi(id);
 	} else {
-	    struct passwd *pwd = (struct passwd *)0;
-	    if ((pwd = getpwnam(id)) == (struct passwd *)0) {
+	    struct passwd *pwd = NULL;
+	    if ((pwd = getpwnam(id)) == NULL) {
 		CONDDEBUG((1, "ProcessUidGid(): getpwnam(%s): %s", id,
 			   strerror(errno)));
 		if (isMaster)
@@ -1103,7 +1103,7 @@ ProcessUidGid(uid_t * uid, gid_t * gid, char *id)
 	}
     }
 
-    if (colon != (char *)0) {
+    if (colon != NULL) {
 	*colon = ':';
 	colon++;
 	if (*colon != '\000') {
@@ -1114,8 +1114,8 @@ ProcessUidGid(uid_t * uid, gid_t * gid, char *id)
 	    if (colon[i] == '\000') {
 		*gid = (gid_t) atoi(colon);
 	    } else {
-		struct group *grp = (struct group *)0;
-		if ((grp = getgrnam(colon)) == (struct group *)0) {
+		struct group *grp = NULL;
+		if ((grp = getgrnam(colon)) == NULL) {
 		    CONDDEBUG((1, "ProcessUidGid(): getgrnam(%s): %s",
 			       colon, strerror(errno)));
 		    if (isMaster)
@@ -1182,15 +1182,15 @@ DefaultItemExecrunas(char *id)
 void
 ProcessExec(CONSENT *c, char *id)
 {
-    if (c->exec != (char *)0) {
+    if (c->exec != NULL) {
 	free(c->exec);
-	c->exec = (char *)0;
+	c->exec = NULL;
     }
-    if (id == (char *)0 || id[0] == '\000') {
+    if (id == NULL || id[0] == '\000') {
 	return;
     }
     if ((c->exec = StrDup(id))
-	== (char *)0)
+	== NULL)
 	OutOfMem();
 }
 
@@ -1218,14 +1218,14 @@ DefaultItemFlow(char *id)
 void
 ProcessHost(CONSENT *c, char *id)
 {
-    if (c->host != (char *)0) {
+    if (c->host != NULL) {
 	free(c->host);
-	c->host = (char *)0;
+	c->host = NULL;
     }
-    if ((id == (char *)0) || (*id == '\000'))
+    if ((id == NULL) || (*id == '\000'))
 	return;
     if ((c->host = StrDup(id))
-	== (char *)0)
+	== NULL)
 	OutOfMem();
 }
 
@@ -1239,14 +1239,14 @@ DefaultItemHost(char *id)
 void
 ProcessUds(CONSENT *c, char *id)
 {
-    if (c->uds != (char *)0) {
+    if (c->uds != NULL) {
 	free(c->uds);
-	c->uds = (char *)0;
+	c->uds = NULL;
     }
-    if ((id == (char *)0) || (*id == '\000'))
+    if ((id == NULL) || (*id == '\000'))
 	return;
     if ((c->uds = StrDup(id))
-	== (char *)0)
+	== NULL)
 	OutOfMem();
 }
 
@@ -1266,20 +1266,20 @@ ProcessIpmiKG(CONSENT *c, char *id)
     short octs = 0;
     short backslash = 0;
     char *i = id;
-    static STRING *t = (STRING *)0;
+    static STRING *t = NULL;
 
-    if (t == (STRING *)0)
+    if (t == NULL)
 	t = AllocString();
 
-    if ((id == (char *)0) || (*id == '\000')) {
-	if (c->ipmikg != (STRING *)0) {
+    if ((id == NULL) || (*id == '\000')) {
+	if (c->ipmikg != NULL) {
 	    DestroyString(c->ipmikg);
-	    c->ipmikg = (STRING *)0;
+	    c->ipmikg = NULL;
 	}
 	return;
     }
 
-    BuildString((char *)0, t);
+    BuildString(NULL, t);
 
     while ((s = (*i++)) != '\000') {
 	if (octs > 0 && octs < 3 && s >= '0' && s <= '7') {
@@ -1327,9 +1327,9 @@ ProcessIpmiKG(CONSENT *c, char *id)
 	return;
     }
 
-    if (c->ipmikg == (STRING *)0)
+    if (c->ipmikg == NULL)
 	c->ipmikg = AllocString();
-    BuildString((char *)0, c->ipmikg);
+    BuildString(NULL, c->ipmikg);
     BuildStringN(t->string, t->used - 1, c->ipmikg);
 }
 
@@ -1343,8 +1343,8 @@ DefaultItemIpmiKG(char *id)
 void
 ProcessUsername(CONSENT *c, char *id)
 {
-    if ((id == (char *)0) || (*id == '\000')) {
-	c->username = (char *)0;
+    if ((id == NULL) || (*id == '\000')) {
+	c->username = NULL;
 	return;
     }
     c->username = strdup(id);
@@ -1363,7 +1363,7 @@ ProcessIpmiCipherSuite(CONSENT *c, char *id)
     char *p;
     int i;
 
-    if ((id == (char *)0) || (*id == '\000')) {
+    if ((id == NULL) || (*id == '\000')) {
 	c->ipmiciphersuite = 0;
 	return;
     }
@@ -1410,17 +1410,17 @@ void
 ProcessIpmiWorkaround(CONSENT *c, char *id)
 {
     unsigned int flag;
-    char *token = (char *)0;
+    char *token = NULL;
     short valid = 0;
     unsigned int wrk = 0;
 
-    if ((id == (char *)0) || (*id == '\000')) {
+    if ((id == NULL) || (*id == '\000')) {
 	c->ipmiworkaround = 0;
 	c->ipmiwrkset = 1;
 	return;
     }
 
-    for (token = strtok(id, ALLWORDSEP); token != (char *)0;
+    for (token = strtok(id, ALLWORDSEP); token != NULL;
 	 token = strtok(NULL, ALLWORDSEP)) {
 	short not;
 	if (token[0] == '!') {
@@ -1521,11 +1521,11 @@ DefaultItemIpmiWorkaround(char *id)
 void
 ProcessInclude(CONSENT *c, char *id)
 {
-    CONSENT *inc = (CONSENT *)0;
-    if ((id == (char *)0) || (*id == '\000'))
+    CONSENT *inc = NULL;
+    if ((id == NULL) || (*id == '\000'))
 	return;
     if ((inc =
-	 FindParserDefaultOrConsole(parserDefaults, id)) != (CONSENT *)0) {
+	 FindParserDefaultOrConsole(parserDefaults, id)) != NULL) {
 	ApplyDefault(inc, c);
     } else {
 	if (isMaster)
@@ -1543,59 +1543,59 @@ DefaultItemInclude(char *id)
 void
 ProcessLogfile(CONSENT *c, char *id)
 {
-    if (c->logfile != (char *)0) {
+    if (c->logfile != NULL) {
 	free(c->logfile);
-	c->logfile = (char *)0;
+	c->logfile = NULL;
     }
-    if (id == (char *)0 || id[0] == '\000') {
+    if (id == NULL || id[0] == '\000') {
 	return;
     }
     if ((c->logfile = StrDup(id))
-	== (char *)0)
+	== NULL)
 	OutOfMem();
 }
 
 void
 ProcessInitcmd(CONSENT *c, char *id)
 {
-    if (c->initcmd != (char *)0) {
+    if (c->initcmd != NULL) {
 	free(c->initcmd);
-	c->initcmd = (char *)0;
+	c->initcmd = NULL;
     }
-    if (id == (char *)0 || id[0] == '\000') {
+    if (id == NULL || id[0] == '\000') {
 	return;
     }
     if ((c->initcmd = StrDup(id))
-	== (char *)0)
+	== NULL)
 	OutOfMem();
 }
 
 void
 ProcessMOTD(CONSENT *c, char *id)
 {
-    if (c->motd != (char *)0) {
+    if (c->motd != NULL) {
 	free(c->motd);
-	c->motd = (char *)0;
+	c->motd = NULL;
     }
-    if (id == (char *)0 || id[0] == '\000') {
+    if (id == NULL || id[0] == '\000') {
 	return;
     }
     if ((c->motd = StrDup(id))
-	== (char *)0)
+	== NULL)
 	OutOfMem();
 }
 
 void
 ProcessIdlestring(CONSENT *c, char *id)
 {
-    if (c->idlestring != (char *)0) {
+    if (c->idlestring != NULL) {
 	free(c->idlestring);
-	c->idlestring = (char *)0;
+	c->idlestring = NULL;
     }
-    if (id == (char *)0 || id[0] == '\000') {
+    if (id == NULL || id[0] == '\000') {
 	return;
     }
-    if ((c->idlestring = StrDup(id)) == (char *)0)
+    if ((c->idlestring = StrDup(id)) == NULL)
 	OutOfMem();
 }
 
@@ -1614,7 +1614,7 @@ ProcessLogfilemax(CONSENT *c, char *id)
 
     c->logfilemax = 0;
 
-    if (id == (char *)0 || id[0] == '\000')
+    if (id == NULL || id[0] == '\000')
 	return;
 
     for (p = id; *p != '\000'; p++) {
@@ -1679,14 +1679,14 @@ DefaultItemIdlestring(char *id)
 void
 ProcessMaster(CONSENT *c, char *id)
 {
-    if (c->master != (char *)0) {
+    if (c->master != NULL) {
 	free(c->master);
-	c->master = (char *)0;
+	c->master = NULL;
     }
-    if ((id == (char *)0) || (*id == '\000'))
+    if ((id == NULL) || (*id == '\000'))
 	return;
     if ((c->master = StrDup(id))
-	== (char *)0)
+	== NULL)
 	OutOfMem();
 }
 
@@ -1700,10 +1700,10 @@ DefaultItemMaster(char *id)
 void
 ProcessOptions(CONSENT *c, char *id)
 {
-    char *token = (char *)0;
+    char *token = NULL;
     int negative = 0;
 
-    if ((id == (char *)0) || (*id == '\000')) {
+    if ((id == NULL) || (*id == '\000')) {
 	c->hupcl = FLAGUNKNOWN;
 	c->cstopb = FLAGUNKNOWN;
 	c->ixany = FLAGUNKNOWN;
@@ -1721,7 +1721,7 @@ ProcessOptions(CONSENT *c, char *id)
 	return;
     }
 
-    for (token = strtok(id, ALLWORDSEP); token != (char *)0;
+    for (token = strtok(id, ALLWORDSEP); token != NULL;
 	 token = strtok(NULL, ALLWORDSEP)) {
 	if (token[0] == '!') {
 	    negative = 1;
@@ -1770,12 +1770,12 @@ DefaultItemOptions(char *id)
 void
 ProcessParity(CONSENT *c, char *id)
 {
-    if ((id == (char *)0) || (*id == '\000')) {
-	c->parity = (PARITY *)0;
+    if ((id == NULL) || (*id == '\000')) {
+	c->parity = NULL;
 	return;
     }
     c->parity = FindParity(id);
-    if (c->parity == (PARITY *)0) {
+    if (c->parity == NULL) {
 	if (isMaster)
 	    Error("invalid parity type `%s' [%s:%d]", id, file, line);
     }
@@ -1792,8 +1792,8 @@ DefaultItemParity(char *id)
 void
 ProcessPassword(CONSENT *c, char *id)
 {
-    if ((id == (char *)0) || (*id == '\000')) {
-	c->password = (char *)0;
+    if ((id == NULL) || (*id == '\000')) {
+	c->password = NULL;
 	return;
     }
     c->password = strdup(id);
@@ -1812,7 +1812,7 @@ ProcessPort(CONSENT *c, char *id)
 {
     char *p;
 
-    if ((id == (char *)0) || (*id == '\000')) {
+    if ((id == NULL) || (*id == '\000')) {
 	c->port = 0;
 	return;
     }
@@ -1826,7 +1826,7 @@ ProcessPort(CONSENT *c, char *id)
     } else {
 	/* non-numeric */
 	struct servent *se;
-	if ((struct servent *)0 == (se = getservbyname(id, "tcp"))) {
+	if (NULL == (se = getservbyname(id, "tcp"))) {
 	    if (isMaster)
 		Error
 		    ("invalid port name `%s': getservbyname() failure [%s:%d]",
@@ -1843,7 +1843,7 @@ ProcessPortinc(CONSENT *c, char *id)
 {
     char *p;
 
-    if ((id == (char *)0) || (*id == '\000')) {
+    if ((id == NULL) || (*id == '\000')) {
 	c->portinc = 0;
 	return;
     }
@@ -1864,7 +1864,7 @@ ProcessPortbase(CONSENT *c, char *id)
 {
     char *p;
 
-    if ((id == (char *)0) || (*id == '\000')) {
+    if ((id == NULL) || (*id == '\000')) {
 	c->portbase = 0;
 	return;
     }
@@ -1915,7 +1915,7 @@ ProcessInitspinmax(CONSENT *c, char *id)
     char *p;
     int i;
 
-    if ((id == (char *)0) || (*id == '\000')) {
+    if ((id == NULL) || (*id == '\000')) {
 	c->spinmax = 0;
 	return;
     }
@@ -1952,7 +1952,7 @@ ProcessInitspintimer(CONSENT *c, char *id)
     char *p;
     int i;
 
-    if ((id == (char *)0) || (*id == '\000')) {
+    if ((id == NULL) || (*id == '\000')) {
 	c->spintimer = 0;
 	return;
     }
@@ -1986,7 +1986,7 @@ DefaultItemInitspintimer(char *id)
 void
 ProcessProtocol(CONSENT *c, char *id)
 {
-    if ((id == (char *)0) || (*id == '\000')) {
+    if ((id == NULL) || (*id == '\000')) {
 	c->raw = FLAGUNKNOWN;
 	return;
     }
@@ -2013,14 +2013,14 @@ DefaultItemProtocol(char *id)
 void
 ProcessReplstring(CONSENT *c, char *id)
 {
-    if (c->replstring != (char *)0) {
+    if (c->replstring != NULL) {
 	free(c->replstring);
-	c->replstring = (char *)0;
+	c->replstring = NULL;
     }
-    if ((id == (char *)0) || (*id == '\000'))
+    if ((id == NULL) || (*id == '\000'))
 	return;
     if ((c->replstring = StrDup(id))
-	== (char *)0)
+	== NULL)
 	OutOfMem();
 }
 
@@ -2034,20 +2034,20 @@ DefaultItemReplstring(char *id)
 void
 ProcessTasklist(CONSENT *c, char *id)
 {
-    char *token = (char *)0;
-    char *list = (char *)0;
+    char *token = NULL;
+    char *list = NULL;
 
     CONDDEBUG((1, "ProcessTasklist(%s) [%s:%d]", id, file, line));
 
-    if (c->tasklist != (char *)0) {
+    if (c->tasklist != NULL) {
 	free(c->tasklist);
-	c->tasklist = (char *)0;
+	c->tasklist = NULL;
     }
-    if ((id == (char *)0) || (*id == '\000'))
+    if ((id == NULL) || (*id == '\000'))
 	return;
 
-    list = BuildTmpString((char *)0);
-    for (token = strtok(id, ALLWORDSEP); token != (char *)0;
+    list = BuildTmpString(NULL);
+    for (token = strtok(id, ALLWORDSEP); token != NULL;
 	 token = strtok(NULL, ALLWORDSEP)) {
 	if (token[1] != '\000' ||
 	    ((token[0] < '0' || token[0] > '9') &&
@@ -2059,10 +2059,10 @@ ProcessTasklist(CONSENT *c, char *id)
 	}
 	list = BuildTmpStringChar(token[0]);
     }
-    if (list == (char *)0 || *list == '\000')
+    if (list == NULL || *list == '\000')
 	return;
 
-    if ((c->tasklist = StrDup(list)) == (char *)0)
+    if ((c->tasklist = StrDup(list)) == NULL)
 	OutOfMem();
 }
 
@@ -2076,20 +2076,20 @@ DefaultItemTasklist(char *id)
 void
 ProcessBreaklist(CONSENT *c, char *id)
 {
-    char *token = (char *)0;
-    char *list = (char *)0;
+    char *token = NULL;
+    char *list = NULL;
 
     CONDDEBUG((1, "ProcessBreaklist(%s) [%s:%d]", id, file, line));
 
-    if (c->breaklist != (char *)0) {
+    if (c->breaklist != NULL) {
 	free(c->breaklist);
-	c->breaklist = (char *)0;
+	c->breaklist = NULL;
     }
-    if ((id == (char *)0) || (*id == '\000'))
+    if ((id == NULL) || (*id == '\000'))
 	return;
 
-    list = BuildTmpString((char *)0);
-    for (token = strtok(id, ALLWORDSEP); token != (char *)0;
+    list = BuildTmpString(NULL);
+    for (token = strtok(id, ALLWORDSEP); token != NULL;
 	 token = strtok(NULL, ALLWORDSEP)) {
 	if (token[1] != '\000' ||
 	    (((token[0] < '0' || token[0] > '9') &&
@@ -2101,10 +2101,10 @@ ProcessBreaklist(CONSENT *c, char *id)
 	}
 	list = BuildTmpStringChar(token[0]);
     }
-    if (list == (char *)0 || *list == '\000')
+    if (list == NULL || *list == '\000')
 	return;
 
-    if ((c->breaklist = StrDup(list)) == (char *)0)
+    if ((c->breaklist = StrDup(list)) == NULL)
 	OutOfMem();
 }
 
@@ -2121,7 +2121,7 @@ ProcessIdletimeout(CONSENT *c, char *id)
     char *p;
     int factor = 0;
 
-    if ((id == (char *)0) || (*id == '\000')) {
+    if ((id == NULL) || (*id == '\000')) {
 	c->idletimeout = 0;
 	return;
     }
@@ -2154,17 +2154,17 @@ DefaultItemIdletimeout(char *id)
 void
 ProcessRoRw(CONSENTUSERS **ppCU, char *id)
 {
-    char *token = (char *)0;
-    PARSERGROUP *pg = (PARSERGROUP *)0;
+    char *token = NULL;
+    PARSERGROUP *pg = NULL;
 
     CONDDEBUG((1, "ProcessRoRw(%s) [%s:%d]", id, file, line));
 
-    if ((id == (char *)0) || (*id == '\000')) {
+    if ((id == NULL) || (*id == '\000')) {
 	DestroyConsentUsers(ppCU);
 	return;
     }
 
-    for (token = strtok(id, ALLWORDSEP); token != (char *)0;
+    for (token = strtok(id, ALLWORDSEP); token != NULL;
 	 token = strtok(NULL, ALLWORDSEP)) {
 	short not;
 	if (token[0] == '!') {
@@ -2172,7 +2172,7 @@ ProcessRoRw(CONSENTUSERS **ppCU, char *id)
 	    not = 1;
 	} else
 	    not = 0;
-	if ((pg = GroupFind(token)) == (PARSERGROUP *)0)
+	if ((pg = GroupFind(token)) == NULL)
 	    ConsentAddUser(ppCU, token, not);
 	else
 	    CopyConsentUserList(pg->users, ppCU, not);
@@ -2197,13 +2197,13 @@ void
 ProcessTimestamp(CONSENT *c, char *id)
 {
     time_t tyme;
-    char *p = (char *)0, *n = (char *)0;
+    char *p = NULL, *n = NULL;
     FLAG activity = FLAGFALSE, bactivity = FLAGFALSE, tactivity =
 	FLAGFALSE;
     int factor = 0, pfactor = 0;
     int value = 0, pvalue = 0;
 
-    if ((id == (char *)0) || (*id == '\000')) {
+    if ((id == NULL) || (*id == '\000')) {
 	c->breaklog = FLAGFALSE;
 	c->tasklog = FLAGFALSE;
 	c->activitylog = FLAGFALSE;
@@ -2213,11 +2213,11 @@ ProcessTimestamp(CONSENT *c, char *id)
     }
 
     /* Parse the [number(m|h|d|l)[a][b]] spec */
-    tyme = time((time_t *)0);
+    tyme = time(NULL);
 
     for (p = id; *p != '\000'; p++) {
 	if (*p == 'a' || *p == 'A') {
-	    if (n != (char *)0) {
+	    if (n != NULL) {
 		if (isMaster)
 		    Error
 			("invalid timestamp specification `%s': numeral before `a' (ignoring numeral) [%s:%d]",
@@ -2225,7 +2225,7 @@ ProcessTimestamp(CONSENT *c, char *id)
 	    }
 	    activity = FLAGTRUE;
 	} else if (*p == 'b' || *p == 'B') {
-	    if (n != (char *)0) {
+	    if (n != NULL) {
 		if (isMaster)
 		    Error
 			("invalid timestamp specification `%s': numeral before `b' (ignoring numeral) [%s:%d]",
@@ -2233,7 +2233,7 @@ ProcessTimestamp(CONSENT *c, char *id)
 	    }
 	    bactivity = FLAGTRUE;
 	} else if (*p == 't' || *p == 'T') {
-	    if (n != (char *)0) {
+	    if (n != NULL) {
 		if (isMaster)
 		    Error
 			("invalid timestamp specification `%s': numeral before `t' (ignoring numeral) [%s:%d]",
@@ -2249,10 +2249,10 @@ ProcessTimestamp(CONSENT *c, char *id)
 	} else if (*p == 'l' || *p == 'L') {
 	    pfactor = -1;
 	} else if (isdigit((int)*p)) {
-	    if (n == (char *)0)
+	    if (n == NULL)
 		n = p;
 	} else if (isspace((int)*p)) {
-	    if (n != (char *)0) {
+	    if (n != NULL) {
 		pfactor = 60;
 	    }
 	} else {
@@ -2263,7 +2263,7 @@ ProcessTimestamp(CONSENT *c, char *id)
 	    return;
 	}
 	if (pfactor) {
-	    if (n == (char *)0) {
+	    if (n == NULL) {
 		if (isMaster)
 		    Error
 			("invalid timestamp specification `%s': missing numeric prefix for `%c' [%s:%d]",
@@ -2279,7 +2279,7 @@ ProcessTimestamp(CONSENT *c, char *id)
 			     id, file, line);
 		    return;
 		}
-		n = (char *)0;
+		n = NULL;
 		factor = pfactor;
 		value = pvalue * pfactor;
 		pvalue = pfactor = 0;
@@ -2287,7 +2287,7 @@ ProcessTimestamp(CONSENT *c, char *id)
 	}
     }
 
-    if (n != (char *)0) {
+    if (n != NULL) {
 	pvalue = atoi(n);
 	if (pvalue < 0) {
 	    if (isMaster)
@@ -2319,7 +2319,7 @@ ProcessTimestamp(CONSENT *c, char *id)
 		 * or a day
 		 */
 		now = tyme;
-		if ((struct tm *)0 != (tm = localtime(&tyme))) {
+		if (NULL != (tm = localtime(&tyme))) {
 		    tyme -= tm->tm_min * 60;	/* hour boundary */
 		    tyme -= tm->tm_hour * 60 * 60;	/* day boundary */
 		    tyme += ((now - tyme) / value) * value;
@@ -2346,7 +2346,7 @@ void
 ProcessType(CONSENT *c, char *id)
 {
     CONSTYPE t = UNKNOWNTYPE;
-    if ((id == (char *)0) || (*id == '\000')) {
+    if ((id == NULL) || (*id == '\000')) {
 	c->type = t;
 	return;
     }
@@ -2379,9 +2379,9 @@ DefaultItemType(char *id)
 }
 
 /* 'console' handling */
-CONSENT *parserConsoles = (CONSENT *)0;
+CONSENT *parserConsoles = NULL;
 CONSENT **parserConsolesTail = &parserConsoles;
-CONSENT *parserConsoleTemp = (CONSENT *)0;
+CONSENT *parserConsoleTemp = NULL;
 
 void
 ConsoleBegin(char *id)
@@ -2389,31 +2389,31 @@ ConsoleBegin(char *id)
     CONSENT *c;
 
     CONDDEBUG((1, "ConsoleBegin(%s) [%s:%d]", id, file, line));
-    if (id == (char *)0 || id[0] == '\000') {
+    if (id == NULL || id[0] == '\000') {
 	if (isMaster)
 	    Error("empty console name [%s:%d]", file, line);
 	return;
     }
-    if (parserConsoleTemp != (CONSENT *)0)
-	DestroyParserDefaultOrConsole(parserConsoleTemp, (CONSENT **)0,
-				      (CONSENT ***)0);
+    if (parserConsoleTemp != NULL)
+	DestroyParserDefaultOrConsole(parserConsoleTemp, NULL,
+				      NULL);
     if ((parserConsoleTemp = (CONSENT *)calloc(1, sizeof(CONSENT)))
-	== (CONSENT *)0)
+	== NULL)
 	OutOfMem();
 
-    if ((parserConsoleTemp->breaklist = StrDup("*")) == (char *)0)
+    if ((parserConsoleTemp->breaklist = StrDup("*")) == NULL)
 	OutOfMem();
-    if ((parserConsoleTemp->tasklist = StrDup("*")) == (char *)0)
+    if ((parserConsoleTemp->tasklist = StrDup("*")) == NULL)
 	OutOfMem();
 
     /* prime the pump with a default of "*" */
     if ((c =
 	 FindParserDefaultOrConsole(parserDefaults,
-				    "*")) != (CONSENT *)0) {
+				    "*")) != NULL) {
 	ApplyDefault(c, parserConsoleTemp);
     }
     if ((parserConsoleTemp->server = StrDup(id))
-	== (char *)0)
+	== NULL)
 	OutOfMem();
 }
 
@@ -2424,7 +2424,7 @@ CheckSubst(char *label, char *subst)
     int invalid = 0;
 
     ZeroSubstTokenCount();
-    ProcessSubst(substData, (char **)0, (char **)0, label, subst);
+    ProcessSubst(substData, NULL, NULL, label, subst);
 
     if (SubstTokenCount('p') && parserConsoleTemp->port == 0) {
 	if (isMaster)
@@ -2434,7 +2434,7 @@ CheckSubst(char *label, char *subst)
 	invalid = 1;
     }
 
-    if (SubstTokenCount('h') && parserConsoleTemp->host == (char *)0) {
+    if (SubstTokenCount('h') && parserConsoleTemp->host == NULL) {
 	if (isMaster)
 	    Error
 		("[%s] console references 'host' in '%s' without defining 'host' attribute (ignoring %s) [%s:%d]",
@@ -2450,11 +2450,11 @@ ConsoleEnd(void)
 {
     int invalid = 0;
 
-    CONSENT *c = (CONSENT *)0;
+    CONSENT *c = NULL;
 
     CONDDEBUG((1, "ConsoleEnd() [%s:%d]", file, line));
 
-    if (parserConsoleTemp->master == (char *)0) {
+    if (parserConsoleTemp->master == NULL) {
 	if (isMaster)
 	    Error("[%s] console missing 'master' attribute [%s:%d]",
 		  parserConsoleTemp->server, file, line);
@@ -2463,45 +2463,45 @@ ConsoleEnd(void)
 
     switch (parserConsoleTemp->type) {
 	case EXEC:
-	    if (parserConsoleTemp->execsubst != (char *)0) {
+	    if (parserConsoleTemp->execsubst != NULL) {
 		if (CheckSubst("execsubst", parserConsoleTemp->execsubst)) {
 		    free(parserConsoleTemp->execsubst);
-		    parserConsoleTemp->execsubst = (char *)0;
+		    parserConsoleTemp->execsubst = NULL;
 		}
 	    }
 	    break;
 	case DEVICE:
-	    if (parserConsoleTemp->device == (char *)0) {
+	    if (parserConsoleTemp->device == NULL) {
 		if (isMaster)
 		    Error
 			("[%s] console missing 'device' attribute [%s:%d]",
 			 parserConsoleTemp->server, file, line);
 		invalid = 1;
 	    }
-	    if (parserConsoleTemp->baud == (BAUD *)0) {
+	    if (parserConsoleTemp->baud == NULL) {
 		if (isMaster)
 		    Error("[%s] console missing 'baud' attribute [%s:%d]",
 			  parserConsoleTemp->server, file, line);
 		invalid = 1;
 	    }
-	    if (parserConsoleTemp->parity == (PARITY *)0) {
+	    if (parserConsoleTemp->parity == NULL) {
 		if (isMaster)
 		    Error
 			("[%s] console missing 'parity' attribute [%s:%d]",
 			 parserConsoleTemp->server, file, line);
 		invalid = 1;
 	    }
-	    if (parserConsoleTemp->devicesubst != (char *)0) {
+	    if (parserConsoleTemp->devicesubst != NULL) {
 		if (CheckSubst
 		    ("devicesubst", parserConsoleTemp->devicesubst)) {
 		    free(parserConsoleTemp->devicesubst);
-		    parserConsoleTemp->devicesubst = (char *)0;
+		    parserConsoleTemp->devicesubst = NULL;
 		}
 	    }
 	    break;
 #if HAVE_FREEIPMI
 	case IPMI:
-	    if (parserConsoleTemp->host == (char *)0) {
+	    if (parserConsoleTemp->host == NULL) {
 		if (isMaster)
 		    Error("[%s] console missing 'host' attribute [%s:%d]",
 			  parserConsoleTemp->server, file, line);
@@ -2510,7 +2510,7 @@ ConsoleEnd(void)
 	    break;
 #endif
 	case HOST:
-	    if (parserConsoleTemp->host == (char *)0) {
+	    if (parserConsoleTemp->host == NULL) {
 		if (isMaster)
 		    Error("[%s] console missing 'host' attribute [%s:%d]",
 			  parserConsoleTemp->server, file, line);
@@ -2526,16 +2526,16 @@ ConsoleEnd(void)
 	case NOOP:
 	    break;
 	case UDS:
-	    if (parserConsoleTemp->uds == (char *)0) {
+	    if (parserConsoleTemp->uds == NULL) {
 		if (isMaster)
 		    Error("[%s] console missing 'uds' attribute [%s:%d]",
 			  parserConsoleTemp->server, file, line);
 		invalid = 1;
 	    }
-	    if (parserConsoleTemp->udssubst != (char *)0) {
+	    if (parserConsoleTemp->udssubst != NULL) {
 		if (CheckSubst("udssubst", parserConsoleTemp->udssubst)) {
 		    free(parserConsoleTemp->udssubst);
-		    parserConsoleTemp->udssubst = (char *)0;
+		    parserConsoleTemp->udssubst = NULL;
 		}
 	    }
 	    break;
@@ -2547,18 +2547,18 @@ ConsoleEnd(void)
 	    invalid = 1;
 	    break;
     }
-    if (parserConsoleTemp->initsubst != (char *)0 &&
-	parserConsoleTemp->initcmd != (char *)0) {
+    if (parserConsoleTemp->initsubst != NULL &&
+	parserConsoleTemp->initcmd != NULL) {
 	if (CheckSubst("initsubst", parserConsoleTemp->initsubst)) {
 	    free(parserConsoleTemp->initsubst);
-	    parserConsoleTemp->initsubst = (char *)0;
+	    parserConsoleTemp->initsubst = NULL;
 	}
     }
 
     if (invalid != 0) {
-	DestroyParserDefaultOrConsole(parserConsoleTemp, (CONSENT **)0,
-				      (CONSENT ***)0);
-	parserConsoleTemp = (CONSENT *)0;
+	DestroyParserDefaultOrConsole(parserConsoleTemp, NULL,
+				      NULL);
+	parserConsoleTemp = NULL;
 	return;
     }
 
@@ -2566,7 +2566,7 @@ ConsoleEnd(void)
     if ((c =
 	 FindParserDefaultOrConsole(parserConsoles,
 				    parserConsoleTemp->server)) !=
-	(CONSENT *)0) {
+	NULL) {
 	if (isMaster)
 	    Error("console definition for `%s' overridden [%s:%d]",
 		  parserConsoleTemp->server, file, line);
@@ -2577,16 +2577,16 @@ ConsoleEnd(void)
     /* add the temp to the tail of the list */
     *parserConsolesTail = parserConsoleTemp;
     parserConsolesTail = &(parserConsoleTemp->pCEnext);
-    parserConsoleTemp = (CONSENT *)0;
+    parserConsoleTemp = NULL;
 }
 
 void
 ConsoleAbort(void)
 {
     CONDDEBUG((1, "ConsoleAbort() [%s:%d]", file, line));
-    DestroyParserDefaultOrConsole(parserConsoleTemp, (CONSENT **)0,
-				  (CONSENT ***)0);
-    parserConsoleTemp = (CONSENT *)0;
+    DestroyParserDefaultOrConsole(parserConsoleTemp, NULL,
+				  NULL);
+    parserConsoleTemp = NULL;
 }
 
 void
@@ -2601,11 +2601,11 @@ SwapStr(char **s1, char **s2)
 void
 ExpandLogfile(CONSENT *c, char *id)
 {
-    char *amp = (char *)0;
-    char *p = (char *)0;
-    char *tmp = (char *)0;
+    char *amp = NULL;
+    char *p = NULL;
+    char *tmp = NULL;
 
-    if (id == (char *)0)
+    if (id == NULL)
 	return;
     /*
      *  Here we substitute the console name for any '&' character in the
@@ -2613,8 +2613,8 @@ ExpandLogfile(CONSENT *c, char *id)
      *  "/var/console/&" for each of the conserver.cf entries.
      */
     p = id;
-    BuildTmpString((char *)0);
-    while ((amp = strchr(p, '&')) != (char *)0) {
+    BuildTmpString(NULL);
+    while ((amp = strchr(p, '&')) != NULL) {
 	*amp = '\000';
 	BuildTmpString(p);
 	BuildTmpString(c->server);
@@ -2623,7 +2623,7 @@ ExpandLogfile(CONSENT *c, char *id)
     }
     tmp = BuildTmpString(p);
     if ((c->logfile = StrDup(tmp))
-	== (char *)0)
+	== NULL)
 	OutOfMem();
 }
 
@@ -2633,25 +2633,25 @@ ExpandLogfile(CONSENT *c, char *id)
 void
 ConsoleAdd(CONSENT *c)
 {
-    CONSENT *pCEmatch = (CONSENT *)0;
-    GRPENT *pGEmatch = (GRPENT *)0, *pGEtmp = (GRPENT *)0;
-    CONSCLIENT *pCLtmp = (CONSCLIENT *)0;
+    CONSENT *pCEmatch = NULL;
+    GRPENT *pGEmatch = NULL, *pGEtmp = NULL;
+    CONSCLIENT *pCLtmp = NULL;
 
     /* check for remote consoles */
     if (!IsMe(c->master)) {
 	if (isMaster) {
 	    REMOTE *pRCTemp;
 	    if ((pRCTemp = (REMOTE *)calloc(1, sizeof(REMOTE)))
-		== (REMOTE *)0)
+		== NULL)
 		OutOfMem();
 	    if ((pRCTemp->rhost = StrDup(c->master))
-		== (char *)0)
+		== NULL)
 		OutOfMem();
 	    if ((pRCTemp->rserver = StrDup(c->server))
-		== (char *)0)
+		== NULL)
 		OutOfMem();
 	    pRCTemp->aliases = c->aliases;
-	    c->aliases = (NAMES *)0;
+	    c->aliases = NULL;
 	    *ppRC = pRCTemp;
 	    ppRC = &pRCTemp->pRCnext;
 	    CONDDEBUG((1, "[%s] remote on %s", c->server, c->master));
@@ -2682,12 +2682,12 @@ ConsoleAdd(CONSENT *c)
      */
     if (!isStartup) {
 	CONSENT **ppCE;
-	/* hunt for a local match, "pCEmatch != (CONSENT *)0" if found */
-	pCEmatch = (CONSENT *)0;
-	for (pGEmatch = pGroupsOld; pGEmatch != (GRPENT *)0;
+	/* hunt for a local match, "pCEmatch != NULL" if found */
+	pCEmatch = NULL;
+	for (pGEmatch = pGroupsOld; pGEmatch != NULL;
 	     pGEmatch = pGEmatch->pGEnext) {
 	    for (ppCE = &pGEmatch->pCElist, pCEmatch = pGEmatch->pCElist;
-		 pCEmatch != (CONSENT *)0;
+		 pCEmatch != NULL;
 		 ppCE = &pCEmatch->pCEnext, pCEmatch = pCEmatch->pCEnext) {
 		if (strcasecmp(c->server, pCEmatch->server) == 0) {
 		    /* extract pCEmatch from the linked list */
@@ -2696,12 +2696,12 @@ ConsoleAdd(CONSENT *c)
 		    break;
 		}
 	    }
-	    if (pCEmatch != (CONSENT *)0)
+	    if (pCEmatch != NULL)
 		break;
 	}
 
 	/* we're a child and we didn't find a match, next! */
-	if (!isMaster && (pCEmatch == (CONSENT *)0))
+	if (!isMaster && (pCEmatch == NULL))
 	    return;
 
 	/* otherwise....we'll fall through and build a group with a
@@ -2718,9 +2718,9 @@ ConsoleAdd(CONSENT *c)
      * out a console and start filling it up
      */
     /* let's get going with a group */
-    if (pGroups == (GRPENT *)0) {
+    if (pGroups == NULL) {
 	if ((pGroups = (GRPENT *)calloc(1, sizeof(GRPENT)))
-	    == (GRPENT *)0)
+	    == NULL)
 	    OutOfMem();
 	pGE = pGroups;
 	pGE->pid = -1;
@@ -2731,7 +2731,7 @@ ConsoleAdd(CONSENT *c)
      */
     if (cMaxMemb == pGE->imembers) {
 	if ((pGE->pGEnext = (GRPENT *)calloc(1, sizeof(GRPENT)))
-	    == (GRPENT *)0)
+	    == NULL)
 	    OutOfMem();
 	pGE = pGE->pGEnext;
 	pGE->pid = -1;
@@ -2739,9 +2739,9 @@ ConsoleAdd(CONSENT *c)
     }
 
     /* ok, now for the hard part of the reread */
-    if (pCEmatch == (CONSENT *)0) {	/* add new console */
+    if (pCEmatch == NULL) {	/* add new console */
 	CONSENT **ph = &parserConsoles;
-	while (*ph != (CONSENT *)0) {
+	while (*ph != NULL) {
 	    if (*ph == c) {
 		break;
 	    } else {
@@ -2750,44 +2750,44 @@ ConsoleAdd(CONSENT *c)
 	}
 
 	/* if we were in a chain... */
-	if (*ph != (CONSENT *)0) {
+	if (*ph != NULL) {
 	    /* unlink from the chain */
 	    *ph = c->pCEnext;
 	    /* and possibly fix tail ptr... */
-	    if (c->pCEnext == (CONSENT *)0)
+	    if (c->pCEnext == NULL)
 		parserConsolesTail = ph;
 	}
 
 	/* putting into action, so allocate runtime items */
-	if (c->wbuf == (STRING *)0)
+	if (c->wbuf == NULL)
 	    c->wbuf = AllocString();
 	c->pCEnext = pGE->pCElist;
 	pGE->pCElist = c;
 	pGE->imembers++;
-    } else {			/* pCEmatch != (CONSENT *) 0  - modify console */
+    } else {			/* pCEmatch != NULL  - modify console */
 	short closeMatch = 1;
 	/* see if the group is already staged */
-	for (pGEtmp = pGEstage; pGEtmp != (GRPENT *)0;
+	for (pGEtmp = pGEstage; pGEtmp != NULL;
 	     pGEtmp = pGEtmp->pGEnext) {
 	    if (pGEtmp->id == pGEmatch->id)
 		break;
 	}
 
 	/* if not, allocate one, copy the data, and reset things */
-	if (pGEtmp == (GRPENT *)0) {
+	if (pGEtmp == NULL) {
 	    if ((pGEtmp =
-		 (GRPENT *)calloc(1, sizeof(GRPENT))) == (GRPENT *)0)
+		 (GRPENT *)calloc(1, sizeof(GRPENT))) == NULL)
 		OutOfMem();
 
 	    /* copy the data */
 	    *pGEtmp = *pGEmatch;
 
 	    /* don't destroy the fake console */
-	    pGEmatch->pCEctl = (CONSENT *)0;
+	    pGEmatch->pCEctl = NULL;
 
 	    /* prep counters and such */
-	    pGEtmp->pCElist = (CONSENT *)0;
-	    pGEtmp->pCLall = (CONSCLIENT *)0;
+	    pGEtmp->pCElist = NULL;
+	    pGEtmp->pCLall = NULL;
 	    pGEtmp->imembers = 0;
 
 	    /* link in to the staging area */
@@ -2796,25 +2796,25 @@ ConsoleAdd(CONSENT *c)
 
 	    /* fix the free list (the easy one) */
 	    /* the ppCLbnext link needs to point to the new group */
-	    if (pGEtmp->pCLfree != (CONSCLIENT *)0)
+	    if (pGEtmp->pCLfree != NULL)
 		pGEtmp->pCLfree->ppCLbnext = &pGEtmp->pCLfree;
-	    pGEmatch->pCLfree = (CONSCLIENT *)0;
+	    pGEmatch->pCLfree = NULL;
 
 	    if (pGEtmp->pCEctl) {
 		/* fix the half-logged in clients */
 		/* the pCLscan list needs to be rebuilt */
 		/* file descriptors need to be watched */
 		for (pCLtmp = pGEtmp->pCEctl->pCLon;
-		     pCLtmp != (CONSCLIENT *)0; pCLtmp = pCLtmp->pCLnext) {
+		     pCLtmp != NULL; pCLtmp = pCLtmp->pCLnext) {
 		    /* remove cleanly from the old group */
-		    if ((CONSCLIENT *)0 != pCLtmp->pCLscan) {
+		    if (NULL != pCLtmp->pCLscan) {
 			pCLtmp->pCLscan->ppCLbscan = pCLtmp->ppCLbscan;
 		    }
 		    *(pCLtmp->ppCLbscan) = pCLtmp->pCLscan;
 		    /* insert into the new group */
 		    pCLtmp->pCLscan = pGEtmp->pCLall;
 		    pCLtmp->ppCLbscan = &pGEtmp->pCLall;
-		    if (pCLtmp->pCLscan != (CONSCLIENT *)0) {
+		    if (pCLtmp->pCLscan != NULL) {
 			pCLtmp->pCLscan->ppCLbscan = &pCLtmp->pCLscan;
 		    }
 		    pGEtmp->pCLall = pCLtmp;
@@ -2830,17 +2830,17 @@ ConsoleAdd(CONSENT *c)
 	/* fix the real clients */
 	/* the pCLscan list needs to be rebuilt */
 	/* file descriptors need to be watched */
-	for (pCLtmp = pCEmatch->pCLon; pCLtmp != (CONSCLIENT *)0;
+	for (pCLtmp = pCEmatch->pCLon; pCLtmp != NULL;
 	     pCLtmp = pCLtmp->pCLnext) {
 	    /* remove cleanly from the old group */
-	    if ((CONSCLIENT *)0 != pCLtmp->pCLscan) {
+	    if (NULL != pCLtmp->pCLscan) {
 		pCLtmp->pCLscan->ppCLbscan = pCLtmp->ppCLbscan;
 	    }
 	    *(pCLtmp->ppCLbscan) = pCLtmp->pCLscan;
 	    /* insert into the new group */
 	    pCLtmp->pCLscan = pGEtmp->pCLall;
 	    pCLtmp->ppCLbscan = &pGEtmp->pCLall;
-	    if (pCLtmp->pCLscan != (CONSCLIENT *)0) {
+	    if (pCLtmp->pCLscan != NULL) {
 		pCLtmp->pCLscan->ppCLbscan = &pCLtmp->pCLscan;
 	    }
 	    pGEtmp->pCLall = pCLtmp;
@@ -2856,7 +2856,7 @@ ConsoleAdd(CONSENT *c)
 	pCEmatch->pCEnext = pGEtmp->pCElist;
 	pGEtmp->pCElist = pCEmatch;
 	pGEtmp->imembers++;
-	if (pCEmatch->cofile != (CONSFILE *)0) {
+	if (pCEmatch->cofile != NULL) {
 	    int cofile = FileFDNum(pCEmatch->cofile);
 	    FD_SET(cofile, &rinit);
 	    if (maxfd < cofile + 1)
@@ -2865,7 +2865,7 @@ ConsoleAdd(CONSENT *c)
 		FD_SET(cofile, &winit);
 	}
 
-	if (pCEmatch->initfile != (CONSFILE *)0) {
+	if (pCEmatch->initfile != NULL) {
 	    int initfile = FileFDNum(pCEmatch->initfile);
 	    FD_SET(initfile, &rinit);
 	    if (maxfd < initfile + 1)
@@ -2873,7 +2873,7 @@ ConsoleAdd(CONSENT *c)
 	    if (!FileBufEmpty(pCEmatch->initfile))
 		FD_SET(FileFDOutNum(pCEmatch->initfile), &winit);
 	}
-	if (pCEmatch->taskfile != (CONSFILE *)0) {
+	if (pCEmatch->taskfile != NULL) {
 	    int taskfile = FileFDNum(pCEmatch->taskfile);
 	    FD_SET(taskfile, &rinit);
 	    if (maxfd < taskfile + 1)
@@ -2888,25 +2888,25 @@ ConsoleAdd(CONSENT *c)
 	    pCEmatch->type = c->type;
 	    closeMatch = 0;
 	}
-	if (pCEmatch->logfile != (char *)0 && c->logfile != (char *)0) {
+	if (pCEmatch->logfile != NULL && c->logfile != NULL) {
 	    if (strcmp(pCEmatch->logfile, c->logfile) != 0) {
 		SwapStr(&pCEmatch->logfile, &c->logfile);
 		closeMatch = 0;
 	    }
-	} else if (pCEmatch->logfile != (char *)0 ||
-		   c->logfile != (char *)0) {
+	} else if (pCEmatch->logfile != NULL ||
+		   c->logfile != NULL) {
 	    SwapStr(&pCEmatch->logfile, &c->logfile);
 	    closeMatch = 0;
 	}
-	if (pCEmatch->initcmd != (char *)0 && c->initcmd != (char *)0) {
+	if (pCEmatch->initcmd != NULL && c->initcmd != NULL) {
 	    if (strcmp(pCEmatch->initcmd, c->initcmd) != 0) {
 		SwapStr(&pCEmatch->initcmd, &c->initcmd);
 		/* only trigger reinit if we're running the old command */
 		if (pCEmatch->initpid != 0)
 		    closeMatch = 0;
 	    }
-	} else if (pCEmatch->initcmd != (char *)0 ||
-		   c->initcmd != (char *)0) {
+	} else if (pCEmatch->initcmd != NULL ||
+		   c->initcmd != NULL) {
 	    SwapStr(&pCEmatch->initcmd, &c->initcmd);
 	    /* only trigger reinit if we're running the old command */
 	    if (pCEmatch->initpid != 0)
@@ -2915,13 +2915,13 @@ ConsoleAdd(CONSENT *c)
 
 	switch (pCEmatch->type) {
 	    case EXEC:
-		if (pCEmatch->exec != (char *)0 && c->exec != (char *)0) {
+		if (pCEmatch->exec != NULL && c->exec != NULL) {
 		    if (strcmp(pCEmatch->exec, c->exec) != 0) {
 			SwapStr(&pCEmatch->exec, &c->exec);
 			closeMatch = 0;
 		    }
-		} else if (pCEmatch->exec != (char *)0 ||
-			   c->exec != (char *)0) {
+		} else if (pCEmatch->exec != NULL ||
+			   c->exec != NULL) {
 		    SwapStr(&pCEmatch->exec, &c->exec);
 		    closeMatch = 0;
 		}
@@ -2953,14 +2953,14 @@ ConsoleAdd(CONSENT *c)
 #endif
 		break;
 	    case DEVICE:
-		if (pCEmatch->device != (char *)0 &&
-		    c->device != (char *)0) {
+		if (pCEmatch->device != NULL &&
+		    c->device != NULL) {
 		    if (strcmp(pCEmatch->device, c->device) != 0) {
 			SwapStr(&pCEmatch->device, &c->device);
 			closeMatch = 0;
 		    }
-		} else if (pCEmatch->device != (char *)0 ||
-			   c->device != (char *)0) {
+		} else if (pCEmatch->device != NULL ||
+			   c->device != NULL) {
 		    SwapStr(&pCEmatch->device, &c->device);
 		    closeMatch = 0;
 		}
@@ -3001,35 +3001,35 @@ ConsoleAdd(CONSENT *c)
 		break;
 #if HAVE_FREEIPMI
 	    case IPMI:
-		if (pCEmatch->host != (char *)0 && c->host != (char *)0) {
+		if (pCEmatch->host != NULL && c->host != NULL) {
 		    if (strcasecmp(pCEmatch->host, c->host) != 0) {
 			SwapStr(&pCEmatch->host, &c->host);
 			closeMatch = 0;
 		    }
-		} else if (pCEmatch->host != (char *)0 ||
-			   c->host != (char *)0) {
+		} else if (pCEmatch->host != NULL ||
+			   c->host != NULL) {
 		    SwapStr(&pCEmatch->host, &c->host);
 		    closeMatch = 0;
 		}
-		if (pCEmatch->username != (char *)0 &&
-		    c->username != (char *)0) {
+		if (pCEmatch->username != NULL &&
+		    c->username != NULL) {
 		    if (strcmp(pCEmatch->username, c->username) != 0) {
 			SwapStr(&pCEmatch->username, &c->username);
 			closeMatch = 0;
 		    }
-		} else if (pCEmatch->username != (char *)0 ||
-			   c->username != (char *)0) {
+		} else if (pCEmatch->username != NULL ||
+			   c->username != NULL) {
 		    SwapStr(&pCEmatch->username, &c->username);
 		    closeMatch = 0;
 		}
-		if (pCEmatch->password != (char *)0 &&
-		    c->password != (char *)0) {
+		if (pCEmatch->password != NULL &&
+		    c->password != NULL) {
 		    if (strcmp(pCEmatch->password, c->password) != 0) {
 			SwapStr(&pCEmatch->password, &c->password);
 			closeMatch = 0;
 		    }
-		} else if (pCEmatch->password != (char *)0 ||
-			   c->password != (char *)0) {
+		} else if (pCEmatch->password != NULL ||
+			   c->password != NULL) {
 		    SwapStr(&pCEmatch->password, &c->password);
 		    closeMatch = 0;
 		}
@@ -3056,7 +3056,7 @@ ConsoleAdd(CONSENT *c)
 				c->ipmikg->used) != 0
 # endif
 			) {
-			BuildString((char *)0, pCEmatch->ipmikg);
+			BuildString(NULL, pCEmatch->ipmikg);
 			BuildStringN(c->ipmikg->string,
 				     c->ipmikg->used - 1,
 				     pCEmatch->ipmikg);
@@ -3064,7 +3064,7 @@ ConsoleAdd(CONSENT *c)
 		    }
 		} else if (pCEmatch->ipmikg->used != 0 ||
 			   c->ipmikg->used != 0) {
-		    BuildString((char *)0, pCEmatch->ipmikg);
+		    BuildString(NULL, pCEmatch->ipmikg);
 		    BuildStringN(c->ipmikg->string, c->ipmikg->used - 1,
 				 pCEmatch->ipmikg);
 		    closeMatch = 0;
@@ -3072,13 +3072,13 @@ ConsoleAdd(CONSENT *c)
 		break;
 #endif /* freeipmi */
 	    case HOST:
-		if (pCEmatch->host != (char *)0 && c->host != (char *)0) {
+		if (pCEmatch->host != NULL && c->host != NULL) {
 		    if (strcasecmp(pCEmatch->host, c->host) != 0) {
 			SwapStr(&pCEmatch->host, &c->host);
 			closeMatch = 0;
 		    }
-		} else if (pCEmatch->host != (char *)0 ||
-			   c->host != (char *)0) {
+		} else if (pCEmatch->host != NULL ||
+			   c->host != NULL) {
 		    SwapStr(&pCEmatch->host, &c->host);
 		    closeMatch = 0;
 		}
@@ -3090,13 +3090,13 @@ ConsoleAdd(CONSENT *c)
 	    case NOOP:
 		break;
 	    case UDS:
-		if (pCEmatch->uds != (char *)0 && c->uds != (char *)0) {
+		if (pCEmatch->uds != NULL && c->uds != NULL) {
 		    if (strcasecmp(pCEmatch->uds, c->uds) != 0) {
 			SwapStr(&pCEmatch->uds, &c->uds);
 			closeMatch = 0;
 		    }
-		} else if (pCEmatch->uds != (char *)0 ||
-			   c->uds != (char *)0) {
+		} else if (pCEmatch->uds != NULL ||
+			   c->uds != NULL) {
 		    SwapStr(&pCEmatch->uds, &c->uds);
 		    closeMatch = 0;
 		}
@@ -3115,8 +3115,8 @@ ConsoleAdd(CONSENT *c)
 
 	pCEmatch->logfilemax = c->logfilemax;
 	if (pCEmatch->logfilemax != (off_t) 0 &&
-	    timers[T_ROLL] == (time_t)0)
-	    timers[T_ROLL] = time((time_t *)0);
+	    timers[T_ROLL] == NULL)
+	    timers[T_ROLL] = time(NULL);
 
 	SwapStr(&pCEmatch->motd, &c->motd);
 	SwapStr(&pCEmatch->idlestring, &c->idlestring);
@@ -3142,16 +3142,16 @@ ConsoleAdd(CONSENT *c)
 	pCEmatch->login = c->login;
 	pCEmatch->inituid = c->inituid;
 	pCEmatch->initgid = c->initgid;
-	while (pCEmatch->aliases != (NAMES *)0) {
+	while (pCEmatch->aliases != NULL) {
 	    NAMES *name;
 	    name = pCEmatch->aliases->next;
-	    if (pCEmatch->aliases->name != (char *)0)
+	    if (pCEmatch->aliases->name != NULL)
 		free(pCEmatch->aliases->name);
 	    free(pCEmatch->aliases);
 	    pCEmatch->aliases = name;
 	}
 	pCEmatch->aliases = c->aliases;
-	c->aliases = (NAMES *)0;
+	c->aliases = NULL;
 
 	/* we have to override the ro/rw lists... */
 	/* so first destroy the existing (which point to freed space anyway) */
@@ -3176,23 +3176,23 @@ ConsoleAdd(CONSENT *c)
 void
 ConsoleDestroy(void)
 {
-    GRPENT **ppGE = (GRPENT **)0;
-    GRPENT *pGEtmp = (GRPENT *)0;
-    CONSENT *c = (CONSENT *)0;
-    CONSENT *cNext = (CONSENT *)0;
-    REMOTE *pRCtmp = (REMOTE *)0;
+    GRPENT **ppGE = NULL;
+    GRPENT *pGEtmp = NULL;
+    CONSENT *c = NULL;
+    CONSENT *cNext = NULL;
+    REMOTE *pRCtmp = NULL;
 
     CONDDEBUG((1, "ConsoleDestroy() [%s:%d]", file, line));
 
     /* move aside any existing groups */
     pGroupsOld = pGroups;
-    pGroups = (GRPENT *)0;
+    pGroups = NULL;
 
     /* init other trackers */
-    pGE = pGEstage = (GRPENT *)0;
+    pGE = pGEstage = NULL;
 
     /* nuke the old remote consoles */
-    while (pRCList != (REMOTE *)0) {
+    while (pRCList != NULL) {
 	pRCtmp = pRCList->pRCnext;
 	DestroyRemoteConsole(pRCList);
 	pRCList = pRCtmp;
@@ -3203,7 +3203,7 @@ ConsoleDestroy(void)
      * this will potentially adjust parserConsoles/parserConsolesTail
      * so we need to peek at the pCEnext pointer ahead of time
      */
-    for (c = parserConsoles; c != (CONSENT *)0; c = cNext) {
+    for (c = parserConsoles; c != NULL; c = cNext) {
 	/* time to set some defaults and fix up values */
 
 #if HAVE_FREEIPMI
@@ -3215,7 +3215,7 @@ ConsoleDestroy(void)
 	    c->ipmiciphersuite = 1;
 	c->ipmiciphersuite -= 2;
 
-	if (c->ipmikg == (STRING *)0)
+	if (c->ipmikg == NULL)
 	    c->ipmikg = AllocString();
 
 	if (c->ipmiwrkset == 0) {
@@ -3272,24 +3272,24 @@ ConsoleDestroy(void)
 	substData->data = (void *)c;
 
 	/* check for substitutions */
-	if (c->type == DEVICE && c->devicesubst != (char *)0)
-	    ProcessSubst(substData, &(c->device), (char **)0, (char *)0,
+	if (c->type == DEVICE && c->devicesubst != NULL)
+	    ProcessSubst(substData, &(c->device), NULL, NULL,
 			 c->devicesubst);
 
-	if (c->type == EXEC && c->execsubst != (char *)0)
-	    ProcessSubst(substData, &(c->exec), (char **)0, (char *)0,
+	if (c->type == EXEC && c->execsubst != NULL)
+	    ProcessSubst(substData, &(c->exec), NULL, NULL,
 			 c->execsubst);
 
-	if (c->type == UDS && c->udssubst != (char *)0)
-	    ProcessSubst(substData, &(c->uds), (char **)0, (char *)0,
+	if (c->type == UDS && c->udssubst != NULL)
+	    ProcessSubst(substData, &(c->uds), NULL, NULL,
 			 c->udssubst);
 
-	if (c->initcmd != (char *)0 && c->initsubst != (char *)0)
-	    ProcessSubst(substData, &(c->initcmd), (char **)0, (char *)0,
+	if (c->initcmd != NULL && c->initsubst != NULL)
+	    ProcessSubst(substData, &(c->initcmd), NULL, NULL,
 			 c->initsubst);
 
 	/* go ahead and do the '&' substitution */
-	if (c->logfile != (char *)0) {
+	if (c->logfile != NULL) {
 	    char *lf;
 	    lf = c->logfile;
 	    ExpandLogfile(c, lf);
@@ -3297,8 +3297,8 @@ ConsoleDestroy(void)
 	}
 
 	/* set the idlestring default, if needed */
-	if (c->idlestring == (char *)0 &&
-	    (c->idlestring = StrDup("\\n")) == (char *)0)
+	if (c->idlestring == NULL &&
+	    (c->idlestring = StrDup("\\n")) == NULL)
 	    OutOfMem();
 
 	/* set the options that default true */
@@ -3346,7 +3346,7 @@ ConsoleDestroy(void)
 	/* set some forced options, based on situations */
 	if (c->type == NOOP) {
 	    c->login = FLAGFALSE;
-	    ProcessLogfile(c, (char *)0);
+	    ProcessLogfile(c, NULL);
 	}
 
 	/* now let command-line args override things */
@@ -3381,17 +3381,17 @@ ConsoleDestroy(void)
 	}
 
 	if (fSyntaxOnly > 1) {
-	    static STRING *s = (STRING *)0;
+	    static STRING *s = NULL;
 
-	    if (s == (STRING *)0)
+	    if (s == NULL)
 		s = AllocString();
 
-	    BuildString((char *)0, s);
+	    BuildString(NULL, s);
 	    BuildString(BuildTmpStringPrint
 			("{%s:%s:", c->server, c->master), s);
-	    if (c->aliases != (NAMES *)0) {
+	    if (c->aliases != NULL) {
 		NAMES *n;
-		for (n = c->aliases; n != (NAMES *)0; n = n->next) {
+		for (n = c->aliases; n != NULL; n = n->next) {
 		    if (n == c->aliases)
 			BuildStringChar(',', s);
 		    BuildString(n->name, s);
@@ -3403,7 +3403,7 @@ ConsoleDestroy(void)
 		    BuildString(BuildTmpStringPrint
 				("|:%s",
 				 (c->exec !=
-				  (char *)0 ? c->exec : "/bin/sh")), s);
+				  NULL ? c->exec : "/bin/sh")), s);
 		    break;
 		case HOST:
 		    BuildString(BuildTmpStringPrint
@@ -3436,7 +3436,7 @@ ConsoleDestroy(void)
     }
 
     /* go through and nuke groups (if a child or are empty) */
-    for (ppGE = &pGroups; *ppGE != (GRPENT *)0;) {
+    for (ppGE = &pGroups; *ppGE != NULL;) {
 	if (!isMaster || (*ppGE)->imembers == 0) {
 	    pGEtmp = *ppGE;
 	    *ppGE = (*ppGE)->pGEnext;
@@ -3449,32 +3449,32 @@ ConsoleDestroy(void)
     *ppGE = pGEstage;
 
     /* reset the trackers */
-    pGE = pGEstage = (GRPENT *)0;
+    pGE = pGEstage = NULL;
 
     /* nuke the old groups lists (non-matching groups/consoles) */
-    while (pGroupsOld != (GRPENT *)0) {
+    while (pGroupsOld != NULL) {
 	pGEtmp = pGroupsOld->pGEnext;
 	DestroyGroup(pGroupsOld);
 	pGroupsOld = pGEtmp;
     }
 
-    while (parserConsoles != (CONSENT *)0)
+    while (parserConsoles != NULL)
 	DestroyParserDefaultOrConsole(parserConsoles, &parserConsoles,
 				      &parserConsolesTail);
-    DestroyParserDefaultOrConsole(parserConsoleTemp, (CONSENT **)0,
-				  (CONSENT ***)0);
-    parserConsoles = parserConsoleTemp = (CONSENT *)0;
+    DestroyParserDefaultOrConsole(parserConsoleTemp, NULL,
+				  NULL);
+    parserConsoles = parserConsoleTemp = NULL;
 
     /* here we check on the client permissions and adjust accordingly */
-    if (!isMaster && pGroups != (GRPENT *)0) {
-	CONSENT *pCE = (CONSENT *)0;
-	CONSCLIENT *pCL = (CONSCLIENT *)0;
-	CONSCLIENT *pCLnext = (CONSCLIENT *)0;
+    if (!isMaster && pGroups != NULL) {
+	CONSENT *pCE = NULL;
+	CONSCLIENT *pCL = NULL;
+	CONSCLIENT *pCLnext = NULL;
 	int access = -1;
 
-	for (pCE = pGroups->pCElist; pCE != (CONSENT *)0;
+	for (pCE = pGroups->pCElist; pCE != NULL;
 	     pCE = pCE->pCEnext) {
-	    for (pCL = pCE->pCLon; pCL != (CONSCLIENT *)0; pCL = pCLnext) {
+	    for (pCL = pCE->pCLon; pCL != NULL; pCL = pCLnext) {
 		pCLnext = pCL->pCLnext;	/* in case we drop client */
 		access = ClientAccess(pCE, pCL->username->string);
 		if (access == -1) {
@@ -3491,7 +3491,7 @@ ConsoleDestroy(void)
 			      "[Conserver reconfigured - r/w access removed]\r\n",
 			      -1);
 		    if (pCL->fwr) {
-			BumpClient(pCE, (char *)0);
+			BumpClient(pCE, NULL);
 			TagLogfileAct(pCE, "%s detached",
 				      pCL->acid->string);
 			if (pCE->nolog) {
@@ -3514,11 +3514,11 @@ ConsoleDestroy(void)
 CONSENT *
 FindConsoleName(CONSENT *c, char *id)
 {
-    NAMES *a = (NAMES *)0;
-    for (; c != (CONSENT *)0; c = c->pCEnext) {
+    NAMES *a = NULL;
+    for (; c != NULL; c = c->pCEnext) {
 	if (strcasecmp(id, c->server) == 0)
 	    return c;
-	for (a = c->aliases; a != (NAMES *)0; a = a->next)
+	for (a = c->aliases; a != NULL; a = a->next)
 	    if (strcasecmp(id, a->name) == 0)
 		return c;
     }
@@ -3528,24 +3528,24 @@ FindConsoleName(CONSENT *c, char *id)
 void
 ConsoleItemAliases(char *id)
 {
-    char *token = (char *)0;
-    NAMES *name = (NAMES *)0;
-    CONSENT *c = (CONSENT *)0;
+    char *token = NULL;
+    NAMES *name = NULL;
+    CONSENT *c = NULL;
 
     CONDDEBUG((1, "ConsoleItemAliases(%s) [%s:%d]", id, file, line));
-    if ((id == (char *)0) || (*id == '\000')) {
-	while (parserConsoleTemp->aliases != (NAMES *)0) {
+    if ((id == NULL) || (*id == '\000')) {
+	while (parserConsoleTemp->aliases != NULL) {
 	    name = parserConsoleTemp->aliases->next;
-	    if (parserConsoleTemp->aliases->name != (char *)0)
+	    if (parserConsoleTemp->aliases->name != NULL)
 		free(parserConsoleTemp->aliases->name);
 	    free(parserConsoleTemp->aliases);
 	    parserConsoleTemp->aliases = name;
 	}
 	return;
     }
-    for (token = strtok(id, ALLWORDSEP); token != (char *)0;
+    for (token = strtok(id, ALLWORDSEP); token != NULL;
 	 token = strtok(NULL, ALLWORDSEP)) {
-	if ((c = FindConsoleName(parserConsoles, token)) != (CONSENT *)0) {
+	if ((c = FindConsoleName(parserConsoles, token)) != NULL) {
 	    if (isMaster)
 		Error
 		    ("alias name `%s' invalid: already in use by console `%s' [%s:%d]",
@@ -3553,15 +3553,15 @@ ConsoleItemAliases(char *id)
 	    continue;
 	}
 	if ((c =
-	     FindConsoleName(parserConsoleTemp, token)) != (CONSENT *)0) {
+	     FindConsoleName(parserConsoleTemp, token)) != NULL) {
 	    if (isMaster)
 		Error("alias name `%s' repeated: ignored [%s:%d]", token,
 		      file, line);
 	    continue;
 	}
-	if ((name = (NAMES *)calloc(1, sizeof(NAMES))) == (NAMES *)0)
+	if ((name = (NAMES *)calloc(1, sizeof(NAMES))) == NULL)
 	    OutOfMem();
-	if ((name->name = StrDup(token)) == (char *)0)
+	if ((name->name = StrDup(token)) == NULL)
 	    OutOfMem();
 	name->next = parserConsoleTemp->aliases;
 	parserConsoleTemp->aliases = name;
@@ -3593,7 +3593,7 @@ void
 ConsoleItemDevicesubst(char *id)
 {
     CONDDEBUG((1, "ConsoleItemDevicesubst(%s) [%s:%d]", id, file, line));
-    ProcessSubst(substData, (char **)0, &(parserConsoleTemp->devicesubst),
+    ProcessSubst(substData, NULL, &(parserConsoleTemp->devicesubst),
 		 "devicesubst", id);
 }
 
@@ -3601,7 +3601,7 @@ void
 ConsoleItemExecsubst(char *id)
 {
     CONDDEBUG((1, "ConsoleItemExecsubst(%s) [%s:%d]", id, file, line));
-    ProcessSubst(substData, (char **)0, &(parserConsoleTemp->execsubst),
+    ProcessSubst(substData, NULL, &(parserConsoleTemp->execsubst),
 		 "execsubst", id);
 }
 
@@ -3609,7 +3609,7 @@ void
 ConsoleItemUdssubst(char *id)
 {
     CONDDEBUG((1, "ConsoleItemUdssubst(%s) [%s:%d]", id, file, line));
-    ProcessSubst(substData, (char **)0, &(parserConsoleTemp->udssubst),
+    ProcessSubst(substData, NULL, &(parserConsoleTemp->udssubst),
 		 "udssubst", id);
 }
 
@@ -3617,7 +3617,7 @@ void
 ConsoleItemInitsubst(char *id)
 {
     CONDDEBUG((1, "ConsoleItemInitsubst(%s) [%s:%d]", id, file, line));
-    ProcessSubst(substData, (char **)0, &(parserConsoleTemp->initsubst),
+    ProcessSubst(substData, NULL, &(parserConsoleTemp->initsubst),
 		 "initsubst", id);
 }
 
@@ -3874,21 +3874,21 @@ typedef struct parserAccess {
     struct parserAccess *next;
 } PARSERACCESS;
 
-PARSERACCESS *parserAccesses = (PARSERACCESS *)0;
+PARSERACCESS *parserAccesses = NULL;
 PARSERACCESS **parserAccessesTail = &parserAccesses;
-PARSERACCESS *parserAccessTemp = (PARSERACCESS *)0;
+PARSERACCESS *parserAccessTemp = NULL;
 
 void
 DestroyParserAccess(PARSERACCESS *pa)
 {
     PARSERACCESS **ppa = &parserAccesses;
-    ACCESS *a = (ACCESS *)0;
-    char *m = (char *)0;
+    ACCESS *a = NULL;
+    char *m = NULL;
 
-    if (pa == (PARSERACCESS *)0)
+    if (pa == NULL)
 	return;
 
-    while (*ppa != (PARSERACCESS *)0) {
+    while (*ppa != NULL) {
 	if (*ppa == pa) {
 	    break;
 	} else {
@@ -3896,18 +3896,18 @@ DestroyParserAccess(PARSERACCESS *pa)
 	}
     }
 
-    BuildTmpString((char *)0);
+    BuildTmpString(NULL);
     m = BuildTmpString(pa->name->string);
     /* if we were in a chain... */
-    if (*ppa != (PARSERACCESS *)0) {
+    if (*ppa != NULL) {
 	/* unlink from the chain */
 	*ppa = pa->next;
 	/* and possibly fix tail ptr... */
-	if (pa->next == (PARSERACCESS *)0)
+	if (pa->next == NULL)
 	    parserAccessesTail = ppa;
     }
     DestroyString(pa->name);
-    for (a = pa->access; a != (ACCESS *)0;) {
+    for (a = pa->access; a != NULL;) {
 	ACCESS *n = a->pACnext;
 	BuildTmpStringChar(',');
 	m = BuildTmpString(a->pcwho);
@@ -3924,7 +3924,7 @@ PARSERACCESS *
 AccessFind(char *id)
 {
     PARSERACCESS *pa;
-    for (pa = parserAccesses; pa != (PARSERACCESS *)0; pa = pa->next) {
+    for (pa = parserAccesses; pa != NULL; pa = pa->next) {
 	if (strcasecmp(id, pa->name->string) == 0)
 	    return pa;
     }
@@ -3934,10 +3934,10 @@ AccessFind(char *id)
 void
 AccessAddACL(PARSERACCESS *pa, ACCESS *access)
 {
-    ACCESS **ppa = (ACCESS **)0;
-    ACCESS *new = (ACCESS *)0;
+    ACCESS **ppa = NULL;
+    ACCESS *new = NULL;
 
-    for (ppa = &(pa->access); *ppa != (ACCESS *)0;
+    for (ppa = &(pa->access); *ppa != NULL;
 	 ppa = &((*ppa)->pACnext)) {
 	if ((*ppa)->ctrust == access->ctrust &&
 	    (*ppa)->isCIDR == access->isCIDR &&
@@ -3947,14 +3947,14 @@ AccessAddACL(PARSERACCESS *pa, ACCESS *access)
     }
 
     if ((new = (ACCESS *)calloc(1, sizeof(ACCESS)))
-	== (ACCESS *)0)
+	== NULL)
 	OutOfMem();
     *new = *access;
     if ((new->pcwho = StrDup(access->pcwho))
-	== (char *)0)
+	== NULL)
 	OutOfMem();
     /* link into the list at the end */
-    new->pACnext = (ACCESS *)0;
+    new->pACnext = NULL;
     *ppa = new;
 }
 
@@ -3962,16 +3962,16 @@ void
 AccessBegin(char *id)
 {
     CONDDEBUG((1, "AccessBegin(%s) [%s:%d]", id, file, line));
-    if (id == (char *)0 || id[0] == '\000') {
+    if (id == NULL || id[0] == '\000') {
 	if (isMaster)
 	    Error("empty access name [%s:%d]", file, line);
 	return;
     }
-    if (parserAccessTemp != (PARSERACCESS *)0)
+    if (parserAccessTemp != NULL)
 	DestroyParserAccess(parserAccessTemp);
     if ((parserAccessTemp =
 	 (PARSERACCESS *)calloc(1, sizeof(PARSERACCESS)))
-	== (PARSERACCESS *)0)
+	== NULL)
 	OutOfMem();
     parserAccessTemp->name = AllocString();
     BuildString(id, parserAccessTemp->name);
@@ -3980,27 +3980,27 @@ AccessBegin(char *id)
 void
 AccessEnd(void)
 {
-    PARSERACCESS *pa = (PARSERACCESS *)0;
+    PARSERACCESS *pa = NULL;
 
     CONDDEBUG((1, "AccessEnd() [%s:%d]", file, line));
 
     if (parserAccessTemp->name->used <= 1) {
 	DestroyParserAccess(parserAccessTemp);
-	parserAccessTemp = (PARSERACCESS *)0;
+	parserAccessTemp = NULL;
 	return;
     }
 
     /* if we're overriding an existing group, nuke it */
     if ((pa =
 	 AccessFind(parserAccessTemp->name->string)) !=
-	(PARSERACCESS *)0) {
+	NULL) {
 	DestroyParserAccess(pa);
     }
 
     /* add the temp to the tail of the list */
     *parserAccessesTail = parserAccessTemp;
     parserAccessesTail = &(parserAccessTemp->next);
-    parserAccessTemp = (PARSERACCESS *)0;
+    parserAccessTemp = NULL;
 }
 
 void
@@ -4008,7 +4008,7 @@ AccessAbort(void)
 {
     CONDDEBUG((1, "AccessAbort() [%s:%d]", file, line));
     DestroyParserAccess(parserAccessTemp);
-    parserAccessTemp = (PARSERACCESS *)0;
+    parserAccessTemp = NULL;
 }
 
 void
@@ -4023,34 +4023,34 @@ AccessDestroy(void)
     CONDDEBUG((1, "AccessDestroy() [%s:%d]", file, line));
 
     /* clean out the access restrictions */
-    while (pACList != (ACCESS *)0) {
+    while (pACList != NULL) {
 	a = pACList->pACnext;
 	DestroyAccessList(pACList);
 	pACList = a;
     }
-    pACList = (ACCESS *)0;
+    pACList = NULL;
 
     DestroyConsentUsers(&(pADList));
     DestroyConsentUsers(&(pLUList));
-    pADList = (CONSENTUSERS *)0;
-    pLUList = (CONSENTUSERS *)0;
+    pADList = NULL;
+    pLUList = NULL;
 
     ppa = &(pACList);
     pad = &(pADList);
     plu = &(pLUList);
 
-    for (p = parserAccesses; p != (PARSERACCESS *)0; p = p->next) {
+    for (p = parserAccesses; p != NULL; p = p->next) {
 #if DUMPDATA
 	Msg("ParserAccess = %s", p->name->string);
-	for (a = p->access; a != (ACCESS *)0; a = a->pACnext) {
+	for (a = p->access; a != NULL; a = a->pACnext) {
 	    Msg("    Access = %c, %d, %s", a->ctrust, a->isCIDR, a->pcwho);
 	}
 	{
 	    CONSENTUSERS *u;
-	    for (u = p->admin; u != (CONSENTUSERS *)0; u = u->next) {
+	    for (u = p->admin; u != NULL; u = u->next) {
 		Msg("    Admin = %s", u->user->name);
 	    }
-	    for (u = p->limited; u != (CONSENTUSERS *)0; u = u->next) {
+	    for (u = p->limited; u != NULL; u = u->next) {
 		Msg("    Limited = %s", u->user->name);
 	    }
 	}
@@ -4060,16 +4060,16 @@ AccessDestroy(void)
 	    CONDDEBUG((1, "AccessDestroy(): adding ACL `%s'",
 		       p->name->string));
 	    *ppa = p->access;
-	    p->access = (ACCESS *)0;
+	    p->access = NULL;
 	    /* add any admin users to the list */
-	    if (p->admin != (CONSENTUSERS *)0) {
+	    if (p->admin != NULL) {
 		*pad = p->admin;
-		p->admin = (CONSENTUSERS *)0;
+		p->admin = NULL;
 	    }
 	    /* add any limited users to the list */
-	    if (p->limited != (CONSENTUSERS *)0) {
+	    if (p->limited != NULL) {
 		*plu = p->limited;
-		p->limited = (CONSENTUSERS *)0;
+		p->limited = NULL;
 	    }
 
 	    /* advance to the end of the list so we can append more 
@@ -4077,22 +4077,22 @@ AccessDestroy(void)
 	     * list, but since we're using the first seen, it's more
 	     * overhead, but no big deal
 	     */
-	    while (*ppa != (ACCESS *)0) {
+	    while (*ppa != NULL) {
 		ppa = &((*ppa)->pACnext);
 	    }
-	    while (*pad != (CONSENTUSERS *)0) {
+	    while (*pad != NULL) {
 		pad = &((*pad)->next);
 	    }
-	    while (*plu != (CONSENTUSERS *)0) {
+	    while (*plu != NULL) {
 		plu = &((*plu)->next);
 	    }
 	}
     }
 
-    while (parserAccesses != (PARSERACCESS *)0)
+    while (parserAccesses != NULL)
 	DestroyParserAccess(parserAccesses);
     DestroyParserAccess(parserAccessTemp);
-    parserAccesses = parserAccessTemp = (PARSERACCESS *)0;
+    parserAccesses = parserAccessTemp = NULL;
 }
 
 void
@@ -4112,29 +4112,29 @@ AccessItemLimited(char *id)
 void
 AccessItemInclude(char *id)
 {
-    char *token = (char *)0;
-    PARSERACCESS *pa = (PARSERACCESS *)0;
+    char *token = NULL;
+    PARSERACCESS *pa = NULL;
 
     CONDDEBUG((1, "AccessItemInclude(%s) [%s:%d]", id, file, line));
 
-    if ((id == (char *)0) || (*id == '\000'))
+    if ((id == NULL) || (*id == '\000'))
 	return;
 
-    for (token = strtok(id, ALLWORDSEP); token != (char *)0;
+    for (token = strtok(id, ALLWORDSEP); token != NULL;
 	 token = strtok(NULL, ALLWORDSEP)) {
-	if ((pa = AccessFind(token)) == (PARSERACCESS *)0) {
+	if ((pa = AccessFind(token)) == NULL) {
 	    if (isMaster)
 		Error("unknown access name `%s' [%s:%d]", token, file,
 		      line);
 	} else {
 	    ACCESS *a;
-	    for (a = pa->access; a != (ACCESS *)0; a = a->pACnext) {
+	    for (a = pa->access; a != NULL; a = a->pACnext) {
 		AccessAddACL(parserAccessTemp, a);
 	    }
-	    if (pa->admin != (CONSENTUSERS *)0)
+	    if (pa->admin != NULL)
 		CopyConsentUserList(pa->admin, &(parserAccessTemp->admin),
 				    0);
-	    if (pa->limited != (CONSENTUSERS *)0)
+	    if (pa->limited != NULL)
 		CopyConsentUserList(pa->limited,
 				    &(parserAccessTemp->limited), 0);
 	}
@@ -4144,9 +4144,9 @@ AccessItemInclude(char *id)
 void
 AccessProcessACL(char trust, char *acl)
 {
-    char *token = (char *)0;
-    ACCESS **ppa = (ACCESS **)0;
-    ACCESS *pa = (ACCESS *)0;
+    char *token = NULL;
+    ACCESS **ppa = NULL;
+    ACCESS *pa = NULL;
 #if HAVE_INET_ATON
     struct in_addr inetaddr;
 #else
@@ -4154,12 +4154,12 @@ AccessProcessACL(char trust, char *acl)
 #endif
 
     /* an empty acl will clear out that type of acl */
-    if ((acl == (char *)0) || (*acl == '\000')) {
+    if ((acl == NULL) || (*acl == '\000')) {
 	/* move the old access list aside */
 	ACCESS *a = parserAccessTemp->access;
-	parserAccessTemp->access = (ACCESS *)0;
+	parserAccessTemp->access = NULL;
 	/* go through the access list */
-	while (a != (ACCESS *)0) {
+	while (a != NULL) {
 	    ACCESS *n = a->pACnext;
 	    /* if it's not the trust that we see, add it back */
 	    if (a->ctrust != trust)
@@ -4170,7 +4170,7 @@ AccessProcessACL(char trust, char *acl)
 	}
     }
 
-    for (token = strtok(acl, ALLWORDSEP); token != (char *)0;
+    for (token = strtok(acl, ALLWORDSEP); token != NULL;
 	 token = strtok(NULL, ALLWORDSEP)) {
 	int i = 0, isCIDR = 0;
 	int nCount = 0, dCount = 0, sCount = 0, mCount = 0, sPos = 0;
@@ -4228,15 +4228,15 @@ AccessProcessACL(char trust, char *acl)
 
 	/* ok...either a hostname or CIDR notation */
 	if ((pa = (ACCESS *)calloc(1, sizeof(ACCESS)))
-	    == (ACCESS *)0)
+	    == NULL)
 	    OutOfMem();
 	pa->ctrust = trust;
 	pa->isCIDR = isCIDR;
 	if ((pa->pcwho = StrDup(token))
-	    == (char *)0)
+	    == NULL)
 	    OutOfMem();
 
-	for (ppa = &(parserAccessTemp->access); *ppa != (ACCESS *)0;
+	for (ppa = &(parserAccessTemp->access); *ppa != NULL;
 	     ppa = &((*ppa)->pACnext)) {
 	    if ((*ppa)->ctrust == pa->ctrust &&
 		(*ppa)->isCIDR == pa->isCIDR &&
@@ -4246,7 +4246,7 @@ AccessProcessACL(char trust, char *acl)
 		break;
 	    }
 	}
-	if (*ppa == (ACCESS *)0)
+	if (*ppa == NULL)
 	    *ppa = pa;		/* add to end of list */
     }
 }
@@ -4273,27 +4273,27 @@ AccessItemTrusted(char *id)
 }
 
 /* 'config' handling */
-CONFIG *parserConfigTemp = (CONFIG *)0;
+CONFIG *parserConfigTemp = NULL;
 
 void
 DestroyConfig(CONFIG *c)
 {
-    if (c == (CONFIG *)0)
+    if (c == NULL)
 	return;
-    if (c->logfile != (char *)0)
+    if (c->logfile != NULL)
 	free(c->logfile);
-    if (c->passwdfile != (char *)0)
+    if (c->passwdfile != NULL)
 	free(c->passwdfile);
-    if (c->primaryport != (char *)0)
+    if (c->primaryport != NULL)
 	free(c->primaryport);
-    if (c->secondaryport != (char *)0)
+    if (c->secondaryport != NULL)
 	free(c->secondaryport);
-    if (c->unifiedlog != (char *)0)
+    if (c->unifiedlog != NULL)
 	free(c->unifiedlog);
 #if HAVE_OPENSSL
-    if (c->sslcredentials != (char *)0)
+    if (c->sslcredentials != NULL)
 	free(c->sslcredentials);
-    if (c->sslcacertificatefile != (char *)0)
+    if (c->sslcacertificatefile != NULL)
 	free(c->sslcacertificatefile);
 #endif
     free(c);
@@ -4303,15 +4303,15 @@ void
 ConfigBegin(char *id)
 {
     CONDDEBUG((1, "ConfigBegin(%s) [%s:%d]", id, file, line));
-    if (id == (char *)0 || id[0] == '\000') {
+    if (id == NULL || id[0] == '\000') {
 	if (isMaster)
 	    Error("empty config name [%s:%d]", file, line);
 	return;
     }
-    if (parserConfigTemp != (CONFIG *)0)
+    if (parserConfigTemp != NULL)
 	DestroyConfig(parserConfigTemp);
     if ((parserConfigTemp = (CONFIG *)calloc(1, sizeof(CONFIG)))
-	== (CONFIG *)0)
+	== NULL)
 	OutOfMem();
     parserConfigTemp->name = AllocString();
     BuildString(id, parserConfigTemp->name);
@@ -4322,7 +4322,7 @@ ConfigEnd(void)
 {
     CONDDEBUG((1, "ConfigEnd() [%s:%d]", file, line));
 
-    if (parserConfigTemp == (CONFIG *)0)
+    if (parserConfigTemp == NULL)
 	return;
 
     if (parserConfigTemp->name->used > 1) {
@@ -4330,29 +4330,29 @@ ConfigEnd(void)
 	     parserConfigTemp->name->string[1] == '\000') ||
 	    IsMe(parserConfigTemp->name->string)) {
 	    /* go through and copy over any items seen */
-	    if (parserConfigTemp->logfile != (char *)0) {
-		if (pConfig->logfile != (char *)0)
+	    if (parserConfigTemp->logfile != NULL) {
+		if (pConfig->logfile != NULL)
 		    free(pConfig->logfile);
 		pConfig->logfile = parserConfigTemp->logfile;
-		parserConfigTemp->logfile = (char *)0;
+		parserConfigTemp->logfile = NULL;
 	    }
-	    if (parserConfigTemp->passwdfile != (char *)0) {
-		if (pConfig->passwdfile != (char *)0)
+	    if (parserConfigTemp->passwdfile != NULL) {
+		if (pConfig->passwdfile != NULL)
 		    free(pConfig->passwdfile);
 		pConfig->passwdfile = parserConfigTemp->passwdfile;
-		parserConfigTemp->passwdfile = (char *)0;
+		parserConfigTemp->passwdfile = NULL;
 	    }
-	    if (parserConfigTemp->unifiedlog != (char *)0) {
-		if (pConfig->unifiedlog != (char *)0)
+	    if (parserConfigTemp->unifiedlog != NULL) {
+		if (pConfig->unifiedlog != NULL)
 		    free(pConfig->unifiedlog);
 		pConfig->unifiedlog = parserConfigTemp->unifiedlog;
-		parserConfigTemp->unifiedlog = (char *)0;
+		parserConfigTemp->unifiedlog = NULL;
 	    }
-	    if (parserConfigTemp->primaryport != (char *)0) {
-		if (pConfig->primaryport != (char *)0)
+	    if (parserConfigTemp->primaryport != NULL) {
+		if (pConfig->primaryport != NULL)
 		    free(pConfig->primaryport);
 		pConfig->primaryport = parserConfigTemp->primaryport;
-		parserConfigTemp->primaryport = (char *)0;
+		parserConfigTemp->primaryport = NULL;
 	    }
 	    if (parserConfigTemp->defaultaccess != '\000')
 		pConfig->defaultaccess = parserConfigTemp->defaultaccess;
@@ -4368,25 +4368,25 @@ ConfigEnd(void)
 		pConfig->reinitcheck = parserConfigTemp->reinitcheck;
 	    if (parserConfigTemp->initdelay != 0)
 		pConfig->initdelay = parserConfigTemp->initdelay;
-	    if (parserConfigTemp->secondaryport != (char *)0) {
-		if (pConfig->secondaryport != (char *)0)
+	    if (parserConfigTemp->secondaryport != NULL) {
+		if (pConfig->secondaryport != NULL)
 		    free(pConfig->secondaryport);
 		pConfig->secondaryport = parserConfigTemp->secondaryport;
-		parserConfigTemp->secondaryport = (char *)0;
+		parserConfigTemp->secondaryport = NULL;
 	    }
 #if HAVE_OPENSSL
-	    if (parserConfigTemp->sslcredentials != (char *)0) {
-		if (pConfig->sslcredentials != (char *)0)
+	    if (parserConfigTemp->sslcredentials != NULL) {
+		if (pConfig->sslcredentials != NULL)
 		    free(pConfig->sslcredentials);
 		pConfig->sslcredentials = parserConfigTemp->sslcredentials;
-		parserConfigTemp->sslcredentials = (char *)0;
+		parserConfigTemp->sslcredentials = NULL;
 	    }
-	    if (parserConfigTemp->sslcacertificatefile != (char *)0) {
-		if (pConfig->sslcacertificatefile != (char *)0)
+	    if (parserConfigTemp->sslcacertificatefile != NULL) {
+		if (pConfig->sslcacertificatefile != NULL)
 		    free(pConfig->sslcacertificatefile);
 		pConfig->sslcacertificatefile =
 		    parserConfigTemp->sslcacertificatefile;
-		parserConfigTemp->sslcacertificatefile = (char *)0;
+		parserConfigTemp->sslcacertificatefile = NULL;
 	    }
 	    if (parserConfigTemp->sslrequired != FLAGUNKNOWN)
 		pConfig->sslrequired = parserConfigTemp->sslrequired;
@@ -4402,29 +4402,29 @@ ConfigEnd(void)
     }
 
     DestroyConfig(parserConfigTemp);
-    parserConfigTemp = (CONFIG *)0;
+    parserConfigTemp = NULL;
 }
 
 void
 ConfigAbort(void)
 {
     CONDDEBUG((1, "ConfigAbort() [%s:%d]", file, line));
-    if (parserConfigTemp == (CONFIG *)0)
+    if (parserConfigTemp == NULL)
 	return;
 
     DestroyConfig(parserConfigTemp);
-    parserConfigTemp = (CONFIG *)0;
+    parserConfigTemp = NULL;
 }
 
 void
 ConfigDestroy(void)
 {
     CONDDEBUG((1, "ConfigDestroy() [%s:%d]", file, line));
-    if (parserConfigTemp == (CONFIG *)0)
+    if (parserConfigTemp == NULL)
 	return;
 
     DestroyConfig(parserConfigTemp);
-    parserConfigTemp = (CONFIG *)0;
+    parserConfigTemp = NULL;
 }
 
 void
@@ -4432,7 +4432,7 @@ ConfigItemDefaultaccess(char *id)
 {
     CONDDEBUG((1, "ConfigItemDefaultaccess(%s) [%s:%d]", id, file, line));
 
-    if (id == (char *)0 || id[0] == '\000') {
+    if (id == NULL || id[0] == '\000') {
 	parserConfigTemp->defaultaccess = '\000';
 	return;
     }
@@ -4476,14 +4476,14 @@ ConfigItemLogfile(char *id)
 {
     CONDDEBUG((1, "ConfigItemLogfile(%s) [%s:%d]", id, file, line));
 
-    if (parserConfigTemp->logfile != (char *)0)
+    if (parserConfigTemp->logfile != NULL)
 	free(parserConfigTemp->logfile);
 
-    if ((id == (char *)0) || (*id == '\000')) {
-	parserConfigTemp->logfile = (char *)0;
+    if ((id == NULL) || (*id == '\000')) {
+	parserConfigTemp->logfile = NULL;
 	return;
     }
-    if ((parserConfigTemp->logfile = StrDup(id)) == (char *)0)
+    if ((parserConfigTemp->logfile = StrDup(id)) == NULL)
 	OutOfMem();
 }
 
@@ -4492,14 +4492,14 @@ ConfigItemPasswordfile(char *id)
 {
     CONDDEBUG((1, "ConfigItemPasswordfile(%s) [%s:%d]", id, file, line));
 
-    if (parserConfigTemp->passwdfile != (char *)0)
+    if (parserConfigTemp->passwdfile != NULL)
 	free(parserConfigTemp->passwdfile);
 
-    if ((id == (char *)0) || (*id == '\000')) {
-	parserConfigTemp->passwdfile = (char *)0;
+    if ((id == NULL) || (*id == '\000')) {
+	parserConfigTemp->passwdfile = NULL;
 	return;
     }
-    if ((parserConfigTemp->passwdfile = StrDup(id)) == (char *)0)
+    if ((parserConfigTemp->passwdfile = StrDup(id)) == NULL)
 	OutOfMem();
 }
 
@@ -4508,15 +4508,15 @@ ConfigItemUnifiedlog(char *id)
 {
     CONDDEBUG((1, "ConfigItemUnifiedlog(%s) [%s:%d]", id, file, line));
 
-    if (parserConfigTemp->unifiedlog != (char *)0)
+    if (parserConfigTemp->unifiedlog != NULL)
 	free(parserConfigTemp->unifiedlog);
 
-    if ((id == (char *)0) || (*id == '\000')) {
-	parserConfigTemp->unifiedlog = (char *)0;
+    if ((id == NULL) || (*id == '\000')) {
+	parserConfigTemp->unifiedlog = NULL;
 	return;
     }
 
-    if ((parserConfigTemp->unifiedlog = StrDup(id)) == (char *)0)
+    if ((parserConfigTemp->unifiedlog = StrDup(id)) == NULL)
 	OutOfMem();
 }
 
@@ -4525,14 +4525,14 @@ ConfigItemPrimaryport(char *id)
 {
     CONDDEBUG((1, "ConfigItemPrimaryport(%s) [%s:%d]", id, file, line));
 
-    if (parserConfigTemp->primaryport != (char *)0)
+    if (parserConfigTemp->primaryport != NULL)
 	free(parserConfigTemp->primaryport);
 
-    if ((id == (char *)0) || (*id == '\000')) {
-	parserConfigTemp->primaryport = (char *)0;
+    if ((id == NULL) || (*id == '\000')) {
+	parserConfigTemp->primaryport = NULL;
 	return;
     }
-    if ((parserConfigTemp->primaryport = StrDup(id)) == (char *)0)
+    if ((parserConfigTemp->primaryport = StrDup(id)) == NULL)
 	OutOfMem();
 }
 
@@ -4557,7 +4557,7 @@ ConfigItemReinitcheck(char *id)
 
     CONDDEBUG((1, "ConfigItemReinitcheck(%s) [%s:%d]", id, file, line));
 
-    if ((id == (char *)0) || (*id == '\000')) {
+    if ((id == NULL) || (*id == '\000')) {
 	parserConfigTemp->reinitcheck = 0;
 	return;
     }
@@ -4583,7 +4583,7 @@ ConfigItemInitdelay(char *id)
 
     CONDDEBUG((1, "ConfigItemInitdelay(%s) [%s:%d]", id, file, line));
 
-    if ((id == (char *)0) || (*id == '\000')) {
+    if ((id == NULL) || (*id == '\000')) {
 	parserConfigTemp->initdelay = 0;
 	return;
     }
@@ -4606,14 +4606,14 @@ ConfigItemSecondaryport(char *id)
 {
     CONDDEBUG((1, "ConfigItemSecondaryport(%s) [%s:%d]", id, file, line));
 
-    if (parserConfigTemp->secondaryport != (char *)0)
+    if (parserConfigTemp->secondaryport != NULL)
 	free(parserConfigTemp->secondaryport);
 
-    if ((id == (char *)0) || (*id == '\000')) {
-	parserConfigTemp->secondaryport = (char *)0;
+    if ((id == NULL) || (*id == '\000')) {
+	parserConfigTemp->secondaryport = NULL;
 	return;
     }
-    if ((parserConfigTemp->secondaryport = StrDup(id)) == (char *)0)
+    if ((parserConfigTemp->secondaryport = StrDup(id)) == NULL)
 	OutOfMem();
 }
 
@@ -4622,14 +4622,14 @@ ConfigItemSslcredentials(char *id)
 {
     CONDDEBUG((1, "ConfigItemSslcredentials(%s) [%s:%d]", id, file, line));
 #if HAVE_OPENSSL
-    if (parserConfigTemp->sslcredentials != (char *)0)
+    if (parserConfigTemp->sslcredentials != NULL)
 	free(parserConfigTemp->sslcredentials);
 
-    if ((id == (char *)0) || (*id == '\000')) {
-	parserConfigTemp->sslcredentials = (char *)0;
+    if ((id == NULL) || (*id == '\000')) {
+	parserConfigTemp->sslcredentials = NULL;
 	return;
     }
-    if ((parserConfigTemp->sslcredentials = StrDup(id)) == (char *)0)
+    if ((parserConfigTemp->sslcredentials = StrDup(id)) == NULL)
 	OutOfMem();
 #else
     if (isMaster)
@@ -4645,14 +4645,14 @@ ConfigItemSslcacertificatefile(char *id)
     CONDDEBUG((1, "ConfigItemSslcacertificatefile(%s) [%s:%d]", id, file,
 	       line));
 #if HAVE_OPENSSL
-    if (parserConfigTemp->sslcacertificatefile != (char *)0)
+    if (parserConfigTemp->sslcacertificatefile != NULL)
 	free(parserConfigTemp->sslcacertificatefile);
 
-    if ((id == (char *)0) || (*id == '\000')) {
-	parserConfigTemp->sslcacertificatefile = (char *)0;
+    if ((id == NULL) || (*id == '\000')) {
+	parserConfigTemp->sslcacertificatefile = NULL;
 	return;
     }
-    if ((parserConfigTemp->sslcacertificatefile = StrDup(id)) == (char *)0)
+    if ((parserConfigTemp->sslcacertificatefile = StrDup(id)) == NULL)
 	OutOfMem();
 #else
     if (isMaster)
@@ -4712,28 +4712,28 @@ void
 TaskBegin(char *id)
 {
     CONDDEBUG((1, "TaskBegin(%s) [%s:%d]", id, file, line));
-    if (id == (char *)0 || id[0] == '\000' || id[1] != '\000' ||
+    if (id == NULL || id[0] == '\000' || id[1] != '\000' ||
 	((id[0] < '0' || id[0] > '9') && (id[0] < 'a' || id[0] > 'z'))) {
 	if (isMaster)
 	    Error("invalid task id `%s' [%s:%d]", id, file, line);
     } else {
-	if (parserTask == (TASKS *)0) {
+	if (parserTask == NULL) {
 	    if ((parserTask =
-		 (TASKS *)calloc(1, sizeof(TASKS))) == (TASKS *)0)
+		 (TASKS *)calloc(1, sizeof(TASKS))) == NULL)
 		OutOfMem();
 	    parserTask->cmd = AllocString();
 	    parserTask->descr = AllocString();
 	}
-	if (taskSubst == (SUBST *)0) {
+	if (taskSubst == NULL) {
 	    if ((taskSubst =
-		 (SUBST *)calloc(1, sizeof(SUBST))) == (SUBST *)0)
+		 (SUBST *)calloc(1, sizeof(SUBST))) == NULL)
 		OutOfMem();
 	    taskSubst->value = &SubstValue;
 	    taskSubst->token = &SubstToken;
 	}
 
-	BuildString((char *)0, parserTask->cmd);
-	BuildString((char *)0, parserTask->descr);
+	BuildString(NULL, parserTask->cmd);
+	BuildString(NULL, parserTask->descr);
 	parserTask->confirm = FLAGFALSE;
 	parserTask->id = id[0];
     }
@@ -4747,32 +4747,32 @@ TaskEnd(void)
     CONDDEBUG((1, "TaskEnd() [%s:%d]", file, line));
 
     /* skip this if we've marked it that way or if there is no command to run */
-    if (parserTask == (TASKS *)0 || parserTask->id == ' ' ||
+    if (parserTask == NULL || parserTask->id == ' ' ||
 	parserTask->cmd->used <= 1)
 	return;
 
     /* create an ordered list */
     prev = &taskList;
     t = taskList;
-    while (t != (TASKS *)0 && t->id < parserTask->id) {
+    while (t != NULL && t->id < parserTask->id) {
 	prev = &(t->next);
 	t = t->next;
     }
     *prev = parserTask;
-    if (t != (TASKS *)0 && parserTask->id == t->id) {
+    if (t != NULL && parserTask->id == t->id) {
 	parserTask->next = t->next;
 	DestroyTask(t);
     } else {
 	parserTask->next = t;
     }
-    parserTask = (TASKS *)0;
+    parserTask = NULL;
 }
 
 void
 TaskAbort(void)
 {
     CONDDEBUG((1, "TaskAbort() [%s:%d]", file, line));
-    if (parserTask == (TASKS *)0 || parserTask->id == ' ')
+    if (parserTask == NULL || parserTask->id == ' ')
 	return;
 
     parserTask->id = ' ';
@@ -4782,9 +4782,9 @@ void
 TaskDestroy(void)
 {
     CONDDEBUG((1, "TaskDestroy() [%s:%d]", file, line));
-    if (parserTask != (TASKS *)0) {
+    if (parserTask != NULL) {
 	DestroyTask(parserTask);
-	parserTask = (TASKS *)0;
+	parserTask = NULL;
     }
 }
 
@@ -4792,7 +4792,7 @@ void
 TaskItemRunas(char *id)
 {
     CONDDEBUG((1, "TaskItemRunas(%s) [%s:%d]", id, file, line));
-    if (parserTask == (TASKS *)0 || parserTask->id == ' ')
+    if (parserTask == NULL || parserTask->id == ' ')
 	return;
     ProcessUidGid(&(parserTask->uid), &(parserTask->gid), id);
 }
@@ -4801,19 +4801,19 @@ void
 TaskItemSubst(char *id)
 {
     CONDDEBUG((1, "TaskItemSubst(%s) [%s:%d]", id, file, line));
-    if (parserTask == (TASKS *)0 || parserTask->id == ' ')
+    if (parserTask == NULL || parserTask->id == ' ')
 	return;
-    ProcessSubst(taskSubst, (char **)0, &(parserTask->subst), "subst", id);
+    ProcessSubst(taskSubst, NULL, &(parserTask->subst), "subst", id);
 }
 
 void
 TaskItemCmd(char *id)
 {
     CONDDEBUG((1, "TaskItemCmd(%s) [%s:%d]", id, file, line));
-    if (parserTask == (TASKS *)0 || parserTask->id == ' ')
+    if (parserTask == NULL || parserTask->id == ' ')
 	return;
-    BuildString((char *)0, parserTask->cmd);
-    if ((id == (char *)0) || (*id == '\000'))
+    BuildString(NULL, parserTask->cmd);
+    if ((id == NULL) || (*id == '\000'))
 	return;
     BuildString(id, parserTask->cmd);
 }
@@ -4822,10 +4822,10 @@ void
 TaskItemDescr(char *id)
 {
     CONDDEBUG((1, "TaskItemDescr(%s) [%s:%d]", id, file, line));
-    if (parserTask == (TASKS *)0 || parserTask->id == ' ')
+    if (parserTask == NULL || parserTask->id == ' ')
 	return;
-    BuildString((char *)0, parserTask->descr);
-    if ((id == (char *)0) || (*id == '\000'))
+    BuildString(NULL, parserTask->descr);
+    if ((id == NULL) || (*id == '\000'))
 	return;
     BuildString(id, parserTask->descr);
 }
@@ -4844,19 +4844,19 @@ ITEM keyTask[] = {
     {"description", TaskItemDescr},
     {"runas", TaskItemRunas},
     {"subst", TaskItemSubst},
-    {(char *)0, (void *)0}
+    {NULL, NULL}
 };
 
 ITEM keyBreak[] = {
     {"confirm", BreakItemConfirm},
     {"delay", BreakItemDelay},
     {"string", BreakItemString},
-    {(char *)0, (void *)0}
+    {NULL, NULL}
 };
 
 ITEM keyGroup[] = {
     {"users", GroupItemUsers},
-    {(char *)0, (void *)0}
+    {NULL, NULL}
 };
 
 ITEM keyDefault[] = {
@@ -4904,7 +4904,7 @@ ITEM keyDefault[] = {
     {"password", DefaultItemPassword},
     {"username", DefaultItemUsername},
 #endif
-    {(char *)0, (void *)0}
+    {NULL, NULL}
 };
 
 ITEM keyConsole[] = {
@@ -4953,7 +4953,7 @@ ITEM keyConsole[] = {
     {"password", ConsoleItemPassword},
     {"username", ConsoleItemUsername},
 #endif
-    {(char *)0, (void *)0}
+    {NULL, NULL}
 };
 
 ITEM keyAccess[] = {
@@ -4963,7 +4963,7 @@ ITEM keyAccess[] = {
     {"limited", AccessItemLimited},
     {"rejected", AccessItemRejected},
     {"trusted", AccessItemTrusted},
-    {(char *)0, (void *)0}
+    {NULL, NULL}
 };
 
 ITEM keyConfig[] = {
@@ -4984,7 +4984,7 @@ ITEM keyConfig[] = {
     {"sslrequired", ConfigItemSslrequired},
     {"sslreqclientcert", ConfigItemSslreqclientcert},
     {"unifiedlog", ConfigItemUnifiedlog},
-    {(char *)0, (void *)0}
+    {NULL, NULL}
 };
 
 SECTION sections[] = {
@@ -4999,7 +4999,7 @@ SECTION sections[] = {
      keyAccess},
     {"config", ConfigBegin, ConfigEnd, ConfigAbort, ConfigDestroy,
      keyConfig},
-    {(char *)0, (void *)0, (void *)0, (void *)0, (void *)0}
+    {NULL, NULL, NULL, NULL, NULL}
 };
 
 void
@@ -5013,14 +5013,14 @@ ReadCfg(char *filename, FILE *fp)
 #if HAVE_DMALLOC && DMALLOC_MARK_READCFG
     dmallocMarkReadCfg = dmalloc_mark();
 #endif
-    isStartup = (pGroups == (GRPENT *)0 && pRCList == (REMOTE *)0);
+    isStartup = (pGroups == NULL && pRCList == NULL);
 
     /* initialize the break lists */
     for (i = 0; i < BREAKLISTSIZE; i++) {
-	if (breakList[i].seq == (STRING *)0) {
+	if (breakList[i].seq == NULL) {
 	    breakList[i].seq = AllocString();
 	} else {
-	    BuildString((char *)0, breakList[i].seq);
+	    BuildString(NULL, breakList[i].seq);
 	}
 	breakList[i].delay = BREAKDELAYDEFAULT;
 	breakList[i].confirm = FLAGFALSE;
@@ -5038,11 +5038,11 @@ ReadCfg(char *filename, FILE *fp)
     DestroyTaskList();
 
     /* initialize the config set */
-    if (pConfig != (CONFIG *)0) {
+    if (pConfig != NULL) {
 	DestroyConfig(pConfig);
-	pConfig = (CONFIG *)0;
+	pConfig = NULL;
     }
-    if ((pConfig = (CONFIG *)calloc(1, sizeof(CONFIG))) == (CONFIG *)0)
+    if ((pConfig = (CONFIG *)calloc(1, sizeof(CONFIG))) == NULL)
 	OutOfMem();
 
     /* initialize the substition bits */
@@ -5062,7 +5062,7 @@ ReReadCfg(int fd, int msfd)
 {
     FILE *fpConfig;
 
-    if ((FILE *)0 == (fpConfig = fopen(pcConfig, "r"))) {
+    if (NULL == (fpConfig = fopen(pcConfig, "r"))) {
 	if (isMaster)
 	    Error("ReReadCfg(): fopen(%s): %s", pcConfig, strerror(errno));
 	return;
@@ -5080,53 +5080,53 @@ ReReadCfg(int fd, int msfd)
 
     fclose(fpConfig);
 
-    if (pGroups == (GRPENT *)0 && pRCList == (REMOTE *)0) {
+    if (pGroups == NULL && pRCList == NULL) {
 	if (isMaster) {
 	    Error("no consoles found in configuration file");
 	    kill(thepid, SIGTERM);	/* shoot myself in the head */
 	    return;
 	} else {
 	    Msg("no consoles to manage in child process after reconfiguration - child exiting");
-	    DeUtmp((GRPENT *)0, fd);
+	    DeUtmp(NULL, fd);
 	}
     }
 
     /* check for changes to master & child values */
-    if (optConf->logfile == (char *)0) {
+    if (optConf->logfile == NULL) {
 	char *p;
-	if (pConfig->logfile == (char *)0)
+	if (pConfig->logfile == NULL)
 	    p = defConfig.logfile;
 	else
 	    p = pConfig->logfile;
-	if (config->logfile == (char *)0 ||
+	if (config->logfile == NULL ||
 	    strcmp(p, config->logfile) != 0) {
-	    if (config->logfile != (char *)0)
+	    if (config->logfile != NULL)
 		free(config->logfile);
 	    if ((config->logfile = StrDup(p))
-		== (char *)0)
+		== NULL)
 		OutOfMem();
 	    ReopenLogfile();
 	}
     }
 
     /* check for changes to unifiedlog...this might (and does) have
-     * a default of (char *)0, so it's slightly different than the
+     * a default of NULL, so it's slightly different than the
      * other code that does similar stuff (like logfile)
      */
-    if (optConf->unifiedlog == (char *)0) {
+    if (optConf->unifiedlog == NULL) {
 	char *p;
-	if (pConfig->unifiedlog == (char *)0)
+	if (pConfig->unifiedlog == NULL)
 	    p = defConfig.unifiedlog;
 	else
 	    p = pConfig->unifiedlog;
-	if (config->unifiedlog == (char *)0 || p == (char *)0 ||
+	if (config->unifiedlog == NULL || p == NULL ||
 	    strcmp(p, config->unifiedlog) != 0) {
-	    if (config->unifiedlog != (char *)0)
+	    if (config->unifiedlog != NULL)
 		free(config->unifiedlog);
-	    if (p == (char *)0)
+	    if (p == NULL)
 		config->unifiedlog = p;
 	    else if ((config->unifiedlog = StrDup(p))
-		     == (char *)0)
+		     == NULL)
 		OutOfMem();
 	    ReopenUnifiedlog();
 	}
@@ -5140,18 +5140,18 @@ ReReadCfg(int fd, int msfd)
 	/* gets used below by SetDefAccess() */
     }
 
-    if (optConf->passwdfile == (char *)0) {
+    if (optConf->passwdfile == NULL) {
 	char *p;
-	if (pConfig->passwdfile == (char *)0)
+	if (pConfig->passwdfile == NULL)
 	    p = defConfig.passwdfile;
 	else
 	    p = pConfig->passwdfile;
-	if (config->passwdfile == (char *)0 ||
+	if (config->passwdfile == NULL ||
 	    strcmp(p, config->passwdfile) != 0) {
-	    if (config->passwdfile != (char *)0)
+	    if (config->passwdfile != NULL)
 		free(config->passwdfile);
 	    if ((config->passwdfile = StrDup(p))
-		== (char *)0)
+		== NULL)
 		OutOfMem();
 	    /* gets used on-the-fly */
 	}
@@ -5208,7 +5208,7 @@ ReReadCfg(int fd, int msfd)
 
     /* if no one can use us we need to come up with a default
      */
-    if (pACList == (ACCESS *)0)
+    if (pACList == NULL)
 #if USE_IPV6
 	SetDefAccess();
 #else
@@ -5233,77 +5233,77 @@ ReReadCfg(int fd, int msfd)
 	    }
 	}
 #if !USE_UNIX_DOMAIN_SOCKETS
-	if (optConf->primaryport == (char *)0) {
+	if (optConf->primaryport == NULL) {
 	    char *p;
-	    if (pConfig->primaryport == (char *)0)
+	    if (pConfig->primaryport == NULL)
 		p = defConfig.primaryport;
 	    else
 		p = pConfig->primaryport;
-	    if (config->primaryport == (char *)0 ||
+	    if (config->primaryport == NULL ||
 		strcmp(p, config->primaryport) != 0) {
-		if (config->primaryport != (char *)0)
+		if (config->primaryport != NULL)
 		    free(config->primaryport);
 		if ((config->primaryport = StrDup(p))
-		    == (char *)0)
+		    == NULL)
 		    OutOfMem();
 		Msg("warning: `primaryport' config option changed - you must restart for it to take effect");
 	    }
 	}
-	if (optConf->secondaryport == (char *)0) {
+	if (optConf->secondaryport == NULL) {
 	    char *p;
-	    if (pConfig->secondaryport == (char *)0)
+	    if (pConfig->secondaryport == NULL)
 		p = defConfig.secondaryport;
 	    else
 		p = pConfig->secondaryport;
-	    if (config->secondaryport == (char *)0 ||
+	    if (config->secondaryport == NULL ||
 		strcmp(p, config->secondaryport) != 0) {
-		if (config->secondaryport != (char *)0)
+		if (config->secondaryport != NULL)
 		    free(config->secondaryport);
 		if ((config->secondaryport = StrDup(p))
-		    == (char *)0)
+		    == NULL)
 		    OutOfMem();
 		Msg("warning: `secondaryport' config option changed - you must restart for it to take effect");
 	    }
 	}
 #endif
 #if HAVE_OPENSSL
-	if (optConf->sslcredentials == (char *)0) {
-	    if (pConfig->sslcredentials == (char *)0) {
-		if (config->sslcredentials != (char *)0) {
+	if (optConf->sslcredentials == NULL) {
+	    if (pConfig->sslcredentials == NULL) {
+		if (config->sslcredentials != NULL) {
 		    free(config->sslcredentials);
-		    config->sslcredentials = (char *)0;
+		    config->sslcredentials = NULL;
 		    Msg("warning: `sslcredentials' config option changed - you must restart for it to take effect");
 		}
 	    } else {
-		if (config->sslcredentials == (char *)0 ||
+		if (config->sslcredentials == NULL ||
 		    strcmp(pConfig->sslcredentials,
 			   config->sslcredentials) != 0) {
-		    if (config->sslcredentials != (char *)0)
+		    if (config->sslcredentials != NULL)
 			free(config->sslcredentials);
 		    if ((config->sslcredentials =
 			 StrDup(pConfig->sslcredentials))
-			== (char *)0)
+			== NULL)
 			OutOfMem();
 		    Msg("warning: `sslcredentials' config option changed - you must restart for it to take effect");
 		}
 	    }
 	}
-	if (optConf->sslcacertificatefile == (char *)0) {
-	    if (pConfig->sslcacertificatefile == (char *)0) {
-		if (config->sslcacertificatefile != (char *)0) {
+	if (optConf->sslcacertificatefile == NULL) {
+	    if (pConfig->sslcacertificatefile == NULL) {
+		if (config->sslcacertificatefile != NULL) {
 		    free(config->sslcacertificatefile);
-		    config->sslcacertificatefile = (char *)0;
+		    config->sslcacertificatefile = NULL;
 		    Msg("warning: `sslcacertificatefile' config option changed - you must restart for it to take effect");
 		}
 	    } else {
-		if (config->sslcacertificatefile == (char *)0 ||
+		if (config->sslcacertificatefile == NULL ||
 		    strcmp(pConfig->sslcacertificatefile,
 			   config->sslcacertificatefile) != 0) {
-		    if (config->sslcacertificatefile != (char *)0)
+		    if (config->sslcacertificatefile != NULL)
 			free(config->sslcacertificatefile);
 		    if ((config->sslcacertificatefile =
 			 StrDup(pConfig->sslcacertificatefile))
-			== (char *)0)
+			== NULL)
 			OutOfMem();
 		    Msg("warning: `sslcacertificatefile' config option changed - you must restart for it to take effect");
 		}
@@ -5334,7 +5334,7 @@ ReReadCfg(int fd, int msfd)
 #endif
 
 	/* spawn all the children, so fix kids has an initial pid */
-	for (pGE = pGroups; pGE != (GRPENT *)0; pGE = pGE->pGEnext) {
+	for (pGE = pGroups; pGE != NULL; pGE = pGE->pGEnext) {
 	    if (pGE->imembers == 0 || pGE->pid != -1)
 		continue;
 
@@ -5346,7 +5346,7 @@ ReReadCfg(int fd, int msfd)
 
 	if (fVerbose) {
 	    ACCESS *pACtmp;
-	    for (pACtmp = pACList; pACtmp != (ACCESS *)0;
+	    for (pACtmp = pACList; pACtmp != NULL;
 		 pACtmp = pACtmp->pACnext) {
 		Verbose("access type `%c' for `%s'", pACtmp->ctrust,
 			pACtmp->pcwho);
@@ -5359,7 +5359,7 @@ ReReadCfg(int fd, int msfd)
 	 */
 	if (fVerbose) {
 	    REMOTE *pRC;
-	    for (pRC = pRCUniq; (REMOTE *)0 != pRC; pRC = pRC->pRCuniq) {
+	    for (pRC = pRCUniq; NULL != pRC; pRC = pRC->pRCuniq) {
 		Verbose("peer server on `%s'", pRC->rhost);
 	    }
 	}
@@ -5370,9 +5370,9 @@ ReReadCfg(int fd, int msfd)
 	    REMOTE *pRC;
 	    GRPENT *pGE;
 	    int local = 0, remote = 0;
-	    for (pGE = pGroups; pGE != (GRPENT *)0; pGE = pGE->pGEnext)
+	    for (pGE = pGroups; pGE != NULL; pGE = pGE->pGEnext)
 		local += pGE->imembers;
-	    for (pRC = pRCList; (REMOTE *)0 != pRC; pRC = pRC->pRCnext)
+	    for (pRC = pRCList; NULL != pRC; pRC = pRC->pRCnext)
 		remote++;
 #if USE_IPV6
 	    setproctitle("master: %d local, %d remote", local, remote);
