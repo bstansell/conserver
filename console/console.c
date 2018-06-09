@@ -32,7 +32,6 @@
 #include "getpassword.h"
 #include "cutil.h"
 #include "readconf.h"
-#include "version.h"
 
 #include <sysexits.h>
 #if HAVE_OPENSSL

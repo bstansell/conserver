@@ -26,6 +26,19 @@ AC_C_CONST
 AC_PROG_CC_C99
 AC_PROG_INSTALL
 
+AC_DEFINE_UNQUOTED([VERSION_TEXT], ["conserver.com version"], [Version banner])
+version_int=`echo $PACKAGE_VERSION | awk -F. '{print $1 * 1000000 + $2 * 1000 + $3}'`
+AC_DEFINE_UNQUOTED([VERSION_UINT], [$version_int],
+  [Conserver version as unsigned int])
+
+AC_DEFINE_UNQUOTED([COPYRIGHT],
+  ["Copyright 1990 The Ohio State University.\n\
+Copyright 1992 Purdue Research Foundation.\n\
+Copyright 1998 GNAC, Inc.\n\
+Copyright 2000 conserver.com.\n\
+All rights reserved.\n"],
+  [Conserver copyright])
+
 usrsbin_execdir='${exec_prefix}/sbin'
 AC_SUBST([usrsbin_execdir])
 

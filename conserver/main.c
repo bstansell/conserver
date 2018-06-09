@@ -36,7 +36,6 @@
 #include "access.h"
 #include "master.h"
 #include "readcfg.h"
-#include "version.h"
 
 #include <dirent.h>
 #include <sysexits.h>

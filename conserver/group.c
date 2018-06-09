@@ -67,7 +67,6 @@
 #include "readcfg.h"
 #include "master.h"
 #include "main.h"
-#include "version.h"
 
 #if HAVE_PAM
 # include <security/pam_appl.h>

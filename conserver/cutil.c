@@ -7,7 +7,6 @@
 #include <compat.h>
 
 #include "cutil.h"
-#include "version.h"
 
 #include <net/if.h>
 #include <sysexits.h>
@@ -3054,8 +3053,7 @@ MyVersion(void)
     if (version != (STRING *)0)
 	return version->string;
     version = AllocString();
-    BuildStringPrint(version, "%s %d.%d.%d", VERSION_TEXT, VERSION_MAJOR,
-		     VERSION_MINOR, VERSION_REV);
+    BuildStringPrint(version, "%s %s", VERSION_TEXT, PACKAGE_VERSION);
     return version->string;
 }
 

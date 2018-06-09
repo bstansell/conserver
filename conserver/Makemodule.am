@@ -20,8 +20,7 @@ conserver_conserver_SOURCES = \
 	conserver/master.c \
 	conserver/master.h \
 	conserver/readcfg.c \
-	conserver/readcfg.h \
-	conserver/version.h
+	conserver/readcfg.h
 
 conserver_conserver_LDADD = \
 	$(FREEIPMI_LIBS) \

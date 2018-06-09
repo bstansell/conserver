@@ -11,8 +11,6 @@
 #include <pwd.h>
 
 #include <cutil.h>
-#include <version.h>
-
 
 /* the next two routines assure that the users tty is in the
  * correct mode for us to do our thing
