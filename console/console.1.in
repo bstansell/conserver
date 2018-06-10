@@ -11,7 +11,7 @@ console \- console server client program
 .br
 .B console
 .RI [ generic-args ]
-.RB [ \-iIuwWx ]
+.RB [ \-iIjuwWx ]
 .RI [ console ]
 .br
 .B console
@@ -177,6 +177,10 @@ Display status information in a machine-parseable format (see below for the deta
 Same as
 .B \-i
 but just acts on the primary server.
+.TP
+.BI \-j
+Request conserver to print status information in a json format.  Keys and
+values are the same as in the \-i output.
 .TP
 .BI \-l user
 Set the login name used for authentication to

@@ -8,6 +8,7 @@ AM_CPPFLAGS = \
 	-I$(top_srcdir)/conserver \
 	$(FREEIPMI_CFLAGS) \
 	$(GSSAPI_CFLAGS) \
+	$(JSON_CFLAGS) \
 	$(OPENSSL_CFLAGS)
 
 EXTRA_DIST = \

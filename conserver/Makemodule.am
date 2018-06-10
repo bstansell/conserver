@@ -26,6 +26,7 @@ conserver_conserver_SOURCES = \
 conserver_conserver_LDADD = \
 	$(FREEIPMI_LIBS) \
 	$(GSSAPI_LIBS) \
+	$(JSON_LIBS) \
 	$(OPENSSL_LIBS) \
 	$(SETPROCTITLE_LIBS) \
 	$(UTIL_LIBS)

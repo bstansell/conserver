@@ -219,6 +219,7 @@ AC_ARG_WITH([dmalloc],
 
 CONSERVER_PKG([freeipmi], [FreeIPMI], [FREEIPMI], [libipmiconsole])
 CONSERVER_PKG([gssapi], [GSS-API], [GSSAPI], [krb5-gssapi])
+CONSERVER_PKG([json], [json-c], [JSON], [json-c])
 CONSERVER_PKG([libbsd], [libbsd], [SETPROCTITLE], [libbsd])
 CONSERVER_PKG([openssl], [OpenSSL], [OPENSSL], [openssl])
 
@@ -284,6 +285,7 @@ Feature Summary
   freeipmi:         ${with_freeipmi}
   gssapi:           ${with_gssapi}
   openssl:          ${with_openssl}
+  json:             ${with_json}
   libbsd:           ${with_libbsd}
   libwrap:          ${with_libwrap}
   pam:              ${with_pam}

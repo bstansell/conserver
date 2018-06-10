@@ -72,6 +72,9 @@
 # include <security/pam_appl.h>
 #endif
 
+#ifdef HAVE_JSON
+# include <json-c/json.h>
+#endif
 
 #ifdef HAVE_SETPROCTITLE
 # ifdef HAVE_BSD_UNISTD_H
@@ -2465,6 +2468,249 @@ CommandInfo(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
     }
 }
 
+#ifdef HAVE_JSON
+void
+CommandJson(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
+	    long tyme)
+{
+    CONSENT *pCE = pGE->pCElist;
+    CONSCLIENT *pCL;
+    json_object *joutput = json_object_new_object();
+    json_object *jstring;
+    json_object *jint;
+    json_object *jboolean;
+    json_object *jaliases;
+    char str[2];
+
+    /* for elements should probably go to array */
+
+    for (; pCE != NULL; pCE = pCE->pCEnext) {
+        json_object *jconsole = json_object_new_object();
+	json_object_object_add(joutput, pCE->server, jconsole);
+
+	jstring = json_object_new_string(myHostname);
+	json_object_object_add(jconsole, "myhostname", jstring);
+
+	jint = json_object_new_int(thepid);
+	json_object_object_add(jconsole, "pid", jint);
+
+	jint = json_object_new_int(pGE->port);
+	json_object_object_add(jconsole, "port", jint);
+
+	switch (pCE->type) {
+	case EXEC:
+	    jstring = json_object_new_string("exec");
+	    json_object_object_add(jconsole, "type", jstring);
+
+	    jstring = json_object_new_string(pCE->exec != NULL ? pCE->exec : "/bin/sh");
+	    json_object_object_add(jconsole, "exec", jstring);
+
+	    jint = json_object_new_int(pCE->ipid);
+	    json_object_object_add(jconsole, "exec-pid", jint);
+
+	    jstring = json_object_new_string(pCE->execSlave);
+	    json_object_object_add(jconsole, "execslave", jstring);
+
+	    jint = json_object_new_int(FileFDNum(pCE->cofile));
+	    json_object_object_add(jconsole, "cofile", jint);
+	    break;
+
+#if HAVE_FREEIPMI
+	case IPMI:
+	    jstring = json_object_new_string("ipmi");
+	    json_object_object_add(jconsole, "type", jstring);
+
+	    jstring = json_object_new_string(pCE->execSlave);
+	    json_object_object_add(jconsole, "host", jstring);
+
+	    jint = json_object_new_int(FileFDNum(pCE->cofile));
+	    json_object_object_add(jconsole, "cofile", jint);
+	    break;
+#endif
+	case HOST:
+	    jstring = json_object_new_string("host");
+	    json_object_object_add(jconsole, "type", jstring);
+
+	    jstring = json_object_new_string(pCE->host);
+	    json_object_object_add(jconsole, "host", jstring);
+
+	    jint = json_object_new_int(pCE->netport);
+	    json_object_object_add(jconsole, "netport", jint);
+
+	    jboolean = json_object_new_boolean(1);
+	    json_object_object_add(jconsole, pCE->raw == FLAGTRUE ? "raw" : "telnet", jboolean);
+
+	    jint = json_object_new_int(FileFDNum(pCE->cofile));
+	    json_object_object_add(jconsole, "cofile", jint);
+	    break;
+
+	case NOOP:
+	    jstring = json_object_new_string("noop");
+	    json_object_object_add(jconsole, "type", jstring);
+	    break;
+
+	case UDS:
+	    jstring = json_object_new_string("uds");
+	    json_object_object_add(jconsole, "type", jstring);
+
+	    jstring = json_object_new_string(pCE->uds);
+	    json_object_object_add(jconsole, "uds", jstring);
+
+	    jint = json_object_new_int(FileFDNum(pCE->cofile));
+	    json_object_object_add(jconsole, "cofile", jint);
+	    break;
+
+	case DEVICE:
+	    jstring = json_object_new_string("device");
+	    json_object_object_add(jconsole, "type", jstring);
+
+	    jstring = json_object_new_string(pCE->device);
+	    json_object_object_add(jconsole, "device", jstring);
+
+	    jstring = json_object_new_string(pCE->baud ? pCE->baud->acrate : "");
+	    json_object_object_add(jconsole, "baud", jstring);
+
+	    str[0] = pCE->parity ? pCE->parity->key[0] : ' ';
+	    str[1] = '\0';
+	    jstring = json_object_new_string(str);
+	    json_object_object_add(jconsole, "parity-key", jstring);
+
+	    jint = json_object_new_int(FileFDNum(pCE->cofile));
+	    json_object_object_add(jconsole, "cofile", jint);
+
+	    jboolean = json_object_new_boolean(pCE->hupcl == FLAGTRUE);
+	    json_object_object_add(jconsole, "hupcl", jboolean);
+
+	    jboolean = json_object_new_boolean(pCE->cstopb == FLAGTRUE);
+	    json_object_object_add(jconsole, "cstopb", jboolean);
+
+	    jboolean = json_object_new_boolean(pCE->crtscts == FLAGTRUE);
+	    json_object_object_add(jconsole, "crtscts", jboolean);
+	    break;
+
+	case UNKNOWNTYPE:
+	    jstring = json_object_new_string("unknown");
+	    json_object_object_add(jconsole, "type", jstring);
+	    break;
+	}
+
+	if (pCE->pCLwr) {
+	    jstring = json_object_new_string(pCE->pCLwr->acid->string);
+	    json_object_object_add(jconsole, "client-writer", jstring);
+
+	    jint = json_object_new_int(tyme - pCE->pCLwr->typetym);
+	    json_object_object_add(jconsole, "tyme", jint);
+	}
+
+	for (pCL = pCE->pCLon; (CONSCLIENT *) 0 != pCL; pCL = pCL->pCLnext) {
+	    if (pCL == pCE->pCLwr)
+		continue;
+
+	    jstring = json_object_new_string(pCE->pCLwr->acid->string);
+	    json_object_object_add(jconsole, "client-writer", jstring);
+
+	    jint = json_object_new_int(tyme - pCE->pCLwr->typetym);
+	    json_object_object_add(jconsole, "tyme", jint);
+
+	    jboolean = json_object_new_boolean(pCL->fwantwr && !pCL->fro);
+	    json_object_object_add(jconsole, "rw", jboolean);
+	}
+
+	jstring = json_object_new_string((pCE->fup &&
+					  pCE->ioState ==
+					  ISNORMAL) ? (pCE->initfile ==
+						       (CONSFILE *) 0 ? "up" : "init")
+					 : "down");
+	json_object_object_add(jconsole, "status", jstring);
+
+	jboolean = json_object_new_boolean(pCE->fronly);
+	json_object_object_add(jconsole, "read-only", jboolean);
+
+	jstring = json_object_new_string(pCE->logfile == NULL ? "" : pCE->logfile);
+	json_object_object_add(jconsole, "logfile", jstring);
+
+	jboolean = json_object_new_boolean(pCE->nolog);
+	json_object_object_add(jconsole, "nolog", jboolean);
+
+	jboolean = json_object_new_boolean(pCE->activitylog);
+	json_object_object_add(jconsole, "activitylog", jboolean);
+
+	jboolean = json_object_new_boolean(pCE->breaklog);
+	json_object_object_add(jconsole, "breaklog", jboolean);
+
+	jboolean = json_object_new_boolean(pCE->tasklog);
+	json_object_object_add(jconsole, "tasklog", jboolean);
+
+	jint = json_object_new_int(pCE->mark);
+	json_object_object_add(jconsole, "mark", jint);
+
+	jint = json_object_new_int(pCE->fdlog ? pCE->fdlog->fd : -1);
+	json_object_object_add(jconsole, "logfd", jint);
+
+	jint = json_object_new_int(pCE->breakNum);
+	json_object_object_add(jconsole, "breaknum", jint);
+
+	jboolean = json_object_new_boolean(pCE->autoReUp);
+	json_object_object_add(jconsole, "autoup", jboolean);
+
+	jaliases = json_object_new_array();
+	if (pCE->aliases != NULL) {
+	    NAMES *n;
+
+	    for (n = pCE->aliases; n != (NAMES *) 0; n = n->next) {
+		jstring = json_object_new_string(n->name);
+		json_object_array_add(jaliases, jstring);
+	    }
+	}
+	json_object_object_add(jconsole, "aliases", jaliases);
+
+	if (pCE->type == DEVICE || pCE->type == EXEC) {
+	    jboolean = json_object_new_boolean(pCE->ixon == FLAGTRUE);
+	    json_object_object_add(jconsole, "ixon", jboolean);
+
+	    jboolean = json_object_new_boolean(pCE->ixany == FLAGTRUE);
+	    json_object_object_add(jconsole, "ixany", jboolean);
+
+	    jboolean = json_object_new_boolean(pCE->ixoff == FLAGTRUE);
+	    json_object_object_add(jconsole, "ixoff", jboolean);
+	}
+
+	jboolean = json_object_new_boolean(pCE->ondemand == FLAGTRUE);
+	json_object_object_add(jconsole, "ondemand", jboolean);
+
+	jboolean = json_object_new_boolean(pCE->reinitoncc == FLAGTRUE);
+	json_object_object_add(jconsole, "reinitoncc", jboolean);
+
+	jboolean = json_object_new_boolean(pCE->striphigh == FLAGTRUE);
+	json_object_object_add(jconsole, "striphigh", jboolean);
+
+	jboolean = json_object_new_boolean(pCE->autoreinit == FLAGTRUE);
+	json_object_object_add(jconsole, "autoreinit", jboolean);
+
+	jboolean = json_object_new_boolean(pCE->unloved == FLAGTRUE);
+	json_object_object_add(jconsole, "unloved", jboolean);
+
+	jboolean = json_object_new_boolean(pCE->login == FLAGTRUE);
+	json_object_object_add(jconsole, "login", jboolean);
+
+	jstring = json_object_new_string(pCE->initcmd == NULL ? "" : pCE->initcmd);
+	json_object_object_add(jconsole, "initcmd", jstring);
+
+	jint = json_object_new_int(pCE->idletimeout);
+	json_object_object_add(jconsole, "idletimeout", jint);
+
+	jstring = json_object_new_string(pCE->idlestring == NULL ? "" : pCE->idlestring);
+	json_object_object_add(jconsole, "idlestring", jstring);
+    }
+
+    /* Print and free memory json object reseved.  */
+    FilePrint(pCLServing->fd, FLAGFALSE, "%s",
+	      json_object_to_json_string_ext(joutput,
+					     JSON_C_TO_STRING_SPACED | JSON_C_TO_STRING_PRETTY));
+    json_object_put(joutput);
+}
+#endif /* HAVE_JSON */
+
 void
 CommandLogging(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
 	       long tyme)
@@ -3252,6 +3498,14 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 		} else if (pCLServing->iState == S_NORMAL &&
 			   strcmp(pcCmd, "info") == 0) {
 		    CommandInfo(pGE, pCLServing, pCEServing, tyme, pcArgs);
+		} else if (pCLServing->iState == S_NORMAL &&
+			   strcmp(pcCmd, "json") == 0) {
+#ifdef HAVE_JSON
+		    CommandJson(pGE, pCLServing, pCEServing, tyme);
+#else
+		    FileWrite(pCLServing->fd, FLAGFALSE,
+			      "{\"conserver\": \"is compiled without json support\"}\n", -1);
+#endif
 		} else if (pCLServing->iState == S_NORMAL &&
 			   strcmp(pcCmd, "examine") == 0) {
 		    CommandExamine(pGE, pCLServing, pCEServing, tyme,
