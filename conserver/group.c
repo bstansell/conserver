@@ -1226,6 +1226,7 @@ WriteLog(CONSENT *pCE, char *s, int len)
     if (NULL == pCE->fdlog) {
 	return;
     }
+    pCE->totalWrites += len;
     if (pCE->mark >= 0) {	/* no line marking */
 	FileWrite(pCE->fdlog, FLAGFALSE, s, len);
 	return;
@@ -2476,10 +2477,11 @@ CommandJson(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
     CONSENT *pCE = pGE->pCElist;
     CONSCLIENT *pCL;
     json_object *joutput = json_object_new_object();
+    json_object *juser;
     json_object *jstring;
     json_object *jint;
     json_object *jboolean;
-    json_object *jaliases;
+    json_object *jarray;
     char str[2];
 
     /* for elements should probably go to array */
@@ -2594,27 +2596,41 @@ CommandJson(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
 	    break;
 	}
 
+	juser = json_object_new_object();
 	if (pCE->pCLwr) {
 	    jstring = json_object_new_string(pCE->pCLwr->acid->string);
-	    json_object_object_add(jconsole, "client-writer", jstring);
+	    json_object_object_add(juser, "client-writer", jstring);
 
 	    jint = json_object_new_int(tyme - pCE->pCLwr->typetym);
-	    json_object_object_add(jconsole, "tyme", jint);
-	}
+	    json_object_object_add(juser, "tyme", jint);
 
-	for (pCL = pCE->pCLon; (CONSCLIENT *) 0 != pCL; pCL = pCL->pCLnext) {
+	    jint = json_object_new_int(pCE->pCLwr->fcon);
+	    json_object_object_add(juser, "isconnected", jint);
+
+	    jint = json_object_new_int(pCE->pCLwr->tym);
+	    json_object_object_add(juser, "timeofconnect", jint);
+	}
+	json_object_object_add(jconsole, "writeuser", juser);
+
+	jarray = json_object_new_array();
+	for (pCL = pCE->pCLon; pCL; pCL = pCL->pCLnext) {
 	    if (pCL == pCE->pCLwr)
 		continue;
 
-	    jstring = json_object_new_string(pCE->pCLwr->acid->string);
-	    json_object_object_add(jconsole, "client-writer", jstring);
+	    juser = json_object_new_object();
 
-	    jint = json_object_new_int(tyme - pCE->pCLwr->typetym);
-	    json_object_object_add(jconsole, "tyme", jint);
+	    jstring = json_object_new_string(pCL->acid->string);
+	    json_object_object_add(juser, "client-writer", jstring);
+
+	    jint = json_object_new_int(tyme - pCL->typetym);
+	    json_object_object_add(juser, "tyme", jint);
 
 	    jboolean = json_object_new_boolean(pCL->fwantwr && !pCL->fro);
-	    json_object_object_add(jconsole, "rw", jboolean);
+	    json_object_object_add(juser, "rw", jboolean);
+
+	    json_object_array_add(jarray, juser);
 	}
+	json_object_object_add(jconsole, "rousers", jarray);
 
 	jstring = json_object_new_string((pCE->fup &&
 					  pCE->ioState ==
@@ -2622,6 +2638,9 @@ CommandJson(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
 						       (CONSFILE *) 0 ? "up" : "init")
 					 : "down");
 	json_object_object_add(jconsole, "status", jstring);
+
+	jstring = json_object_new_string(ConsState(pCE));
+	json_object_object_add(jconsole, "iostate", jstring);
 
 	jboolean = json_object_new_boolean(pCE->fronly);
 	json_object_object_add(jconsole, "read-only", jboolean);
@@ -2653,16 +2672,16 @@ CommandJson(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
 	jboolean = json_object_new_boolean(pCE->autoReUp);
 	json_object_object_add(jconsole, "autoup", jboolean);
 
-	jaliases = json_object_new_array();
+	jarray = json_object_new_array();
 	if (pCE->aliases != NULL) {
 	    NAMES *n;
 
 	    for (n = pCE->aliases; n != (NAMES *) 0; n = n->next) {
 		jstring = json_object_new_string(n->name);
-		json_object_array_add(jaliases, jstring);
+		json_object_array_add(jarray, jstring);
 	    }
 	}
-	json_object_object_add(jconsole, "aliases", jaliases);
+	json_object_object_add(jconsole, "aliases", jarray);
 
 	if (pCE->type == DEVICE || pCE->type == EXEC) {
 	    jboolean = json_object_new_boolean(pCE->ixon == FLAGTRUE);
@@ -2701,6 +2720,19 @@ CommandJson(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
 
 	jstring = json_object_new_string(pCE->idlestring == NULL ? "" : pCE->idlestring);
 	json_object_object_add(jconsole, "idlestring", jstring);
+
+#if HAVE_GETTIMEOFDAY
+	jint = json_object_new_int(pCE->lastInit.tv_sec);
+#else
+	jint = json_object_new_int(pCE->lastInit);
+#endif
+	json_object_object_add(jconsole, "lastinit", jint);
+
+	jint = json_object_new_int(pCE->connectCount);
+	json_object_object_add(jconsole, "connectcount", jint);
+
+	jint = json_object_new_int(pCE->totalWrites);
+	json_object_object_add(jconsole, "totalwrites", jint);
     }
 
     /* Print and free memory json object reseved.  */
@@ -5011,6 +5043,7 @@ Kiddie(GRPENT *pGE, int sfd)
 		    }
 		    SendIWaitClientsMsg(pCEServing, "up]\r\n");
 		    StartInit(pCEServing);
+		    pCEServing->connectCount++;
 		    break;
 		case ISNORMAL:
 		    if (FileCanRead(pCEServing->cofile, &rmask, &wmask))

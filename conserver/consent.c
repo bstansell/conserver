@@ -1243,6 +1243,8 @@ ConsInit(CONSENT *pCE)
 	pCE->lastInit = tv;
 #endif
 
+    pCE->connectCount++;
+
     if (pCE->ioState == ISNORMAL)
 	StartInit(pCE);
 }

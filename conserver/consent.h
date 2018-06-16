@@ -172,11 +172,13 @@ typedef struct consent {	/* console information                  */
     IOSTATE ioState;		/* state of the socket                  */
     time_t stateTimer;		/* timer for ioState states             */
     time_t lastWrite;		/* time of last data sent to console    */
+    size_t totalWrites;		/* bytes wrote to console log		*/
 #if HAVE_GETTIMEOFDAY
     struct timeval lastInit;	/* time of last initialization          */
 #else
     time_t lastInit;		/* time of last initialization          */
 #endif
+    unsigned int connectCount;	/* number of times init has happen	*/
     unsigned short spincount;	/* initialization spin counter          */
 
     /*** state information ***/
