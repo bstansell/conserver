@@ -1761,7 +1761,12 @@ main(int argc, char **argv)
 		local += pGE->imembers;
 	    for (pRC = pRCList; NULL != pRC; pRC = pRC->pRCnext)
 		remote++;
-	    setproctitle("master: port %hu, %d local, %d remote",
+# if USE_IPV6
+#  define PORT_FORMAT_MODIFIER "%s"
+# else
+#  define PORT_FORMAT_MODIFIER "%hu"
+# endif
+	    setproctitle("master: port " PORT_FORMAT_MODIFIER ", %d local, %d remote",
 # if USE_IPV6
 			 config->primaryport,
 # elif USE_UNIX_DOMAIN_SOCKETS
