@@ -46,6 +46,11 @@
 # include <gssapi/gssapi.h>
 #endif
 
+#ifdef HAVE_SETPROCTITLE
+# ifdef HAVE_BSD_UNISTD_H
+#  include <bsd/unistd.h>
+# endif
+#endif
 
 int fAll = 0, fNoinit = 0, fVersion = 0, fStrip = 0, fReopen =
     0, fNoautoreup = 0, fSyntaxOnly = 0;

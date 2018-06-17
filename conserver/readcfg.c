@@ -34,6 +34,12 @@
 #include "readcfg.h"
 #include "main.h"
 
+#ifdef HAVE_SETPROCTITLE
+# ifdef HAVE_BSD_UNISTD_H
+#  include <bsd/unistd.h>
+# endif
+#endif
+
 /*****  external things *****/
 NAMES *userList = NULL;
 GRPENT *pGroups = NULL;

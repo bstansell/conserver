@@ -58,6 +58,7 @@ AC_HEADER_SYS_WAIT
 AC_HEADER_TIME
 
 AC_CHECK_HEADERS([ \
+  bsd/unistd.h \
   bsm/audit.h \
   hpsecurity.h \
   libutil.h \

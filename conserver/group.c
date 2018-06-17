@@ -73,6 +73,12 @@
 #endif
 
 
+#ifdef HAVE_SETPROCTITLE
+# ifdef HAVE_BSD_UNISTD_H
+#  include <bsd/unistd.h>
+# endif
+#endif
+
 /* flags that a signal has occurred */
 static sig_atomic_t fSawChldHUP = 0, fSawReUp = 0, fSawGoAway =
     0, fSawReapVirt = 0, fSawChldUSR2 = 0;
