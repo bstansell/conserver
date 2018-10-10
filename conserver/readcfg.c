@@ -3116,7 +3116,7 @@ ConsoleAdd(CONSENT *c)
 	pCEmatch->logfilemax = c->logfilemax;
 	if (pCEmatch->logfilemax != (off_t) 0 &&
 	    timers[T_ROLL] == (time_t)0)
-	    timers[T_ROLL] = time((time_t)0);
+	    timers[T_ROLL] = time((time_t *)0);
 
 	SwapStr(&pCEmatch->motd, &c->motd);
 	SwapStr(&pCEmatch->idlestring, &c->idlestring);
