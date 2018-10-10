@@ -686,7 +686,7 @@ character
 The resulting value must be no more than 20 characters.
 The null string (``\f3""\fP'') is the default.
 .TP
-\f3impiworkaround\fP [\f3!\fP]option[\f3,\fP...]|\f3""\fP
+\f3ipmiworkaround\fP [\f3!\fP]option[\f3,\fP...]|\f3""\fP
 .br
 You can turn off a workaround by prefixing it with a
 .RB `` ! ''
