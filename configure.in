@@ -535,7 +535,7 @@ AC_ARG_WITH(openssl,
 	    [LIBS="$LIBS -lssl -lcrypto"
 	    AC_MSG_CHECKING(for openssl libraries -lssl and -lcrypto)
 	    AC_TRY_LINK([#include <openssl/ssl.h>
-		],[SSL_library_init()],
+		],[SSL_CTX_new(NULL)],
 		[AC_MSG_RESULT(yes)
 		cons_with_openssl="YES"
 		AC_DEFINE(HAVE_OPENSSL)
