@@ -560,10 +560,13 @@ DoNormalRead(CONSCLIENT *pCLServing)
 		if (iSep >= 0) {
 		    if (config->redirect == FLAGTRUE) {
 			REMOTE *pRC;
+			char *s;
 			for (pRC = pRCUniq; (REMOTE *)0 != pRC;
 			     pRC = pRC->pRCuniq) {
+			    s = ":@%s";
+			    s += iSep;
 			    FilePrint(pCLServing->fd, FLAGTRUE,
-				      ":@%s" + iSep, pRC->rhost);
+				      s, pRC->rhost);
 			    iSep = 0;
 			}
 		    }
@@ -642,12 +645,14 @@ DoNormalRead(CONSCLIENT *pCLServing)
 		       strcmp(pcCmd, "groups") == 0) {
 		int iSep = 1;
 		GRPENT *pGE;
+		char *s;
 
 		for (pGE = pGroups; pGE != (GRPENT *)0; pGE = pGE->pGEnext) {
 		    if (0 == pGE->imembers)
 			continue;
-		    FilePrint(pCLServing->fd, FLAGTRUE, ":%hu" + iSep,
-			      pGE->port);
+		    s = ":%hu";
+		    s += iSep;
+		    FilePrint(pCLServing->fd, FLAGTRUE, s, pGE->port);
 		    iSep = 0;
 		}
 		FileWrite(pCLServing->fd, FLAGFALSE, "\r\n", 2);
