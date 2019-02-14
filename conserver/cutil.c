@@ -57,7 +57,9 @@ Bye(int status)
 {
     DestroyDataStructures();
 #if HAVE_OPENSSL
+# if OPENSSL_VERSION_NUMBER < 0x10100000L
     ERR_free_strings();
+# endif
 #endif
     exit(status);
 }
