@@ -27,6 +27,9 @@
 /* Define to 1 if you have the <bsm/audit.h> header file. */
 #undef HAVE_BSM_AUDIT_H
 
+/* Define to 1 if you have the `closefrom' function. */
+#undef HAVE_CLOSEFROM
+
 /* Define to 1 if you have the <crypt.h> header file. */
 #undef HAVE_CRYPT_H
 
