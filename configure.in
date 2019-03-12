@@ -828,7 +828,7 @@ AC_CHECK_HEADERS(pty.h libutil.h util.h)
 AC_CHECK_LIB(util, openpty)
 AC_CHECK_FUNCS(openpty)
 
-AC_CHECK_FUNCS(getopt strerror getrlimit getsid setsid getuserattr setgroups tcgetpgrp tcsetpgrp tcgetattr tcsetattr tcsendbreak setpgrp getutent setttyent getspnam setlinebuf setvbuf ptsname grantpt unlockpt sigaction setsockopt getdtablesize putenv memset memcpy memcmp memmove sysconf getlogin inet_aton setproctitle gettimeofday strlcpy)
+AC_CHECK_FUNCS(getopt strerror getrlimit getsid setsid getuserattr setgroups tcgetpgrp tcsetpgrp tcgetattr tcsetattr tcsendbreak setpgrp getutent setttyent getspnam setlinebuf setvbuf ptsname grantpt unlockpt sigaction setsockopt getdtablesize putenv memset memcpy memcmp memmove sysconf getlogin inet_aton setproctitle gettimeofday strlcpy closefrom)
 AC_CHECK_FUNC(strcasecmp,
 	[AC_DEFINE(HAVE_STRCASECMP, 1, [Define if strcasecmp is available])],
 	[AC_CHECK_FUNC(stricmp,
