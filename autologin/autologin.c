@@ -206,9 +206,13 @@ Process(void)
 
     /* Close open files
      */
+#if HAVE_CLOSEFROM
+    closefrom((char *)0 == pcTty ? 3 : 0);
+#else
     for (i = (char *)0 == pcTty ? 3 : 0; i < getdtablesize(); ++i) {
 	(void)close(i);
     }
+#endif
 
     /* Make us a session leader so that when we open /dev/tty
      * it will become our controlling terminal.
