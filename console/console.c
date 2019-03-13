@@ -910,11 +910,19 @@ ExecCmd(void)
     /* setup new process with clean file descriptors
      * stderr still goes to stderr...so user sees it
      */
+#ifdef HAVE_CLOSEFROM
+    for (i = 3; i <= pout[0] || i <= pin[1]; i++) {
+	if (i != pout[0] && i != pin[1])
+	    close(i);
+    }
+    closefrom(i);
+#else
     i = GetMaxFiles();
     for ( /* i above */ ; --i > 3;) {
 	if (i != pout[0] && i != pin[1])
 	    close(i);
     }
+#endif
     close(1);
     close(0);
 
