@@ -918,7 +918,7 @@ ExecCmd(void)
     closefrom(i);
 #else
     i = GetMaxFiles();
-    for ( /* i above */ ; --i > 3;) {
+    for ( /* i above */ ; --i > 2;) {
 	if (i != pout[0] && i != pin[1])
 	    close(i);
     }
