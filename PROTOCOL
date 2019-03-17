@@ -7,7 +7,7 @@ What Is This?
 
 The following is an attempt to describe the client/server protocol used
 between the server (conserver) and the client (console).  This document
-bases it's information on conserver version 8.1.4, as it's the release
+bases its information on conserver version 8.1.4, as it's the release
 currently available.  If there are changes to the client/server
 protocol, the INSTALL file should reference them and, ideally, this
 document will be updated.
