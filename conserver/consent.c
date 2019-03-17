@@ -454,11 +454,19 @@ StartInit(CONSENT *pCE)
 
     /* setup new process with clean file descriptors
      */
+#if HAVE_CLOSEFROM
+    for (i = 3; i <= pout[0] || i <= pin[1]; i++) {
+	if (i != pout[0] && i != pin[1])
+	    close(i);
+    }
+    closefrom(i);
+#else
     i = GetMaxFiles();
     for ( /* i above */ ; --i > 2;) {
 	if (i != pout[0] && i != pin[1])
 	    close(i);
     }
+#endif
     /* leave 2 until we have to close it */
     close(1);
     close(0);
@@ -592,11 +600,18 @@ VirtDev(CONSENT *pCE)
 
     /* setup new process with clean filew descriptors
      */
+#if HAVE_CLOSEFROM
+    for (i = 3; i < pCE->execSlaveFD; i++)
+	close(i);
+    i++;
+    closefrom(i);
+#else
     i = GetMaxFiles();
     for ( /* i above */ ; --i > 2;) {
 	if (i != pCE->execSlaveFD)
 	    close(i);
     }
+#endif
     /* leave 2 until we *have to close it*
      */
     close(1);

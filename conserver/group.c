@@ -1810,10 +1810,14 @@ StartTask(CONSENT *pCE, char *cmd, uid_t uid, gid_t gid)
 
     /* setup new process with clean file descriptors
      */
+#if HAVE_CLOSEFROM
+    closefrom(3);
+#else
     i = GetMaxFiles();
     for ( /* i above */ ; --i > 2;) {
 	close(i);
     }
+#endif
 
     if (geteuid() == 0) {
 	if (gid != 0)
