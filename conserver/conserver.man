@@ -1,4 +1,4 @@
-.TH CONSERVER 8 "2018/05/28" "conserver-8.2.2" "conserver"
+.TH CONSERVER 8 "2019/03/17" "conserver-8.2.3" "conserver"
 .SH NAME
 conserver \- console server daemon
 .SH SYNOPSIS
