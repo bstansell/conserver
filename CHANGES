@@ -1,6 +1,19 @@
 				CHANGES
 				=======
 
+version 8.2.3 (March 17, 2019):
+	- Correct 'impi' typo (Ed Maste <emaste@freebsd.org>)
+	- Correct argument type passed to time() (Ed Maste <emaste@freebsd.org>)
+	- Fix compilation without deprecated OpenSSL APIs (Rosen Penev <rosenp@gmail.com>)
+	- Fix compilation without deprecated OpenSSL 1.1 APIs (Rosen Penev <rosenp@gmail.com>)
+	- Fix #6 - clang "-Wstring-plus-int" warning (Bryan Stansell <bryan@conserver.com>)
+	- configure.in: Add test for closefrom (Ed Maste <emaste@freebsd.org>)
+	- regenerate autoconf files (Ed Maste <emaste@freebsd.org>)
+	- Use closefrom if available (Ed Maste <emaste@freebsd.org>)
+	- Correct typo (Ed Maste <emaste@freebsd.org>)
+	- Add Cirrus-CI FreeBSD CI build config (Ed Maste <emaste@freebsd.org>)
+	- off by one found by Ed Maste (Bryan Stansell <bryan@conserver.com>)
+
 version 8.2.2 (May 28, 2018):
 	- fixes for OpenSSL 1.1+ - patch by Eneas U de Queiroz
 	  <cote2004-github@yahoo.com>

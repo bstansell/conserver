@@ -14,6 +14,6 @@ All rights reserved.\n"
 
 #define VERSION_MAJOR	8
 #define VERSION_MINOR	2
-#define VERSION_REV	2
+#define VERSION_REV	3
 #define VERSION_TEXT	"conserver.com version"
 #define VERSION_UINT	(VERSION_MAJOR * 1000000 + VERSION_MINOR * 1000 + VERSION_REV)
