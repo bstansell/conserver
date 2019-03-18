@@ -1,0 +1,15 @@
+#!/bin/sh
+
+maj=`grep MAJOR conserver/version.h | awk '{print $NF; exit}'`
+min=`grep MINOR conserver/version.h | awk '{print $NF; exit}'`
+rev=`grep REV conserver/version.h | awk '{print $NF; exit}'`
+ver="$maj.$min.$rev"
+date=`grep '^version' CHANGES | head -1 | sed -e 's/.*(\(.*\)).*/\1/'`
+mandate=`date -j -f '%b %d, %Y' "$date" "+%Y/%m/%d"`
+
+for i in c*/*.man; do
+    sed -i "" -e "/^\.TH /s|\".*|\"$mandate\" \"conserver-$ver\" \"conserver\"|" "$i"
+done
+
+sed -i "" -e "/^%define ver/s| ver .*| ver $ver|" contrib/redhat-rpm/conserver.spec
+sed -i "" -e "/^VERSION=/s|.*|VERSION=\"$ver\"|" contrib/solaris-package/pkginfo

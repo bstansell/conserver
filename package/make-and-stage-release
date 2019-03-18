@@ -1,0 +1,43 @@
+#!/bin/bash
+
+set -e
+
+[ -f conserver/version.h ] || { echo "you are in the wrong place" ; exit 1; }
+maj=`grep MAJOR conserver/version.h | awk '{print $NF; exit}'`
+min=`grep MINOR conserver/version.h | awk '{print $NF; exit}'`
+rev=`grep REV conserver/version.h | awk '{print $NF; exit}'`
+ver="$maj.$min.$rev"
+if [ ! -f ../conserver-$ver.tar.gz ]; then
+    echo "Creating ../conserver-$ver.tar.gz"
+    (
+	[ -d build ] && rm -rf build
+        mkdir build
+	git archive --format=tar.gz --prefix=conserver-$ver/ v$ver | (cd build; tar zxf -)
+	cd build/conserver-$ver && autoconf && rm -rf autom4te.cache
+    )
+    tar zcf ../conserver-$ver.tar.gz -C build conserver-$ver
+    rm -rf build
+
+    [ -f ../conserver-$ver.tar.gz.asc ] && rm ../conserver-$ver.tar.gz.asc
+fi
+if [ ! -f ../conserver-$ver.tar.gz.asc ]; then
+    echo "Signing ../conserver-$ver.tar.gz"
+    gpg -ab --local-user bryan@conserver.com ../conserver-$ver.tar.gz
+fi
+body="\`\`\`
+`sed -ne '/^ver/,/^$/p' CHANGES | sed -e '/^$/,$d'`
+\`\`\`"
+
+ls -l ../conserver-$ver.tar.gz*
+echo "Ready to push (y/N)?"
+read i
+if [ "$i" = "y" ]; then
+    git tag -a -m "Release $ver" v$ver && git push
+    githubrelease release conserver/conserver create --name conserver-$ver --body "$body" v$ver ../conserver-$ver.tar.gz* 
+    echo You can publish this release on the website or with:
+    echo "    "githubrelease release conserver/conserver publish v$ver
+else
+    echo Ok, here is the command I would have used:
+    echo "    "git tag -a -m \""Release $ver"\" v$ver \&\& git push
+    echo "    "githubrelease release conserver/conserver create --name conserver-$ver --body \""$body"\" v$ver ../conserver-$ver.tar.gz* 
+fi
