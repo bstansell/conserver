@@ -420,7 +420,7 @@ output, but all consoles, not
 just those without a user, are logged.
 Each line of output is prefixed with the console name.
 If a user is attached read/write, a `*' is appended to the console name,
-to allow log watching utilites to ignore potential user-introduced alarms.
+to allow log watching utilities to ignore potential user-introduced alarms.
 .TP
 .B \-v
 Echo the configuration as it is being read (be verbose).
