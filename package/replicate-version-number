@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 maj=`grep MAJOR conserver/version.h | awk '{print $NF; exit}'`
 min=`grep MINOR conserver/version.h | awk '{print $NF; exit}'`
 rev=`grep REV conserver/version.h | awk '{print $NF; exit}'`

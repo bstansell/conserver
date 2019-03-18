@@ -2,6 +2,7 @@ Creating a new release
 ----------------------
 
 - Create a new release branch `git checkout -b release-v...`
+- Update `CHANGES` with output of `./package/create-changes v-xx..`
 - Edit `conserver/version.h`
 - Run `./package/replicate-version-number`
 - Double-check and merge release branch
