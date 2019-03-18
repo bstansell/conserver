@@ -12,3 +12,13 @@ freebsd_12_task:
     - make
   test_script:
     - make test
+
+linux_gcc_task:
+  container:
+    image: gcc:latest
+  build_script:
+    - autoconf
+    - ./configure || { cat config.log; exit 1; }
+    - make
+  test_script:
+    - make test
