@@ -14,7 +14,7 @@ if [ ! -f ../conserver-$ver.tar.gz ]; then
         mkdir build
 	git archive --format=tar.gz --prefix=conserver-$ver/ v$ver | (cd build; tar zxf -)
 	cd build/conserver-$ver
-	./package/setup-configure
+	../../package/setup-configure
 	rm -rf package
     )
     tar zcf ../conserver-$ver.tar.gz -C build conserver-$ver
