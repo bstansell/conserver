@@ -1,7 +1,5 @@
-[![Build Status](https://api.cirrus-ci.com/github/conserver/conserver.svg)](https://cirrus-ci.com/github/conserver/conserver)
-
-README
-======
+Conserver [![Build Status](https://api.cirrus-ci.com/github/conserver/conserver.svg)](https://cirrus-ci.com/github/conserver/conserver)
+=========
 
 Maintainer/Enhancer
 -------------------
