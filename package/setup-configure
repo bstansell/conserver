@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 curl -s -o config.guess 'https://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.guess'
 curl -s -o config.sub 'https://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.sub'
