@@ -1,15 +1,6 @@
 Conserver [![Build Status](https://api.cirrus-ci.com/github/conserver/conserver.svg)](https://cirrus-ci.com/github/conserver/conserver)
 =========
 
-Maintainer/Enhancer
--------------------
-
-Bryan Stansell (bryan@conserver.com)
-
-
-Overview
---------
-
 Conserver is an application that allows multiple users to watch a
 serial console at the same time. It can log the data, allows users to
 take write-access of a console (one at a time), and has a variety of
@@ -26,18 +17,17 @@ you can interact with any of the equipment from home or wherever.
 Documentation
 -------------
 
-See the INSTALL file for installation and the man pages for specifics.
+See the `INSTALL` file for installation and the man pages for specifics.
 
 
 Downloading
 -----------
 
-The latest version can be found via http://www.conserver.com/ or
-directly from https://github.com/conserver/conserver/.
+The latest version can be found on [GitHub](https://github.com/conserver/conserver/releases).
 
 
 Contributions
 -------------
 
-Contributions distributed with the code can be found in the contrib
+Contributions distributed with the code can be found in the `contrib`
 subdirectory.
