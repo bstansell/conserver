@@ -1,5 +1,7 @@
-Conserver [![Build Status](https://api.cirrus-ci.com/github/conserver/conserver.svg)](https://cirrus-ci.com/github/conserver/conserver)
+Conserver
 =========
+
+[![Build Status](https://api.cirrus-ci.com/github/conserver/conserver.svg)](https://cirrus-ci.com/github/conserver/conserver)
 
 Conserver is an application that allows multiple users to watch a
 serial console at the same time. It can log the data, allows users to
