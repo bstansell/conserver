@@ -7,7 +7,7 @@ freebsd_12_task:
   install_script:
     - pkg install -y autoconf
   build_script:
-    - autoconf
+    - ./package/setup-configure
     - ./configure || { cat config.log; exit 1; }
     - make
   test_script:
@@ -17,7 +17,7 @@ linux_gcc_task:
   container:
     image: gcc:latest
   build_script:
-    - autoconf
+    - ./package/setup-configure
     - ./configure || { cat config.log; exit 1; }
     - make
   test_script:
