@@ -84,36 +84,37 @@ unsigned long dmallocMarkMain = 0;
 #endif
 
 #if HAVE_OPENSSL
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-int DH_set0_pqg(DH *dh, BIGNUM *p, BIGNUM *q, BIGNUM *g)
+# if OPENSSL_VERSION_NUMBER < 0x10100000L
+int
+DH_set0_pqg(DH *dh, BIGNUM * p, BIGNUM * q, BIGNUM * g)
 {
     /* If the fields p and g in d are NULL, the corresponding input
      * parameters MUST be non-NULL.  q may remain NULL.
      */
     if ((dh->p == NULL && p == NULL)
-        || (dh->g == NULL && g == NULL))
-        return 0;
+	|| (dh->g == NULL && g == NULL))
+	return 0;
 
     if (p != NULL) {
-        BN_free(dh->p);
-        dh->p = p;
+	BN_free(dh->p);
+	dh->p = p;
     }
     if (q != NULL) {
-        BN_free(dh->q);
-        dh->q = q;
+	BN_free(dh->q);
+	dh->q = q;
     }
     if (g != NULL) {
-        BN_free(dh->g);
-        dh->g = g;
+	BN_free(dh->g);
+	dh->g = g;
     }
 
     if (q != NULL) {
-        dh->length = BN_num_bits(q);
+	dh->length = BN_num_bits(q);
     }
 
     return 1;
 }
-#endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
+# endif/* OPENSSL_VERSION_NUMBER < 0x10100000L */
 
 SSL_CTX *ctx = (SSL_CTX *)0;
 DH *dh512 = (DH *)0;
@@ -122,7 +123,9 @@ DH *dh2048 = (DH *)0;
 DH *dh4096 = (DH *)0;
 
 DH *
-DHFromArray(unsigned char *dh_p, size_t dh_p_size, unsigned char *dh_g, size_t dh_g_size) {
+DHFromArray(unsigned char *dh_p, size_t dh_p_size, unsigned char *dh_g,
+	    size_t dh_g_size)
+{
     DH *dh;
     BIGNUM *p, *g;
 
@@ -194,7 +197,8 @@ GetDH1024(void)
 	0x02,
     };
 
-    return DHFromArray(dh1024_p, sizeof(dh1024_p), dh1024_g, sizeof(dh1024_g));
+    return DHFromArray(dh1024_p, sizeof(dh1024_p), dh1024_g,
+		       sizeof(dh1024_g));
 }
 
 DH *
@@ -232,7 +236,8 @@ GetDH2048(void)
 	0x02,
     };
 
-    return DHFromArray(dh2048_p, sizeof(dh2048_p), dh2048_g, sizeof(dh2048_g));
+    return DHFromArray(dh2048_p, sizeof(dh2048_p), dh2048_g,
+		       sizeof(dh2048_g));
 }
 
 DH *
@@ -296,7 +301,8 @@ GetDH4096(void)
 	0x02,
     };
 
-    return DHFromArray(dh4096_p, sizeof(dh4096_p), dh4096_g, sizeof(dh4096_g));
+    return DHFromArray(dh4096_p, sizeof(dh4096_p), dh4096_g,
+		       sizeof(dh4096_g));
 }
 
 DH *
@@ -330,13 +336,13 @@ SetupSSL(void)
     if (ctx == (SSL_CTX *)0) {
 	char *ciphers;
 	int verifymode;
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+# if OPENSSL_VERSION_NUMBER < 0x10100000L
 	SSL_load_error_strings();
 	if (!SSL_library_init()) {
 	    Error("SetupSSL(): SSL_library_init() failed");
 	    Bye(EX_SOFTWARE);
 	}
-#endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
+# endif/* OPENSSL_VERSION_NUMBER < 0x10100000L */
 	if ((ctx = SSL_CTX_new(TLS_method())) == (SSL_CTX *)0) {
 	    Error("SetupSSL(): SSL_CTX_new() failed");
 	    Bye(EX_SOFTWARE);

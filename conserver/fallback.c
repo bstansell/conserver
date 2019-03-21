@@ -226,7 +226,7 @@ GetPseudoTTY(STRING *slave, int *slaveFD)
 
     *slaveFD = sfd;
     return fd;
-# endif	/* (HAVE_PTSNAME && HAVE_GRANTPT && HAVE_UNLOCKPT) || defined(_AIX) */
+# endif/* (HAVE_PTSNAME && HAVE_GRANTPT && HAVE_UNLOCKPT) || defined(_AIX) */
 #endif /* HAVE_OPENPTY */
 }
 

@@ -15,7 +15,7 @@
 #  define CIPHER_SEC0
 # else
 #  define CIPHER_SEC0 ":@SECLEVEL=0"
-# endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
+# endif/* OPENSSL_VERSION_NUMBER < 0x10100000L */
 #endif
 #if HAVE_GSSAPI
 # include <gssapi/gssapi.h>
@@ -100,15 +100,15 @@ typedef struct consFile {
 
 typedef struct item {
     char *id;
-    void (*reg) (char *);
+    void (*reg)(char *);
 } ITEM;
 
 typedef struct section {
     char *id;
-    void (*begin) (char *);
-    void (*end) (void);
-    void (*abort) (void);
-    void (*destroy) (void);
+    void (*begin)(char *);
+    void (*end)(void);
+    void (*abort)(void);
+    void (*destroy)(void);
     ITEM *items;
 } SECTION;
 
@@ -121,14 +121,14 @@ typedef enum substToken {
 typedef struct subst {
     /* function to retrieve a token type based on a character
      */
-    SUBSTTOKEN (*token) (char);
+    SUBSTTOKEN (*token)(char);
     /* data for callback function
      */
     void *data;
     /* function to retrieve a value (as a char* or int or both) for
      * a substitution
      */
-    int (*value) (char, char **, int *);
+    int (*value)(char, char **, int *);
 } SUBST;
 
 extern int isMultiProc, fDebug, fVerbose, fErrorPrinted;

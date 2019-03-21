@@ -87,16 +87,17 @@ char
     " -V",
     (char *)0
 }, *u_help[] = {
-"c cmd       command to run",
-	"e env=value environment variable to set",
-	"g group     initial group",
-	"h           print this help message",
-	"l login     login name",
-	"t tty       attach to this terminal",
-	"u           do no make utmp entry",
-	"V           show version information", (char *)0}, *pcCommand =
-    (char *)0, *pcGroup = (char *)0, *pcLogin = (char *)0, *pcTty =
-    (char *)0;
+
+    "c cmd       command to run",
+    "e env=value environment variable to set",
+    "g group     initial group",
+    "h           print this help message",
+    "l login     login name",
+    "t tty       attach to this terminal",
+    "u           do no make utmp entry",
+    "V           show version information", (char *)0
+}, *pcCommand = (char *)0, *pcGroup = (char *)0, *pcLogin =
+    (char *)0, *pcTty = (char *)0;
 int
   fMakeUtmp = 1, iErrs = 0;
 

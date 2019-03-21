@@ -74,13 +74,13 @@ SetupSSL(void)
 {
     if (ctx == (SSL_CTX *)0) {
 	char *ciphers;
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+# if OPENSSL_VERSION_NUMBER < 0x10100000L
 	SSL_load_error_strings();
 	if (!SSL_library_init()) {
 	    Error("SSL library initialization failed");
 	    Bye(EX_UNAVAILABLE);
 	}
-#endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
+# endif/* OPENSSL_VERSION_NUMBER < 0x10100000L */
 	if ((ctx = SSL_CTX_new(TLS_method())) == (SSL_CTX *)0) {
 	    Error("Creating SSL context failed");
 	    Bye(EX_UNAVAILABLE);

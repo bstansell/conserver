@@ -4154,9 +4154,8 @@ FlushConsole(CONSENT *pCEServing)
 	    unsigned char next =
 		(unsigned char)pCEServing->wbuf->string[offset + 1];
 	    if ((next >= '0' && next <= '9') ||
-		(next >= 'a' && next <= 'z') || (next == BREAK &&
-						 pCEServing->type !=
-						 HOST)) {
+		(next >= 'a' && next <= 'z')
+		|| (next == BREAK && pCEServing->type != HOST)) {
 		CONDDEBUG((1, "Kiddie(): heavy IAC for [%s]",
 			   pCEServing->server));
 		offset += 2;
@@ -4866,8 +4865,8 @@ Kiddie(GRPENT *pGE, int sfd)
 			CONDDEBUG((1, "Kiddie(): flushing fd %d",
 				   FileFDNum(pCLServing->fd)));
 			if (FileWrite
-			    (pCLServing->fd, FLAGFALSE, (char *)0,
-			     0) < 0) {
+			    (pCLServing->fd, FLAGFALSE, (char *)0, 0)
+			    < 0) {
 			    DisconnectClient(pGE, pCLServing, (char *)0,
 					     FLAGTRUE);
 			    break;
@@ -5197,7 +5196,8 @@ Spawn(GRPENT *pGE, int msfd)
     }
 # if HAVE_SETSOCKOPT
     if (setsockopt
-	(sfd, SOL_SOCKET, SO_REUSEADDR, (char *)&true, sizeof(true)) < 0) {
+	(sfd, SOL_SOCKET, SO_REUSEADDR, (char *)&true, sizeof(true))
+	< 0) {
 	Error("Spawn(): setsockopt(%u,SO_REUSEADDR): %s", sfd,
 	      strerror(errno));
 	Bye(EX_OSERR);
