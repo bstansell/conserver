@@ -1763,6 +1763,12 @@ DoCmds(char *master, char *pports, int cmdi)
 		}
 		FileWrite(pcf, FLAGFALSE, "exit\r\n", 6);
 		t = ReadReply(pcf, FLAGTRUE);
+	    } else if (interact == FLAGFALSE && result[0] == '[' &&
+		       cmdi > 0) {
+		FileClose(&pcf);
+		/* reconnect to same, but with the next command (info, examine, etc) */
+		DoCmds(master, pports, cmdi - 1);
+		break;
 	    } else {
 		/* if we're not trying to connect to a console */
 		if (interact == FLAGFALSE) {
@@ -1867,7 +1873,7 @@ DoCmds(char *master, char *pports, int cmdi)
 	FileClose(&pcf);
 
 	/* this would only be true if we got extra redirects (@... above) */
-	if (cmds[cmdi][0] == 'c' && interact == FLAGTRUE)
+	if (cmds[cmdi][0] == 'c')
 	    DoCmds(server, result, cmdi);
 	else if (cmdi > 0)
 	    DoCmds(server, result, cmdi - 1);
