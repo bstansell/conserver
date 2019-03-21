@@ -13,4 +13,3 @@ gindent -npro -i4 -ip4 -cli4 -br -brs -cdw -ce -npcs -ncs -nhnl -l75 -lc75 -nbbo
  echo -T DH
  sed -ne '/typedef/,/}/p' */*.[ch] | grep '^[ 	]*}' | sed -e 's/[ 	]*}/-T/' -e 's/;//' | sort -u
  ` */*.[ch]
-rm */*.[ch]~
