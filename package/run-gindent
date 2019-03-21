@@ -1,0 +1,15 @@
+#!/bin/bash
+
+gindent -npro -i4 -ip4 -cli4 -br -brs -cdw -ce -npcs -ncs -nhnl -l75 -lc75 -nbbo -ppi1 `
+ echo -T SOCKADDR_STYPE
+ echo -T INADDR_STYPE
+ echo -T time_t
+ echo -T X509_STORE_CTX
+ echo -T FILE
+ echo -T SSL
+ echo -T fd_set
+ echo -T pam_handle_t
+ echo -T SSL_CTX
+ echo -T DH
+ sed -ne '/typedef/,/}/p' */*.[ch] | grep '^[ 	]*}' | sed -e 's/[ 	]*}/-T/' -e 's/;//' | sort -u
+ ` */*.[ch]

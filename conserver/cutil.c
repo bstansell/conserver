@@ -578,10 +578,12 @@ GetMaxFiles(void)
 #  else
 #   ifndef OPEN_MAX
 #    define OPEN_MAX 64
-#   endif /* !OPEN_MAX */
+#   endif
+    /* !OPEN_MAX */
     mf = OPEN_MAX;
-#  endif /* HAVE_GETDTABLESIZE */
-# endif	/* HAVE_GETRLIMIT */
+#  endif
+    /* HAVE_GETDTABLESIZE */
+# endif/* HAVE_GETRLIMIT */
 #endif /* HAVE_SYSCONF */
 #ifdef FD_SETSIZE
     if (FD_SETSIZE <= mf) {
@@ -1990,7 +1992,7 @@ ProbeInterfaces(in_addr_t bindAddr)
     }
     close(sock);
     free(ifc.ifc_req);
-# else /* use the hostname like the old code did (but use all addresses!) */
+# else/* use the hostname like the old code did (but use all addresses!) */
     int count;
     struct hostent *he;
 
@@ -2713,8 +2715,8 @@ ParseFile(char *filename, FILE *fp, int level)
 		case VALUE:
 		    switch (token) {
 			case WORD:
-			    (*sections[secIndex].items[keyIndex].
-			     reg) (word->string);
+			    (*sections[secIndex].
+			     items[keyIndex].reg) (word->string);
 			    state = SEMI;
 			    break;
 			case SEMICOLON:

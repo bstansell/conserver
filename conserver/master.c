@@ -565,8 +565,8 @@ DoNormalRead(CONSCLIENT *pCLServing)
 			     pRC = pRC->pRCuniq) {
 			    s = ":@%s";
 			    s += iSep;
-			    FilePrint(pCLServing->fd, FLAGTRUE,
-				      s, pRC->rhost);
+			    FilePrint(pCLServing->fd, FLAGTRUE, s,
+				      pRC->rhost);
 			    iSep = 0;
 			}
 		    }
@@ -945,8 +945,8 @@ Master(void)
 			CONDDEBUG((1, "Master(): flushing fd %d",
 				   FileFDNum(pCLServing->fd)));
 			if (FileWrite
-			    (pCLServing->fd, FLAGFALSE, (char *)0,
-			     0) < 0) {
+			    (pCLServing->fd, FLAGFALSE, (char *)0, 0)
+			    < 0) {
 			    DropMasterClient(pCLServing, FLAGTRUE);
 			    break;
 			}
