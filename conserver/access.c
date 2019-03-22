@@ -355,7 +355,7 @@ SetDefAccess(
 	if ((a->pcwho = StrDup(addr)) == (char *)0)
 	    OutOfMem();
 
-	a->ctrust = 'a';
+	a->ctrust = config->defaultaccess;
 	a->pACnext = pACList;
 	pACList = a;
 
@@ -368,7 +368,7 @@ SetDefAccess(
 	OutOfMem();
     if ((pACList->pcwho = StrDup("127.0.0.1")) == (char *)0)
 	OutOfMem();
-    pACList->ctrust = 'a';
+    pACList->ctrust = config->defaultaccess;
     CONDDEBUG((1, "SetDefAccess(): trust=%c, who=%s", pACList->ctrust,
 	       pACList->pcwho));
 #else
@@ -380,7 +380,7 @@ SetDefAccess(
 	    OutOfMem();
 	if ((a->pcwho = StrDup(addr)) == (char *)0)
 	    OutOfMem();
-	a->ctrust = 'a';
+	a->ctrust = config->defaultaccess;
 	a->pACnext = pACList;
 	pACList = a;
 
