@@ -5,6 +5,4 @@ set -e
 curl -s -o config.guess 'https://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.guess'
 curl -s -o config.sub 'https://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.sub'
 
-autoconf
-autoheader
-rm -rf autom4te.cache
+autoreconf
