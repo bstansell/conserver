@@ -7,4 +7,4 @@ range="$1"
 date=`./package/get-version date`
 changedate=`date -j -f '%Y/%m/%d' "$date" '+%B %-d, %Y'`
 echo "version `./package/get-version number` ($changedate):"
-git log --no-merges --pretty=tformat:'        - %s (%an <%ae>)' "$range" | tail -r | awk '{if (! l[$0]) {l[$0]++; print}}'
+git log --no-merges --pretty=tformat:'        - %s (%an <%ae>)' "$range" | tail -r | awk '{if (! l[$0]) {l[$0]++; print}}' | sed -e 's/(Bryan Stansell <bryan@conserver.com>)$//'
