@@ -5,4 +5,14 @@ set -e
 curl -s -o config.guess 'https://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.guess'
 curl -s -o config.sub 'https://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.sub'
 
-autoreconf
+# We set lang to avoid this with the gcc docker image on cirrus:
+# 
+#   ./package/setup-configure
+#   perl: warning: Setting locale failed.
+#   perl: warning: Please check that your locale settings:
+#   	LANGUAGE = (unset),
+#   	LC_ALL = (unset),
+#   	LANG = "en_US.UTF-8"
+#       are supported and installed on your system.
+
+LANG=C autoreconf
