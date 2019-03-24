@@ -29,7 +29,7 @@ AH_TEMPLATE([REQ_SERVER_CERT], [Defined if client requires server SSL certificat
 AH_TEMPLATE([TRUST_UDS_CRED], [Defined if we trust credentials from UDS client])
 
 dnl ### Normal initialization. ######################################
-AC_INIT
+AC_INIT([conserver],m4_esyscmd_s([./package/get-version number]))
 AC_PREREQ(2.59)
 AC_CONFIG_SRCDIR([conserver/main.c])
 AC_CONFIG_HEADER(config.h)
@@ -42,6 +42,9 @@ if test -z "$CFLAGS"; then
 fi
 MKDIR="mkdir -p -m 755"
 AC_SUBST(MKDIR)
+
+AC_SUBST(CONSERVER_VERSION, m4_esyscmd_s([./package/get-version number]))
+AC_SUBST(CONSERVER_DATE, m4_esyscmd_s([./package/get-version date]))
 
 
 dnl ### Custom settings. ############################################
@@ -844,6 +847,7 @@ AC_CHECK_FUNCS(getaudit getaudit_addr)
 dnl ### Create output files. #######################################
 AC_CONFIG_FILES([Makefile conserver/Makefile conserver.cf/Makefile console/Makefile autologin/Makefile contrib/chat/Makefile])
 AC_CONFIG_FILES([conserver/conserver.rc], [chmod +x conserver/conserver.rc])
+AC_CONFIG_FILES([conserver.cf/conserver.cf.man conserver.cf/conserver.passwd.man conserver/conserver.man console/console.man])
 AC_OUTPUT
 
 [

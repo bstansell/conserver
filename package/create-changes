@@ -4,10 +4,7 @@ set -e
 
 [ -z "$1" ] && echo "Usage: $0 tag" && exit 1
 range="$1"
-maj=`grep MAJOR conserver/version.h | awk '{print $NF; exit}'`
-min=`grep MINOR conserver/version.h | awk '{print $NF; exit}'`
-rev=`grep REV conserver/version.h | awk '{print $NF; exit}'`
-ver="$maj.$min.$rev"
-
-echo "version $ver (`date '+%B %-d, %Y'`):"
-git log --no-merges --pretty=tformat:'        - %s (%an <%ae>)' "$range" | tail -r | awk '{if (! l[$0]) {l[$0]++; print}}'
+date=`./package/get-version date`
+changedate=`date -j -f '%Y/%m/%d' "$date" '+%B %-d, %Y'`
+echo "version `./package/get-version number` ($changedate):"
+git log --no-merges --pretty=tformat:'        - %s (%an <%ae>)' "$range" | tail -r | awk '{if (! l[$0]) {l[$0]++; print}}' | sed -e 's/(Bryan Stansell <bryan@conserver.com>)$//'

@@ -1,10 +1,9 @@
 Creating a new release
 ----------------------
 
-- Create a new release branch `git checkout -b release-v...`
-- Update `CHANGES` with output of `./package/create-changes v-xx..`
+- Create a new release branch `git checkout -b release-vx.y.z`
 - Edit `conserver/version.h`
-- Run `./package/replicate-version-number`
+- Update `CHANGES` with output of `./package/create-changes vx.y.z..`
 - Double-check and merge release branch
 - Run `./package/make-and-stage-release` to create distribution, pgp sign, tag release, and push to github
 
