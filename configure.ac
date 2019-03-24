@@ -847,7 +847,7 @@ AC_CHECK_FUNCS(getaudit getaudit_addr)
 dnl ### Create output files. #######################################
 AC_CONFIG_FILES([Makefile conserver/Makefile conserver.cf/Makefile console/Makefile autologin/Makefile contrib/chat/Makefile])
 AC_CONFIG_FILES([conserver/conserver.rc], [chmod +x conserver/conserver.rc])
-AC_CONFIG_FILES([conserver.cf/conserver.cf.man conserver.cf/conserver.passwd.man conserver/conserver.man  console/console.man])
+AC_CONFIG_FILES([conserver.cf/conserver.cf.man conserver.cf/conserver.passwd.man conserver/conserver.man console/console.man])
 AC_OUTPUT
 
 [
