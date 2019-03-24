@@ -12,6 +12,7 @@
 @(#) Copyright 2000 conserver.com.\n\
 All rights reserved.\n"
 
+#define VERSION_DATE	"2019/03/17"
 #define VERSION_MAJOR	8
 #define VERSION_MINOR	2
 #define VERSION_REV	3

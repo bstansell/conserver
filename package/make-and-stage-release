@@ -5,10 +5,8 @@ set -e
 local=false && [ "$1" = "local" ] && local=true
 
 [ -f conserver/version.h ] || { echo "you are in the wrong place" ; exit 1; }
-maj=`grep MAJOR conserver/version.h | awk '{print $NF; exit}'`
-min=`grep MINOR conserver/version.h | awk '{print $NF; exit}'`
-rev=`grep REV conserver/version.h | awk '{print $NF; exit}'`
-ver="$maj.$min.$rev"
+
+ver=`./package/get-version number`
 if [ ! -f ../conserver-$ver.tar.gz ] || $local; then
     (
 	[ -d build ] && rm -rf build

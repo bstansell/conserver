@@ -1,0 +1,22 @@
+#!/bin/sh
+
+set -e
+
+# awk gets stdin from /dev/null 'cause when autoconf runs this via m4_esyscmd_s,
+# stdin is closed and awk assumes there will always be an open stdin and you end
+# up with a bogus message:
+#
+#   awk: i/o error occurred while closing /dev/stdin
+#    input record number 20, file conserver/version.h
+#    source line number 1
+#
+#
+case "$1" in
+    number)
+	awk '$2=="VERSION_MAJOR"{maj=$NF} $2=="VERSION_MINOR"{min=$NF} $2=="VERSION_REV"{rev=$NF} END{print maj "." min "." rev}' conserver/version.h < /dev/null
+	;;
+
+    date)
+	awk '$2=="VERSION_DATE"{print $NF}' conserver/version.h < /dev/null | tr -d '"'
+	;;
+esac
