@@ -5,7 +5,7 @@ Creating a new release
 - Edit `conserver/version.h`
 - Update `CHANGES` with output of `./package/create-changes vx.y.z..`
 - Double-check and merge release branch
-- Run `./package/make-and-stage-release` to create distribution, pgp sign, tag release, and push to github
+- Run `GITHUB_TOKEN=xxxx ./package/make-and-stage-release` to tag release, create distribution, pgp sign, and push to github
 
 Requirements:
 
