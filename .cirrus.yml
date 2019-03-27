@@ -11,6 +11,16 @@ freebsd_12_task:
     - ./configure || { cat config.log; exit 1; }
     - make
     - make test
+  uds_script:
+    - ./package/setup-configure
+    - ./configure --with-trust-uds-cred --with-uds || { cat config.log; exit 1; }
+    - make
+    - make test
+  pam_ssl_script:
+    - ./package/setup-configure
+    - ./configure --with-pam --with-openssl || { cat config.log; exit 1; }
+    - make
+    - make test
 
 linux_gcc_task:
   container:
@@ -39,5 +49,15 @@ macos_task:
   basic_script:
     - ./package/setup-configure
     - ./configure || { cat config.log; exit 1; }
+    - make
+    - make test
+  uds_script:
+    - ./package/setup-configure
+    - ./configure --with-trust-uds-cred --with-uds || { cat config.log; exit 1; }
+    - make
+    - make test
+  pam_ssl_script:
+    - ./package/setup-configure
+    - ./configure --with-pam --with-openssl || { cat config.log; exit 1; }
     - make
     - make test
