@@ -1,979 +1,989 @@
-				CHANGES
-				=======
+                                CHANGES
+                                =======
+
+version 8.2.4 (March 26, 2019):
+        - Correct man page typo (Ed Maste <emaste@freebsd.org>)
+        - Remove autotools generated files from repo and create with release
+        - Better integration of Cirrus CI - FreeBSD, Linux, and MacOS
+        - Moving README to markdown
+        - Fix #12 - Remote infomation flags (i.e. "-x") cannot be filtered by console
+        - Fix #8 - defaultaccess appears broken
+        - Rename configure.in and use autoreconf
+        - Better use of version.h and letting configure build things with versions
 
 version 8.2.3 (March 17, 2019):
-	- Correct 'impi' typo (Ed Maste <emaste@freebsd.org>)
-	- Correct argument type passed to time() (Ed Maste <emaste@freebsd.org>)
-	- Fix compilation without deprecated OpenSSL APIs (Rosen Penev <rosenp@gmail.com>)
-	- Fix compilation without deprecated OpenSSL 1.1 APIs (Rosen Penev <rosenp@gmail.com>)
-	- Fix #6 - clang "-Wstring-plus-int" warning (Bryan Stansell <bryan@conserver.com>)
-	- configure.in: Add test for closefrom (Ed Maste <emaste@freebsd.org>)
-	- regenerate autoconf files (Ed Maste <emaste@freebsd.org>)
-	- Use closefrom if available (Ed Maste <emaste@freebsd.org>)
-	- Correct typo (Ed Maste <emaste@freebsd.org>)
-	- Add Cirrus-CI FreeBSD CI build config (Ed Maste <emaste@freebsd.org>)
-	- off by one found by Ed Maste (Bryan Stansell <bryan@conserver.com>)
+        - Correct 'impi' typo (Ed Maste <emaste@freebsd.org>)
+        - Correct argument type passed to time() (Ed Maste <emaste@freebsd.org>)
+        - Fix compilation without deprecated OpenSSL APIs (Rosen Penev <rosenp@gmail.com>)
+        - Fix compilation without deprecated OpenSSL 1.1 APIs (Rosen Penev <rosenp@gmail.com>)
+        - Fix #6 - clang "-Wstring-plus-int" warning (Bryan Stansell <bryan@conserver.com>)
+        - configure.in: Add test for closefrom (Ed Maste <emaste@freebsd.org>)
+        - regenerate autoconf files (Ed Maste <emaste@freebsd.org>)
+        - Use closefrom if available (Ed Maste <emaste@freebsd.org>)
+        - Correct typo (Ed Maste <emaste@freebsd.org>)
+        - Add Cirrus-CI FreeBSD CI build config (Ed Maste <emaste@freebsd.org>)
+        - off by one found by Ed Maste (Bryan Stansell <bryan@conserver.com>)
 
 version 8.2.2 (May 28, 2018):
-	- fixes for OpenSSL 1.1+ - patch by Eneas U de Queiroz
-	  <cote2004-github@yahoo.com>
-	- adjustments to documentation after move to github
-	- removal of old RCS/CVS tags since we have git
+        - fixes for OpenSSL 1.1+ - patch by Eneas U de Queiroz
+          <cote2004-github@yahoo.com>
+        - adjustments to documentation after move to github
+        - removal of old RCS/CVS tags since we have git
 
 version 8.2.1 (Jun 2, 2015):
-	- added TCP keepalives between client and server - TCP-based consoles
-	  already had the code - this was mostly an oversight
-	- patch for SEGV and task execution - patch by Artem Savkov
-	  <asavkov@redhat.com>
-	- expanded break sequences from [1-9] to [1-9a-z] - based on patch by
-	  Artem Savkov <asavkov@redhat.com>
+        - added TCP keepalives between client and server - TCP-based consoles
+          already had the code - this was mostly an oversight
+        - patch for SEGV and task execution - patch by Artem Savkov
+          <asavkov@redhat.com>
+        - expanded break sequences from [1-9] to [1-9a-z] - based on patch by
+          Artem Savkov <asavkov@redhat.com>
 
 version 8.2.0 (Apr 20, 2014):
-	- added --with-trust-uds-cred which uses getsockopt() to fetch and
-	  trust the client uid, bypassing password lookups - patch by Anton
-	  Lundin <glance@acc.umu.se>
-	- missing closedir() causing memory leak - patch by Anton Lundin
-	  <glance@acc.umu.se>
-	- sending a break signal over IPMI was broken - based on patch by
-	  Alexander Y.  Fomichev <git.user@gmail.com>
-	- IPv6 support (marked as experimental at this point because it's
-	  untested (except by the author), there's a lack of documentation, and
-	  I'm hoping for non-getifaddrs() system support) - patch by Milos
-	  Vyletel <milos.vyletel@gmail.com>
-	- no more K&R compiler support
+        - added --with-trust-uds-cred which uses getsockopt() to fetch and
+          trust the client uid, bypassing password lookups - patch by Anton
+          Lundin <glance@acc.umu.se>
+        - missing closedir() causing memory leak - patch by Anton Lundin
+          <glance@acc.umu.se>
+        - sending a break signal over IPMI was broken - based on patch by
+          Alexander Y.  Fomichev <git.user@gmail.com>
+        - IPv6 support (marked as experimental at this point because it's
+          untested (except by the author), there's a lack of documentation, and
+          I'm hoping for non-getifaddrs() system support) - patch by Milos
+          Vyletel <milos.vyletel@gmail.com>
+        - no more K&R compiler support
 
 version 8.1.20 (Apr 4, 2014):
-	- IPMI serial over LAN support via FreeIPMI - based on patch by Anton
-	  D. Kachalov <mouse@yandex-team.ru>
-	- minor cleanup of code, removal of gcc warnings and such that should
-	  have no fuctional change
+        - IPMI serial over LAN support via FreeIPMI - based on patch by Anton
+          D. Kachalov <mouse@yandex-team.ru>
+        - minor cleanup of code, removal of gcc warnings and such that should
+          have no fuctional change
 
 version 8.1.19 (Sep 26, 2013):
-	- prevent select/read loop when EOF on non-pty input (console) -
-	  reported by Chris Marget <chris@marget.com>
-	- "!" syntax prefixing use of group names not honored - reported by
-	  Zonker <consoleteam@gmail.com>
-	- fixed memory leak using timestamps - patch by Karvendhan M.
-	  <Karvendhan.M@netapp.com>
-	- deprecated --with-cycladests (noop now) - cross-compilation should
-	  work without it as autologin now expects setpgrp() to take two
-	  arugments instead of testing for it
-	- no automatic checks for an empty password when using PAM
-	  authentication - based on discussion with Ryan Kirkpatrick
-	  <linux@rkirkpat.net>
-	- added 'sslcacertificatefile' and 'sslcacertificatepath' client
-	  configuration options - based on patch by Aki Tuomi <cmouse@cmouse.fi>
-	- added 'sslcacertificatefile' and 'sslreqclientcert' server
-	  configuration options
-	- added --with-req-server-cert to force clients to require a certificate
-	  from the server when using SSL - based on emails with Thor Simon
-	  <tls@coyotepoint.com>
-	- added server-side tasks (see conserver.cf man page) that are invoked
-	  by the client (useful for things like IPMI-based power control of
-	  servers, invoking resets of terminal server ports, or anything else
-	  that requires scripting) - ideas from patch by Anton Lundin
-	  <glance@acc.umu.se> and discussion on mailing list (2011)
-	- added 'confirm' option to break sequences
-	- added 'breaklist' option to limit exposure of break sequences to
-	  consoles
-	- sending of break signals is now announced to all attached clients
+        - prevent select/read loop when EOF on non-pty input (console) -
+          reported by Chris Marget <chris@marget.com>
+        - "!" syntax prefixing use of group names not honored - reported by
+          Zonker <consoleteam@gmail.com>
+        - fixed memory leak using timestamps - patch by Karvendhan M.
+          <Karvendhan.M@netapp.com>
+        - deprecated --with-cycladests (noop now) - cross-compilation should
+          work without it as autologin now expects setpgrp() to take two
+          arugments instead of testing for it
+        - no automatic checks for an empty password when using PAM
+          authentication - based on discussion with Ryan Kirkpatrick
+          <linux@rkirkpat.net>
+        - added 'sslcacertificatefile' and 'sslcacertificatepath' client
+          configuration options - based on patch by Aki Tuomi <cmouse@cmouse.fi>
+        - added 'sslcacertificatefile' and 'sslreqclientcert' server
+          configuration options
+        - added --with-req-server-cert to force clients to require a certificate
+          from the server when using SSL - based on emails with Thor Simon
+          <tls@coyotepoint.com>
+        - added server-side tasks (see conserver.cf man page) that are invoked
+          by the client (useful for things like IPMI-based power control of
+          servers, invoking resets of terminal server ports, or anything else
+          that requires scripting) - ideas from patch by Anton Lundin
+          <glance@acc.umu.se> and discussion on mailing list (2011)
+        - added 'confirm' option to break sequences
+        - added 'breaklist' option to limit exposure of break sequences to
+          consoles
+        - sending of break signals is now announced to all attached clients
 
 version 8.1.18 (Nov 11, 2010):
-	- install man pages read-only and improved the contributed redhat init
-	  script - patches by Eric Biederman <ebiederm@aristanetworks.com>
-	- spec file improvements in contrib/redhat-rpm - patch by Jodok Ole
-	  Muellers <jodok.muellers@aschendorff.de>
-	- GSS-API patch for client code - patch by Andras Horvath
-	  <Andras.Horvath@cern.ch> 
+        - install man pages read-only and improved the contributed redhat init
+          script - patches by Eric Biederman <ebiederm@aristanetworks.com>
+        - spec file improvements in contrib/redhat-rpm - patch by Jodok Ole
+          Muellers <jodok.muellers@aschendorff.de>
+        - GSS-API patch for client code - patch by Andras Horvath
+          <Andras.Horvath@cern.ch> 
 
 version 8.1.17 (Sep 29, 2009):
-	- fix for interface detection when HAVE_SA_LEN is defined - first
-	  detected on NetBSD 5.0 and patched by Chris Ross
-	  <cross+conserver@distal.com>
-	- first person to connect to a console wanting read/write now gets it
-	  once the active user drops read/write - suggested by Thomas Gardner
-	  <tmg@pobox.com>
-	- fix typo when setting nonblocking socket for client connections,
-	  fixing stall issues - patch by Eric Biederman
-	  <ebiederm@aristanetworks.com>   
-	- GSS-API patch (--with-gssapi) to help with Kerberos tokens - patch by
-	  Nate Straz <nstraz@redhat.com>
-	- authenticate username without @REALM when using GSS-API
-	  (--with-striprealm) - based on patch by Andras Horvath
-	  <Andras.Horvath@cern.ch>
-	- various contrib/redhat-rpm fixes - patch by Fabien Wernli
-	  <wernli@in2p3.fr>
-	- fix handling of read(stdin) returning -1 in console client - patch by
-	  Ed Swierk <eswierk@arastra.com>
+        - fix for interface detection when HAVE_SA_LEN is defined - first
+          detected on NetBSD 5.0 and patched by Chris Ross
+          <cross+conserver@distal.com>
+        - first person to connect to a console wanting read/write now gets it
+          once the active user drops read/write - suggested by Thomas Gardner
+          <tmg@pobox.com>
+        - fix typo when setting nonblocking socket for client connections,
+          fixing stall issues - patch by Eric Biederman
+          <ebiederm@aristanetworks.com>   
+        - GSS-API patch (--with-gssapi) to help with Kerberos tokens - patch by
+          Nate Straz <nstraz@redhat.com>
+        - authenticate username without @REALM when using GSS-API
+          (--with-striprealm) - based on patch by Andras Horvath
+          <Andras.Horvath@cern.ch>
+        - various contrib/redhat-rpm fixes - patch by Fabien Wernli
+          <wernli@in2p3.fr>
+        - fix handling of read(stdin) returning -1 in console client - patch by
+          Ed Swierk <eswierk@arastra.com>
 
 version 8.1.16 (Apr 10, 2007):
-	- added 'replstring' substitution option - inspired by
-	  conversation with Owen DeLong <owen@c2company.com>
-	- added '^Ecn' option for writing a note to the logfile - patch
-	  by Bryan Schmersal <bschmer@yahoo.com>
-	- fixed leaking file descriptors when 'host' and 'uds' consoles
-	  fail to connect - based on patch by Michael Heironimus
-	  <michael_heironimus@archwayconcepts.com>
+        - added 'replstring' substitution option - inspired by
+          conversation with Owen DeLong <owen@c2company.com>
+        - added '^Ecn' option for writing a note to the logfile - patch
+          by Bryan Schmersal <bschmer@yahoo.com>
+        - fixed leaking file descriptors when 'host' and 'uds' consoles
+          fail to connect - based on patch by Michael Heironimus
+          <michael_heironimus@archwayconcepts.com>
 
 version 8.1.15 (Dec 31, 2006):
-	- protection again telnet option negotation loops - patch by
-	  Robby Griffin <rmg@yakshavers.com>
-	- console now prints the attach/detach sequences when suspended
-	- added --with-cycladests configure option to allow
-	  cross-compiling on a cyclades ts - patch by Matt Johnson
-	  <mwj@doc.ic.ac.uk>
-	- added master conserver host to 'console -x' output for
-	  'device' consoles - patch by Matt Johnson <mwj@doc.ic.ac.uk>
-	- fixed parsing error when dealing with encapsulated
-	  client/server options
+        - protection again telnet option negotation loops - patch by
+          Robby Griffin <rmg@yakshavers.com>
+        - console now prints the attach/detach sequences when suspended
+        - added --with-cycladests configure option to allow
+          cross-compiling on a cyclades ts - patch by Matt Johnson
+          <mwj@doc.ic.ac.uk>
+        - added master conserver host to 'console -x' output for
+          'device' consoles - patch by Matt Johnson <mwj@doc.ic.ac.uk>
+        - fixed parsing error when dealing with encapsulated
+          client/server options
 
 version 8.1.14 (Apr 9, 2006):
-	- fixed rpm conserver.spec file - based on patch by Martin Evans
-	  <m.d.t.evans@qmul.ac.uk>
-	- added 'uds' console type for unix domain socket connections -
-	  based on patch by DJ Gregor <dj@gregor.com>
-	- probing of interfaces under cygwin (and possibly others?) now
-	  skips unconfigured interfaces (even if flagged as up!) -
-	  reported by Chris Riddoch <chrisr@digeo.com>
-	- added the '!login' console option to prevent clients from
-	  connecting to a console - suggested by Greg Tillman
-	  <gregtillman@comcast.net>
-	- added a 'noop' console type for consoles you'd like to name,
-	  but have no connection to - suggested by Greg Tillman
-	  <gregtillman@comcast.net>
-	- deprecated escape commands removed from the code
-	- added '^EcP' and '^EcR' sequences to set the playback and
-	  replay line lengths
-	- new console config options 'playback' and 'replay' to let the
-	  client set prefered output lengths (with a special feature for
-	  a size of zero)
-	- prefer strlcpy() over strcpy() - based on patch by Peter
-	  Valchev <pvalchev@openbsd.org>
-	- fixed bug where '^Eco' by user on an 'exec' console with an
-	  'initcmd' causes input by user to be ignored (could be other
-	  console types as well) - reported by Mark Wedel
-	  <Mark.Wedel@sun.com>
-	- made POSIX termios code in autologin a requirement (since
-	  conserver requires it) and cleaned up a few other issues -
-	  based on reports by Arthur Clune <ajc22@york.ac.uk>
+        - fixed rpm conserver.spec file - based on patch by Martin Evans
+          <m.d.t.evans@qmul.ac.uk>
+        - added 'uds' console type for unix domain socket connections -
+          based on patch by DJ Gregor <dj@gregor.com>
+        - probing of interfaces under cygwin (and possibly others?) now
+          skips unconfigured interfaces (even if flagged as up!) -
+          reported by Chris Riddoch <chrisr@digeo.com>
+        - added the '!login' console option to prevent clients from
+          connecting to a console - suggested by Greg Tillman
+          <gregtillman@comcast.net>
+        - added a 'noop' console type for consoles you'd like to name,
+          but have no connection to - suggested by Greg Tillman
+          <gregtillman@comcast.net>
+        - deprecated escape commands removed from the code
+        - added '^EcP' and '^EcR' sequences to set the playback and
+          replay line lengths
+        - new console config options 'playback' and 'replay' to let the
+          client set prefered output lengths (with a special feature for
+          a size of zero)
+        - prefer strlcpy() over strcpy() - based on patch by Peter
+          Valchev <pvalchev@openbsd.org>
+        - fixed bug where '^Eco' by user on an 'exec' console with an
+          'initcmd' causes input by user to be ignored (could be other
+          console types as well) - reported by Mark Wedel
+          <Mark.Wedel@sun.com>
+        - made POSIX termios code in autologin a requirement (since
+          conserver requires it) and cleaned up a few other issues -
+          based on reports by Arthur Clune <ajc22@york.ac.uk>
 
 version 8.1.13 (Jan 15, 2006):
-	- use SIOCGIFNUM for interface count (if available) and catch
-	  EINVAL on Solaris - patch by Peter Jeremy
-	  <peter.jeremy@alcatel.com.au>
-	- console output now resets idle timer - suggested by Peter
-	  Saunders <pajs@fodder.org.uk>
-	- bug fix for conserver process running out of control and using
-	  up cpu - debugged with Alexandra N. Kossovsky
-	  <Alexandra.Kossovsky@oktetlabs.ru>
+        - use SIOCGIFNUM for interface count (if available) and catch
+          EINVAL on Solaris - patch by Peter Jeremy
+          <peter.jeremy@alcatel.com.au>
+        - console output now resets idle timer - suggested by Peter
+          Saunders <pajs@fodder.org.uk>
+        - bug fix for conserver process running out of control and using
+          up cpu - debugged with Alexandra N. Kossovsky
+          <Alexandra.Kossovsky@oktetlabs.ru>
 
 version 8.1.12 (Sep 5, 2005):
-	- printf() fix for autologin - patch by Menno Duursma
-	  <druiloor@zonnet.nl>
-	- newly spawned (from SIGHUP) processes didn't properly close
-	  primary socket
-	- SSL certificates now work again (anonymous ciphers are not
-	  allowed if a certificate is used)
-	- client options -x, -u, -w, and -i can now take a console name
-	  to restrict output - suggested by Evan McClure
-	  <emcclure@internap.com>
-	- convert program now installed in $libdir/conserver - patch by
-	  Petter Reinholdtsen <pere@hungry.com>
-	- we now ignore SIGXFSZ, if it exists
-	- added 'limited' access option to remove certain functionality
-	  from users - suggested by Sven Michels <sven@darkman.de>
-	- added client option -z/-Z for sending commands to servers
-	  (reload, quit, etc) - based on suggestion by Joshua Pincus
-	  <Joshua.Pincus@Sun.COM>
-	- added 'execrunas' and 'initrunas' console options to allow
-	  'exec' and 'initcmd' execution as another user and/or group -
-	  based on patch by Gary Mills <mills@cc.umanitoba.ca>
-	- the east coast mirror had to shut down (for now, at least)
-	- crash from bad pointer manipulation during log replay - reported by
-	  Ryan Kirkpatrick <linux@rkirkpat.net>
+        - printf() fix for autologin - patch by Menno Duursma
+          <druiloor@zonnet.nl>
+        - newly spawned (from SIGHUP) processes didn't properly close
+          primary socket
+        - SSL certificates now work again (anonymous ciphers are not
+          allowed if a certificate is used)
+        - client options -x, -u, -w, and -i can now take a console name
+          to restrict output - suggested by Evan McClure
+          <emcclure@internap.com>
+        - convert program now installed in $libdir/conserver - patch by
+          Petter Reinholdtsen <pere@hungry.com>
+        - we now ignore SIGXFSZ, if it exists
+        - added 'limited' access option to remove certain functionality
+          from users - suggested by Sven Michels <sven@darkman.de>
+        - added client option -z/-Z for sending commands to servers
+          (reload, quit, etc) - based on suggestion by Joshua Pincus
+          <Joshua.Pincus@Sun.COM>
+        - added 'execrunas' and 'initrunas' console options to allow
+          'exec' and 'initcmd' execution as another user and/or group -
+          based on patch by Gary Mills <mills@cc.umanitoba.ca>
+        - the east coast mirror had to shut down (for now, at least)
+        - crash from bad pointer manipulation during log replay - reported by
+          Ryan Kirkpatrick <linux@rkirkpat.net>
 
 version 8.1.11 (Nov 9, 2004):
-	- fixed array bounds and stack tromping - reported by Emmett
-	  Hogan <hogan@bigcityit.com>
-	- most recent client to ask for read-write now gets it (used to
-	  be first client to connect)
-	- client read-write mode now separate from console up/down state
-	- 'make autologin.install' now compiles autologin - reported by
-	  Graham Merrill <teddgram@sbcglobal.net>
-	- new 'autocomplete' option for controlling shortest-prefix
-	  console name matching (which has always been on)
-	- client now blocks on ^Eco, waiting for status of connection
-	- added 'a' and 'A' for upper and lowercase alphanumeric
-	  (0-9a-z) conversions to the *subst config items - based on
-	  patch by Jonathan Chen <jon+conserver@spock.org>
+        - fixed array bounds and stack tromping - reported by Emmett
+          Hogan <hogan@bigcityit.com>
+        - most recent client to ask for read-write now gets it (used to
+          be first client to connect)
+        - client read-write mode now separate from console up/down state
+        - 'make autologin.install' now compiles autologin - reported by
+          Graham Merrill <teddgram@sbcglobal.net>
+        - new 'autocomplete' option for controlling shortest-prefix
+          console name matching (which has always been on)
+        - client now blocks on ^Eco, waiting for status of connection
+        - added 'a' and 'A' for upper and lowercase alphanumeric
+          (0-9a-z) conversions to the *subst config items - based on
+          patch by Jonathan Chen <jon+conserver@spock.org>
 
 version 8.1.10 (Sep 21, 2004):
-	- fix "forwarding level too deep" issue with '^Ec;' - reported
-	  by Han Pilmeyer <han.pilmeyer@hp.com>
+        - fix "forwarding level too deep" issue with '^Ec;' - reported
+          by Han Pilmeyer <han.pilmeyer@hp.com>
 
 version 8.1.9 (Jul 14, 2004):
-	- fixed bug processing access lists when duplicates exist in the
-	  list - reported by Phil Dibowitz <phil@usc.edu>
-	- fixed bug where 'idletimeout' was not recognized in default
-	  blocks - reported by John Cagle <jcagle@gmail.com>
-	- added an 'autocomplete' config option to set the console name
-	  autocompletion behavior - suggested by John Stoffel
-	  <stoffel@lucent.com>
+        - fixed bug processing access lists when duplicates exist in the
+          list - reported by Phil Dibowitz <phil@usc.edu>
+        - fixed bug where 'idletimeout' was not recognized in default
+          blocks - reported by John Cagle <jcagle@gmail.com>
+        - added an 'autocomplete' config option to set the console name
+          autocompletion behavior - suggested by John Stoffel
+          <stoffel@lucent.com>
 
 version 8.1.8 (Jun 9, 2004):
-	- added 'initspinmax' and 'initspintimer' console options to
-	  help calm console initialization "spinning"
-	- fixed setsockopt() error on 64bit solaris - reported by Trond
-	  Hagen <trond@basefarm.no>
+        - added 'initspinmax' and 'initspintimer' console options to
+          help calm console initialization "spinning"
+        - fixed setsockopt() error on 64bit solaris - reported by Trond
+          Hagen <trond@basefarm.no>
 
 version 8.1.7 (May 28, 2004):
-	- cleaned up the manpages a bit to make things clearer and more
-	  standard - reported by Dave Stuit <djs@tellme.com>
-	- added an east coast mirror!  http://conserver.syr.edu/ -
-	  thanks to Christopher T. Beers <ctbeers@syr.edu>
-	- primary group of users not included in '@group' syntax -
-	  reported by Phil Dibowitz <phil@usc.edu>
-	- changed '@group' behavior such that groups are checked when
-	  needed, instead of cached at startup, which is more logical
-	- missing variables when building convert with tcp_wrappers -
-	  reported by Nikolaos Papavassiliou
-	  <Nikolaos.Papavassiliou@reuters.com>
-	- added --with-rpath option - suggested by Phil Dibowitz
-	  <phil@usc.edu>
+        - cleaned up the manpages a bit to make things clearer and more
+          standard - reported by Dave Stuit <djs@tellme.com>
+        - added an east coast mirror!  http://conserver.syr.edu/ -
+          thanks to Christopher T. Beers <ctbeers@syr.edu>
+        - primary group of users not included in '@group' syntax -
+          reported by Phil Dibowitz <phil@usc.edu>
+        - changed '@group' behavior such that groups are checked when
+          needed, instead of cached at startup, which is more logical
+        - missing variables when building convert with tcp_wrappers -
+          reported by Nikolaos Papavassiliou
+          <Nikolaos.Papavassiliou@reuters.com>
+        - added --with-rpath option - suggested by Phil Dibowitz
+          <phil@usc.edu>
 
 version 8.1.6 (May 25, 2004):
-	- added ability to configure client via system-wide console.cf
-	  file and per-user .consolerc - suggested (independently) by
-	  Erik Sjolund <erik.sjolund@sbc.su.se> and Trevor Fiatal
-	  <trevor@fiatal.net>
-	- fixed bug where break strings were not properly sent -
-	  reported by Tim Small <tim@buttersideup.com>
-	- fixed bug in config file 'protocol' value handling - reported
-	  by Kees Cook <kees@osdl.org>
-	- conserver no longer uses the local domain name in the default
-	  access list (the default list is only created if no access
-	  list is specified in the configuration file) - inspired by
-	  William P LePera <lepera@us.ibm.com>
-	- added a 'terminal' console configuration block for printing
-	  strings when attaching and detaching from consoles - suggested
-	  by Richard Threadgill <richardt@tellme.com>
+        - added ability to configure client via system-wide console.cf
+          file and per-user .consolerc - suggested (independently) by
+          Erik Sjolund <erik.sjolund@sbc.su.se> and Trevor Fiatal
+          <trevor@fiatal.net>
+        - fixed bug where break strings were not properly sent -
+          reported by Tim Small <tim@buttersideup.com>
+        - fixed bug in config file 'protocol' value handling - reported
+          by Kees Cook <kees@osdl.org>
+        - conserver no longer uses the local domain name in the default
+          access list (the default list is only created if no access
+          list is specified in the configuration file) - inspired by
+          William P LePera <lepera@us.ibm.com>
+        - added a 'terminal' console configuration block for printing
+          strings when attaching and detaching from consoles - suggested
+          by Richard Threadgill <richardt@tellme.com>
 
 version 8.1.5 (May 7, 2004):
-	- changed remaining O_NDELAY flags to O_NONBLOCK
-	- added PROTOCOLS file to describe the client/server protocol
-	- added '#include' capability to conserver.cf file
-	- added '@group' syntax to conserver.cf file to support use of
-	  system groups
-	- added -U client option to allow client to ask for encryption
-	  but fall back to non-encrypted connections otherwise -
-	  suggested by Mike Hendon <mike.hendon@uk.nomura.com>
-	- fixed bug where socket not properly deleted on exit - reported
-	  by William P LePera <lepera@us.ibm.com>
-	- added 'initdelay' option for throttling startup of consoles -
-	  suggested by Jay McCanta <mccantaj@amgen.com>
+        - changed remaining O_NDELAY flags to O_NONBLOCK
+        - added PROTOCOLS file to describe the client/server protocol
+        - added '#include' capability to conserver.cf file
+        - added '@group' syntax to conserver.cf file to support use of
+          system groups
+        - added -U client option to allow client to ask for encryption
+          but fall back to non-encrypted connections otherwise -
+          suggested by Mike Hendon <mike.hendon@uk.nomura.com>
+        - fixed bug where socket not properly deleted on exit - reported
+          by William P LePera <lepera@us.ibm.com>
+        - added 'initdelay' option for throttling startup of consoles -
+          suggested by Jay McCanta <mccantaj@amgen.com>
 
 version 8.1.4 (Apr 13, 2004):
-	- fixed macro use in manpages to hopefully be more compatible
-	- removed extra newline of --MARK-- range output
-	- fixed bug where server -b option wasn't working - reported by
-	  Nathan R. Hruby <nhruby@uga.edu>
-	- fixed client segfault when using -R, -t, -d, and -b options
-	- added a --with-uds configure option to have all client/server
-	  communication happen via unix domain sockets - suggested by
-	  William P LePera <lepera@us.ibm.com>
+        - fixed macro use in manpages to hopefully be more compatible
+        - removed extra newline of --MARK-- range output
+        - fixed bug where server -b option wasn't working - reported by
+          Nathan R. Hruby <nhruby@uga.edu>
+        - fixed client segfault when using -R, -t, -d, and -b options
+        - added a --with-uds configure option to have all client/server
+          communication happen via unix domain sockets - suggested by
+          William P LePera <lepera@us.ibm.com>
 
 version 8.1.3 (Mar 22, 2004):
-	- fixed small memory and file descriptor leak in client when
-	  using '^Ec;'
-	- '^Ec;' now only disconnects from the previous console only
-	  after a successfully move to a new console, allowing you to
-	  abort the move - suggested by Christopher T. Beers
-	  <ctbeers@syr.edu>
+        - fixed small memory and file descriptor leak in client when
+          using '^Ec;'
+        - '^Ec;' now only disconnects from the previous console only
+          after a successfully move to a new console, allowing you to
+          abort the move - suggested by Christopher T. Beers
+          <ctbeers@syr.edu>
 
 version 8.1.2 (Mar 11, 2004):
-	- better handling of client command (^Ec|) when user is bumped,
-	  conserver is reconfigured, etc
-	- added 'initsubst' option for 'initcmd' substitutions like
-	  'devicesubst' and 'execsubst' - based on patch by Bill
-	  Sommerfeld <sommerfeld@east.sun.com>
-	- modified and added to *subst (initsubst, etc) syntax to allow
-	  for flexibility and future enhancement
-	- changed 'port' and 'portinc' minimums from 1 to 0 - it allows
-	  more flexibility and helps with 0-based counting
-	- removed unportable sys/cdefs.h from contrib/chat/chat.c -
-	  patch by Bill Sommerfeld <sommerfeld@east.sun.com>
-	- added --with-extmsgs configure switch to enable entertaining
-	  messages
-	- marked various undocumented client commands as deprecated so
-	  that they can be removed in a future version
-	- added ability to "move" to a new console via '^Ec;' -
-	  suggested by Christopher T. Beers <ctbeers@syr.edu>
-	- added a dump of console information when -S is used twice -
-	  suggested by Todd Stansell <todd@stansell.org>
+        - better handling of client command (^Ec|) when user is bumped,
+          conserver is reconfigured, etc
+        - added 'initsubst' option for 'initcmd' substitutions like
+          'devicesubst' and 'execsubst' - based on patch by Bill
+          Sommerfeld <sommerfeld@east.sun.com>
+        - modified and added to *subst (initsubst, etc) syntax to allow
+          for flexibility and future enhancement
+        - changed 'port' and 'portinc' minimums from 1 to 0 - it allows
+          more flexibility and helps with 0-based counting
+        - removed unportable sys/cdefs.h from contrib/chat/chat.c -
+          patch by Bill Sommerfeld <sommerfeld@east.sun.com>
+        - added --with-extmsgs configure switch to enable entertaining
+          messages
+        - marked various undocumented client commands as deprecated so
+          that they can be removed in a future version
+        - added ability to "move" to a new console via '^Ec;' -
+          suggested by Christopher T. Beers <ctbeers@syr.edu>
+        - added a dump of console information when -S is used twice -
+          suggested by Todd Stansell <todd@stansell.org>
 
 version 8.1.1 (Feb 10, 2004):
-	- fixed mistake in Makefiles where rpmbuild fails - reported by
-	  Martin Evans <m.d.t.evans@qmul.ac.uk>
-	- fixed a couple typos - reported by Matt Selsky
-	  <selsky@columbia.edu>
+        - fixed mistake in Makefiles where rpmbuild fails - reported by
+          Martin Evans <m.d.t.evans@qmul.ac.uk>
+        - fixed a couple typos - reported by Matt Selsky
+          <selsky@columbia.edu>
 
 version 8.1.0 (Jan 18, 2004):
-	- fixes for HP-UX compilation - patch by Petter Reinholdtsen
-	  <pere@hungry.com>
-	- fixes for compilation under various operating systems -
-	  patch by Albert Chin <conserver-users@mlists.thewrittenword.com>
-	- added a 'protocol' option for either 'telnet' or 'raw' socket
-	  communication - also reflected in -i output
-	- changed the client/server protocol to use 0xff as a command
-	  character for sending control commands - similiar to the
-	  telnet protocol - improves the ^Ec| interaction
-	- client -E option now disables ssl encryption attempts, useful
-	  for broken SSL environents - suggested by Graydon Dodson
-	  <grdodson@lexmark.com>
-	- bad error message connecting non-ssl client with ssl-required
-	  server - reported by Graydon Dodson <grdodson@lexmark.com>
-	- added note about pam configuration to conserver.passwd.man -
-	  suggested by Erik Sjolund <erik.sjolund@sbc.su.se>
-	- improved telnet protocol option handling such that connections
-	  to standard telnet ports should work properly
+        - fixes for HP-UX compilation - patch by Petter Reinholdtsen
+          <pere@hungry.com>
+        - fixes for compilation under various operating systems -
+          patch by Albert Chin <conserver-users@mlists.thewrittenword.com>
+        - added a 'protocol' option for either 'telnet' or 'raw' socket
+          communication - also reflected in -i output
+        - changed the client/server protocol to use 0xff as a command
+          character for sending control commands - similiar to the
+          telnet protocol - improves the ^Ec| interaction
+        - client -E option now disables ssl encryption attempts, useful
+          for broken SSL environents - suggested by Graydon Dodson
+          <grdodson@lexmark.com>
+        - bad error message connecting non-ssl client with ssl-required
+          server - reported by Graydon Dodson <grdodson@lexmark.com>
+        - added note about pam configuration to conserver.passwd.man -
+          suggested by Erik Sjolund <erik.sjolund@sbc.su.se>
+        - improved telnet protocol option handling such that connections
+          to standard telnet ports should work properly
 
 version 8.0.9 (Dec 10, 2003):
-	- fixed major bug in connect() handling which causes most
-	  socket-based consoles to timeout after 10 seconds - reported
-	  by Tom Rataski <trataski@intlsteel.com> 
-	- added a couple details to the 'logfilemax' manpage entry
+        - fixed major bug in connect() handling which causes most
+          socket-based consoles to timeout after 10 seconds - reported
+          by Tom Rataski <trataski@intlsteel.com> 
+        - added a couple details to the 'logfilemax' manpage entry
 
 version 8.0.8 (Dec 2, 2003):
-	- added client ^Ec| sequence for running a command on the client
-	  and having it's I/O directed to the console - inspired by
-	  discussions with David Williamson
-	  <david+conserver@williamsons.net> years ago  ;-)
-	- touched up Makefiles to test against .h files
-	- fixed inability to replay the console log while the console is
-	  down - reported by Matt Selsky <selsky@columbia.edu>
-	- added a console 'logfilemax' option for rotating the console
-	  logfile once the file is greater than the specified size
-	- added sample configuration files to conserver.cf/samples
-	- tweaked some failure messages and initcmd notifications
+        - added client ^Ec| sequence for running a command on the client
+          and having it's I/O directed to the console - inspired by
+          discussions with David Williamson
+          <david+conserver@williamsons.net> years ago  ;-)
+        - touched up Makefiles to test against .h files
+        - fixed inability to replay the console log while the console is
+          down - reported by Matt Selsky <selsky@columbia.edu>
+        - added a console 'logfilemax' option for rotating the console
+          logfile once the file is greater than the specified size
+        - added sample configuration files to conserver.cf/samples
+        - tweaked some failure messages and initcmd notifications
 
 version 8.0.7 (Nov 20, 2003):
-	- renamed util.[ch] to cutil.[ch] to prevent name conflict with
-	  system util.h, reordered some #includes, and fixed a configure
-	  test for sys/proc.h to build on OpenBSD 3.4 (and probably
-	  others) - reported by Kurt Raschke <kurt@raschke.net>
-	- fixed missing semi-colon for cygwin build - reported by
-	  Raymond Richmond <raymond.richmond@ualberta.ca>
+        - renamed util.[ch] to cutil.[ch] to prevent name conflict with
+          system util.h, reordered some #includes, and fixed a configure
+          test for sys/proc.h to build on OpenBSD 3.4 (and probably
+          others) - reported by Kurt Raschke <kurt@raschke.net>
+        - fixed missing semi-colon for cygwin build - reported by
+          Raymond Richmond <raymond.richmond@ualberta.ca>
 
 version 8.0.6 (Nov 16, 2003):
-	- code was missing regarding the 'setproctitle' option - patch
-	  by Dmitry Morozovsky <marck@rinet.ru>
-	- fixed the order of access list checking when
-	  --with-trustrevdns is used
-	- fixed various spelling errors - patches by Matt Selsky
-	  <selsky@columbia.edu>
-	- added console 'idletimeout' and 'idlestring' options to
-	  trigger the sending of 'idlestring' after a lack of activity
-	  for 'idletimeout' seconds - suggested by Ian Potts
-	  <ian.potts@db.com>
-	- added console 'portbase' and 'portinc' options to allow
-	  specifying a formula for referencing ports - inspired by Todd
-	  Stansell <todd@stansell.org>
-	- fixed problem where console 'port' option didn't take port
-	  names (manpage said it did)
-	- added server -U option and configuration option 'unifiedlog'
-	  to allow a copy of all console activity to go to a single file
-	- removed all sprintf() calls
-	- added 'devicesubst' and 'execsubst' console options for doing
-	  replacements with calculated port numbers on the 'device' and
-	  'exec' values
-	- NULL characters in console data caused data loss because of
-	  strlen() usage - reported by Toby Gerhart <toby.gerhart@eds.com>
-	- fixed a couple errors in contrib/redhat-rpm/conserver.spec -
-	  reported by Martin Evans <m.d.t.evans@qmul.ac.uk>
-	- added capability to use '!' in user access lists to prevent a
-	  user from having access - suggested by Matt Selsky
-	  <selsky@columbia.edu>
+        - code was missing regarding the 'setproctitle' option - patch
+          by Dmitry Morozovsky <marck@rinet.ru>
+        - fixed the order of access list checking when
+          --with-trustrevdns is used
+        - fixed various spelling errors - patches by Matt Selsky
+          <selsky@columbia.edu>
+        - added console 'idletimeout' and 'idlestring' options to
+          trigger the sending of 'idlestring' after a lack of activity
+          for 'idletimeout' seconds - suggested by Ian Potts
+          <ian.potts@db.com>
+        - added console 'portbase' and 'portinc' options to allow
+          specifying a formula for referencing ports - inspired by Todd
+          Stansell <todd@stansell.org>
+        - fixed problem where console 'port' option didn't take port
+          names (manpage said it did)
+        - added server -U option and configuration option 'unifiedlog'
+          to allow a copy of all console activity to go to a single file
+        - removed all sprintf() calls
+        - added 'devicesubst' and 'execsubst' console options for doing
+          replacements with calculated port numbers on the 'device' and
+          'exec' values
+        - NULL characters in console data caused data loss because of
+          strlen() usage - reported by Toby Gerhart <toby.gerhart@eds.com>
+        - fixed a couple errors in contrib/redhat-rpm/conserver.spec -
+          reported by Martin Evans <m.d.t.evans@qmul.ac.uk>
+        - added capability to use '!' in user access lists to prevent a
+          user from having access - suggested by Matt Selsky
+          <selsky@columbia.edu>
 
 version 8.0.5 (Oct 31, 2003):
-	- added 'loghostnames' config option (default is on) to log
-	  client hostnames instead of ip addresses (like pre-8.0.0) -
-	  suggested by Han Pilmeyer <han@zk3.dec.com>
-	- fixed bug where 'daemonmode' config file option wasn't being
-	  used
-	- fixed potential logfile (-L) opening problem processing SIGHUP
-	- fixed various potential conserver.cf issues with 'config'
-	  block values processing SIGHUP
-	- added 'setproctitle' config option (default is off) to enable
-	  changing the process title to contain runtime information -
-	  patch by Dmitry Morozovsky <marck@rinet.ru>
+        - added 'loghostnames' config option (default is on) to log
+          client hostnames instead of ip addresses (like pre-8.0.0) -
+          suggested by Han Pilmeyer <han@zk3.dec.com>
+        - fixed bug where 'daemonmode' config file option wasn't being
+          used
+        - fixed potential logfile (-L) opening problem processing SIGHUP
+        - fixed various potential conserver.cf issues with 'config'
+          block values processing SIGHUP
+        - added 'setproctitle' config option (default is off) to enable
+          changing the process title to contain runtime information -
+          patch by Dmitry Morozovsky <marck@rinet.ru>
 
 version 8.0.4 (Oct 10, 2003):
-	- fixed client rejection bug that can nearly never happen -
-	  reported by Han Pilmeyer <han@zk3.dec.com>
-	- fixed bug where client is reconnected to the previous console
-	  when non-exact console names are used - reported by Rolf
-	  Petter Halle <rph@online.no>
-	- fixed bug where exact matchs on a remote console name never
-	  happened - reported by Toby Gerhart <toby.gerhart@eds.com>
-	- fixed bug where SIGHUP fails to update console aliases -
-	  reported by Han Pilmeyer <han@zk3.dec.com>
+        - fixed client rejection bug that can nearly never happen -
+          reported by Han Pilmeyer <han@zk3.dec.com>
+        - fixed bug where client is reconnected to the previous console
+          when non-exact console names are used - reported by Rolf
+          Petter Halle <rph@online.no>
+        - fixed bug where exact matchs on a remote console name never
+          happened - reported by Toby Gerhart <toby.gerhart@eds.com>
+        - fixed bug where SIGHUP fails to update console aliases -
+          reported by Han Pilmeyer <han@zk3.dec.com>
 
 version 8.0.3 (Oct 6, 2003):
-	- the SIGHUP process fails to pick up changes to certain fields
-	  because of a horribly broken SwapStr() function [broken in
-	  all previous 8.0.x versions] - reported by Toby Gerhart
-	  <toby.gerhart@eds.com>
+        - the SIGHUP process fails to pick up changes to certain fields
+          because of a horribly broken SwapStr() function [broken in
+          all previous 8.0.x versions] - reported by Toby Gerhart
+          <toby.gerhart@eds.com>
 
 version 8.0.2 (Oct 5, 2003):
-	- reworked the i/o calls to better buffer data
-	- added console 'motd' option for holding a "message of the
-	  day", displayed to the client on attachment to console -
-	  suggested by Toby Gerhart <toby.gerhart@eds.com>
-	- added ^Ecm client command for displaying MOTD and integrated
-	  it into the client console attachment sequence
-	- now unallocate client lists when forking new child conserver
-	  processes
-	- changed strdup() to local StrDup() so dmalloc can gracefully
-	  track changes
-	- added a ^Ec; sequence to let client signal server when it's
-	  ready to see console data, otherwise a chatty console can
-	  cause the login sequence to fail and you can never attach to
-	  the console
+        - reworked the i/o calls to better buffer data
+        - added console 'motd' option for holding a "message of the
+          day", displayed to the client on attachment to console -
+          suggested by Toby Gerhart <toby.gerhart@eds.com>
+        - added ^Ecm client command for displaying MOTD and integrated
+          it into the client console attachment sequence
+        - now unallocate client lists when forking new child conserver
+          processes
+        - changed strdup() to local StrDup() so dmalloc can gracefully
+          track changes
+        - added a ^Ec; sequence to let client signal server when it's
+          ready to see console data, otherwise a chatty console can
+          cause the login sequence to fail and you can never attach to
+          the console
 
 version 8.0.1 (Sep 29, 2003):
-	- fixed bug in access list parsing where multiple addresses per
-	  line can cause errors - reported by Jay McCanta
-	  <mccantaj@amgen.com>
-	- changed client password prompt to show hostname passed down by
-	  the server - suggested by Toby Gerhart <toby.gerhart@eds.com>
-	- fixed bug where remote console names were only search for
-	  substring matches - reported by Toby Gerhart
-	  <toby.gerhart@eds.com> 
-	- the server -M option wasn't being used properly to limit the
-	  consoles managed by the host
-	- added 'initcmd' console option which allows a command to
-	  interact with a console right after a console is opened -
-	  suggested by Greg Woods <woods@weird.com>
-	- added the chat program contributed by Greg Woods
-	  <woods@weird.com> to the contrib/chat directory
-	- added WUNTRACED to waitpid() for catching suspended processes
-	- reworded some client/server messages to be clearer
-	- embedded non-printable characters in break lists now display
-	  correctly when '^Ecl?' is used
-	- in case client aborts unexpectedly, terminal state should
-	  now be restored to normal
+        - fixed bug in access list parsing where multiple addresses per
+          line can cause errors - reported by Jay McCanta
+          <mccantaj@amgen.com>
+        - changed client password prompt to show hostname passed down by
+          the server - suggested by Toby Gerhart <toby.gerhart@eds.com>
+        - fixed bug where remote console names were only search for
+          substring matches - reported by Toby Gerhart
+          <toby.gerhart@eds.com> 
+        - the server -M option wasn't being used properly to limit the
+          consoles managed by the host
+        - added 'initcmd' console option which allows a command to
+          interact with a console right after a console is opened -
+          suggested by Greg Woods <woods@weird.com>
+        - added the chat program contributed by Greg Woods
+          <woods@weird.com> to the contrib/chat directory
+        - added WUNTRACED to waitpid() for catching suspended processes
+        - reworded some client/server messages to be clearer
+        - embedded non-printable characters in break lists now display
+          correctly when '^Ecl?' is used
+        - in case client aborts unexpectedly, terminal state should
+          now be restored to normal
 
 version 8.0.0 (Sep 22, 2003):
-	- better error messages and management of the user's password
-	- 8.0.0-beta4 mistakenly lost conserver.passwd usage
-	- empty passwords now don't trigger a passwd prompt (like 7.2.7)
-	- upgraded to autoconf-2.57 and use recent config.guess/sub
-	  files - suggested by Jorgen Hagg <jorgen.hagg@axis.com>
-	- we now install the conserver.rc file as well as sample
-	  conserver.cf and conserver.passwd files in
-	  $(prefix)/share/examples/conserver - suggested by
-	  Hubert Feyrer <hubertf@netbsd.org>
+        - better error messages and management of the user's password
+        - 8.0.0-beta4 mistakenly lost conserver.passwd usage
+        - empty passwords now don't trigger a passwd prompt (like 7.2.7)
+        - upgraded to autoconf-2.57 and use recent config.guess/sub
+          files - suggested by Jorgen Hagg <jorgen.hagg@axis.com>
+        - we now install the conserver.rc file as well as sample
+          conserver.cf and conserver.passwd files in
+          $(prefix)/share/examples/conserver - suggested by
+          Hubert Feyrer <hubertf@netbsd.org>
 
 version 8.0.0-beta4 (Aug 24, 2003):
-	- totally rewrote the client/server communication, allowing SSL
-	  connections to occur first, protecting *all* information
-	- added 'admin' keyword to the 'access' portion of the config
-	  file for specifying users able to issue the 'quit' command
-	- removed client -G option since it's not really useful any more
-	- added client -t option for sending "text messages" to users,
-	  which is similar to broadcast messages, but you can specify
-	  the user and/or console - suggested by Trevor Fiatal
-	  <trevor@seven.com>
-	- added client -d option for disconnecting users specified by
-	  username and/or console - suggested by Trevor Fiatal
-	  <trevor@seven.com>
-	- removed --with-64bit configure option as 64bit operation is
-	  reported to work just fine
-	- break strings with '\d' are interpreted as a delay, which can
-	  be specified in the config file (default 250ms)
-	- removed 'reset -x' portion of default break sequence #3
-	- remote conserver hostnames now properly match - had to be a
-	  character string match previously
-	- hostname aliases now checked against access lists and the
-	  matched name is used for logging
-	- added --with-trustrevdns to enable the use of reverse DNS
-	  information for access list checks [not recommended] - see the
-	  INSTALL file for full details on who should actually need this
-	  Many thanks to Chuck Rouzer <crouzer@yahoo.com> for all the
-	  help with FreeBSD support and the following issues...
-	- fixed 'make test' problem on hosts where 'localhost' doesn't
-	  resolve to 127.0.0.1
-	- fixed interface probe problem under *BSD
-	- added openpty() interface for pty allocation
+        - totally rewrote the client/server communication, allowing SSL
+          connections to occur first, protecting *all* information
+        - added 'admin' keyword to the 'access' portion of the config
+          file for specifying users able to issue the 'quit' command
+        - removed client -G option since it's not really useful any more
+        - added client -t option for sending "text messages" to users,
+          which is similar to broadcast messages, but you can specify
+          the user and/or console - suggested by Trevor Fiatal
+          <trevor@seven.com>
+        - added client -d option for disconnecting users specified by
+          username and/or console - suggested by Trevor Fiatal
+          <trevor@seven.com>
+        - removed --with-64bit configure option as 64bit operation is
+          reported to work just fine
+        - break strings with '\d' are interpreted as a delay, which can
+          be specified in the config file (default 250ms)
+        - removed 'reset -x' portion of default break sequence #3
+        - remote conserver hostnames now properly match - had to be a
+          character string match previously
+        - hostname aliases now checked against access lists and the
+          matched name is used for logging
+        - added --with-trustrevdns to enable the use of reverse DNS
+          information for access list checks [not recommended] - see the
+          INSTALL file for full details on who should actually need this
+          Many thanks to Chuck Rouzer <crouzer@yahoo.com> for all the
+          help with FreeBSD support and the following issues...
+        - fixed 'make test' problem on hosts where 'localhost' doesn't
+          resolve to 127.0.0.1
+        - fixed interface probe problem under *BSD
+        - added openpty() interface for pty allocation
 
 version 8.0.0-beta3 (Aug 8, 2003):
-	- master process no longer forks on client requests - handles
-	  them with select() like child process
-	- alarm()/SIGALRM usage removed and replaced with counters and
-	  timer on select() call
-	- removed caching of timeouts to terminal servers - each
-	  socket connection now has a proper timeout (and can happen
-	  simultaniously)
-	- partial write()s are properly buffered and retried
-	- made all sockets (including SSL) non-buffered
-	- client now supports piping data to it and properly printing
-	  all server data ("echo '^Ecr^Ec.' | console universe")
+        - master process no longer forks on client requests - handles
+          them with select() like child process
+        - alarm()/SIGALRM usage removed and replaced with counters and
+          timer on select() call
+        - removed caching of timeouts to terminal servers - each
+          socket connection now has a proper timeout (and can happen
+          simultaniously)
+        - partial write()s are properly buffered and retried
+        - made all sockets (including SSL) non-buffered
+        - client now supports piping data to it and properly printing
+          all server data ("echo '^Ecr^Ec.' | console universe")
 
 version 8.0.0-beta2 (Jul 17, 2003):
-	- console aliases added with 'aliases' console keyword
-	- two stop bit support for serial devices - requested by Kelly
-	  Setzer <setzer@placemark.com>
-	- added support for inet_aton() over inet_addr()
-	- all server interfaces now used to identify console management
-	- server interfaces probed with SIOCGIFCONF ioctl, if available
-	- added flow control options 'ixon', 'ixany', 'ixoff', and
-	  'crtscts'
-	- added info to console client -i output
-	- man pages updated, however the wording needs work
+        - console aliases added with 'aliases' console keyword
+        - two stop bit support for serial devices - requested by Kelly
+          Setzer <setzer@placemark.com>
+        - added support for inet_aton() over inet_addr()
+        - all server interfaces now used to identify console management
+        - server interfaces probed with SIOCGIFCONF ioctl, if available
+        - added flow control options 'ixon', 'ixany', 'ixoff', and
+          'crtscts'
+        - added info to console client -i output
+        - man pages updated, however the wording needs work
 
 version 8.0.0-beta1 (Jul 4, 2003):
-	- ***NOTICE*** the format of conserver.cf and conserver.passwd
-	  has completely changed.  see the INSTALL file for
-	  upgrade instructions (it should be "fairly painless").
-	  some documentation has been updated to reflect the new world,
-	  some hasn't - my goal for beta2 is to have all the docs updated
-	- many command-line options now also conserver.cf options options
-	- POSIX termios interface now required for compilation - some
-	  POSIX requirements were already in the code and others will
-	  undoubtedly creep in as time goes by
-	- configure --with-regex option removed because of conserver.cf
-	  and conserver.passwd changes
-	- added -S option to server for syntax checking of the
-	  configuration file - suggested by Dave Stuit <djs@tellme.com>
-	- authorized users now either have r/w or r/o access to consoles
-	- getpassword.o replaces getpass() and getpassphrase() so we can
-	  get any string length
-	- fixed rm commands in test script - patch by Petter Reinholdtsen
-	  <pere@hungry.com>
+        - ***NOTICE*** the format of conserver.cf and conserver.passwd
+          has completely changed.  see the INSTALL file for
+          upgrade instructions (it should be "fairly painless").
+          some documentation has been updated to reflect the new world,
+          some hasn't - my goal for beta2 is to have all the docs updated
+        - many command-line options now also conserver.cf options options
+        - POSIX termios interface now required for compilation - some
+          POSIX requirements were already in the code and others will
+          undoubtedly creep in as time goes by
+        - configure --with-regex option removed because of conserver.cf
+          and conserver.passwd changes
+        - added -S option to server for syntax checking of the
+          configuration file - suggested by Dave Stuit <djs@tellme.com>
+        - authorized users now either have r/w or r/o access to consoles
+        - getpassword.o replaces getpass() and getpassphrase() so we can
+          get any string length
+        - fixed rm commands in test script - patch by Petter Reinholdtsen
+          <pere@hungry.com>
 
 version 7.2.7 (Apr 9, 2003):
-	- added test suite ('make test') for basic client/server
-	  communication tests
-	- changed configure script to provide better checking of options,
-	  hp-ux specifics, and functions
-	- console names are no longer case-sensitive
-	- fixed case-sensitive DNS name comparisons - reported by
-	  Peter Chubb <peter@chubb.wattle.id.au> via Jorgen Hagg
-	  <jorgen.hagg@axis.com>
-	- added dmalloc and openssl version numbers to -V output
-	- reordered includes for openssl-0.9.7a compatibility
-	- conserver.rc looks at pidfile to find the master pid - suggested
-	  by Petter Reinholdtsen <petter.reinholdtsen@usit.uio.no>
-	- misplaced code regarding --with-regex - patch by Andreas Wrede
-	  <andreas@planix.com>
-	- added password support for HP-UX trusted systems - immense
-	  help by Greg Brown <gregb_ka6max@hotmail.com>
-	- potential SIGUSR1 bug where cached terminal server availability
-	  wasn't being cleared correctly - reported by Dave Stuit
-	  <djs@tellme.com>
-	- server is now more forgiving about errors instead of just
-	  giving up and shutting everything down
-	- consoles that have trouble coming up (and are forced down)
-	  now log when they come back up - suggested by Dave Stuit
-	  <djs@tellme.com>
+        - added test suite ('make test') for basic client/server
+          communication tests
+        - changed configure script to provide better checking of options,
+          hp-ux specifics, and functions
+        - console names are no longer case-sensitive
+        - fixed case-sensitive DNS name comparisons - reported by
+          Peter Chubb <peter@chubb.wattle.id.au> via Jorgen Hagg
+          <jorgen.hagg@axis.com>
+        - added dmalloc and openssl version numbers to -V output
+        - reordered includes for openssl-0.9.7a compatibility
+        - conserver.rc looks at pidfile to find the master pid - suggested
+          by Petter Reinholdtsen <petter.reinholdtsen@usit.uio.no>
+        - misplaced code regarding --with-regex - patch by Andreas Wrede
+          <andreas@planix.com>
+        - added password support for HP-UX trusted systems - immense
+          help by Greg Brown <gregb_ka6max@hotmail.com>
+        - potential SIGUSR1 bug where cached terminal server availability
+          wasn't being cleared correctly - reported by Dave Stuit
+          <djs@tellme.com>
+        - server is now more forgiving about errors instead of just
+          giving up and shutting everything down
+        - consoles that have trouble coming up (and are forced down)
+          now log when they come back up - suggested by Dave Stuit
+          <djs@tellme.com>
 
 version 7.2.6 (Mar 10, 2003):
-	- the -b conserver option was mostly broken (since 7.2.0)
-	- changed logging format so that all messages are of a similar
-	  form
-	- fixed bad port number in 'cached previous timeout' message -
-	  reported by Dave Stuit <djs@tellme.com>
-	- now using pid_t type for better compatibility
-	- fixed the RPM and Solaris package to include the man
-	  page for conserver.passwd - suggested by R P Herrold
-	  <herrold@owlriver.com>
-	- added restart option (-HUP) to conserver startup scripts
-	- added -B option to client for sending messages to a single
-	  server - suggested by Dave Stuit <djs@tellme.com>
-	- added --with-dmalloc for memory usage debugging
-	- bug with multiple interfaces and -M option not maching hostname
-	  in configuration file - patch by Igor Sviridov <sia@nest.org>
-	- memory leak using openssl library plugged
-	- automatic reinitialization of failed consoles now retries
-	  every minute like the manpage says it does - reported by Chris
-	  Fowler <cfowler@outpostsentinel.com>
-	- when -R option is used, substring matches on console names
-	  from clients only match local console names (and if that
-	  fails just remote console names) but ambiguous name list
-	  returns both local and remote consoles - suggested by Todd
-	  Stansell <todd@stansell.org>
+        - the -b conserver option was mostly broken (since 7.2.0)
+        - changed logging format so that all messages are of a similar
+          form
+        - fixed bad port number in 'cached previous timeout' message -
+          reported by Dave Stuit <djs@tellme.com>
+        - now using pid_t type for better compatibility
+        - fixed the RPM and Solaris package to include the man
+          page for conserver.passwd - suggested by R P Herrold
+          <herrold@owlriver.com>
+        - added restart option (-HUP) to conserver startup scripts
+        - added -B option to client for sending messages to a single
+          server - suggested by Dave Stuit <djs@tellme.com>
+        - added --with-dmalloc for memory usage debugging
+        - bug with multiple interfaces and -M option not maching hostname
+          in configuration file - patch by Igor Sviridov <sia@nest.org>
+        - memory leak using openssl library plugged
+        - automatic reinitialization of failed consoles now retries
+          every minute like the manpage says it does - reported by Chris
+          Fowler <cfowler@outpostsentinel.com>
+        - when -R option is used, substring matches on console names
+          from clients only match local console names (and if that
+          fails just remote console names) but ambiguous name list
+          returns both local and remote consoles - suggested by Todd
+          Stansell <todd@stansell.org>
 
 version 7.2.5 (Jan 27, 2003):
-	- fixed many documentation bugs - reported by Dave Stuit
-	  <djs@tellme.com>
-	- added -I option to client which operates like -i, but on the
-	  primary conserver only - suggested by Dave Stuit
-	  <djs@tellme.com>
-	- added SIGUSR2, which does not reread the configuration file,
-	  but does everything else SIGHUP does - suggested at LISA 2002
-	- fixed bug where LOGDIR setting gets used even if no logfile
-	  is wanted
-	- added -R option to server to prevent client redirection to
-	  other conserver hosts - suggested by Todd Stansell
-	  <todd@stansell.org>
+        - fixed many documentation bugs - reported by Dave Stuit
+          <djs@tellme.com>
+        - added -I option to client which operates like -i, but on the
+          primary conserver only - suggested by Dave Stuit
+          <djs@tellme.com>
+        - added SIGUSR2, which does not reread the configuration file,
+          but does everything else SIGHUP does - suggested at LISA 2002
+        - fixed bug where LOGDIR setting gets used even if no logfile
+          is wanted
+        - added -R option to server to prevent client redirection to
+          other conserver hosts - suggested by Todd Stansell
+          <todd@stansell.org>
 
 version 7.2.4 (Oct 14, 2002):
-	- added --with-openssl for some client/server encryption
-	- added -E option to client and server to allow for non-encrypted
-	  connections (encryption is the default if compiled in)
-	- added -c option so credentials (certificate and key) can be
-	  exchanged between client and server
-	- expanded -V output to show what optional bits actually got
-	  compiled into the code (libwrap, regex, etc)
-	- compilation errors on non-shadow file systems without using
-	  --with-pam - reported by Jesper Frank Nemholt <jfn@dassic.com>
-	- client now prefers $LOGNAME, then $USER, then the current uid
-	  for its -l default - suggested by Dave Stuit <djs@tellme.com>
-	- putting back socklen_t usage - it's the right thing to do,
-	  so tell me where it breaks things
-	- configure options --with-cffile and --with-pwdfile now
-	  recognize fully-qualified pathnames - suggested by Kjell
-	  Andresen <kjell.andresen@usit.uio.no>
+        - added --with-openssl for some client/server encryption
+        - added -E option to client and server to allow for non-encrypted
+          connections (encryption is the default if compiled in)
+        - added -c option so credentials (certificate and key) can be
+          exchanged between client and server
+        - expanded -V output to show what optional bits actually got
+          compiled into the code (libwrap, regex, etc)
+        - compilation errors on non-shadow file systems without using
+          --with-pam - reported by Jesper Frank Nemholt <jfn@dassic.com>
+        - client now prefers $LOGNAME, then $USER, then the current uid
+          for its -l default - suggested by Dave Stuit <djs@tellme.com>
+        - putting back socklen_t usage - it's the right thing to do,
+          so tell me where it breaks things
+        - configure options --with-cffile and --with-pwdfile now
+          recognize fully-qualified pathnames - suggested by Kjell
+          Andresen <kjell.andresen@usit.uio.no>
 
 version 7.2.3 (Sep 23, 2002):
-	- checking for duplicate console names got lost in the major
-	  7.2.0 rewrite of that code.  it's back now, with a couple of
-	  other edge-case fixes i noticed while scanning the code -
-	  reported by Dave Stuit <djs@tellme.com>
-	- added --with-pam and PAM authentication support - suggested
-	  by Stu May <jsmay@wasteofbits.com>
-	- added -F server option to prevent automatic reinitialization
-	  of failed consoles ('|' syntax consoles which exit with a
-	  zero status are still reinitialized) - requested by William P
-	  LePera <lepera@us.ibm.com> and Malcolm Gibbs
-	  <Malcolm.Gibbs005@msd.govt.nz>
-	- successful automatic reinitialization of consoles now attaches
-	  a client that wants read-write mode
-	- added read-only client wish to become read-write in -i output
-	- moved to autoconf-2.54 and fixed some small configure.in bugs
+        - checking for duplicate console names got lost in the major
+          7.2.0 rewrite of that code.  it's back now, with a couple of
+          other edge-case fixes i noticed while scanning the code -
+          reported by Dave Stuit <djs@tellme.com>
+        - added --with-pam and PAM authentication support - suggested
+          by Stu May <jsmay@wasteofbits.com>
+        - added -F server option to prevent automatic reinitialization
+          of failed consoles ('|' syntax consoles which exit with a
+          zero status are still reinitialized) - requested by William P
+          LePera <lepera@us.ibm.com> and Malcolm Gibbs
+          <Malcolm.Gibbs005@msd.govt.nz>
+        - successful automatic reinitialization of consoles now attaches
+          a client that wants read-write mode
+        - added read-only client wish to become read-write in -i output
+        - moved to autoconf-2.54 and fixed some small configure.in bugs
     Many thanks to John R. Jackson <jrj@purdue.edu> for the following
     fixes, cleanups, and enhancements...
-	- "lost timestamps" bug (SIGALRM/sleep()/usleep()/tcp_wrapper
-	  interaction)
-	- compiler warnings, bad fileOpenFD tests, and ability to use
-	  a colon after an equal in the config file (LOGDIR=C:\Logs)
-	- autologin fix for Solaris BSM support
+        - "lost timestamps" bug (SIGALRM/sleep()/usleep()/tcp_wrapper
+          interaction)
+        - compiler warnings, bad fileOpenFD tests, and ability to use
+          a colon after an equal in the config file (LOGDIR=C:\Logs)
+        - autologin fix for Solaris BSM support
 
 version 7.2.2 (Jun 05, 2002):
-	- added 'n' as token for no-parity - patch by Greg A. Woods
-	  <woods@weird.com>
-	- extra timestamps occur when consoles come back up after being
-	  down longer than their timestamp period - reported by Dave
-	  Stuit <djs@gnac.com>
-	- AIX 5.1 pseudo-terminal support broken - patch by William P
-	  LePera <lepera@us.ibm.com>
-	- PID file overwritten and not unlinked on exit - reported by
-	  William P LePera <lepera@us.ibm.com>
-	- signals cleaned up in master, child, and sub-proc sections
-	- SIGPIPE now ignored - reported by Greg A. Woods
-	  <woods@weird.com>
+        - added 'n' as token for no-parity - patch by Greg A. Woods
+          <woods@weird.com>
+        - extra timestamps occur when consoles come back up after being
+          down longer than their timestamp period - reported by Dave
+          Stuit <djs@gnac.com>
+        - AIX 5.1 pseudo-terminal support broken - patch by William P
+          LePera <lepera@us.ibm.com>
+        - PID file overwritten and not unlinked on exit - reported by
+          William P LePera <lepera@us.ibm.com>
+        - signals cleaned up in master, child, and sub-proc sections
+        - SIGPIPE now ignored - reported by Greg A. Woods
+          <woods@weird.com>
 
 version 7.2.1 (Mar 25, 2002):
-	- bug regarding timestamp/break reading - patch by Benn Oshrin
-	  <benno@columbia.edu>
-	- console names in conserver.passwd can be regular expressions
-	  if enabled using --with-regex - based on code from Vladislav
-	  Patenko <vp@goldentele.com>
-	- breaks recorded to console logs if 'b' option used in
-	  timestamp-spec - suggested by Dave Stuit <djs@gnac.com>
+        - bug regarding timestamp/break reading - patch by Benn Oshrin
+          <benno@columbia.edu>
+        - console names in conserver.passwd can be regular expressions
+          if enabled using --with-regex - based on code from Vladislav
+          Patenko <vp@goldentele.com>
+        - breaks recorded to console logs if 'b' option used in
+          timestamp-spec - suggested by Dave Stuit <djs@gnac.com>
 
 version 7.2.0 (Mar 12, 2002):
-	- check for valid baud rates (invalid resulted in '0') -
-	  reported by Andrew Gallatin <gallatin@cs.duke.edu>
-	- a broadcast messages to others on your console can now be
-	  sent via ^Ecb
+        - check for valid baud rates (invalid resulted in '0') -
+          reported by Andrew Gallatin <gallatin@cs.duke.edu>
+        - a broadcast messages to others on your console can now be
+          sent via ^Ecb
 
 version 7.2.0-beta3 (Feb 25, 2002):
-	- allow for 57600 and 115200 baud rates - patch by Andreas
-	  Wrede <andreas@planix.com>
-	- TCP traffic now escaped according to Telnet protocol
-	- the highly desired dynamic reconfiguration of conserver is
-	  here!  the HUP signal now triggers a read of the
-	  configuration file and adjustment of consoles
-	- configure flags shown in -V output
+        - allow for 57600 and 115200 baud rates - patch by Andreas
+          Wrede <andreas@planix.com>
+        - TCP traffic now escaped according to Telnet protocol
+        - the highly desired dynamic reconfiguration of conserver is
+          here!  the HUP signal now triggers a read of the
+          configuration file and adjustment of consoles
+        - configure flags shown in -V output
 
 version 7.2.0-beta2 (Feb 14, 2002):
-	- new -W client option for showing who's attached to a single
-	  conserver master - suggested by Dave Stuit <djs@gnac.com>
-	- maxfiles() clashes with HP-UX 11 'maxfiles' variable - patch
-	  by Adam Morris <AMorris@providence.org>
-	- removed use of socklen_t type for better compatibility
-	- removed TELCMD/TELOPT use for compatibility
+        - new -W client option for showing who's attached to a single
+          conserver master - suggested by Dave Stuit <djs@gnac.com>
+        - maxfiles() clashes with HP-UX 11 'maxfiles' variable - patch
+          by Adam Morris <AMorris@providence.org>
+        - removed use of socklen_t type for better compatibility
+        - removed TELCMD/TELOPT use for compatibility
 
 version 7.2.0-beta1 (Jan 29, 2002):
-	- static structures and strings are now dynamic in server
-	- MAXGRP (--with-maxgrp) has been removed as it's now dynamic
-	- new -m server option for setting the maximum consoles per
-	  process - the default is still set with --with-maxmemb
-	- new -i client option (and ^Eci) that displays console
-	  information in a machine-parseable format
-	- two debug levels (second level by using two -D options)
-	- ANSI prototypes and definitions (when available)
+        - static structures and strings are now dynamic in server
+        - MAXGRP (--with-maxgrp) has been removed as it's now dynamic
+        - new -m server option for setting the maximum consoles per
+          process - the default is still set with --with-maxmemb
+        - new -i client option (and ^Eci) that displays console
+          information in a machine-parseable format
+        - two debug levels (second level by using two -D options)
+        - ANSI prototypes and definitions (when available)
 
 version 7.1.4 (Jan 21, 2002):
-	- console -[PqQ] didn't work - patch by Han Pilmeyer
-	  <han@zk3.dec.com>
-	- maxfiles() didn't check FD_SETSIZE - patch by Justin Grudzien
-	  <grudzien@31337.com>
-	- New -o and -O server flags for automatically reconnecting
-	  downed consoles - patch by Benn Oshrin <benno@columbia.edu>
-	- Automatic reconnection of consoles on read failures, retried
-	  every minute
-	- Up to nine break sequences can be defined in the
-	  configuration file and assigned to consoles individually,
-	  accessed via new ^ecl[?0-9] escape sequences
-	- console logs are marked with "up" and "down" timestamps
+        - console -[PqQ] didn't work - patch by Han Pilmeyer
+          <han@zk3.dec.com>
+        - maxfiles() didn't check FD_SETSIZE - patch by Justin Grudzien
+          <grudzien@31337.com>
+        - New -o and -O server flags for automatically reconnecting
+          downed consoles - patch by Benn Oshrin <benno@columbia.edu>
+        - Automatic reconnection of consoles on read failures, retried
+          every minute
+        - Up to nine break sequences can be defined in the
+          configuration file and assigned to consoles individually,
+          accessed via new ^ecl[?0-9] escape sequences
+        - console logs are marked with "up" and "down" timestamps
     The following based on code by John R. Jackson <jrj@cc.purdue.edu>
-	- sequential timestamps merged into one range during playback
-	- timestamps done on "nice" boundaries (hour, minute, etc.)
-	- lots of code cleanup, optimizations, etc.
+        - sequential timestamps merged into one range during playback
+        - timestamps done on "nice" boundaries (hour, minute, etc.)
+        - lots of code cleanup, optimizations, etc.
 
 version 7.1.3 (Oct 16, 2001):
-	- NetBSD 1.5 termios bug/compatibility - patch by Andreas Wrede
-	  <aew.conserver@planix.com>
-	- Missing quotes broke ^ecl1 code - reported by William Charles
-	  <william.charles@db.com>
-	- Alternate break code didn't exist for local ports
+        - NetBSD 1.5 termios bug/compatibility - patch by Andreas Wrede
+          <aew.conserver@planix.com>
+        - Missing quotes broke ^ecl1 code - reported by William Charles
+          <william.charles@db.com>
+        - Alternate break code didn't exist for local ports
 
 version 7.1.2 (Oct 15, 2001):
-	- fixed line-based timestamp code - reported by Benn Oshrin
-	  <benno@columbia.edu>
-	- tcp_wrappers support (--with-libwrap)
-	- CLOCAL bit set for local ports - patch by Egan Ford
-	  <egan@us.ibm.com>
-	- timestamp added to 'lost carrier' error - suggested by Todd
-	  Stansell <todd@stansell.org>
-	- Alternate break sequence for Solaris 8 is available as ^ecl2
-	  escape sequence - patch by William Charles
-	  <william.charles@db.com>
+        - fixed line-based timestamp code - reported by Benn Oshrin
+          <benno@columbia.edu>
+        - tcp_wrappers support (--with-libwrap)
+        - CLOCAL bit set for local ports - patch by Egan Ford
+          <egan@us.ibm.com>
+        - timestamp added to 'lost carrier' error - suggested by Todd
+          Stansell <todd@stansell.org>
+        - Alternate break sequence for Solaris 8 is available as ^ecl2
+          escape sequence - patch by William Charles
+          <william.charles@db.com>
     The following suggested by Trevor Fiatal <trevor@seven.com>
-	- Widened username field of 'console -w' output
-	- Added server hostname to password entry prompt
-	- AC_CHECK_LIB replaced with AC_SEARCH_LIBS in configure.in so
-	  that irrelevant (and sometimes incompatible) libraries aren't
-	  linked in
+        - Widened username field of 'console -w' output
+        - Added server hostname to password entry prompt
+        - AC_CHECK_LIB replaced with AC_SEARCH_LIBS in configure.in so
+          that irrelevant (and sometimes incompatible) libraries aren't
+          linked in
 
 version 7.1.1 (Aug 4, 2001):
-	- Now using getlogin() for real username info - suggested by
-	  Dave Stuit <djs@gnac.com>
-	- gethostbyname() failure for a console now doesn't cause a
-	  shutdown - reported by Todd Stansell <todd@stansell.org>
-	- Shutdown via client -q/-Q fixed (broken in 7.1.0 because of
-	  master process fork() code)
-	- Password file parsing fixed to allow for empty passwords -
-	  allowing users to access conserver without a password prompt
-	- Both the password and configuration files no longer have
-	  line length limitations, they now support comments (`#' lines),
-	  and lines with leading whitespace are continuations of
-	  previous lines
-	- Client hostname/ip sometimes not printed - reported by Todd
-	  Stansell <todd@stansell.org>
+        - Now using getlogin() for real username info - suggested by
+          Dave Stuit <djs@gnac.com>
+        - gethostbyname() failure for a console now doesn't cause a
+          shutdown - reported by Todd Stansell <todd@stansell.org>
+        - Shutdown via client -q/-Q fixed (broken in 7.1.0 because of
+          master process fork() code)
+        - Password file parsing fixed to allow for empty passwords -
+          allowing users to access conserver without a password prompt
+        - Both the password and configuration files no longer have
+          line length limitations, they now support comments (`#' lines),
+          and lines with leading whitespace are continuations of
+          previous lines
+        - Client hostname/ip sometimes not printed - reported by Todd
+          Stansell <todd@stansell.org>
 
 version 7.1.0 (Jul 26, 2001):
-	- Hostname in access list that began with a digit was treated as
-	  an IP address - only strings using [0-9./] are considered CIDR
-	  notation and they must be of the form a.b.c.d[/n]
-	- Fixed SIGHUP always opening logfile(-L) - shouldn't without -d
-	- Fixed 'make install' problem under MacOS X and cygwin
-	- Client -l option totally broken in 7.0.3 - patch by Daniel E.
-	  Singer <des@cs.duke.edu>
-	- Client now accepts IP addresses from server and server now sends
-	  the IP of the socket instead of its hostname to the client,
-	  fixing part of the multi-interface problem
-	- Client no longer passes hostname to server along with username
-	- Client now turns off IEXTEN so stuff like ^V passes through
-	- Server now pauses one second when reopening a TCP-based console
-	  to give the terminal server a chance to clean up
-	- Master server process now fork()s when accepting clients
-	- timestamp-spec can be numeric only ('m' default)
-	- Ambiguous console name error now shows ambiguous list
-	- Console list in conserver.passwd can now have whitespace
-	- Access lists in conserver.cf can now use ',' as a separator
-	- Added special '*any*' username in conserver.passwd
-	- Username match (real or '*any*') now stops conserver.passwd file
-	  processing - allowing you to lock out users
-	- Added -u flag to server to enable "unloved" output - this is the
-	  opposite of the old -n flag, which now does nothing
-	- Added -7 flag to client and server for stripping the high bit
-	  of data on either side (--disable-8bit removed)
-	- Added -b to server to specify the base port number for the
-	  secondary communication channel - based on code from Enrik
-	  Berkhan <Enrik.Berkhan@planb.de>
-	- Changed -d and -D flags to -r and -R in client - now -D enables
-	  debugging mode in the client (and -d is unused)
-	- Changed -r to -G in client so -r could be used for the above
-	- Client now uses getpassphrase() (if available) for > 8 char
-	  passwords - pointed out by Gregory Bond <gnb@itga.com.au>
-	- Improved signal handling
-	- Improved process handling (POSIX waitpid() now necessary)
-	- Significant rework of STREAMS-based pseudo-tty code
-	- TCP connections ('!' config syntax) now have some Telnet protocol
-	  knowledge, removing the "noise" seen when connecting to a terminal
-	  server - reported by Todd Stansell <todd@stansell.org>
-	- Various code and message "pretty-printing" done
-	- Client and server both run in Windows (tested with Windows
-	  2000) under the cygwin environment thanks to a debug-fest with
-	  Emmett Hogan <hogan@gnac.com>
-	- Using autoconf version 2.50
-	- Man pages reworked and conserver.passwd page created by Dave
-	  Stuit <djs@gnac.com> - the pain he suffered documenting
-	  the program (and pointing out many of the bugs fixed above)
-	  should help endless others
+        - Hostname in access list that began with a digit was treated as
+          an IP address - only strings using [0-9./] are considered CIDR
+          notation and they must be of the form a.b.c.d[/n]
+        - Fixed SIGHUP always opening logfile(-L) - shouldn't without -d
+        - Fixed 'make install' problem under MacOS X and cygwin
+        - Client -l option totally broken in 7.0.3 - patch by Daniel E.
+          Singer <des@cs.duke.edu>
+        - Client now accepts IP addresses from server and server now sends
+          the IP of the socket instead of its hostname to the client,
+          fixing part of the multi-interface problem
+        - Client no longer passes hostname to server along with username
+        - Client now turns off IEXTEN so stuff like ^V passes through
+        - Server now pauses one second when reopening a TCP-based console
+          to give the terminal server a chance to clean up
+        - Master server process now fork()s when accepting clients
+        - timestamp-spec can be numeric only ('m' default)
+        - Ambiguous console name error now shows ambiguous list
+        - Console list in conserver.passwd can now have whitespace
+        - Access lists in conserver.cf can now use ',' as a separator
+        - Added special '*any*' username in conserver.passwd
+        - Username match (real or '*any*') now stops conserver.passwd file
+          processing - allowing you to lock out users
+        - Added -u flag to server to enable "unloved" output - this is the
+          opposite of the old -n flag, which now does nothing
+        - Added -7 flag to client and server for stripping the high bit
+          of data on either side (--disable-8bit removed)
+        - Added -b to server to specify the base port number for the
+          secondary communication channel - based on code from Enrik
+          Berkhan <Enrik.Berkhan@planb.de>
+        - Changed -d and -D flags to -r and -R in client - now -D enables
+          debugging mode in the client (and -d is unused)
+        - Changed -r to -G in client so -r could be used for the above
+        - Client now uses getpassphrase() (if available) for > 8 char
+          passwords - pointed out by Gregory Bond <gnb@itga.com.au>
+        - Improved signal handling
+        - Improved process handling (POSIX waitpid() now necessary)
+        - Significant rework of STREAMS-based pseudo-tty code
+        - TCP connections ('!' config syntax) now have some Telnet protocol
+          knowledge, removing the "noise" seen when connecting to a terminal
+          server - reported by Todd Stansell <todd@stansell.org>
+        - Various code and message "pretty-printing" done
+        - Client and server both run in Windows (tested with Windows
+          2000) under the cygwin environment thanks to a debug-fest with
+          Emmett Hogan <hogan@gnac.com>
+        - Using autoconf version 2.50
+        - Man pages reworked and conserver.passwd page created by Dave
+          Stuit <djs@gnac.com> - the pain he suffered documenting
+          the program (and pointing out many of the bugs fixed above)
+          should help endless others
 
 version 7.0.3 (Jul 5, 2001):
-	- "Off by 1" bug in 7.0.2 line-oriented timestamp code fixed (extra
-	  chars in logfile) reported by Matthew Cheek <cheek@mars-systems.com>
-	- TODO file added to distribution
-	- 'attached', 'detached', and 'bumped' actions now written to
-	  console logs that have 'a' in timestamp-spec field
-	- Default timestamp specification with TIMESTAMP= in .cf file
-	- Config file much more forgiving about whitespace in fields
-	- gethostbyaddr() failures are no longer fatal
-	- Added -M to server to specify the address to listen on
-	  based on code from Enrik Berkhan <Enrik.Berkhan@planb.de>
-	- Added -p option to client and server to specify the port to
-	  connect to and listen on (--with-port still sets the default)
-	- Added logfile output when going into daemon mode
-	    - Added --with-logfile to configure
-	    - Added -L to override compile-time logfile location
-	    - SIGHUP reopens this logfile as well as previous behavior
-	- Run as root only restriction removed - warning now (if necessary)
-	- More #defines for FreeBSD compatibility
-	- Using inet_ntoa() now instead of peeking at bytes
-	- Fixed up -V (and -Vv) output for client and server
-	- Increased conserver.passwd read buffer (CheckPasswd())
-	- Removed DO_VIRTUAL #if's - always build that code now
-	- Removed ORIGINAL_CODE #if's (old non-CIDR access list parsing)
-	- Changed undocumented -p option to -P in console client
-	- man pages updated to reflect a little more reality
+        - "Off by 1" bug in 7.0.2 line-oriented timestamp code fixed (extra
+          chars in logfile) reported by Matthew Cheek <cheek@mars-systems.com>
+        - TODO file added to distribution
+        - 'attached', 'detached', and 'bumped' actions now written to
+          console logs that have 'a' in timestamp-spec field
+        - Default timestamp specification with TIMESTAMP= in .cf file
+        - Config file much more forgiving about whitespace in fields
+        - gethostbyaddr() failures are no longer fatal
+        - Added -M to server to specify the address to listen on
+          based on code from Enrik Berkhan <Enrik.Berkhan@planb.de>
+        - Added -p option to client and server to specify the port to
+          connect to and listen on (--with-port still sets the default)
+        - Added logfile output when going into daemon mode
+            - Added --with-logfile to configure
+            - Added -L to override compile-time logfile location
+            - SIGHUP reopens this logfile as well as previous behavior
+        - Run as root only restriction removed - warning now (if necessary)
+        - More #defines for FreeBSD compatibility
+        - Using inet_ntoa() now instead of peeking at bytes
+        - Fixed up -V (and -Vv) output for client and server
+        - Increased conserver.passwd read buffer (CheckPasswd())
+        - Removed DO_VIRTUAL #if's - always build that code now
+        - Removed ORIGINAL_CODE #if's (old non-CIDR access list parsing)
+        - Changed undocumented -p option to -P in console client
+        - man pages updated to reflect a little more reality
 
 version 7.0.2 (Jun 15, 2001):
-	- Bogus "ambiguous server abbreviation" with distributed server
-	  setup fixed
-	- Hostname not passed with username from console client
-	- Fixed pseudo-terminal ('|' syntax in .cf file) bug with Solaris
-	  and other STREAMS-based systems (actually works now in 7.X)
-	- Line-oriented timestamps in logfiles (see 'l' mark
-	  specification) based on patch from Benn Oshrin
-	  <benno@columbia.edu>
-	- Generalized debugging output, info messages and error messages
-	- Moved library search up in configure.in so function calls are
-	  detected properly
-	- Permissions of install-sh were wrong
-	- Trimmed the README file and now distribute conserver.html
-	- Redhat RPM bundle (contrib/redhat-rpm) contributed by Paul
-	  Heinlein <heinlein@measurecast.com>
-	- Cleaned up gcc warnings (for Solaris 7, at least)
-	- Makefiles now use .c.o: specification instead of %.o:
+        - Bogus "ambiguous server abbreviation" with distributed server
+          setup fixed
+        - Hostname not passed with username from console client
+        - Fixed pseudo-terminal ('|' syntax in .cf file) bug with Solaris
+          and other STREAMS-based systems (actually works now in 7.X)
+        - Line-oriented timestamps in logfiles (see 'l' mark
+          specification) based on patch from Benn Oshrin
+          <benno@columbia.edu>
+        - Generalized debugging output, info messages and error messages
+        - Moved library search up in configure.in so function calls are
+          detected properly
+        - Permissions of install-sh were wrong
+        - Trimmed the README file and now distribute conserver.html
+        - Redhat RPM bundle (contrib/redhat-rpm) contributed by Paul
+          Heinlein <heinlein@measurecast.com>
+        - Cleaned up gcc warnings (for Solaris 7, at least)
+        - Makefiles now use .c.o: specification instead of %.o:
 
 version 7.0.1 (May 3, 2001):
-	- 8bit on by default now (use --disable-8bit for old behavior)
-	- FreeBSD patches by Bill Fenner <fenner@research.att.com>
-	  (hopefully *BSD systems will compile cleaner now)
-	- Bad error reporting on getsockopt() found by Bill Fenner
-	  <fenner@research.att.com>
-	- PID file patch by Martin Andrews <mandrews@netgenics.com>
+        - 8bit on by default now (use --disable-8bit for old behavior)
+        - FreeBSD patches by Bill Fenner <fenner@research.att.com>
+          (hopefully *BSD systems will compile cleaner now)
+        - Bad error reporting on getsockopt() found by Bill Fenner
+          <fenner@research.att.com>
+        - PID file patch by Martin Andrews <mandrews@netgenics.com>
 
 version 7.0.0 (Feb 18, 2001):
-	- GNU configure-based packaging!!!
-	  All work done by Mark D. Roth <roth@feep.net>.
-	  Thank you!
-	- Removed conserver/cons.h and moved options into --with
-	  and --enable configure arguments
-	- ioctl() bug found by Ross Parker <parker@redback.com>
-	- Removed last of the "loopback preference" code in
-	  console/console.c - should have been removed a long time ago
+        - GNU configure-based packaging!!!
+          All work done by Mark D. Roth <roth@feep.net>.
+          Thank you!
+        - Removed conserver/cons.h and moved options into --with
+          and --enable configure arguments
+        - ioctl() bug found by Ross Parker <parker@redback.com>
+        - Removed last of the "loopback preference" code in
+          console/console.c - should have been removed a long time ago
 
 version 6.1.7 (Dec 14, 2000):
-	- Documented no parity option in conserver.cf.man
-	- Lowered default CONNECTTIMEOUT to 10 seconds
-	- Changed more internal references to GNAC
-	- Shell command support just plain broken (tracked down and
-	  slain by Rob Joyce <robjoyce@ee.princeton.edu>)
-	- Added a -P option for specifying the password file
-	- CPARITY setting reflected in -V output
-	- New version numbering scheme and packaging
+        - Documented no parity option in conserver.cf.man
+        - Lowered default CONNECTTIMEOUT to 10 seconds
+        - Changed more internal references to GNAC
+        - Shell command support just plain broken (tracked down and
+          slain by Rob Joyce <robjoyce@ee.princeton.edu>)
+        - Added a -P option for specifying the password file
+        - CPARITY setting reflected in -V output
+        - New version numbering scheme and packaging
 
 version 6.16 (Sep 8, 2000):
-	- Changed the main GNAC references to Certainty Solutions
-	- Made the comment blocks in conserver/cons.h a little less
-	  confusing
-	- There are *NO* code changes to this version.  If you have
-	  version 6.15, you're good to go.
+        - Changed the main GNAC references to Certainty Solutions
+        - Made the comment blocks in conserver/cons.h a little less
+          confusing
+        - There are *NO* code changes to this version.  If you have
+          version 6.15, you're good to go.
 
 version 6.15 (Mar 6, 2000):
-	- Added debug flag (-D) and the beginning of debug output
-	- A timeout can now be set for TCP connect() calls.  The
-	  default is 30 seconds.  Hosts not responding are only
-	  tried once at startup (per child), lessening the impact
-	  of a down terminal server.  See CONNECTTIMEOUT in
-	  conserver/cons.h.
+        - Added debug flag (-D) and the beginning of debug output
+        - A timeout can now be set for TCP connect() calls.  The
+          default is 30 seconds.  Hosts not responding are only
+          tried once at startup (per child), lessening the impact
+          of a down terminal server.  See CONNECTTIMEOUT in
+          conserver/cons.h.
 
 version 6.14 (Jan 5, 2000):
-	- Determining if the local conserver controls a port (with
-	  @conserver spec) we now compare ip addresses instead of
-	  hostnames
-	- Invalid argument now shows -h output
+        - Determining if the local conserver controls a port (with
+          @conserver spec) we now compare ip addresses instead of
+          hostnames
+        - Invalid argument now shows -h output
 
 version 6.13 (Dec 1, 1999):
-	- High-bit always stripped from network - now follows
-	  CPARITY setting in cons.h (found by Daniel Andersson
-	  <daniel@sto.sema.se>)
-	- New conserver -i flag for on-demand connects/disconnects
-	  to console ports (contributed by Thomas E. Knowles
-	  <tek@CS.Princeton.EDU>)
-	- Solaris, Linux, and others now use tcsendbreak()
+        - High-bit always stripped from network - now follows
+          CPARITY setting in cons.h (found by Daniel Andersson
+          <daniel@sto.sema.se>)
+        - New conserver -i flag for on-demand connects/disconnects
+          to console ports (contributed by Thomas E. Knowles
+          <tek@CS.Princeton.EDU>)
+        - Solaris, Linux, and others now use tcsendbreak()
 
 version 6.12 (Aug 24, 1999):
-	- Blank line bug after '%%' in .cf file (found by Miss
-	  Himali Patel <cpate03@dcs.bbk.ac.uk>)
+        - Blank line bug after '%%' in .cf file (found by Miss
+          Himali Patel <cpate03@dcs.bbk.ac.uk>)
      Special thanks to Michael Sullivan <mike@trdlnk.com> for
      the following improvements and fixes...
-	- Read result bug in group.c caused lock up
-	- Signal handling fixes and cleanup
-	- Several minor spelling errors in strings and comments
-	- Solaris package creation scripts (contrib/solaris-package)
-	- Extended syntax of the access restrictions to understand
-	  network numbers with optional netmasks
+        - Read result bug in group.c caused lock up
+        - Signal handling fixes and cleanup
+        - Several minor spelling errors in strings and comments
+        - Solaris package creation scripts (contrib/solaris-package)
+        - Extended syntax of the access restrictions to understand
+          network numbers with optional netmasks
 
 version 6.11 (May 14, 1999):
-	- Added broadcast capability in client (-b option)
-	- Protected certain escape sequences from end-user use
-	- Added "console server shutting down" broadcast
-	- Improved local tty break code (thanks Craig and Brian!)
+        - Added broadcast capability in client (-b option)
+        - Protected certain escape sequences from end-user use
+        - Added "console server shutting down" broadcast
+        - Improved local tty break code (thanks Craig and Brian!)
 
 version 6.10 (Jan 26, 1999):
-	- Documentation fixes
-	- Web page up and running
+        - Documentation fixes
+        - Web page up and running
 
 version 6.09:
-	- Added more documentation (look for README and INSTALL files).
-	- Fixed up man pages so they are more accurate.
+        - Added more documentation (look for README and INSTALL files).
+        - Fixed up man pages so they are more accurate.
 
 version 6.08:
-	- Added support for Linux 2.X and IRIX 6.X
-	- Fixed "suspend" code in client - it shouldn't have worked
-	  before, but slow connections could explain it.
+        - Added support for Linux 2.X and IRIX 6.X
+        - Fixed "suspend" code in client - it shouldn't have worked
+          before, but slow connections could explain it.
 
 version 6.07:
-	- Porting infrastructure has been set up in ./port.  Solaris
-	  2.5.1 and BSD/OS 3.1 successfully built.
-	- Added CHANGES and README files.  Wow, starting to document!
+        - Porting infrastructure has been set up in ./port.  Solaris
+          2.5.1 and BSD/OS 3.1 successfully built.
+        - Added CHANGES and README files.  Wow, starting to document!
 
 version 6.06:
-	- SIGUSR1 now tells the console server to try and reopen all
-	  currently downed consoles.
-	- Cleaned up configuration file (cons.h) and Makefiles.
+        - SIGUSR1 now tells the console server to try and reopen all
+          currently downed consoles.
+        - Cleaned up configuration file (cons.h) and Makefiles.
 
 version 6.05:
-	- conserver.cf change: groups and their passwords have been
-	  removed and timestamp specifications have been added.
+        - conserver.cf change: groups and their passwords have been
+          removed and timestamp specifications have been added.
 
 before version 6.05:
-	- Many, many variations.  Nothing was tracked well.  Bug fixes
-	  and enhancements of various types were applied.
+        - Many, many variations.  Nothing was tracked well.  Bug fixes
+          and enhancements of various types were applied.
