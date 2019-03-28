@@ -1,3 +1,9 @@
+Testing Locally
+---------------
+
+You can run `./package/make-and-stage-release local` and the current code will be
+packaged into `./build` so anyone can configure and build code in a confined space.
+
 Creating a new release
 ----------------------
 

@@ -1768,7 +1768,7 @@ main(int argc, char **argv)
 # if USE_IPV6
 			 config->primaryport,
 # elif USE_UNIX_DOMAIN_SOCKETS
-			 0,
+			 (unsigned short)0,
 # else
 			 bindPort,
 # endif
