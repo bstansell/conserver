@@ -66,6 +66,7 @@
 #include <master.h>
 #include <main.h>
 #include <version.h>
+#include <stdio.h>
 
 #if HAVE_PAM
 # include <security/pam_appl.h>
@@ -1985,7 +1986,7 @@ AttemptGSSAPI(CONSCLIENT *pCL)
 	    FileWrite(pCL->fd, FLAGFALSE, sendtok.value, sendtok.length);
 	    FileSetQuoteIAC(pCL->fd, FLAGTRUE);
 	    pCL->iState = S_NORMAL;
-	    gss_release_buffer(NULL, &sendtok);
+	    gss_release_buffer(&stmin, &sendtok);
 	    BuildString((char *)0, pCL->username);
 	    BuildString((char *)0, pCL->acid);
 	    stmaj = gss_display_name(&stmin, user, &dbuf, NULL);
@@ -1995,7 +1996,7 @@ AttemptGSSAPI(CONSCLIENT *pCL)
 	    BuildStringChar('@', pCL->acid);
 	    BuildString(pCL->peername->string, pCL->acid);
 	    gss_release_name(&stmin, &user);
-	    gss_release_buffer(NULL, &dbuf);
+	    gss_release_buffer(&stmin, &dbuf);
 	    ret = 1;
 	    break;
 	case GSS_S_CREDENTIALS_EXPIRED:
