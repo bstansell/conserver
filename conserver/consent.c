@@ -700,6 +700,10 @@ ConsState(CONSENT *pCE)
 	case INSSLSHUTDOWN:
 	    return "SSL_shutdown";
 #endif
+#if HAVE_GSSAPI
+	case INGSSACCEPT:
+	    return "GSSAPI_accept";
+#endif
 	case ISFLUSHING:
 	    return "flushing";
     }
