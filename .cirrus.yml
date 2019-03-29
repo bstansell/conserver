@@ -8,17 +8,17 @@ freebsd_12_task:
     - pkg install -y autoconf automake
     - ./package/setup-configure
   basic_script:
-    - [ -f Makefile ] \&\& make distclean
+    - "[ -f Makefile ] && make distclean"
     - ./configure || { cat config.log; exit 1; }
     - make
     - make test
   uds_script:
-    - [ -f Makefile ] \&\& make distclean
+    - "[ -f Makefile ] && make distclean"
     - ./configure --with-trust-uds-cred --with-uds || { cat config.log; exit 1; }
     - make
     - make test
   pam_ssl_script:
-    - [ -f Makefile ] \&\& make distclean
+    - "[ -f Makefile ] && make distclean"
     - ./configure --with-pam --with-openssl || { cat config.log; exit 1; }
     - make
     - make test
@@ -29,17 +29,17 @@ linux_gcc_task:
   install_script:
     - ./package/setup-configure
   basic_script:
-    - [ -f Makefile ] \&\& make distclean
+    - "[ -f Makefile ] && make distclean"
     - ./configure || { cat config.log; exit 1; }
     - make
     - make test
   uds_script:
-    - [ -f Makefile ] \&\& make distclean
+    - "[ -f Makefile ] && make distclean"
     - ./configure --with-trust-uds-cred --with-uds || { cat config.log; exit 1; }
     - make
     - make test
   pam_ssl_script:
-    - [ -f Makefile ] \&\& make distclean
+    - "[ -f Makefile ] && make distclean"
     - ./configure --with-pam --with-openssl || { cat config.log; exit 1; }
     - make
     - make test
@@ -51,17 +51,17 @@ linux_gcc_task:
 #    - brew install autoconf automake
 #    - ./package/setup-configure
 #  basic_script:
-#    - [ -f Makefile ] \&\& make distclean
+#    - "[ -f Makefile ] && make distclean"
 #    - ./configure || { cat config.log; exit 1; }
 #    - make
 #    - make test
 #  uds_script:
-#    - [ -f Makefile ] \&\& make distclean
+#    - "[ -f Makefile ] && make distclean"
 #    - ./configure --with-trust-uds-cred --with-uds || { cat config.log; exit 1; }
 #    - make
 #    - make test
 #  pam_ssl_script:
-#    - [ -f Makefile ] \&\& make distclean
+#    - "[ -f Makefile ] && make distclean"
 #    - ./configure --with-pam --with-openssl || { cat config.log; exit 1; }
 #    - make
 #    - make test
