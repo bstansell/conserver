@@ -1941,7 +1941,11 @@ ProbeInterfaces(in_addr_t bindAddr)
 	if ((ifc.ifc_len - r) < sizeof(*ifr))
 	    break;
 #  ifdef HAVE_SA_LEN
+#  ifdef __FreeBSD__
+	if (sa->sa_len > sizeof(ifr->ifr_addr))
+#  else
 	if (sa->sa_len > sizeof(ifr->ifr_ifru))
+#  endif
 	    r += sizeof(ifr->ifr_name) + sa->sa_len;
 	else
 #  endif
