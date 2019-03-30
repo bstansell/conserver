@@ -22,6 +22,11 @@ freebsd_12_task:
     - ./configure --with-pam --with-openssl || { cat config.log; exit 1; }
     - make
     - make test
+  gssapi_script:
+    - "[ -f Makefile ] && make distclean"
+    - ./configure --with-gssapi || { cat config.log; exit 1; }
+    - make
+    - make test
 
 linux_gcc_task:
   container:

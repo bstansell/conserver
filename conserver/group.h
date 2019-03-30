@@ -83,3 +83,6 @@ extern void SendIWaitClientsMsg(CONSENT *, char *);
 #if HAVE_OPENSSL
 extern int AttemptSSL(CONSCLIENT *);
 #endif
+#if HAVE_GSSAPI
+extern int AttemptGSSAPI(CONSCLIENT *);
+#endif

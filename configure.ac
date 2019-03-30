@@ -612,6 +612,7 @@ AC_ARG_WITH(gssapi,
 	    [LIBS="$oLIBS -lgssapi"
 	    AC_MSG_CHECKING(for gssapi library -lgssapi)
 	    AC_TRY_LINK([#include <gssapi/gssapi.h>
+			 #include <stdio.h>
 		],[gss_create_empty_oid_set(NULL, NULL)],
 		[AC_MSG_RESULT(yes)
 		cons_with_gssapi="YES"
@@ -621,6 +622,7 @@ AC_ARG_WITH(gssapi,
 		LIBS="$oLIBS -lgssglue"
 		AC_MSG_CHECKING(for gssapi library -lgssglue)
 		AC_TRY_LINK([#include <gssapi/gssapi.h>
+			     #include <stdio.h>
 		    ],[gss_create_empty_oid_set(NULL, NULL)],
 		    [AC_MSG_RESULT(yes)
 		    cons_with_gssapi="YES"
@@ -630,6 +632,7 @@ AC_ARG_WITH(gssapi,
 		    LIBS="$oLIBS -lgss"
 		    AC_MSG_CHECKING(for gssapi library -lgss)
 		    AC_TRY_LINK([#include <gssapi/gssapi.h>
+				 #include <stdio.h>
 			],[gss_create_empty_oid_set(NULL, NULL)],
 			[AC_MSG_RESULT(yes)
 			cons_with_gssapi="YES"
