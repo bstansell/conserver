@@ -29,7 +29,7 @@ AH_TEMPLATE([REQ_SERVER_CERT], [Defined if client requires server SSL certificat
 AH_TEMPLATE([TRUST_UDS_CRED], [Defined if we trust credentials from UDS client])
 
 dnl ### Normal initialization. ######################################
-AC_INIT([conserver],m4_esyscmd_s([./package/get-version number]))
+AC_INIT([conserver],m4_esyscmd_s([./gen-version number]))
 AC_PREREQ(2.59)
 AC_CONFIG_SRCDIR([conserver/main.c])
 AC_CONFIG_HEADER(config.h)
@@ -43,8 +43,8 @@ fi
 MKDIR="mkdir -p -m 755"
 AC_SUBST(MKDIR)
 
-AC_SUBST(CONSERVER_VERSION, m4_esyscmd_s([./package/get-version number]))
-AC_SUBST(CONSERVER_DATE, m4_esyscmd_s([./package/get-version date]))
+AC_SUBST(CONSERVER_VERSION, m4_esyscmd_s([./gen-version number]))
+AC_SUBST(CONSERVER_DATE, m4_esyscmd_s([./gen-version date]))
 
 
 dnl ### Custom settings. ############################################

@@ -6,7 +6,7 @@ local=false && [ "$1" = "local" ] && local=true
 
 [ -f conserver/version.h ] || { echo "you are in the wrong place" ; exit 1; }
 
-ver=`./package/get-version number`
+ver=`./gen-version number`
 
 if ! $local; then
     echo "Ready to tag release v$ver (y/N)?"
