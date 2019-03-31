@@ -7,22 +7,22 @@ freebsd_12_task:
   install_script:
     - pkg install -y autoconf automake
     - ./package/setup-configure
-  basic_script:
+  basic_script: &basic
     - "[ -f Makefile ] && make distclean"
     - ./configure || { cat config.log; exit 1; }
     - make
     - make test
-  uds_script:
+  uds_script: &uds
     - "[ -f Makefile ] && make distclean"
     - ./configure --with-trust-uds-cred --with-uds || { cat config.log; exit 1; }
     - make
     - make test
-  pam_ssl_script:
+  pam_ssl_script: &pamssl
     - "[ -f Makefile ] && make distclean"
     - ./configure --with-pam --with-openssl || { cat config.log; exit 1; }
     - make
     - make test
-  gssapi_script:
+  gssapi_script: &gssapi
     - "[ -f Makefile ] && make distclean"
     - ./configure --with-gssapi || { cat config.log; exit 1; }
     - make
@@ -33,40 +33,16 @@ linux_gcc_task:
     image: gcc:latest
   install_script:
     - ./package/setup-configure
-  basic_script:
-    - "[ -f Makefile ] && make distclean"
-    - ./configure || { cat config.log; exit 1; }
-    - make
-    - make test
-  uds_script:
-    - "[ -f Makefile ] && make distclean"
-    - ./configure --with-trust-uds-cred --with-uds || { cat config.log; exit 1; }
-    - make
-    - make test
-  pam_ssl_script:
-    - "[ -f Makefile ] && make distclean"
-    - ./configure --with-pam --with-openssl || { cat config.log; exit 1; }
-    - make
-    - make test
-#
+  basic_script: *basic
+  uds_script: *uds
+  pam_ssl_script: *pamssl
+
 #macos_task:
 #  osx_instance:
 #    image: mojave-xcode-10.1
 #  install_script:
 #    - brew install autoconf automake
 #    - ./package/setup-configure
-#  basic_script:
-#    - "[ -f Makefile ] && make distclean"
-#    - ./configure || { cat config.log; exit 1; }
-#    - make
-#    - make test
-#  uds_script:
-#    - "[ -f Makefile ] && make distclean"
-#    - ./configure --with-trust-uds-cred --with-uds || { cat config.log; exit 1; }
-#    - make
-#    - make test
-#  pam_ssl_script:
-#    - "[ -f Makefile ] && make distclean"
-#    - ./configure --with-pam --with-openssl || { cat config.log; exit 1; }
-#    - make
-#    - make test
+#  basic_script: *basic
+#  uds_script: *uds
+#  pam_ssl_script: *pamssl
