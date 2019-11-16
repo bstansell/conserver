@@ -2,6 +2,11 @@
 
 set -e
 
+case $(sed --help 2>&1) in
+  *GNU*) sed_i () { sed -i "$@"; };;
+  *) sed_i () { sed -i '' "$@"; };;
+esac
+
 local=false && [ "$1" = "local" ] && local=true
 
 [ -f conserver/version.h ] || { echo "you are in the wrong place" ; exit 1; }
@@ -27,8 +32,8 @@ if [ ! -f ../conserver-$ver.tar.gz ] || $local; then
 	cd build/conserver-$ver
 	../../package/setup-configure
 	rm -rf package
-	sed -i "" -e "/^%define ver/s| ver.*| ver $ver|" contrib/redhat-rpm/conserver.spec
-	sed -i "" -e "/^VERSION=/s|.*|VERSION=\"$ver\"|" contrib/solaris-package/pkginfo
+	sed_i -e "/^%define ver/s| ver.*| ver $ver|" contrib/redhat-rpm/conserver.spec
+	sed_i -e "/^VERSION=/s|.*|VERSION=\"$ver\"|" contrib/solaris-package/pkginfo
     )
     $local && exit
     echo "Creating ../conserver-$ver.tar.gz"
