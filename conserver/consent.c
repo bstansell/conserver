@@ -931,10 +931,11 @@ ConsInit(CONSENT *pCE)
 # endif
 			if (!SetFlags(cofile, O_NONBLOCK, 0))
 			    goto fail;
-			if ((ret =
-			     connect(cofile, rp->ai_addr,
-				     rp->ai_addrlen)) == 0)
-			    goto success;
+
+			ret = connect(cofile, rp->ai_addr, rp->ai_addrlen);
+			if (ret == 0 || errno == EINPROGRESS)
+				goto success;
+
 		      fail:
 			close(cofile);
 		    }
