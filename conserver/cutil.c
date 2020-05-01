@@ -590,7 +590,6 @@ GetMaxFiles(void)
 	mf = (FD_SETSIZE - 1);
     }
 #endif
-    CONDDEBUG((1, "GetMaxFiles(): maxfiles=%d", mf));
     return mf;
 }
 
@@ -890,7 +889,10 @@ FileRead(CONSFILE *cfp, void *buf, int len)
 	case simpleSocket:
 	    while (retval < 0) {
 		if ((retval = read(cfp->fd, buf, len)) <= 0) {
-		    if (retval == 0) {
+		    CONDDEBUG((2,
+			       "FileRead(): read(): fd=%d, retval=%d, errno=%d",
+			       cfp->fd, retval, errno));
+		    if (retval == 0 || errno == EIO) {
 			retval = -1;
 			break;
 		    }
@@ -1067,6 +1069,9 @@ FileWrite(CONSFILE *cfp, FLAG bufferonly, char *buf, int len)
 	case simpleSocket:
 	    while (len > 0) {
 		if ((retval = write(fdout, buf, len)) < 0) {
+		    CONDDEBUG((2,
+			       "FileWrite(): write(): fd=%d, retval=%d, errno=%d, len=%d",
+			       fdout, retval, errno, len));
 		    if (errno == EINTR)
 			continue;
 		    if (errno == EAGAIN) {
@@ -1941,11 +1946,11 @@ ProbeInterfaces(in_addr_t bindAddr)
 	if ((ifc.ifc_len - r) < sizeof(*ifr))
 	    break;
 #  ifdef HAVE_SA_LEN
-#  ifdef __FreeBSD__
+#   ifdef __FreeBSD__
 	if (sa->sa_len > sizeof(ifr->ifr_addr))
-#  else
+#   else
 	if (sa->sa_len > sizeof(ifr->ifr_ifru))
-#  endif
+#   endif
 	    r += sizeof(ifr->ifr_name) + sa->sa_len;
 	else
 #  endif
