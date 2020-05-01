@@ -590,7 +590,6 @@ GetMaxFiles(void)
 	mf = (FD_SETSIZE - 1);
     }
 #endif
-    CONDDEBUG((1, "GetMaxFiles(): maxfiles=%d", mf));
     return mf;
 }
 

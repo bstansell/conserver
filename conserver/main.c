@@ -1452,6 +1452,10 @@ main(int argc, char **argv)
 #if !USE_IPV6
     ProbeInterfaces(bindAddr);
 #endif
+#if !HAVE_CLOSEFROM
+    i = GetMaxFiles();
+    CONDDEBUG((1, "main(): GetMaxFiles=%d", i));
+#endif
 
     /* initialize the timers */
     for (i = 0; i < T_MAX; i++)
