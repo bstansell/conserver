@@ -1,6 +1,17 @@
                                 CHANGES
                                 =======
 
+version 8.2.5 (May 1, 2020):
+        - support SO_PEERCRED as well as ucred (Stuart Henderson <stu@spacehopper.org>)
+        - fix TLS with LibreSSL, it doesn't have :@SECLEVEL=0 (Stuart Henderson <stu@spacehopper.org>)
+        - Handle INGSSACCEPT case when processing GSSAPI (Ryan Steinmetz <zi@FreeBSD.org>)
+        - Store status_minor when calling gss_release_buffer() (Ryan Steinmetz <zi@FreeBSD.org>)
+        - Add conditional for FreeBSD to use the correct structure element for address (Ryan Steinmetz <zi@FreeBSD.org>)
+        - Fix #35 - check for sed inplace style
+        - fix host consoles in combination --with-ipv6 (Tobias Waldekranz <tobias@waldekranz.com>)
+        - Fix #38 - task execution error message
+        - Prevent GetMaxFiles() debug output from going to forked processes
+
 version 8.2.4 (March 26, 2019):
         - Correct man page typo (Ed Maste <emaste@freebsd.org>)
         - Remove autotools generated files from repo and create with release
