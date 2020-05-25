@@ -1,5 +1,5 @@
-License Concerns
-================
+License Clarification
+=====================
 
 The licenses attached to this software ([LICENSES](LICENSES)) are supposed
 to paint a simple concept: that this software was built for the open source
