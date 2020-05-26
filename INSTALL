@@ -256,17 +256,6 @@ Detailed Instructions
 
 Other Information And Gotchas
 
-    - Debian Linux Distribution
-
-        The Debian folks have conserver distributed with the package
-        names of conserver-client and conserver-server.  They are in
-        the distribution "sid" and the "non-free" part (because the
-        Ohio State license doesn't explicitly allow for modification to
-        the code, even though it's totally implied and the intention of
-        the author - I've even got proof in email!  Oh well, can't
-        blame the Debian folks for being cautious - they've been burned
-        before, apparently).
-
     - Potential GCC bug
 
         Adam Morris <AMorris@providence.org> reported a problem with
