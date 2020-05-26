@@ -81,5 +81,24 @@ author at OSU) in 2001 that is referenced above:
     
     	 tom
 
+In addition, a post to the Conserver Users mailing list in May 2020 contained:
+
+    From: Paul Wise via users <users@conserver.com>
+    To: users@conserver.com
+    Subject: Re: license change?
+    Date: Mon, 25 May 2020 12:42:28 +0800
+    
+    On Thu, 2019-07-04 at 10:20 +0200, Bryan Stansell via users wrote:
+    > So, it's more the lack of explicitly stating the code can be
+    > modified.
+    
+    Since then I talked to one of RedHat's lawyers and they mentioned that
+    they have dealt with this problem too and also concluded that these
+    licenses were intended to cover modification. The current wording of
+    the initial part of the BSD license reflects an attempt to correct an
+    earlier mistake (i.e. someone pointed out the error and Berkeley added
+    "with or without modification"). Also the anti-endorsement clause
+    implies a right to modify.
+
 Hopefully corporations (or, I suppose, their lawyers) will be happy with the
 explanation above and become comfortable with the stated license.
