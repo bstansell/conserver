@@ -4213,8 +4213,10 @@ FlushConsole(CONSENT *pCEServing)
 		    CONDDEBUG((1,
 			       "Kiddie(): heavy IAC - doing usleep() for [%s] (break #%c - delay %dms)",
 			       pCEServing->server, next, delay));
-		    if (delay != 0)
-			usleep(delay * 1000);
+		    if (delay != 0) {
+			struct timespec d = {0, delay * 1000 * 1000};
+			nanosleep(&d, NULL);
+		    }
 		} else if (next == BREAK) {
 		    CONDDEBUG((1,
 			       "Kiddie(): heavy IAC - sending break for [%s]",
@@ -5250,7 +5252,8 @@ Spawn(GRPENT *pGE, int msfd)
 	     * possibly opens another socket to the port.  this really is only
 	     * an issue if you use the same port with -p and -b, i think.
 	     */
-	    usleep(750000);	/* pause 0.75 sec to throttle startup a bit */
+	    struct timespec s = {0, 750 * 1000 * 1000};
+	    nanosleep(&s, NULL); /* pause 0.75 sec to throttle startup a bit */
 	    pGE->pid = pid;
 	    return;
 	case 0:

@@ -820,7 +820,8 @@ ConsInit(CONSENT *pCE)
      */
     if (pCE->fup) {
 	ConsDown(pCE, FLAGFALSE, FLAGTRUE);
-	usleep(250000);		/* pause 0.25 sec to let things settle a bit */
+	struct timespec t = {0, 250 * 1000 * 1000};
+	nanosleep(&t, NULL);	/* pause 0.25 sec to let things settle a bit */
     }
 
     pCE->autoReUp = 0;
@@ -885,8 +886,9 @@ ConsInit(CONSENT *pCE)
 #if HAVE_SETSOCKOPT
 		int one = 1;
 #endif
+		struct timespec t = {0, 100 * 1000 * 1000};
 
-		usleep(100000);	/* Not all terminal servers can keep up */
+		nanosleep(&t, NULL); /* Not all terminal servers can keep up */
 
 #if USE_IPV6
 # if HAVE_MEMSET
