@@ -3091,3 +3091,14 @@ StrCpy(char *dst, const char *src, unsigned int size)
     strcpy(dst, src);
 #endif
 }
+
+void
+Sleep(useconds_t usec)
+{
+#ifdef HAVE_NANOSLEEP
+    struct timespec ts = {0, usec * 1000};
+    nanosleep(&ts, NULL);
+#else
+    usleep(usec);
+#endif
+}
