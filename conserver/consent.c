@@ -820,7 +820,7 @@ ConsInit(CONSENT *pCE)
      */
     if (pCE->fup) {
 	ConsDown(pCE, FLAGFALSE, FLAGTRUE);
-	usleep(250000);		/* pause 0.25 sec to let things settle a bit */
+	Sleep(250000);
     }
 
     pCE->autoReUp = 0;
@@ -885,8 +885,7 @@ ConsInit(CONSENT *pCE)
 #if HAVE_SETSOCKOPT
 		int one = 1;
 #endif
-
-		usleep(100000);	/* Not all terminal servers can keep up */
+		Sleep(100000); /* Not all terminal servers can keep up */
 
 #if USE_IPV6
 # if HAVE_MEMSET

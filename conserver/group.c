@@ -4211,10 +4211,10 @@ FlushConsole(CONSENT *pCEServing)
 		     }
 		     */
 		    CONDDEBUG((1,
-			       "Kiddie(): heavy IAC - doing usleep() for [%s] (break #%c - delay %dms)",
+			       "Kiddie(): heavy IAC - doing Sleep() for [%s] (break #%c - delay %dms)",
 			       pCEServing->server, next, delay));
 		    if (delay != 0)
-			usleep(delay * 1000);
+			Sleep(delay * 1000);
 		} else if (next == BREAK) {
 		    CONDDEBUG((1,
 			       "Kiddie(): heavy IAC - sending break for [%s]",
@@ -4246,7 +4246,7 @@ FlushConsole(CONSENT *pCEServing)
 		}
 		/* we do this 'cause we just potentially paused for
 		 * a half-second doing a break...or even the
-		 * intentional usleep().  we could take out the
+		 * intentional Sleep().  we could take out the
 		 * justHadDelay bits and continue with the stream,
 		 * but this allows us to process other consoles and
 		 * then come around and do more on this one.  you
@@ -5250,7 +5250,7 @@ Spawn(GRPENT *pGE, int msfd)
 	     * possibly opens another socket to the port.  this really is only
 	     * an issue if you use the same port with -p and -b, i think.
 	     */
-	    usleep(750000);	/* pause 0.75 sec to throttle startup a bit */
+	    Sleep(750000); /* pause 0.75 sec to throttle startup a bit */
 	    pGE->pid = pid;
 	    return;
 	case 0:

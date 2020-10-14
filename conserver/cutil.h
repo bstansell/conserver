@@ -215,6 +215,7 @@ extern void ProcessSubst(SUBST *, char **, char **, char *, char *);
 extern char *MyVersion(void);
 extern unsigned int AtoU(char *);
 extern void StrCpy(char *, const char *, unsigned int);
+extern void Sleep(useconds_t);
 #if HAVE_OPENSSL
 extern SSL *FileGetSSL(CONSFILE *);
 extern void FileSetSSL(CONSFILE *, SSL *);
