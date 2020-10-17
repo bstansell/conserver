@@ -1471,8 +1471,13 @@ CallUp(CONSFILE *pcf, char *pcMaster, char *pcMach, char *pcHow,
     /* try to grok the state of the console */
     FilePrint(pcf, FLAGFALSE, "%c%c=", chAttn, chEsc);
     r = ReadReply(pcf, FLAGFALSE);
-    if (strncmp(r, "[unknown", 8) != 0 && strncmp(r, "[up]", 4) != 0)
-	FileWrite(cfstdout, FLAGFALSE, r, -1);
+    if (strncmp(r, "[unknown", 8) != 0 && strncmp(r, "[up]", 4) != 0) {
+	    FileWrite(cfstdout, FLAGFALSE, r, -1);
+	    if (config->exitdown == FLAGTRUE) {
+		    printf("Device is down. Will exit with option 'k'\n");
+		    kill(thepid, SIGTERM);
+	    }
+    }
 
     /* try to grok the version of the server */
     FilePrint(pcf, FLAGFALSE, "%c%c%c", chAttn, chEsc, 0xD6);
@@ -1905,7 +1910,7 @@ main(int argc, char **argv)
     int fLocal;
     static STRING *acPorts = (STRING *)0;
     static char acOpts[] =
-	"7aAb:B:c:C:d:De:EfFhiIl:M:np:PqQrRsSt:uUvVwWxz:Z:";
+	"7aAb:B:c:C:d:De:EfFhikIl:M:np:PqQrRsSt:uUvVwWxz:Z:";
     extern int optind;
     extern int optopt;
     extern char *optarg;
@@ -2033,6 +2038,10 @@ main(int argc, char **argv)
 		/* fall through */
 	    case 'i':
 		pcCmd = "info";
+		break;
+
+	case 'k':
+		optConf->exitdown = FLAGTRUE;
 		break;
 
 	    case 'l':
@@ -2231,6 +2240,13 @@ main(int argc, char **argv)
 	config->striphigh = pConfig->striphigh;
     else
 	config->striphigh = FLAGFALSE;
+
+    if (optConf->exitdown != FLAGUNKNOWN)
+	config->exitdown = optConf->exitdown;
+    else if (pConfig->exitdown != FLAGUNKNOWN)
+	config->exitdown = pConfig->exitdown;
+    else
+	config->exitdown = FLAGFALSE;
 
     if (optConf->escape != (char *)0)
 	ParseEsc(optConf->escape);
