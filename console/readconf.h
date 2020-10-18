@@ -12,6 +12,7 @@ typedef struct config {
     char *port;
     char *escape;
     FLAG striphigh;
+    FLAG exitdown;
     unsigned short replay;
     unsigned short playback;
 #if HAVE_OPENSSL
