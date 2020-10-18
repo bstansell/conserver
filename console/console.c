@@ -285,6 +285,7 @@ Usage(int wantfull)
 	"f(F)      force read/write connection (and replay)",
 	"h         output this message",
 	"i(I)      display status info in machine-parseable form (on master)",
+	"k         abort connection if the console is not 'up'",
 	"l user    use username instead of current username",
 	"M master  master server to poll first",
 	"n         do not read system-wide config file",
@@ -312,7 +313,7 @@ Usage(int wantfull)
        %s [generic-args] [-iIuwWx] [console]\n\
        %s [generic-args] [-hPqQrRV] [-[bB] message] [-d [user][@console]]\n\
                               [-t [user][@console] message] [-[zZ] cmd]\n\n\
-       generic-args: [-7DEnUv] [-c cred] [-C config] [-M master]\n\
+       generic-args: [-7DEknUv] [-c cred] [-C config] [-M master]\n\
                      [-p port] [-l username]\n", progname, progname, progname);
 
     if (wantfull) {
@@ -1474,8 +1475,8 @@ CallUp(CONSFILE *pcf, char *pcMaster, char *pcMach, char *pcHow,
     if (strncmp(r, "[unknown", 8) != 0 && strncmp(r, "[up]", 4) != 0) {
 	    FileWrite(cfstdout, FLAGFALSE, r, -1);
 	    if (config->exitdown == FLAGTRUE) {
-		    printf("Device is down. Will exit with option 'k'\n");
-		    kill(thepid, SIGTERM);
+		    Error("Console is not 'up'. Exiting. (-k)");
+		    Bye(EX_UNAVAILABLE);
 	    }
     }
 
