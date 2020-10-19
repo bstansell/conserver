@@ -5102,7 +5102,7 @@ Spawn(GRPENT *pGE, int msfd)
 		hints.ai_flags =
 		    AI_PASSIVE | AI_NUMERICHOST | AI_NUMERICSERV;
 		snprintf(serv, sizeof(serv), "%hu",
-			 bindBasePort + portInc);
+			 (short)(bindBasePort + portInc));
 		error = getaddrinfo(host, serv, &hints, &res);
 		if (error)
 		    goto OUT;

@@ -49,7 +49,6 @@
 # include <netdb.h>
 #endif
 
-#if !USE_IPV6
 /* Compare an Internet address (IPv4 expected), with an address pattern
  * passed as a character string representing an address in the Internet
  * standard `.' notation, optionally followed by a slash and an integer
@@ -120,7 +119,6 @@ AddrCmp(struct in_addr *addr, char *pattern)
 	       pattern_addr & netmask, pattern_addr, netmask));
     return (hostaddr & netmask) != (pattern_addr & netmask);
 }
-#endif /* USE_IPV6 */
 
 /* return the access type for a given host entry			(ksb)
  */
@@ -166,6 +164,13 @@ AccType(INADDR_STYPE *addr, char **peername)
     for (pACtmp = pACList; pACtmp != (ACCESS *)0; pACtmp = pACtmp->pACnext) {
 	CONDDEBUG((1, "AccType(): who=%s, trust=%c", pACtmp->pcwho,
 		   pACtmp->ctrust));
+        if (addr->ss_family == AF_INET && pACtmp->isCIDR != 0) {
+            if (AddrCmp(&(((struct sockaddr_in *)addr)->sin_addr), pACtmp->pcwho) == 0) {
+                ret = pACtmp->ctrust;
+                goto common_ret;
+            }
+            continue;
+        }
 
 	if (strstr(ipaddr, pACtmp->pcwho) != NULL) {
 	    CONDDEBUG((1, "AccType(): match for ip=%s", ipaddr));
