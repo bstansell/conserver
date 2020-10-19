@@ -1,7 +1,7 @@
 Conserver
 =========
 
-[![Build Status](https://api.cirrus-ci.com/github/conserver/conserver.svg)](https://cirrus-ci.com/github/conserver/conserver)
+[![Build Status](https://api.cirrus-ci.com/github/bstansell/conserver.svg)](https://cirrus-ci.com/github/bstansell/conserver)
 
 Conserver is an application that allows multiple users to watch a
 serial console at the same time. It can log the data, allows users to
@@ -25,7 +25,7 @@ See the `INSTALL` file for installation and the man pages for specifics.
 Downloading
 -----------
 
-The latest version can be found on [GitHub](https://github.com/conserver/conserver/releases).
+The latest version can be found on [GitHub](https://github.com/bstansell/conserver/releases).
 
 
 Contributions
