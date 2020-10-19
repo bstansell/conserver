@@ -885,7 +885,7 @@ ConsInit(CONSENT *pCE)
 #if HAVE_SETSOCKOPT
 		int one = 1;
 #endif
-		Sleep(100000); /* Not all terminal servers can keep up */
+		Sleep(100000);	/* Not all terminal servers can keep up */
 
 #if USE_IPV6
 # if HAVE_MEMSET
@@ -933,7 +933,7 @@ ConsInit(CONSENT *pCE)
 
 			ret = connect(cofile, rp->ai_addr, rp->ai_addrlen);
 			if (ret == 0 || errno == EINPROGRESS)
-				goto success;
+			    goto success;
 
 		      fail:
 			close(cofile);

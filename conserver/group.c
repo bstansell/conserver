@@ -5102,7 +5102,7 @@ Spawn(GRPENT *pGE, int msfd)
 		hints.ai_flags =
 		    AI_PASSIVE | AI_NUMERICHOST | AI_NUMERICSERV;
 		snprintf(serv, sizeof(serv), "%hu",
-			 bindBasePort + portInc);
+			 (short)(bindBasePort + portInc));
 		error = getaddrinfo(host, serv, &hints, &res);
 		if (error)
 		    goto OUT;
@@ -5250,7 +5250,7 @@ Spawn(GRPENT *pGE, int msfd)
 	     * possibly opens another socket to the port.  this really is only
 	     * an issue if you use the same port with -p and -b, i think.
 	     */
-	    Sleep(750000); /* pause 0.75 sec to throttle startup a bit */
+	    Sleep(750000);	/* pause 0.75 sec to throttle startup a bit */
 	    pGE->pid = pid;
 	    return;
 	case 0:
