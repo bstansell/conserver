@@ -55,11 +55,11 @@ echo "Ready to push (y/N)?"
 read i
 if [ "$i" = "y" ]; then
     git push --tags
-    githubrelease release conserver/conserver create --name conserver-$ver --body "$body" v$ver ../conserver-$ver.tar.gz* 
+    githubrelease release bstansell/conserver create --name conserver-$ver --body "$body" v$ver ../conserver-$ver.tar.gz* 
     echo You can publish this release on the website or with:
-    echo "    "githubrelease release conserver/conserver publish v$ver
+    echo "    "githubrelease release bstansell/conserver publish v$ver
 else
     echo Ok, here is the command I would have used:
     echo "    "git push --tags
-    echo "    "githubrelease release conserver/conserver create --name conserver-$ver --body \""$body"\" v$ver ../conserver-$ver.tar.gz* 
+    echo "    "githubrelease release bstansell/conserver create --name conserver-$ver --body \""$body"\" v$ver ../conserver-$ver.tar.gz* 
 fi
