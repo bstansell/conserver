@@ -67,9 +67,9 @@ AddrCmp(struct in_addr *addr, char *pattern)
     in_addr_t hostaddr, pattern_addr, netmask;
     char *p, *slash_posn;
     static STRING *buf = (STRING *)0;
-# if HAVE_INET_ATON
+#if HAVE_INET_ATON
     struct in_addr inetaddr;
-# endif
+#endif
 
     if (buf == (STRING *)0)
 	buf = AllocString();
@@ -82,15 +82,15 @@ AddrCmp(struct in_addr *addr, char *pattern)
     } else
 	p = pattern;
 
-# if HAVE_INET_ATON
+#if HAVE_INET_ATON
     if (inet_aton(p, &inetaddr) == 0)
 	return 1;
     pattern_addr = inetaddr.s_addr;
-# else
+#else
     pattern_addr = inet_addr(p);
     if (pattern_addr == (in_addr_t) (-1))
 	return 1;		/* malformed address */
-# endif
+#endif
 
     if (slash_posn) {
 	/* convert explicit netmask */
@@ -164,13 +164,15 @@ AccType(INADDR_STYPE *addr, char **peername)
     for (pACtmp = pACList; pACtmp != (ACCESS *)0; pACtmp = pACtmp->pACnext) {
 	CONDDEBUG((1, "AccType(): who=%s, trust=%c", pACtmp->pcwho,
 		   pACtmp->ctrust));
-        if (addr->ss_family == AF_INET && pACtmp->isCIDR != 0) {
-            if (AddrCmp(&(((struct sockaddr_in *)addr)->sin_addr), pACtmp->pcwho) == 0) {
-                ret = pACtmp->ctrust;
-                goto common_ret;
-            }
-            continue;
-        }
+	if (addr->ss_family == AF_INET && pACtmp->isCIDR != 0) {
+	    if (AddrCmp
+		(&(((struct sockaddr_in *)addr)->sin_addr),
+		 pACtmp->pcwho) == 0) {
+		ret = pACtmp->ctrust;
+		goto common_ret;
+	    }
+	    continue;
+	}
 
 	if (strstr(ipaddr, pACtmp->pcwho) != NULL) {
 	    CONDDEBUG((1, "AccType(): match for ip=%s", ipaddr));

@@ -1473,11 +1473,11 @@ CallUp(CONSFILE *pcf, char *pcMaster, char *pcMach, char *pcHow,
     FilePrint(pcf, FLAGFALSE, "%c%c=", chAttn, chEsc);
     r = ReadReply(pcf, FLAGFALSE);
     if (strncmp(r, "[unknown", 8) != 0 && strncmp(r, "[up]", 4) != 0) {
-	    FileWrite(cfstdout, FLAGFALSE, r, -1);
-	    if (config->exitdown == FLAGTRUE) {
-		    Error("Console is not 'up'. Exiting. (-k)");
-		    Bye(EX_UNAVAILABLE);
-	    }
+	FileWrite(cfstdout, FLAGFALSE, r, -1);
+	if (config->exitdown == FLAGTRUE) {
+	    Error("Console is not 'up'. Exiting. (-k)");
+	    Bye(EX_UNAVAILABLE);
+	}
     }
 
     /* try to grok the version of the server */
@@ -2041,7 +2041,7 @@ main(int argc, char **argv)
 		pcCmd = "info";
 		break;
 
-	case 'k':
+	    case 'k':
 		optConf->exitdown = FLAGTRUE;
 		break;
 
