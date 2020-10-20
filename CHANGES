@@ -1,6 +1,12 @@
                                 CHANGES
                                 =======
 
+version 8.2.6 (October 19, 2020):
+        - try and address license concerns with LICENSE.md
+        - replace usleep with nanosleep (Rosen Penev <rosenp@gmail.com>)
+        - console: Add 'k' option to exit on console-down (Mylène Josserand <mylene.josserand@collabora.com>)
+        - Fix #48 - apply ipv4 CIDR access list when compiled with ipv6 support 
+
 version 8.2.5 (May 1, 2020):
         - support SO_PEERCRED as well as ucred (Stuart Henderson <stu@spacehopper.org>)
         - fix TLS with LibreSSL, it doesn't have :@SECLEVEL=0 (Stuart Henderson <stu@spacehopper.org>)
