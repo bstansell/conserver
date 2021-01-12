@@ -30,11 +30,11 @@ AH_TEMPLATE([TRUST_UDS_CRED], [Defined if we trust credentials from UDS client])
 
 dnl ### Normal initialization. ######################################
 AC_INIT([conserver],m4_esyscmd_s([./gen-version number]))
-AC_PREREQ(2.59)
+AC_PREREQ(2.69)
 AC_CONFIG_SRCDIR([conserver/main.c])
 AC_CONFIG_HEADER(config.h)
 
-AC_DEFINE_UNQUOTED(CONFIGINVOCATION, "$0 $@")
+AC_DEFINE_UNQUOTED(CONFIGINVOCATION, "$0 $*")
 
 dnl ### Set some option defaults. ###################################
 if test -z "$CFLAGS"; then
