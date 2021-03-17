@@ -3,7 +3,7 @@ env:
 
 freebsd_12_task:
   freebsd_instance:
-    image_family: freebsd-12-1
+    image_family: freebsd-12-2
   install_script:
     - pkg install -y autoconf automake
     - ./package/setup-configure
