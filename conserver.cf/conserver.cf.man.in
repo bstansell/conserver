@@ -62,6 +62,7 @@ console simple {
 .PP
 The parser has six characters that it considers special.
 These are: ``{'', ``}'', ``;'', ``#'', ``\e'', and ``"''.
+.\" "
 The first three (hereby called tokens) define the format of the
 configuration blocks and are used as word
 separators, the next is the comment character, and the last two are
@@ -96,6 +97,7 @@ If a character is prefixed by a backslash, the next character is a
 literal (so ``\e\e'' produces a ``\e'', ``\e"'' produces ``"'', ``\e{''
 produces a ``{'', etc.).
 For double-quoted strings, all characters are literal except for ``\e"'',
+.\" "
 which embeds a double-quote.
 .PP
 Adding a variety of quotes to our example without changing the meaning
@@ -107,8 +109,11 @@ of things, we have:
 .fi
 .ft
 .PP
-There is one special line the parser recognizes: a ``#include'' statement.
+There is one special line the parser recognizes: a ``#include''
+statement, but only if it is preceded by a blank line.
 It is of the form:
+.IP
+# a normal comment line followed by a blank line
 .IP
 .B #include
 .I filename
