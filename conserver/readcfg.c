@@ -997,6 +997,9 @@ SubstValue(char c, char **s, int *i)
 	} else if (c == 'P') {
 	    (*i) = pCE->netport;
 	    retval = 1;
+	} else if (c == 'b') {
+	    (*i) = pCE->baud->irate;
+	    retval = 1;
 	}
     }
 
@@ -1009,6 +1012,7 @@ SubstToken(char c)
     switch (c) {
 	case 'p':
 	case 'P':
+	case 'b':
 	    substTokenCount[(unsigned)c]++;
 	    return ISNUMBER;
 	case 'h':
