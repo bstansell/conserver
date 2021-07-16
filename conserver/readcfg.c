@@ -987,6 +987,13 @@ SubstValue(char c, char **s, int *i)
 		(*s) = pCE->replstring;
 	    }
 	    retval = 1;
+	} else if (c == 'b') {
+	    if (pCE->baud == NULL || pCE->baud->acrate == (char *)0) {
+		(*s) = empty;
+	    } else {
+		(*s) = pCE->baud->acrate;
+	    }
+	    retval = 1;
 	}
     }
 
@@ -1013,6 +1020,7 @@ SubstToken(char c)
 	    return ISNUMBER;
 	case 'h':
 	case 'c':
+	case 'b':
 	case 'r':
 	    substTokenCount[(unsigned)c]++;
 	    return ISSTRING;

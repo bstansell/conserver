@@ -540,6 +540,10 @@ value
 .PP
 Numeric Replacement
 .TP
+.B b
+.B baud
+value
+.TP
 .B p
 config
 .B port
