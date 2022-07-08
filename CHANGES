@@ -1,6 +1,15 @@
                                 CHANGES
                                 =======
 
+version 8.2.7 (July 7, 2022):
+        - configure.ac: autoconf-2.70 fix (Lars Wendler <polynomial-c@gentoo.org>)
+        - Add high baud rates (Peter Chubb <Peter.Chubb@data61.csiro.au>)
+        - Make compile --with-ipv6 & setproctitle (Bjoern A. Zeeb <patch@zabbadoz.net>)
+        - conserver.cf: devicesubst add 'b' for baud rate (Bjoern A. Zeeb <patch@zabbadoz.net>)
+        - Reflect that baud values have increased to 7 digits (Bjoern A. Zeeb <patch@zabbadoz.net>)
+        - cirrus-ci: move to freebsd-13-0 (Bryan Stansell <bryan@stansell.org>)
+        - configure.ac: support libgssapi_krb5 (Jiri Kastner <cz172638@gmail.com>)
+
 version 8.2.6 (October 19, 2020):
         - try and address license concerns with LICENSE.md
         - replace usleep with nanosleep (Rosen Penev <rosenp@gmail.com>)
