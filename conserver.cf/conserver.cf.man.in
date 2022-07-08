@@ -468,7 +468,7 @@ all consoles have an implicit ``include "*";'' at the beginning
 of their definition).
 .RS
 .TP
-\f3baud\fP \f3300\fP|\f3600\fP|\f31800\fP|\f32400\fP|\f34800\fP|\f39600\fP|\f319200\fP|\f338400\fP|\f357600\fP|\f3115200\fP
+\f3baud\fP \f3300\fP|\f3600\fP|\f31800\fP|\f32400\fP|\f34800\fP|\f39600\fP|\f319200\fP|\f338400\fP|\f357600\fP|\f3115200\fP|..|\f34000000\fP
 .br
 Assign the baud rate to the console.
 Only consoles of type ``device'' will use this value.

@@ -2210,7 +2210,7 @@ CommandExamine(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
 		break;
 	}
 	FilePrint(pCLServing->fd, FLAGFALSE,
-		  " %-24.24s on %-32.32s at %6.6s%c\r\n", pCE->server, d,
+		  " %-24.24s on %-32.32s at %7.7s%c\r\n", pCE->server, d,
 		  b, p);
 	if (args != (char *)0)
 	    break;
