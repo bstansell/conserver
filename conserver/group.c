@@ -5038,7 +5038,7 @@ Spawn(GRPENT *pGE, int msfd)
     struct sockaddr_in lstn_port;
 # endif
 # if HAVE_SETSOCKOPT
-    int true = 1;
+    int sock_opt_true = 1;
 # endif
     unsigned short portInc = 0;
 #else
@@ -5065,8 +5065,8 @@ Spawn(GRPENT *pGE, int msfd)
 	}
 # if HAVE_SETSOCKOPT
 	if (setsockopt
-	    (sfd, SOL_SOCKET, SO_REUSEADDR, (char *)&true,
-	     sizeof(true)) < 0) {
+	    (sfd, SOL_SOCKET, SO_REUSEADDR, (char *)&sock_opt_true,
+	     sizeof(sock_opt_true)) < 0) {
 	    Error("Spawn(): setsockopt(%u,SO_REUSEADDR): %s", sfd,
 		  strerror(errno));
 	    return;
@@ -5197,7 +5197,7 @@ Spawn(GRPENT *pGE, int msfd)
     }
 # if HAVE_SETSOCKOPT
     if (setsockopt
-	(sfd, SOL_SOCKET, SO_REUSEADDR, (char *)&true, sizeof(true))
+	(sfd, SOL_SOCKET, SO_REUSEADDR, (char *)&sock_opt_true, sizeof(sock_opt_true))
 	< 0) {
 	Error("Spawn(): setsockopt(%u,SO_REUSEADDR): %s", sfd,
 	      strerror(errno));

@@ -690,7 +690,7 @@ Master(void)
     struct sockaddr_in master_port;
 # endif
 # if HAVE_SETSOCKOPT
-    int true = 1;
+    int sock_opt_true = 1;
 # endif
 #else
     struct sockaddr_un master_port;
@@ -750,8 +750,8 @@ Master(void)
 
 # if HAVE_SETSOCKOPT
 	if (setsockopt
-	    (msfd, SOL_SOCKET, SO_REUSEADDR, (char *)&true,
-	     sizeof(true)) < 0)
+	    (msfd, SOL_SOCKET, SO_REUSEADDR, (char *)&sock_opt_true,
+	     sizeof(sock_opt_true)) < 0)
 	    goto fail;
 # endif
 	if (!SetFlags(msfd, O_NONBLOCK, 0))
@@ -821,8 +821,8 @@ Master(void)
     }
 # if HAVE_SETSOCKOPT
     if (setsockopt
-	(msfd, SOL_SOCKET, SO_REUSEADDR, (char *)&true,
-	 sizeof(true)) < 0) {
+	(msfd, SOL_SOCKET, SO_REUSEADDR, (char *)&sock_opt_true,
+	 sizeof(sock_opt_true)) < 0) {
 	Error("Master(): setsockopt(%u,SO_REUSEADDR): %s", msfd,
 	      strerror(errno));
 	return;
