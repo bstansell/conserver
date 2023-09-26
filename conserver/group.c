@@ -2560,7 +2560,7 @@ TelOpt(int o)
     if (o < sizeof(telopts) / sizeof(char *))
 	return telopts[o];
     else {
-	sprintf(opt, "%d", o);
+	snprintf(opt, 128, "%d", o);
 	return opt;
     }
 }

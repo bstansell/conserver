@@ -618,19 +618,19 @@ FileOpenFD(int fd, enum consFileType type)
 #if DEBUG_CONSFILE_IO
     {
 	char buf[1024];
-	sprintf(buf, "CONSFILE-%s-%lu-%d.w", progname,
+	snprintf(buf, 1024, "CONSFILE-%s-%lu-%d.w", progname,
 		(unsigned long)thepid, fd);
 	if ((cfp->debugwfd =
 	     open(buf, O_WRONLY | O_CREAT | O_APPEND, 0644)) != -1) {
-	    sprintf(buf, "[---- STARTED - %s ----]\n",
+	    snprintf(buf, 1024, "[---- STARTED - %s ----]\n",
 		    StrTime((time_t *)0));
 	    write(cfp->debugwfd, buf, strlen(buf));
 	}
-	sprintf(buf, "CONSFILE-%s-%lu-%d.r", progname,
+	snprintf(buf, 1024, "CONSFILE-%s-%lu-%d.r", progname,
 		(unsigned long)thepid, fd);
 	if ((cfp->debugrfd =
 	     open(buf, O_WRONLY | O_CREAT | O_APPEND, 0644)) != -1) {
-	    sprintf(buf, "[---- STARTED - %s ----]\n",
+	    snprintf(buf, 1024, "[---- STARTED - %s ----]\n",
 		    StrTime((time_t *)0));
 	    write(cfp->debugrfd, buf, strlen(buf));
 	}
@@ -663,19 +663,19 @@ FileOpenPipe(int fd, int fdout)
 #if DEBUG_CONSFILE_IO
     {
 	char buf[1024];
-	sprintf(buf, "CONSFILE-%s-%lu-%d.w", progname,
+	snprintf(buf, 1024, "CONSFILE-%s-%lu-%d.w", progname,
 		(unsigned long)thepid, fdout);
 	if ((cfp->debugwfd =
 	     open(buf, O_WRONLY | O_CREAT | O_APPEND, 0644)) != -1) {
-	    sprintf(buf, "[---- STARTED - %s ----]\n",
+	    snprintf(buf, 1024, "[---- STARTED - %s ----]\n",
 		    StrTime((time_t *)0));
 	    write(cfp->debugwfd, buf, strlen(buf));
 	}
-	sprintf(buf, "CONSFILE-%s-%lu-%d.r", progname,
+	snprintf(buf, 1024, "CONSFILE-%s-%lu-%d.r", progname,
 		(unsigned long)thepid, fd);
 	if ((cfp->debugrfd =
 	     open(buf, O_WRONLY | O_CREAT | O_APPEND, 0644)) != -1) {
-	    sprintf(buf, "[---- STARTED - %s ----]\n",
+	    snprintf(buf, 1024, "[---- STARTED - %s ----]\n",
 		    StrTime((time_t *)0));
 	    write(cfp->debugrfd, buf, strlen(buf));
 	}
@@ -754,19 +754,19 @@ FileOpen(const char *path, int flag, int mode)
 #if DEBUG_CONSFILE_IO
     {
 	char buf[1024];
-	sprintf(buf, "CONSFILE-%s-%lu-%d.w", progname,
+	snprintf(buf, 1024, "CONSFILE-%s-%lu-%d.w", progname,
 		(unsigned long)thepid, fd);
 	if ((cfp->debugwfd =
 	     open(buf, O_WRONLY | O_CREAT | O_APPEND, 0644)) != -1) {
-	    sprintf(buf, "[---- STARTED - %s ----]\n",
+	    snprintf(buf, 1024, "[---- STARTED - %s ----]\n",
 		    StrTime((time_t *)0));
 	    write(cfp->debugwfd, buf, strlen(buf));
 	}
-	sprintf(buf, "CONSFILE-%s-%lu-%d.r", progname,
+	snprintf(buf, 1024, "CONSFILE-%s-%lu-%d.r", progname,
 		(unsigned long)thepid, fd);
 	if ((cfp->debugrfd =
 	     open(buf, O_WRONLY | O_CREAT | O_APPEND, 0644)) != -1) {
-	    sprintf(buf, "[---- STARTED - %s ----]\n",
+	    snprintf(buf, 1024, "[---- STARTED - %s ----]\n",
 		    StrTime((time_t *)0));
 	    write(cfp->debugrfd, buf, strlen(buf));
 	}
