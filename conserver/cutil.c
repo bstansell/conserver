@@ -708,7 +708,7 @@ FileUnopen(CONSFILE *cfp)
 	    break;
 #if HAVE_OPENSSL
 	case SSLSocket:
-	    retval = -1;
+	    retval = cfp->fd;
 	    break;
 #endif
 	default:

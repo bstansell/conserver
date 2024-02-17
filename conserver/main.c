@@ -53,8 +53,8 @@ int fAll = 0, fNoinit = 0, fVersion = 0, fStrip = 0, fReopen =
 char *pcConfig = CONFIGFILE;
 int cMaxMemb = MAXMEMB;
 #if USE_IPV6
-struct addrinfo *bindAddr;
-struct addrinfo *bindBaseAddr;
+struct addrinfo *bindAddr = (struct addrinfo *)0;
+struct addrinfo *bindBaseAddr = (struct addrinfo *)0;
 #else
 in_addr_t bindAddr = INADDR_ANY;
 unsigned short bindPort;
@@ -781,8 +781,10 @@ DestroyDataStructures(void)
 
 #if USE_IPV6
     /* clean up addrinfo stucts */
-    freeaddrinfo(bindAddr);
-    freeaddrinfo(bindBaseAddr);
+    if ((struct addrinfo *)0 != bindAddr)
+	freeaddrinfo(bindAddr);
+    if ((struct addrinfo *)0 != bindBaseAddr)
+	freeaddrinfo(bindBaseAddr);
 #else
     if (myAddrs != (struct in_addr *)0)
 	free(myAddrs);
