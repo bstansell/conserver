@@ -167,11 +167,12 @@ AttemptSSL(CONSFILE *pcf)
 #endif
 
 #if HAVE_GSSAPI
+#define MAX_GSSAPI_TOKSIZE 64*1024
 gss_name_t gss_server_name = GSS_C_NO_NAME;
 gss_ctx_id_t secctx = GSS_C_NO_CONTEXT;
 gss_buffer_desc mytok = GSS_C_EMPTY_BUFFER;
 
-int
+size_t
 CanGetGSSContext(const char *servername)
 {
     char namestr[128];
@@ -208,18 +209,22 @@ CanGetGSSContext(const char *servername)
 }
 
 int
-AttemptGSSAPI(CONSFILE *pcf)
+AttemptGSSAPI(CONSFILE *pcf, size_t toksize)
 {
     OM_uint32 stmaj, stmin;
     gss_buffer_desc servertok;
-    char buf[1024];
+    char *buf = NULL;
     int nr;
     int ret;
 
+    buf = malloc(toksize);
+    if (buf == NULL) {
+	return -1;
+    }
     FileSetQuoteIAC(pcf, FLAGFALSE);
     FileWrite(pcf, FLAGFALSE, mytok.value, mytok.length);
     FileSetQuoteIAC(pcf, FLAGTRUE);
-    nr = FileRead(pcf, buf, sizeof(buf));
+    nr = FileRead(pcf, buf, toksize);
     servertok.length = nr;
     servertok.value = buf;
 
@@ -233,6 +238,7 @@ AttemptGSSAPI(CONSFILE *pcf)
 
     ret = (stmaj == GSS_S_COMPLETE);
     gss_release_name(&stmin, &gss_server_name);
+    free(buf);
     return ret;
 }
 #endif
@@ -1586,7 +1592,7 @@ DoCmds(char *master, char *pports, int cmdi)
     char *pcopy;
     char *serverName;
 #if HAVE_GSSAPI
-    int toksize;
+    size_t toksize;
 #endif
 
     if ((pcopy = ports = StrDup(pports)) == (char *)0)
@@ -1671,10 +1677,16 @@ DoCmds(char *master, char *pports, int cmdi)
 #endif
 #if HAVE_GSSAPI
 	if ((toksize = CanGetGSSContext(server)) > 0) {
+	    if (toksize > MAX_GSSAPI_TOKSIZE) {
+		Error("Maximum support GSSAPI token size is %lu, "
+		      "GSSAPI context creation reported %lu. "
+		      "Server will reject authentication.",
+		      MAX_GSSAPI_TOKSIZE, toksize);
+	    }
 	    FilePrint(pcf, FLAGFALSE, "gssapi %d\r\n", toksize);
 	    t = ReadReply(pcf, FLAGFALSE);
 	    if (strcmp(t, "ok\r\n") == 0) {
-		if (AttemptGSSAPI(pcf)) {
+		if (AttemptGSSAPI(pcf, toksize)) {
 		    goto gssapi_logged_me_in;
 		}
 	    }
