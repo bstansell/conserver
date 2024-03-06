@@ -1023,7 +1023,7 @@ ReUp(GRPENT *pGE, short automatic)
     /* update all the timers */
     if (automatic == 0 || automatic == 2) {
 	if (config->reinitcheck)
-	    timers[T_REINIT] = tyme + (config->reinitcheck * 60);
+	    timers[T_REINIT] = tyme + config->reinitcheck;
     }
     if (!fNoautoreup)
 	timers[T_AUTOUP] = tyme + 60;

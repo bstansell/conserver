@@ -4562,6 +4562,7 @@ void
 ConfigItemReinitcheck(char *id)
 {
     char *p;
+    int factor = 0;
 
     CONDDEBUG((1, "ConfigItemReinitcheck(%s) [%s:%d]", id, file, line));
 
@@ -4570,18 +4571,22 @@ ConfigItemReinitcheck(char *id)
 	return;
     }
 
-    for (p = id; *p != '\000'; p++)
-	if (!isdigit((int)(*p)))
+    for (p = id; factor == 0 && *p != '\000'; p++)
+	if (*p == 's' || *p == 'S')
+	    factor = 1;
+	else if (*p == 'm' || *p == 'M')
+	    factor = 60;
+	else if (!isdigit((int)(*p)))
 	    break;
 
-    /* if it wasn't a number */
+    /* if it wasn't a number or a qualifier wasn't at the end */
     if (*p != '\000') {
 	if (isMaster)
 	    Error("invalid reinitcheck value `%s' [%s:%d]", id, file,
 		  line);
 	return;
     }
-    parserConfigTemp->reinitcheck = atoi(id);
+    parserConfigTemp->reinitcheck = atoi(id) * (factor == 0 ? 60 : factor);
 }
 
 void
