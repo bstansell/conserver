@@ -798,6 +798,8 @@ ConsDown(CONSENT *pCE, FLAG downHard, FLAG force)
     if (pCE->type == EXEC && pCE->execSlaveFD != 0) {
 	close(pCE->execSlaveFD);
 	pCE->execSlaveFD = 0;
+	free(pCE->execSlave);
+	pCE->execSlave = NULL;
     }
     pCE->fup = 0;
     pCE->nolog = 0;
