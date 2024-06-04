@@ -2175,7 +2175,7 @@ CommandExamine(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
 	char p = '\000';
 	switch (pCE->type) {
 	    case EXEC:
-		d = pCE->execSlave;
+		d = (pCE->execSlaveFD > 0) ? pCE->execSlave : "(inactive)";
 		b = "Local";
 		p = ' ';
 		break;
@@ -2343,7 +2343,8 @@ CommandInfo(GRPENT *pGE, CONSCLIENT *pCLServing, CONSENT *pCEServing,
 	    case EXEC:
 		FilePrint(pCLServing->fd, FLAGTRUE, "|:%s,%lu,%s,%d:",
 			  (pCE->exec != (char *)0 ? pCE->exec : "/bin/sh"),
-			  (unsigned long)pCE->ipid, pCE->execSlave,
+			  (unsigned long)pCE->ipid,
+			  (pCE->execSlaveFD > 0) ? pCE->execSlave : "(inactive)",
 			  FileFDNum(pCE->cofile));
 		break;
 #if HAVE_FREEIPMI
