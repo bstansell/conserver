@@ -3243,7 +3243,6 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 			    TagLogfileAct(pCEServing, "%s attached",
 					  pCLServing->acid->string);
 			} else {
-			    ClientWantsWrite(pCLServing);
 			    FileWrite(pCLServing->fd, FLAGFALSE,
 				      "[spy]\r\n", -1);
 			}
@@ -3790,7 +3789,9 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 
 			    case 'c':
 				if (!pCLServing->fwr) {
-				    goto unknownchar;
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					      "attach to toggle flow control]\r\n", -1);
+				    continue;
 				}
 				CommandChangeFlow(pGE, pCLServing,
 						  pCEServing, tyme);
@@ -3798,7 +3799,9 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 
 			    case 'd':	/* down a console       */
 				if (!pCLServing->fwr) {
-				    goto unknownchar;
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					      "attach to down console]\r\n", -1);
+				    continue;
 				}
 				CommandDown(pGE, pCLServing, pCEServing,
 					    tyme);
@@ -3837,7 +3840,9 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 
 			    case 'L':
 				if (!pCLServing->fwr) {
-				    goto unknownchar;
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					      "attach to toggle logging]\r\n", -1);
+				    continue;
 				}
 				CommandLogging(pGE, pCLServing, pCEServing,
 					       tyme);
@@ -3845,7 +3850,9 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 
 			    case 'l':	/* halt character 1     */
 				if (!pCLServing->fwr) {
-				    goto unknownchar;
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					      "attach to send break]\r\n", -1);
+				    continue;
 				}
 				if (pCEServing->fronly) {
 				    FileWrite(pCLServing->fd, FLAGFALSE,
@@ -3924,10 +3931,12 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 				break;
 
 			    case 's':	/* spy mode */
-				if (!pCLServing->fwr) {
-				    goto unknownchar;
-				}
 				pCLServing->fwantwr = 0;
+				if (!pCLServing->fwr) {
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					      "ok]\r\n", -1);
+				    continue;
+				}
 				BumpClient(pCEServing, (char *)0);
 				TagLogfileAct(pCEServing, "%s detached",
 					      pCLServing->acid->string);
@@ -3989,7 +3998,9 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 
 			    case '!':	/* invoke a task */
 				if (!pCLServing->fwr) {
-				    goto unknownchar;
+				    FileWrite(pCLServing->fd, FLAGFALSE,
+					      "attach to invoke task]\r\n", -1);
+				    continue;
 				}
 				pCLServing->iState = S_TASK;
 				FileWrite(pCLServing->fd, FLAGFALSE,
