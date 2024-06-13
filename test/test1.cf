@@ -7,6 +7,9 @@ default * {
 	timestamp "";
 	include full;
 }
+config * {
+	reinitcheck 1s;
+}
 break 5 {
 	string "\rtest\r";
 }
