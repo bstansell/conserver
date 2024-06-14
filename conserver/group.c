@@ -1964,13 +1964,19 @@ int
 AttemptGSSAPI(CONSCLIENT *pCL)
 {
     int nr, ret = 0;
-    char buf[1024];
+    char *buf = NULL;
     gss_buffer_desc sendtok, recvtok, dbuf;
     gss_ctx_id_t gssctx = GSS_C_NO_CONTEXT;
     OM_uint32 stmaj, stmin, mctx, dmin;
     gss_name_t user = 0;
 
-    if ((nr = FileRead(pCL->fd, buf, sizeof(buf))) <= 0) {
+    buf = malloc(pCL->tokenSize);
+    if (buf == NULL) {
+	Error("Unable to allocate a buffer for GSSAPI token");
+	return -1;
+    }
+    if ((nr = FileRead(pCL->fd, buf, pCL->tokenSize)) <= 0) {
+	free(buf);
 	return nr;
     }
     recvtok.value = buf;
@@ -2009,6 +2015,8 @@ AttemptGSSAPI(CONSCLIENT *pCL)
 	    Error("GSSAPI didn't work, %*s", dbuf.length, dbuf.value);
 	    ret = -1;
     }
+
+    free(buf);
     return ret;
 }
 #endif
@@ -3098,12 +3106,31 @@ DoClientRead(GRPENT *pGE, CONSCLIENT *pCLServing)
 		    }
 #endif
 #if HAVE_GSSAPI
+#define MAX_GSSAPI_TOKSIZE 64*1024
 		} else if (pCLServing->iState == S_IDENT &&
 			   strcmp(pcCmd, "gssapi") == 0) {
-		    FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", -1);
-		    /* Change the I/O mode right away, we'll do the read
-		     * and accept when the select gets back to us */
-		    pCLServing->ioState = INGSSACCEPT;
+		    if (pcArgs == (char *)0) {
+			FileWrite(pCLServing->fd, FLAGFALSE,
+				  "gssapi requires argument\r\n", -1);
+		    } else {
+			FileWrite(pCLServing->fd, FLAGFALSE, "ok\r\n", -1);
+			/* Read the token size but limit it to 64K,
+			 * that's practical limit for GSSAPI krb5 mechanism.
+			 *
+			 * The client connection will be rejected for large
+			 * requests as server will not be able to parse
+			 * incomplete ASN.1 but this is intentional. */
+			pCLServing->tokenSize = (size_t) strtol(pcArgs, NULL, 10);
+			if (pCLServing->tokenSize > MAX_GSSAPI_TOKSIZE) {
+			    FileWrite(pCLServing->fd, FLAGFALSE,
+			              "gssapi token size too large\r\n", -1);
+			    pCLServing->tokenSize = MAX_GSSAPI_TOKSIZE;
+			}
+
+			/* Change the I/O mode right away, we'll do the read
+			 * and accept when the select gets back to us */
+			pCLServing->ioState = INGSSACCEPT;
+		    }
 #endif
 		} else if (pCLServing->iState == S_IDENT &&
 			   strcmp(pcCmd, "login") == 0) {
