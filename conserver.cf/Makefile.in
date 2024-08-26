@@ -28,7 +28,7 @@ install:
 	$(INSTALL) -m 0644 conserver.cf.man $(DESTDIR)$(mandir)/man5/conserver.cf.5
 	$(INSTALL) -m 0644 conserver.passwd.man $(DESTDIR)$(mandir)/man5/conserver.passwd.5
 	$(MKDIR) $(DESTDIR)$(exampledir)
-	$(INSTALL) -m 0644 conserver.cf $(DESTDIR)$(exampledir)
-	$(INSTALL) -m 0644 conserver.passwd $(DESTDIR)$(exampledir)
+	$(INSTALL) -m 0644 $(srcdir)/conserver.cf $(DESTDIR)$(exampledir)
+	$(INSTALL) -m 0644 $(srcdir)/conserver.passwd $(DESTDIR)$(exampledir)
 
 .PHONY: clean distclean install

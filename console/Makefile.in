@@ -21,9 +21,11 @@ CFLAGS	= @CFLAGS@
 DEFS	= @DEFS@ -DSYSCONFDIR=\"$(sysconfdir)\"
 CPPFLAGS = -I.. -I$(top_srcdir) -I$(srcdir) -I$(top_srcdir)/conserver $(DEFS) @CPPFLAGS@
 LDFLAGS	= @LDFLAGS@
-LIBS	= @LIBS@
+LDLIBS	= @LIBS@
+LINK.o = $(LINK.c)
 @SET_MAKE@
 
+vpath %.c $(srcdir)
 
 ### Makefile rules - no user-servicable parts below
 
@@ -39,14 +41,10 @@ all: $(ALL)
 
 $(CONSOLE_OBJS): $(CONSOLE_HDRS)
 
-console: $(CONSOLE_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o console $(CONSOLE_OBJS) $(LIBS)
+console: $(CONSOLE_OBJS) $(LIBS)
 
 ../conserver/cutil.o:
-	( cd ../conserver && $(MAKE) $(MAKE_FLAGS) cutil.o ) || exit 1;
-
-.c.o:
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
+	$(MAKE) -C ../conserver $(MAKE_FLAGS) cutil.o
 
 clean:
 	rm -f *~ *.o $(ALL) core
