@@ -9,8 +9,7 @@ sbindir = @sbindir@
 sysconfdir = @sysconfdir@
 mandir = @mandir@
 datadir = @datadir@
-libdir = @libdir@
-pkglibdir = $(libdir)/conserver
+pkglibdir = @libexecdir@/conserver
 exampledir = $(datadir)/examples/conserver
 
 ### Installation programs and flags
