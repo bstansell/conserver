@@ -46,7 +46,7 @@ static unsigned long dmallocMarkClientConnection = 0;
 #endif
 
 
-static RETSIGTYPE
+static void
 FlagSawCHLD(int sig)
 {
     fSawCHLD = 1;
@@ -122,7 +122,7 @@ FixKids(int msfd)
 /* kill all the kids and exit.
  * Called when master process receives SIGTERM
  */
-static RETSIGTYPE
+static void
 FlagQuitIt(int arg)
 {
     fSawQuit = 1;
@@ -134,7 +134,7 @@ FlagQuitIt(int arg)
 /* yes, this is basically the same as FlagQuitIt but we *may*
  * want to do something special on SIGINT at some point.
  */
-static RETSIGTYPE
+static void
 FlagSawINT(int arg)
 {
     fSawQuit = 1;
@@ -143,7 +143,7 @@ FlagSawINT(int arg)
 #endif
 }
 
-static RETSIGTYPE
+static void
 FlagSawHUP(int arg)
 {
     fSawHUP = 1;
@@ -152,7 +152,7 @@ FlagSawHUP(int arg)
 #endif
 }
 
-static RETSIGTYPE
+static void
 FlagSawUSR2(int arg)
 {
     fSawUSR2 = 1;
@@ -161,7 +161,7 @@ FlagSawUSR2(int arg)
 #endif
 }
 
-static RETSIGTYPE
+static void
 FlagSawUSR1(int arg)
 {
     fSawUSR1 = 1;

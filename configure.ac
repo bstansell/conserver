@@ -29,10 +29,10 @@ AH_TEMPLATE([REQ_SERVER_CERT], [Defined if client requires server SSL certificat
 AH_TEMPLATE([TRUST_UDS_CRED], [Defined if we trust credentials from UDS client])
 
 dnl ### Normal initialization. ######################################
-AC_INIT([conserver],m4_esyscmd_s([./gen-version number]))
-AC_PREREQ(2.69)
+AC_INIT([conserver],[m4_esyscmd_s(./gen-version number)])
+AC_PREREQ([2.72])
 AC_CONFIG_SRCDIR([conserver/main.c])
-AC_CONFIG_HEADER(config.h)
+AC_CONFIG_HEADERS([config.h])
 
 AC_DEFINE_UNQUOTED(CONFIGINVOCATION, "$0 $*")
 
@@ -50,7 +50,7 @@ AC_SUBST(CONSERVER_DATE, m4_esyscmd_s([./gen-version date]))
 dnl ### Custom settings. ############################################
 dnl AC_MSG_CHECKING(whether to allow 64bit compilation)
 dnl AC_ARG_WITH(64bit,
-dnl 	AC_HELP_STRING([--with-64bit],[Allow 64bit compilation]),
+dnl 	AS_HELP_STRING([--with-64bit],[Allow 64bit compilation]),
 dnl 		[case "$withval" in
 dnl 		    yes)
 dnl 			with_64bit=yes
@@ -299,7 +299,7 @@ AC_PROG_LN_S
 AC_PROG_MAKE_SET
 
 dnl ### Compiler characteristics. ##################################
-AC_AIX
+AC_USE_SYSTEM_EXTENSIONS
 AC_C_CONST
 
 dnl AC_CHECK_SIZEOF(long)
@@ -312,7 +312,8 @@ dnl     fi
 dnl fi
 
 dnl ### Checks for header files. ###################################
-AC_HEADER_STDC
+AC_CHECK_INCLUDES_DEFAULT
+
 AC_CHECK_HEADERS(sys/ioctl.h)
 
 AC_SYS_POSIX_TERMIOS
@@ -327,10 +328,8 @@ AC_CHECK_HEADERS(sys/proc.h, [], [],
 #include <sys/param.h>
 #endif
 ])
-AC_HEADER_TIME
 AC_HEADER_SYS_WAIT
 AC_TYPE_MODE_T
-AC_TYPE_SIGNAL
 AC_TYPE_PID_T
 AC_TYPE_SIZE_T
 AC_TYPE_UID_T
@@ -348,9 +347,9 @@ AC_CHECK_TYPE([socklen_t],[AC_DEFINE(HAVE_SOCKLEN_T,1,
 #include <sys/socket.h>])
 
 AC_MSG_CHECKING(for sa_len in struct sockaddr)
-AC_TRY_COMPILE([#include <sys/types.h>
-	#include <sys/socket.h>],
-	[struct sockaddr s; s.sa_len=0;],
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>
+	#include <sys/socket.h>]],
+	[[struct sockaddr s; s.sa_len=0;]])],
 	[AC_MSG_RESULT(yes)
 	 AC_DEFINE(HAVE_SA_LEN)],
 	[AC_MSG_RESULT(no)])
@@ -413,45 +412,45 @@ AC_ARG_WITH(uds,
 		    AS_HELP_STRING([--with-trust-uds-cred],[Trust UDS credentials obtained via socket]),
 		    [case "$withval" in
 			yes)
-			    AC_TRY_COMPILE([#include <sys/types.h>
-				    #include <sys/socket.h>],
-				    [
+			    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>
+				    #include <sys/socket.h>]],
+				    [[
 struct sockpeercred u;
 u.uid = 0;
 #if !defined(SO_PEERCRED)
 #error "no SO_PEERCRED defined"
 #endif
-				    ],
+				    ]])],
 				    [AC_MSG_RESULT(yes)
 				     AC_DEFINE(UDS_CRED_STYPE, sockpeercred, [Defined to UDS credential structure name])
 				     AC_DEFINE(UDS_CRED_UID, uid, [Defined to UDS credential structure uid field])
 				     AC_DEFINE(UDS_CRED_SO, SO_PEERCRED, [Defined to UDS credential socket option])
 				     AC_DEFINE(TRUST_UDS_CRED)],
 				    [
-					AC_TRY_COMPILE([#include <sys/types.h>
-						#include <sys/socket.h>],
-						[
+					AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>
+						#include <sys/socket.h>]],
+						[[
 struct ucred u;
 u.euid = 0;
 #if !defined(SO_PEERCRED)
 #error "no SO_PEERCRED defined"
 #endif
-						],
+						]])],
 						[AC_MSG_RESULT(yes)
 						AC_DEFINE(UDS_CRED_STYPE, ucred, [Defined to UDS credential structure name])
 						AC_DEFINE(UDS_CRED_UID, uid, [Defined to UDS credential structure uid field])
 						AC_DEFINE(UDS_CRED_SO, SO_PEERCRED, [Defined to UDS credential socket option])
 						AC_DEFINE(TRUST_UDS_CRED)],
 						[
-							AC_TRY_COMPILE([#include <sys/types.h>
-								#include <sys/socket.h>],
-								[
+							AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sys/types.h>
+								#include <sys/socket.h>]],
+								[[
 struct peercred_struct u;
 u.euid = 0;
 #if !defined(SO_PEERID)
 #error "no SO_PEERID defined"
 #endif
-								],
+								]])],
 								[AC_MSG_RESULT(yes)
 								 AC_DEFINE(UDS_CRED_STYPE, peercred_struct, [Defined to UDS credential structure name])
 								 AC_DEFINE(UDS_CRED_UID, euid, [Defined to UDS credential structure uid field])
@@ -495,10 +494,10 @@ AC_ARG_WITH(libwrap,
 	AC_CHECK_HEADER(tcpd.h,
 	    [LIBS="$LIBS -lwrap"
 	    AC_MSG_CHECKING(for TCP wrappers library -lwrap)
-	    AC_TRY_LINK([#include <tcpd.h>
+	    AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <tcpd.h>
 		int allow_severity = 0;
 		int deny_severity  = 0;
-		],[hosts_access((void *)0)],
+		]], [[hosts_access((void *)0)]])],
 		[AC_MSG_RESULT(yes)
 		 cons_with_libwrap="YES"
 		 AC_DEFINE(USE_LIBWRAP)
@@ -508,10 +507,10 @@ AC_ARG_WITH(libwrap,
 		[AC_MSG_RESULT(no)
 		 LIBS="$LIBS -lnsl"
 		 AC_MSG_CHECKING(for TCP wrappers library -lwrap with -lnsl)
-		 AC_TRY_LINK([#include <tcpd.h>
+		 AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <tcpd.h>
 		    int allow_severity = 0;
 		    int deny_severity  = 0;
-		    ],[hosts_access((void *)0)],
+		    ]],[[hosts_access((void *)0)]])],
 		    [AC_MSG_RESULT(yes)
 		     cons_with_libwrap="YES"
 		     AC_DEFINE(USE_LIBWRAP)
@@ -553,8 +552,8 @@ AC_ARG_WITH(openssl,
 	AC_CHECK_HEADER([openssl/ssl.h],
 	    [LIBS="$LIBS -lssl -lcrypto"
 	    AC_MSG_CHECKING(for openssl libraries -lssl and -lcrypto)
-	    AC_TRY_LINK([#include <openssl/ssl.h>
-		],[SSL_CTX_new(NULL)],
+	    AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <openssl/ssl.h>
+		]], [[SSL_CTX_new(NULL)]])],
 		[AC_MSG_RESULT(yes)
 		cons_with_openssl="YES"
 		AC_DEFINE(HAVE_OPENSSL)
@@ -611,9 +610,9 @@ AC_ARG_WITH(gssapi,
 	AC_CHECK_HEADER([gssapi/gssapi.h],
 	    [LIBS="$oLIBS -lgssapi"
 	    AC_MSG_CHECKING(for gssapi library -lgssapi)
-	    AC_TRY_LINK([#include <gssapi/gssapi.h>
+	    AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <gssapi/gssapi.h>
 			 #include <stdio.h>
-		],[gss_create_empty_oid_set(NULL, NULL)],
+		]], [[gss_create_empty_oid_set(NULL, NULL)]])],
 		[AC_MSG_RESULT(yes)
 		cons_with_gssapi="YES"
 		AC_DEFINE(HAVE_GSSAPI)
@@ -621,9 +620,9 @@ AC_ARG_WITH(gssapi,
 		[AC_MSG_RESULT(no)
 		LIBS="$oLIBS -lgssglue"
 		AC_MSG_CHECKING(for gssapi library -lgssglue)
-		AC_TRY_LINK([#include <gssapi/gssapi.h>
+		AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <gssapi/gssapi.h>
 			     #include <stdio.h>
-		    ],[gss_create_empty_oid_set(NULL, NULL)],
+		    ]],[[gss_create_empty_oid_set(NULL, NULL)]])],
 		    [AC_MSG_RESULT(yes)
 		    cons_with_gssapi="YES"
 		    AC_DEFINE(HAVE_GSSAPI)
@@ -631,9 +630,9 @@ AC_ARG_WITH(gssapi,
 		    [AC_MSG_RESULT(no)
 		    LIBS="$oLIBS -lgss"
 		    AC_MSG_CHECKING(for gssapi library -lgss)
-		    AC_TRY_LINK([#include <gssapi/gssapi.h>
+		    AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <gssapi/gssapi.h>
 				 #include <stdio.h>
-			],[gss_create_empty_oid_set(NULL, NULL)],
+			]],[[gss_create_empty_oid_set(NULL, NULL)]])],
 			[AC_MSG_RESULT(yes)
 			cons_with_gssapi="YES"
 			AC_DEFINE(HAVE_GSSAPI)
@@ -641,8 +640,8 @@ AC_ARG_WITH(gssapi,
 			[AC_MSG_RESULT(no)
 			LIBS="$oLIBS -lgssapi_krb5"
 			AC_MSG_CHECKING(for gssapi library -lgssapi_krb5)
-			AC_TRY_LINK([#include <gssapi/gssapi.h>
-			],[gss_create_empty_oid_set(NULL, NULL)],
+			AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <gssapi/gssapi.h>
+			]],[[gss_create_empty_oid_set(NULL, NULL)]])],
 			[AC_MSG_RESULT(yes)
 			cons_with_gssapi="YES"
 			AC_DEFINE(HAVE_GSSAPI)
@@ -700,8 +699,8 @@ AC_ARG_WITH(freeipmi,
 	AC_CHECK_HEADER([ipmiconsole.h],
 	    [LIBS="$LIBS -lipmiconsole"
 	    AC_MSG_CHECKING(for freeipmi libraries -lipmiconsole)
-	    AC_TRY_LINK([#include <ipmiconsole.h>
-		],[ipmiconsole_ctx_fd(0)],
+	    AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <ipmiconsole.h>
+		]], [[ipmiconsole_ctx_fd(0)]])],
 		[AC_MSG_RESULT(yes)
 		cons_with_freeipmi="YES"
 		AC_DEFINE(HAVE_FREEIPMI)
@@ -745,8 +744,8 @@ AC_ARG_WITH(dmalloc,
 	AC_CHECK_HEADER([dmalloc.h],
 	    [LIBS="$LIBS -ldmalloc"
 	    AC_MSG_CHECKING(for dmalloc libraries -ldmalloc)
-	    AC_TRY_LINK([#include <dmalloc.h>
-		],[dmalloc_debug(0)],
+	    AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <dmalloc.h>
+		]], [[dmalloc_debug(0)]])],
 		[AC_MSG_RESULT(yes)
 		cons_with_dmalloc="YES"
 		AC_DEFINE(HAVE_DMALLOC)
@@ -768,10 +767,9 @@ dnl dnl The following basically stollen from the less-358 distribution, but
 dnl dnl modified for my own purposes
 dnl AC_MSG_CHECKING(for POSIX regex)
 dnl AC_ARG_WITH(regex,
-dnl     AC_HELP_STRING([--with-regex],
-dnl 	[Use regular expressions in conserver.passwd]),
+dnl     AS_HELP_STRING([--with-regex],[Use regular expressions in conserver.passwd]),
 dnl 	[if test "$withval" = yes; then
-dnl 	    AC_TRY_RUN([
+dnl 	    AC_RUN_IFELSE([AC_LANG_SOURCE([[
 dnl 		#include <sys/types.h>
 dnl 		#include <regex.h>
 dnl 		main() { regex_t r; regmatch_t rm; char *text = "xabcy";
@@ -779,17 +777,17 @@ dnl 		if (regcomp(&r, "abc", 0)) exit(1);
 dnl 		if (regexec(&r, text, 1, &rm, 0)) exit(1);
 dnl 		if (rm.rm_so != 1) exit(1); /* check for correct offset */
 dnl 		exit(0); }
-dnl 	    ],have_posix_regex=yes,have_posix_regex=no,have_posix_regex=unknown)
+dnl 	    ]])],[have_posix_regex=yes],[have_posix_regex=no],[have_posix_regex=unknown])
 dnl 	    if test $have_posix_regex = yes; then
 dnl 	      AC_MSG_RESULT(yes)
 dnl 	      AC_DEFINE(HAVE_POSIX_REGCOMP)
 dnl 	    elif test $have_posix_regex = unknown; then
-dnl 		AC_TRY_LINK([
+dnl 		AC_LINK_IFELSE([AC_LANG_PROGRAM([[
 dnl 		    #include <sys/types.h>
-dnl 		    #include <regex.h>],
-dnl 		[regex_t *r; regfree(r);],
+dnl 		    #include <regex.h>]], [[
+dnl 		regex_t *r; regfree(r);]])],[
 dnl 		AC_MSG_RESULT(yes)
-dnl 		AC_DEFINE(HAVE_POSIX_REGCOMP))
+dnl 		AC_DEFINE(HAVE_POSIX_REGCOMP)],[])
 dnl 	    else
 dnl 	      AC_MSG_RESULT(no)
 dnl 	    fi

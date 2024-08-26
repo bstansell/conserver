@@ -35,7 +35,7 @@ GetPseudoTTY(STRING *slave, int *slaveFD)
 # if HAVE_SIGACTION
     sigset_t oldmask, newmask;
 # else
-    extern RETSIGTYPE FlagReapVirt(int);
+    extern void FlagReapVirt(int);
 # endif
 
 # if HAVE_SIGACTION
@@ -83,7 +83,7 @@ GetPseudoTTY(STRING *slave, int *slaveFD)
 #  if HAVE_SIGACTION
     sigset_t oldmask, newmask;
 #  else
-    extern RETSIGTYPE FlagReapVirt(int);
+    extern void FlagReapVirt(int);
 #  endif
     int c;
     /* clone list and idea stolen from xemacs distribution */
