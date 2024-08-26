@@ -33,6 +33,7 @@
 #include <access.h>
 #include <readcfg.h>
 #include <main.h>
+#include <time.h>
 
 /*****  external things *****/
 NAMES *userList = (NAMES *)0;

@@ -7,6 +7,7 @@
 #include <compat.h>
 
 #include <cutil.h>
+#include <time.h>
 #include <version.h>
 
 #include <net/if.h>

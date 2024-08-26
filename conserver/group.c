@@ -67,6 +67,7 @@
 #include <main.h>
 #include <version.h>
 #include <stdio.h>
+#include <time.h>
 
 #if HAVE_PAM
 # include <security/pam_appl.h>
