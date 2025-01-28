@@ -2593,7 +2593,7 @@ ParseFile(char *filename, FILE *fp, int level)
 	    } else {
 		char *fname;
 		char *sfile;
-		int *sline;
+		int sline;
 		/* word gets destroyed, so save the name */
 		fname = StrDup(word->string);
 		sfile = file;
