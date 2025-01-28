@@ -67,6 +67,7 @@
 #include <main.h>
 #include <version.h>
 #include <stdio.h>
+#include <time.h>
 
 #if HAVE_PAM
 # include <security/pam_appl.h>
@@ -828,7 +829,7 @@ CheckPass(char *pcUser, char *pcWord, FLAG empty_check)
  * and reread the configuration file
  * lucky for us: log file fd's can change async from the group driver!
  */
-static RETSIGTYPE
+static void
 FlagSawChldHUP(int sig)
 {
     fSawChldHUP = 1;
@@ -840,7 +841,7 @@ FlagSawChldHUP(int sig)
 /* on an USR2 close and re-open log files so lop can trim them		(ksb)
  * lucky for us: log file fd's can change async from the group driver!
  */
-static RETSIGTYPE
+static void
 FlagSawChldUSR2(int sig)
 {
     fSawChldUSR2 = 1;
@@ -890,7 +891,7 @@ ReOpen(GRPENT *pGE)
     }
 }
 
-static RETSIGTYPE
+static void
 FlagReUp(int sig)
 {
     fSawReUp = 1;
@@ -1250,7 +1251,7 @@ WriteLog(CONSENT *pCE, char *s, int len)
     FileWrite(pCE->fdlog, FLAGFALSE, (char *)0, 0);
 }
 
-static RETSIGTYPE
+static void
 FlagGoAway(int sig)
 {
     fSawGoAway = 1;
@@ -1260,7 +1261,7 @@ FlagGoAway(int sig)
 }
 
 /* yep, basically the same...ah well, maybe someday */
-static RETSIGTYPE
+static void
 FlagGoAwayAlso(int sig)
 {
     fSawGoAway = 1;
@@ -1269,7 +1270,7 @@ FlagGoAwayAlso(int sig)
 #endif
 }
 
-static RETSIGTYPE
+static void
 FlagReapVirt(int sig)
 {
     fSawReapVirt = 1;

@@ -156,7 +156,7 @@ extern void Debug(int, char *, ...);
 extern void Error(char *, ...);
 extern void Msg(char *, ...);
 extern void Verbose(char *, ...);
-extern void SimpleSignal(int, RETSIGTYPE(*)(int));
+extern void SimpleSignal(int, void(*)(int));
 extern int GetMaxFiles();
 extern char *FmtCtl(int, STRING *);
 extern void FmtCtlStr(char *, int, STRING *);

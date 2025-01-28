@@ -7,6 +7,7 @@
 #include <compat.h>
 
 #include <cutil.h>
+#include <time.h>
 #include <version.h>
 
 #include <net/if.h>
@@ -546,7 +547,7 @@ Verbose(char *fmt, ...)
 }
 
 void
-SimpleSignal(int sig, RETSIGTYPE(*disp) (int))
+SimpleSignal(int sig, void(*disp) (int))
 {
 #if HAVE_SIGACTION
     struct sigaction sa;

@@ -9,8 +9,7 @@ sbindir = @sbindir@
 sysconfdir = @sysconfdir@
 mandir = @mandir@
 datadir = @datadir@
-libdir = @libdir@
-pkglibdir = $(libdir)/conserver
+pkglibdir = @libexecdir@/conserver
 exampledir = $(datadir)/examples/conserver
 
 ### Installation programs and flags
@@ -25,9 +24,11 @@ CFLAGS	= @CFLAGS@
 DEFS	= @DEFS@ -DSYSCONFDIR=\"$(sysconfdir)\"
 CPPFLAGS = -I.. -I$(top_srcdir) -I$(srcdir) $(DEFS) @CPPFLAGS@ @CONSCPPFLAGS@
 LDFLAGS	= @LDFLAGS@ @CONSLDFLAGS@
-LIBS	= @LIBS@ @CONSLIBS@
+LDLIBS	= @LIBS@ @CONSLIBS@
+LINK.o = $(LINK.c)
 @SET_MAKE@
 
+vpath %.c $(srcdir)
 
 ### Makefile rules - no user-servicable parts below
 
@@ -46,13 +47,9 @@ all: $(ALL)
 $(CONSERVER_OBJS): $(CONSERVER_HDRS)
 
 conserver: $(CONSERVER_OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o conserver $(CONSERVER_OBJS) $(LIBS)
+	$(LINK.o) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 convert: convert.o cutil.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o convert convert.o cutil.o $(LIBS)
-
-.c.o:
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
 
 clean:
 	rm -f *~ *.o $(ALL) core

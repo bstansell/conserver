@@ -47,6 +47,7 @@
 #include <access.h>
 #include <readcfg.h>
 #include <main.h>
+#include <time.h>
 
 
 BAUD baud[] = {
