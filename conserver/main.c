@@ -1365,7 +1365,7 @@ main(int argc, char **argv)
 		break;
 	    case 'O':
 		/* How often to try opening all down consoles, in minutes */
-		optConf->reinitcheck = atoi(optarg);
+		optConf->reinitcheck = atoi(optarg) * 60;
 		break;
 	    case 'p':
 		if ((optConf->primaryport = StrDup(optarg)) == (char *)0)

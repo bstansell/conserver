@@ -798,6 +798,8 @@ ConsDown(CONSENT *pCE, FLAG downHard, FLAG force)
     if (pCE->type == EXEC && pCE->execSlaveFD != 0) {
 	close(pCE->execSlaveFD);
 	pCE->execSlaveFD = 0;
+	free(pCE->execSlave);
+	pCE->execSlave = NULL;
     }
     pCE->fup = 0;
     pCE->nolog = 0;
@@ -913,6 +915,9 @@ ConsInit(CONSENT *pCE)
 	case HOST:
 	    {
 #if USE_IPV6
+		/* XXX IPv4 should use getaddrinfo() and getnameinfo() as well,
+		 * (if available, they are in IEEE Std 1003.1g-2000)
+		 */
 		int error;
 		char host[NI_MAXHOST];
 		char serv[NI_MAXSERV];
@@ -927,7 +932,7 @@ ConsInit(CONSENT *pCE)
 		Sleep(100000);	/* Not all terminal servers can keep up */
 
 #if USE_IPV6
-# if HAVE_MEMSET
+# if HAVE_MEMSET		/* XXX memset() is C89!!! */
 		memset(&hints, 0, sizeof(hints));
 # else
 		bzero(&hints, sizeof(hints));
@@ -964,8 +969,12 @@ ConsInit(CONSENT *pCE)
 # if HAVE_SETSOCKOPT
 			if (setsockopt
 			    (cofile, SOL_SOCKET, SO_KEEPALIVE,
-			     (char *)&one, sizeof(one)) < 0)
+			     (char *)&one, sizeof(one)) < 0) {
+			    Error
+				("[%s] %s:%s setsockopt(%u,SO_KEEPALIVE): %s",
+				 pCE->server, host, serv, cofile, strerror(errno));
 			    goto fail;
+			}
 # endif
 			if (!SetFlags(cofile, O_NONBLOCK, 0))
 			    goto fail;
@@ -973,20 +982,25 @@ ConsInit(CONSENT *pCE)
 			ret = connect(cofile, rp->ai_addr, rp->ai_addrlen);
 			if (ret == 0 || errno == EINPROGRESS)
 			    goto success;
-
+			Error("[%s] %s:%s connect(%u): %s",
+			      pCE->server, host, serv, cofile, strerror(errno));
 		      fail:
 			close(cofile);
+		    } else {
+			Error
+			    ("[%s] %s:%s socket(AF_INET,SOCK_STREAM): %s",
+			     pCE->server, host, serv, strerror(errno));
 		    }
 		    rp = rp->ai_next;
 		}
 
-		Error("[%s]: Unable to connect to %s:%s", pCE->server,
-		      host, serv);
+		Error("[%s] Unable to connect to %s:%s, forcing down", pCE->server,
+		      pCE->host, serv);
 		ConsDown(pCE, FLAGTRUE, FLAGTRUE);
 		return;
 	      success:
 		freeaddrinfo(ai);
-#else
+#else  /* !USE_IPV6 */
 # if HAVE_MEMSET
 		memset((void *)&port, 0, sizeof(port));
 # else

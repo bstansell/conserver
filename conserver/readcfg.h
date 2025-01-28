@@ -18,7 +18,7 @@ typedef struct config {
     char *primaryport;
     FLAG redirect;
     FLAG loghostnames;
-    int reinitcheck;
+    int reinitcheck; /* stored in sec, configured in min or sec */
     char *secondaryport;
     char *unifiedlog;
     int initdelay;
