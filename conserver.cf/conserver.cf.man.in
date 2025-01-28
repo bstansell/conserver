@@ -385,11 +385,14 @@ Turn redirection on or off (see the
 .B \-R
 command-line flag).
 .TP
-\f3reinitcheck\fP \f2number\fP
+\f3reinitcheck\fP \f2number\fP[\f3s\fP|\f3m\fP]
 .br
 Set the number of minutes used between reinitialization checks (see the
 .B \-O
 command-line flag).
+If an `s' or `m' is used after
+.IR number ,
+the specified time is interpreted as seconds or minutes.
 .TP
 \f3secondaryport\fP \f2number\fP|\f2name\fP
 .br
