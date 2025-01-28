@@ -89,6 +89,7 @@ typedef struct client {		/* Connection Information:              */
     FLAG confirmed;		/* confirm state                        */
     CLIENTSTATE cState;		/* state needing confirmation           */
     char cOption;		/* option initiating the confirmation   */
+    size_t tokenSize;		/* buffer size for GSSAPI token         */
 } CONSCLIENT;
 
 extern void Replay(CONSENT *, CONSFILE *, unsigned short);
