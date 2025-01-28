@@ -2415,7 +2415,7 @@ GetWord(FILE *fp, int *line, short spaceok, STRING *word)
     while ((c = fgetc(fp)) != EOF) {
 	if (c == '\n') {
 	    (*line)++;
-	    if (checkInc == -2)
+	    if (checkInc == -2 || checkInc == 0)
 		checkInc = -1;
 	}
 	if (comment) {
@@ -2592,11 +2592,17 @@ ParseFile(char *filename, FILE *fp, int level)
 			  strerror(errno));
 	    } else {
 		char *fname;
+		char *sfile;
+		int *sline;
 		/* word gets destroyed, so save the name */
 		fname = StrDup(word->string);
+		sfile = file;
+		sline = line;
 		ParseFile(fname, lfp, level + 1);
 		fclose(lfp);
 		free(fname);
+		file = sfile;
+		line = sline;
 	    }
 	} else {
 	    switch (state) {
