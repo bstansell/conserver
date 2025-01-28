@@ -146,6 +146,12 @@ AccType(INADDR_STYPE *addr, char **peername)
     so = sizeof(*addr);
 
 #if USE_IPV6
+    /*
+     * XXX where is the TRUST_REVERSE_DNS support for IPv6???
+     *
+     * XXX IPv4 should use getnameinfo() et al as well
+     * (if available, they are in IEEE Std 1003.1g-2000)
+     */
     error =
 	getnameinfo((struct sockaddr *)addr, so, ipaddr, sizeof(ipaddr),
 		    NULL, 0, NI_NUMERICHOST);
@@ -153,7 +159,11 @@ AccType(INADDR_STYPE *addr, char **peername)
 	Error("AccType(): getnameinfo failed: %s", gai_strerror(error));
 	goto common_ret;
     }
-    CONDDEBUG((1, "AccType(): ip=%s", ipaddr));
+    CONDDEBUG((1, "AccType(): ip=%s (%s)", ipaddr,
+	       addr->ss_family == AF_UNSPEC ? "AF_UNSPEC" : 
+	       addr->ss_family == AF_LOCAL ? "AF_LOCAL" : 
+	       addr->ss_family == AF_INET ? "AF_INET" : 
+	       addr->ss_family == AF_INET6 ? "AF_INET6" : "IF_???"));
 
     error =
 	getnameinfo((struct sockaddr *)addr, so, host, sizeof(host), NULL,
@@ -189,7 +199,7 @@ AccType(INADDR_STYPE *addr, char **peername)
   common_ret:
     if (config->loghostnames == FLAGTRUE && !error)
 	*peername = StrDup(host);
-#else
+#else  /* !USE_IPV6 */
 # if TRUST_REVERSE_DNS
     /* if we trust reverse dns, we get the names associated with
      * the address we're checking and then check each of those
