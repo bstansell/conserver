@@ -262,7 +262,7 @@ DestroyString(STRING *msg)
 {
     if (msg->prev == (STRING *)0 && msg->next == (STRING *)0 &&
 	allStrings != msg) {
-	CONDDEBUG((1, "DestroyString(): 0x%lx non-pooled string destroyed",
+	CONDDEBUG((3, "DestroyString(): 0x%lx non-pooled string destroyed",
 		   (void *)msg, stringCount));
     } else {
 	if (msg->prev != (STRING *)0)
@@ -273,7 +273,7 @@ DestroyString(STRING *msg)
 	    allStrings = msg->next;
 	}
 	stringCount--;
-	CONDDEBUG((1,
+	CONDDEBUG((3,
 		   "DestroyString(): 0x%lx string destroyed (count==%d)",
 		   (void *)msg, stringCount));
     }
@@ -296,7 +296,7 @@ AllocString(void)
     allStrings = s;
     InitString(s);
     stringCount++;
-    CONDDEBUG((1, "AllocString(): 0x%lx created string #%d", (void *)s,
+    CONDDEBUG((3, "AllocString(): 0x%lx created string #%d", (void *)s,
 	       stringCount));
     return s;
 }
