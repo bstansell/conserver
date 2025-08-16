@@ -133,7 +133,7 @@ typedef struct subst {
     int (*value)(char, char **, int *);
 } SUBST;
 
-extern int isMultiProc, fDebug, fVerbose, fErrorPrinted;
+extern int isMultiProc, fDebug, fVerbose, fErrorPrinted, fQuiet;
 extern char *progname;
 extern pid_t thepid;
 #define MAXHOSTNAME 1024

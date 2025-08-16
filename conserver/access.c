@@ -317,9 +317,12 @@ AccType(INADDR_STYPE *addr, char **peername)
 # if TRUST_REVERSE_DNS
   common_ret2:
     if (revNames != (char **)0) {
-	for (a = 0; revNames[a] != (char *)0; a++)
+	for (a = 0; revNames[a] != (char *)0; a++) {
 	    free(revNames[a]);
+	    revNames[a] = (char *)0;
+	}
 	free(revNames);
+	revNames = (char **)0;
     }
 # endif
 #endif /* USE_IPV6 */
@@ -413,7 +416,9 @@ DestroyAccessList(ACCESS *pACList)
 {
     if (pACList == (ACCESS *)0)
 	return;
-    if (pACList->pcwho != (char *)0)
+    if (pACList->pcwho != (char *)0) {
 	free(pACList->pcwho);
+	pACList->pcwho = (char *)0;
+    }
     free(pACList);
 }

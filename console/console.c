@@ -294,6 +294,7 @@ Usage(int wantfull)
 	"k         abort connection if the console is not 'up'",
 	"l user    use username instead of current username",
 	"M master  master server to poll first",
+	"j         suppress timestamp, progname, and pid in output",
 	"n         do not read system-wide config file",
 	"p port    port to connect to",
 	"P         display pids of daemon(s)",
@@ -319,7 +320,7 @@ Usage(int wantfull)
        %s [generic-args] [-iIuwWx] [console]\n\
        %s [generic-args] [-hPqQrRV] [-[bB] message] [-d [user][@console]]\n\
                               [-t [user][@console] message] [-[zZ] cmd]\n\n\
-       generic-args: [-7DEknUv] [-c cred] [-C config] [-M master]\n\
+       generic-args: [-7DEjknUv] [-c cred] [-C config] [-M master]\n\
                      [-p port] [-l username]\n", progname, progname, progname);
 
     if (wantfull) {
@@ -516,10 +517,12 @@ GetPort(char *pcToHost, unsigned short sPort)
     char host[NI_MAXHOST];
     char serv[NI_MAXSERV];
     struct addrinfo *ai, *rp, hints;
-#elif USE_UNIX_DOMAIN_SOCKETS
+#endif
+#if USE_UNIX_DOMAIN_SOCKETS
     struct sockaddr_un port;
     static STRING *portPath = (STRING *)0;
-#else
+#endif
+#if !USE_IPV6 && !USE_UNIX_DOMAIN_SOCKETS
     struct hostent *hp = (struct hostent *)0;
     struct sockaddr_in port;
 #endif
@@ -586,7 +589,8 @@ GetPort(char *pcToHost, unsigned short sPort)
     return (CONSFILE *)0;
   success:
     freeaddrinfo(ai);
-#elif USE_UNIX_DOMAIN_SOCKETS
+#endif
+#if USE_UNIX_DOMAIN_SOCKETS
     if (portPath == (STRING *)0)
 	portPath = AllocString();
     BuildStringPrint(portPath, "%s/%hu", config->master, sPort);
@@ -609,9 +613,11 @@ GetPort(char *pcToHost, unsigned short sPort)
 
     if (connect(s, (struct sockaddr *)(&port), sizeof(port)) < 0) {
 	Error("connect(): %s: %s", port.sun_path, strerror(errno));
+	close(s);
 	return (CONSFILE *)0;
     }
-#else
+#endif
+#if !USE_IPV6 && !USE_UNIX_DOMAIN_SOCKETS
 # if HAVE_INET_ATON
     if (inet_aton(pcToHost, &(port.sin_addr)) == 0)
 # else
@@ -971,8 +977,12 @@ GetUserInput(STRING *str)
     BuildString((char *)0, str);
 
     for (;;) {
-	if (read(0, &c, 1) == 0)
-	    break;
+	int n = read(0, &c, 1);
+	if (n <= 0) {
+		if (n < 0 && errno != EINTR)
+		Error("read(): %s", strerror(errno));
+		break;
+	}
 	if (c == '\n' || c == '\r') {
 	    break;
 	}
@@ -1923,7 +1933,7 @@ main(int argc, char **argv)
     int fLocal;
     static STRING *acPorts = (STRING *)0;
     static char acOpts[] =
-	"7aAb:B:c:C:d:De:EfFhikIl:M:np:PqQrRsSt:uUvVwWxz:Z:";
+	"7aAb:B:c:C:d:De:EfFhikIjl:M:np:PqQrRsSt:uUvVwWxz:Z:";
     extern int optind;
     extern int optopt;
     extern char *optarg;
@@ -2069,6 +2079,10 @@ main(int argc, char **argv)
 
 	    case 'n':
 		readSystemConf = 0;
+		break;
+
+	    case 'j':		/* suppress timestamp, progname, and pid */
+		fQuiet = 1;
 		break;
 
 	    case 'p':

@@ -790,18 +790,22 @@ Master(void)
 	return;
     }
 
-    if (!SetFlags(msfd, O_NONBLOCK, 0))
+    if (!SetFlags(msfd, O_NONBLOCK, 0)) {
+	close(msfd);
 	return;
+    }
 
     if (bind(msfd, (struct sockaddr *)&master_port, sizeof(master_port)) <
 	0) {
 	Error("Master(): bind(%s): %s", master_port.sun_path,
 	      strerror(errno));
+	close(msfd);
 	return;
     }
     if (listen(msfd, SOMAXCONN) < 0) {
 	Error("Master(): listen(%s): %s", master_port.sun_path,
 	      strerror(errno));
+	close(msfd);
 	return;
     }
 # ifdef TRUST_UDS_CRED
@@ -825,22 +829,27 @@ Master(void)
 	 sizeof(sock_opt_true)) < 0) {
 	Error("Master(): setsockopt(%u,SO_REUSEADDR): %s", msfd,
 	      strerror(errno));
+	close(msfd);
 	return;
     }
 # endif
 
-    if (!SetFlags(msfd, O_NONBLOCK, 0))
+    if (!SetFlags(msfd, O_NONBLOCK, 0)) {
+	close(msfd);
 	return;
+    }
 
     if (bind(msfd, (struct sockaddr *)&master_port, sizeof(master_port)) <
 	0) {
 	Error("Master(): bind(%hu): %s", ntohs(master_port.sin_port),
 	      strerror(errno));
+	close(msfd);
 	return;
     }
     if (listen(msfd, SOMAXCONN) < 0) {
 	Error("Master(): listen(%hu): %s", ntohs(master_port.sin_port),
 	      strerror(errno));
+	close(msfd);
 	return;
     }
 #endif

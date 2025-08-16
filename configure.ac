@@ -263,6 +263,29 @@ AC_ARG_WITH(extmsgs,
 		;;
 	esac],[AC_MSG_RESULT(no)])
 
+AC_MSG_CHECKING(whether to keep debug symbols in binaries)
+AC_ARG_WITH(debug-symbols,
+	AS_HELP_STRING([--with-debug-symbols],[Keep debug symbols in binaries (don't strip)]),
+	[case "$withval" in
+	    yes)
+		cons_with_debug_symbols="yes"
+		AC_MSG_RESULT(yes)
+		;;
+	    *)
+		cons_with_debug_symbols="no"
+		AC_MSG_RESULT(no)
+		;;
+	esac],[cons_with_debug_symbols="no"
+	AC_MSG_RESULT(no)])
+
+# Set the strip flag based on user preference
+if test "$cons_with_debug_symbols" = "yes"; then
+    STRIP_FLAG=""
+else  
+    STRIP_FLAG=" -s"
+fi
+AC_SUBST(STRIP_FLAG)
+
 use_dash_r=no
 AC_MSG_CHECKING(whether to use -R paths as well as -L)
 AC_ARG_WITH(rpath,
@@ -894,6 +917,7 @@ fi
 echo "              dmalloc (--with-dmalloc)   : $cons_with_dmalloc"
 echo "          PAM support (--with-pam)       : $cons_with_pam"
 echo "         IPv6 support (--with-ipv6)      : $cons_with_ipv6"
+echo "        debug symbols (--with-debug-symbols): $cons_with_debug_symbols"
 echo ""
 echo "=============================================================="
 ]

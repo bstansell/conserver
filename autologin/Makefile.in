@@ -9,7 +9,7 @@ sysconfdir = @sysconfdir@
 
 ### Installation programs and flags
 INSTALL = @INSTALL@
-INSTALL_PROGRAM = @INSTALL_PROGRAM@ -s
+INSTALL_PROGRAM = @INSTALL_PROGRAM@@STRIP_FLAG@
 LN_S = @LN_S@
 MKDIR = @MKDIR@
 

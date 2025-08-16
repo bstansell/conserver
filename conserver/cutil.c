@@ -21,7 +21,7 @@
 #endif
 
 
-int fVerbose = 0, fErrorPrinted = 0;
+int fVerbose = 0, fErrorPrinted = 0, fQuiet = 0;
 int isMultiProc = 0;
 char *progname = "conserver package";
 pid_t thepid = 0;
@@ -483,13 +483,16 @@ Debug(int level, char *fmt, ...)
     if (fDebug < level)
 	return;
     va_start(ap, fmt);
-    if (isMultiProc)
+    if (fQuiet) {
+	fprintf(stderr, "DEBUG: [%s:%d] ", debugFileName, debugLineNo);
+    } else if (isMultiProc) {
 	fprintf(stderr, "[%s] %s (%lu): DEBUG: [%s:%d] ",
 		StrTime((time_t *)0), progname, (unsigned long)thepid,
 		debugFileName, debugLineNo);
-    else
+    } else {
 	fprintf(stderr, "%s: DEBUG: [%s:%d] ", progname, debugFileName,
 		debugLineNo);
+    }
     vfprintf(stderr, fmt, ap);
     fprintf(stderr, "\n");
     va_end(ap);
@@ -500,11 +503,14 @@ Error(char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
-    if (isMultiProc)
+    if (fQuiet) {
+	fprintf(stderr, "ERROR: ");
+    } else if (isMultiProc) {
 	fprintf(stderr, "[%s] %s (%lu): ERROR: ", StrTime((time_t *)0),
 		progname, (unsigned long)thepid);
-    else
+    } else {
 	fprintf(stderr, "%s: ", progname);
+    }
     vfprintf(stderr, fmt, ap);
     fprintf(stderr, "\n");
     va_end(ap);
@@ -516,11 +522,14 @@ Msg(char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
-    if (isMultiProc)
+    if (fQuiet) {
+	/* In quiet mode, print message without any prefix */
+    } else if (isMultiProc) {
 	fprintf(stdout, "[%s] %s (%lu): ", StrTime((time_t *)0), progname,
 		(unsigned long)thepid);
-    else
+    } else {
 	fprintf(stdout, "%s: ", progname);
+    }
     vfprintf(stdout, fmt, ap);
     fprintf(stdout, "\n");
     va_end(ap);
@@ -535,11 +544,14 @@ Verbose(char *fmt, ...)
 	return;
 
     va_start(ap, fmt);
-    if (isMultiProc)
+    if (fQuiet) {
+	fprintf(stdout, "INFO: ");
+    } else if (isMultiProc) {
 	fprintf(stdout, "[%s] %s (%lu): INFO: ", StrTime((time_t *)0),
 		progname, (unsigned long)thepid);
-    else
+    } else {
 	fprintf(stdout, "%s: ", progname);
+    }
     vfprintf(stdout, fmt, ap);
     fprintf(stdout, "\n");
     va_end(ap);
@@ -618,19 +630,19 @@ FileOpenFD(int fd, enum consFileType type)
 #if DEBUG_CONSFILE_IO
     {
 	char buf[1024];
-	sprintf(buf, "CONSFILE-%s-%lu-%d.w", progname,
+	snprintf(buf, sizeof(buf), "CONSFILE-%s-%lu-%d.w", progname,
 		(unsigned long)thepid, fd);
 	if ((cfp->debugwfd =
 	     open(buf, O_WRONLY | O_CREAT | O_APPEND, 0644)) != -1) {
-	    sprintf(buf, "[---- STARTED - %s ----]\n",
+	    snprintf(buf, sizeof(buf), "[---- STARTED - %s ----]\n",
 		    StrTime((time_t *)0));
 	    write(cfp->debugwfd, buf, strlen(buf));
 	}
-	sprintf(buf, "CONSFILE-%s-%lu-%d.r", progname,
+	snprintf(buf, sizeof(buf), "CONSFILE-%s-%lu-%d.r", progname,
 		(unsigned long)thepid, fd);
 	if ((cfp->debugrfd =
 	     open(buf, O_WRONLY | O_CREAT | O_APPEND, 0644)) != -1) {
-	    sprintf(buf, "[---- STARTED - %s ----]\n",
+	    snprintf(buf, sizeof(buf), "[---- STARTED - %s ----]\n",
 		    StrTime((time_t *)0));
 	    write(cfp->debugrfd, buf, strlen(buf));
 	}
@@ -663,19 +675,19 @@ FileOpenPipe(int fd, int fdout)
 #if DEBUG_CONSFILE_IO
     {
 	char buf[1024];
-	sprintf(buf, "CONSFILE-%s-%lu-%d.w", progname,
+	snprintf(buf, sizeof(buf), "CONSFILE-%s-%lu-%d.w", progname,
 		(unsigned long)thepid, fdout);
 	if ((cfp->debugwfd =
 	     open(buf, O_WRONLY | O_CREAT | O_APPEND, 0644)) != -1) {
-	    sprintf(buf, "[---- STARTED - %s ----]\n",
+	    snprintf(buf, sizeof(buf), "[---- STARTED - %s ----]\n",
 		    StrTime((time_t *)0));
 	    write(cfp->debugwfd, buf, strlen(buf));
 	}
-	sprintf(buf, "CONSFILE-%s-%lu-%d.r", progname,
+	snprintf(buf, sizeof(buf), "CONSFILE-%s-%lu-%d.r", progname,
 		(unsigned long)thepid, fd);
 	if ((cfp->debugrfd =
 	     open(buf, O_WRONLY | O_CREAT | O_APPEND, 0644)) != -1) {
-	    sprintf(buf, "[---- STARTED - %s ----]\n",
+	    snprintf(buf, sizeof(buf), "[---- STARTED - %s ----]\n",
 		    StrTime((time_t *)0));
 	    write(cfp->debugrfd, buf, strlen(buf));
 	}
@@ -754,19 +766,19 @@ FileOpen(const char *path, int flag, int mode)
 #if DEBUG_CONSFILE_IO
     {
 	char buf[1024];
-	sprintf(buf, "CONSFILE-%s-%lu-%d.w", progname,
+	snprintf(buf, sizeof(buf), "CONSFILE-%s-%lu-%d.w", progname,
 		(unsigned long)thepid, fd);
 	if ((cfp->debugwfd =
 	     open(buf, O_WRONLY | O_CREAT | O_APPEND, 0644)) != -1) {
-	    sprintf(buf, "[---- STARTED - %s ----]\n",
+	    snprintf(buf, sizeof(buf), "[---- STARTED - %s ----]\n",
 		    StrTime((time_t *)0));
 	    write(cfp->debugwfd, buf, strlen(buf));
 	}
-	sprintf(buf, "CONSFILE-%s-%lu-%d.r", progname,
+	snprintf(buf, sizeof(buf), "CONSFILE-%s-%lu-%d.r", progname,
 		(unsigned long)thepid, fd);
 	if ((cfp->debugrfd =
 	     open(buf, O_WRONLY | O_CREAT | O_APPEND, 0644)) != -1) {
-	    sprintf(buf, "[---- STARTED - %s ----]\n",
+	    snprintf(buf, sizeof(buf), "[---- STARTED - %s ----]\n",
 		    StrTime((time_t *)0));
 	    write(cfp->debugrfd, buf, strlen(buf));
 	}
@@ -3094,7 +3106,10 @@ StrCpy(char *dst, const char *src, unsigned int size)
 #ifdef HAVE_STRLCPY
     strlcpy(dst, src, size);
 #else
-    strcpy(dst, src);
+    if (size > 0) {
+        strncpy(dst, src, size - 1);
+        dst[size - 1] = '\0';
+    }
 #endif
 }
 

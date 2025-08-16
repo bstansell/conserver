@@ -989,11 +989,11 @@ int c;
     c &= 0x7F;
 
     if (c < 32)
-	sprintf(string, "%s^%c", meta, (int)c + '@');
+	snprintf(string, sizeof(string), "%s^%c", meta, (int)c + '@');
     else if (c == 127)
-	sprintf(string, "%s^?", meta);
+	snprintf(string, sizeof(string), "%s^?", meta);
     else
-	sprintf(string, "%s%c", meta, c);
+	snprintf(string, sizeof(string), "%s%c", meta, c);
 
     return (string);
 }
@@ -1411,7 +1411,7 @@ register char *string;
 		    struct tm* tm_now = localtime (&time_now);
 
 		    strftime (report_buffer, 20, "%b %d %H:%M:%S ", tm_now);
-		    strcat (report_buffer, report_string[n]);
+		    strncat (report_buffer, report_string[n], sizeof(report_buffer) - strlen(report_buffer) - 1);
 
 		    report_string[n] = (char *) NULL;
 		    report_gathering = 1;
@@ -1457,7 +1457,9 @@ register char *string;
 		alarm(0);
 		alarmed = 0;
 		exit_code = n + 4;
-		strcpy(fail_reason = fail_buffer, abort_string[n]);
+		fail_reason = fail_buffer;
+	strncpy(fail_buffer, abort_string[n], sizeof(fail_buffer) - 1);
+	fail_buffer[sizeof(fail_buffer) - 1] = '\0';
 		return (0);
 	    }
 	}

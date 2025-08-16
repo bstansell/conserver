@@ -365,14 +365,22 @@ DestroyClient(CONSCLIENT *pCL)
 {
     if (pCL == (CONSCLIENT *)0)
 	return;
-    if (pCL->acid != (STRING *)0)
+    if (pCL->acid != (STRING *)0) {
 	DestroyString(pCL->acid);
-    if (pCL->peername != (STRING *)0)
+	pCL->acid = (STRING *)0;
+    }
+    if (pCL->peername != (STRING *)0) {
 	DestroyString(pCL->peername);
-    if (pCL->accmd != (STRING *)0)
+	pCL->peername = (STRING *)0;
+    }
+    if (pCL->accmd != (STRING *)0) {
 	DestroyString(pCL->accmd);
-    if (pCL->username != (STRING *)0)
+	pCL->accmd = (STRING *)0;
+    }
+    if (pCL->username != (STRING *)0) {
 	DestroyString(pCL->username);
+	pCL->username = (STRING *)0;
+    }
     FileClose(&pCL->fd);
     free(pCL);
 }
@@ -390,6 +398,7 @@ DestroyConsentUsers(CONSENTUSERS **cu)
 	free(*cu);
 	(*cu) = n;
     }
+    *cu = (CONSENTUSERS *)0;
 }
 
 CONSENTUSERS *
@@ -398,6 +407,9 @@ ConsentFindUser(CONSENTUSERS *pCU, char *id)
     short close = 0;
     struct group *g = (struct group *)0;
     struct passwd *pwd = (struct passwd *)0;
+
+    if (id == (char *)0)
+	return (CONSENTUSERS *)0;
 
     for (; pCU != (CONSENTUSERS *)0; pCU = pCU->next) {
 	if (pCU->user->name[0] == '@' && pCU->user->name[1] != '\000') {
@@ -1245,9 +1257,13 @@ WriteLog(CONSENT *pCE, char *s, int len)
 	}
     }
     if (i < j) {
-	FileWrite(pCE->fdlog, FLAGTRUE, s + i, j - i);
+	if (FileWrite(pCE->fdlog, FLAGTRUE, s + i, j - i) < 0) {
+		CONDDEBUG((1, "WriteLog(): [%s] FileWrite failed", pCE->server));
+	}
     }
-    FileWrite(pCE->fdlog, FLAGFALSE, (char *)0, 0);
+	if (FileWrite(pCE->fdlog, FLAGFALSE, (char *)0, 0) < 0) {
+		CONDDEBUG((1, "WriteLog(): [%s] FileWrite flush failed", pCE->server));
+	}
 }
 
 static RETSIGTYPE
@@ -1977,6 +1993,7 @@ AttemptGSSAPI(CONSCLIENT *pCL)
     }
     if ((nr = FileRead(pCL->fd, buf, pCL->tokenSize)) <= 0) {
 	free(buf);
+	buf = (char *)0;
 	return nr;
     }
     recvtok.value = buf;
@@ -2017,6 +2034,7 @@ AttemptGSSAPI(CONSCLIENT *pCL)
     }
 
     free(buf);
+    buf = (char *)0;
     return ret;
 }
 #endif
@@ -2569,7 +2587,7 @@ TelOpt(int o)
     if (o < sizeof(telopts) / sizeof(char *))
 	return telopts[o];
     else {
-	sprintf(opt, "%d", o);
+	snprintf(opt, sizeof(opt), "%d", o);
 	return opt;
     }
 }
@@ -2730,8 +2748,11 @@ DoConsoleRead(CONSENT *pCEServing)
     /* if we have a command running, interface with it and then
      * allow the normal stuff to happen (so folks can watch)
      */
-    if (pCEServing->initfile != (CONSFILE *)0)
-	FileWrite(pCEServing->initfile, FLAGFALSE, (char *)acIn, nr);
+    if (pCEServing->initfile != (CONSFILE *)0) {
+	if (FileWrite(pCEServing->initfile, FLAGFALSE, (char *)acIn, nr) < 0) {
+		Error("FileWrite(): failed to write to init file");
+	}
+    }
 
     /* output all console info nobody is attached
      * or output to unifiedlog if it's open

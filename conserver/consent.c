@@ -1446,6 +1446,7 @@ AddrsMatch(char *addr1, char *addr2)
 	    Error("AddrsMatch(): gethostbyname(%s): %s", addr2,
 		  hstrerror(h_errno));
 	    free(addrs);
+	    addrs = (in_addr_t *)0;
 	    return 0;
 	}
 	if (4 != he->h_length || AF_INET != he->h_addrtype) {
@@ -1453,6 +1454,7 @@ AddrsMatch(char *addr1, char *addr2)
 		("AddrsMatch(): gethostbyname(%s): wrong address size (4 != %d) or address family (%d != %d)",
 		 addr2, he->h_length, AF_INET, he->h_addrtype);
 	    free(addrs);
+	    addrs = (in_addr_t *)0;
 	    return 0;
 	}
 	for (j = 0; he->h_addr_list[j] != (char *)0; j++) {
@@ -1466,11 +1468,13 @@ AddrsMatch(char *addr1, char *addr2)
 # endif
 		       == 0) {
 		    free(addrs);
+		    addrs = (in_addr_t *)0;
 		    return 1;
 		}
 	    }
 	}
 	free(addrs);
+	addrs = (in_addr_t *)0;
     } else {			/* one hostname, one ip addr */
 	in_addr_t *iaddr;
 	char *addr;

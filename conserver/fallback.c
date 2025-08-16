@@ -245,8 +245,10 @@ FallBack(char **slave, int *sfd)
     if ((fd = GetPseudoTTY(pcTSlave, sfd)) == -1) {
 	return -1;
     }
-    if ((*slave) != (char *)0)
+    if ((*slave) != (char *)0) {
 	free(*slave);
+	*slave = (char *)0;
+    }
     if (((*slave) = StrDup(pcTSlave->string))
 	== (char *)0)
 	OutOfMem();

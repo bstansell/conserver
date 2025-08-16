@@ -85,11 +85,19 @@ GetPassword(char *prompt)
     }
 
     C2Raw(fd);
-    write(fd, prompt, strlen(prompt));
+    if (write(fd, prompt, strlen(prompt)) < 0) {
+	Error("write(): %s", strerror(errno));
+	C2Normal(fd);
+	close(fd);
+	return (char *)0;
+    }
     while (!done) {
 	int i;
-	if ((nc = read(0, buf, sizeof(buf))) == 0)
-	    break;
+	if ((nc = read(0, buf, sizeof(buf))) <= 0) {
+		if (nc < 0 && errno != EINTR)
+		Error("read(): %s", strerror(errno));
+		break;
+	}
 	for (i = 0; i < nc; ++i) {
 	    if (buf[i] == 0x0d || buf[i] == 0x0a) {
 		/* CR, NL */
@@ -113,7 +121,9 @@ GetPassword(char *prompt)
        write(fd, "'\n", 2);
        }
      */
-    write(fd, "\n", 1);
+	if (write(fd, "\n", 1) < 0) {
+	Error("write(): %s", strerror(errno));
+	}
     close(fd);
     /* this way a (char*)0 is only returned on error */
     if (pass->string == (char *)0)

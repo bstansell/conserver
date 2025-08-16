@@ -77,6 +77,8 @@ ProcessYesNo(char *id, FLAG *flag)
 void
 DestroyTask(TASKS *task)
 {
+    if (task == (TASKS *)0)
+	return;
     if (task->cmd != (STRING *)0) {
 	DestroyString(task->cmd);
 	task->cmd = (STRING *)0;
@@ -85,8 +87,10 @@ DestroyTask(TASKS *task)
 	DestroyString(task->descr);
 	task->descr = (STRING *)0;
     }
-    if (task->subst != (char *)0)
+    if (task->subst != (char *)0) {
 	free(task->subst);
+	task->subst = (char *)0;
+    }
     free(task);
 }
 
@@ -1356,6 +1360,8 @@ ProcessUsername(CONSENT *c, char *id)
 	return;
     }
     c->username = strdup(id);
+    if (c->username == (char *)0)
+	OutOfMem();
 }
 
 void
@@ -1805,6 +1811,8 @@ ProcessPassword(CONSENT *c, char *id)
 	return;
     }
     c->password = strdup(id);
+    if (c->password == (char *)0)
+	OutOfMem();
 }
 
 void

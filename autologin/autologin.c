@@ -116,8 +116,7 @@ Process(void)
 	    exit(1);
 	    /* NOTREACHED */
 	}
-	(void)strcpy(pcCmd, "-c ");
-	(void)strcat(pcCmd, pcCommand);
+	snprintf(pcCmd, strlen(pcCommand) + 4, "-c %s", pcCommand);
     }
 
     if ((char *)0 != pcGroup) {
@@ -132,7 +131,9 @@ Process(void)
 	    exit(1);
 	    /* NOTREACHED */
 	}
-	pcLogin = strcpy(acLogin, pwd->pw_name);
+	strncpy(acLogin, pwd->pw_name, sizeof(acLogin) - 1);
+	acLogin[sizeof(acLogin) - 1] = '\0';
+	pcLogin = acLogin;
     } else if ((struct passwd *)0 == (pwd = getpwnam(pcLogin))) {
 	(void)fprintf(stderr, "%s: %s: login name unknown\n", progname,
 		      pcLogin);
@@ -168,7 +169,7 @@ Process(void)
 			      strerror(errno));
 		exit(1);
 	    }
-	    sprintf(pcDevTty, "/dev/%s", pcTty);
+	    snprintf(pcDevTty, strlen(pcTty) + 6, "/dev/%s", pcTty);
 	}
 
 
@@ -459,7 +460,7 @@ make_utmp(char *pclogin, char *pctty)
     auto struct utmp utmp;
 
 
-    if ((char *)0 == pctty) {
+    if ((char *)0 == pclogin || (char *)0 == pctty) {
 	return;
     }
 
@@ -535,13 +536,17 @@ make_utmp(char *pclogin, char *pctty)
     /* look through /etc/utmp by hand (sigh)
      */
     iFound = iPos = 0;
-    while (sizeof(utmp) == read(fdUtmp, &utmp, sizeof(utmp))) {
+    ssize_t n;
+    while ((n = read(fdUtmp, &utmp, sizeof(utmp))) == sizeof(utmp)) {
 	if (0 == strncmp(utmp.ut_line, pcDev, sizeof(utmp.ut_line))) {
 	    ++iFound;
 	    break;
 	}
 	iPos++;
     }
+	if (n < 0) {
+	fprintf(stderr, "%s: read: %s\n", progname, strerror(errno));
+	}
     (void)strncpy(utmp.ut_name, pclogin, sizeof(utmp.ut_name));
 # endif
 #endif

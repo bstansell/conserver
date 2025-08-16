@@ -578,7 +578,7 @@ static void
 Usage(int wantfull)
 {
     static char u_terse[] =
-	"[-7dDEFhinoRSuvV] [-a type] [-m max] [-M master] [-p port] [-b port] [-c cred] [-C config] [-P passwd] [-L logfile] [-O min] [-U logfile]";
+	"[-7dDEFhijnoRSuvV] [-a type] [-m max] [-M master] [-p port] [-b port] [-c cred] [-C config] [-P passwd] [-L logfile] [-O min] [-U logfile]";
     static char *full[] = {
 	"7          strip the high bit off all console data",
 	"a type     set the default access type",
@@ -599,6 +599,7 @@ Usage(int wantfull)
 	"F          do not automatically reinitialize failed consoles",
 	"h          output this message",
 	"i          initialize console connections on demand",
+	"j          suppress timestamp, progname, and pid in output",
 	"L logfile  give a new logfile path to the server process",
 	"m max      maximum consoles managed per process",
 #if USE_UNIX_DOMAIN_SOCKETS
@@ -826,9 +827,10 @@ SummarizeDataStructures(void)
 	 pGE = pGE->pGEnext) {
 	for (pCE = pGE->pCElist; pCE != (CONSENT *)0;
 	     pCE = pCE->pCEnext, count++) {
-	    size += strlen(pCE->server) + sizeof(CONSENT);
+	    if (pCE->server != (char *)0)
+		size += strlen(pCE->server) + sizeof(CONSENT);
 	    if (pCE->host != (char *)0)
-		size += strlen(pCE->server);
+		size += strlen(pCE->host);
 	    if (pCE->device != (char *)0)
 		size += strlen(pCE->device);
 	    if (pCE->exec != (char *)0)
@@ -1229,7 +1231,7 @@ main(int argc, char **argv)
 {
     int i;
     FILE *fpConfig = (FILE *)0;
-    static char acOpts[] = "7a:b:c:C:dDEFhiL:m:M:noO:p:P:RSuU:Vv";
+    static char acOpts[] = "7a:b:c:C:dDEFhijL:m:M:noO:p:P:RSuU:Vv";
     extern int optopt;
     extern char *optarg;
     struct passwd *pwd;
@@ -1341,6 +1343,9 @@ main(int argc, char **argv)
 	    case 'i':
 		fNoinit = 1;
 		break;
+	    case 'j':
+		fQuiet = 1;
+		break;
 	    case 'L':
 		if ((optConf->logfile = StrDup(optarg)) == (char *)0)
 		    OutOfMem();
@@ -1451,7 +1456,7 @@ main(int argc, char **argv)
 	Error("gethostname(): %s", strerror(errno));
 	Bye(EX_OSERR);
     }
-#if !USE_IPV6
+#if !USE_IPV6 && !USE_UNIX_DOMAIN_SOCKETS
     ProbeInterfaces(bindAddr);
 #endif
 #if !HAVE_CLOSEFROM
@@ -1558,14 +1563,18 @@ main(int argc, char **argv)
 	Error("getaddrinfo(%s): %s", interface, gai_strerror(s));
 	Bye(EX_OSERR);
     }
-#elif USE_UNIX_DOMAIN_SOCKETS
+#endif
+#if USE_UNIX_DOMAIN_SOCKETS
     /* Don't do any redirects if we're purely local
      * (but it allows them to see where remote consoles are)
      */
+#if !USE_IPV6
     optConf->redirect = FLAGFALSE;
+#endif
     if (interface == (char *)0)
 	interface = UDSDIR;
-#else
+#endif
+#if !USE_IPV6 && !USE_UNIX_DOMAIN_SOCKETS
     /* set up the address to bind to */
     if (interface == (char *)0 ||
 	(interface[0] == '*' && interface[1] == '\000'))
