@@ -1,9 +1,9 @@
 env:
   CIRRUS_CLONE_DEPTH: 1
 
-freebsd_13_task:
+freebsd_14_task:
   freebsd_instance:
-    image_family: freebsd-13-3
+    image_family: freebsd-14-3
   install_script:
     - pkg install -y autoconf automake
     - ./package/setup-configure
