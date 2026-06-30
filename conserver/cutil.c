@@ -2057,17 +2057,40 @@ ProbeInterfaces(in_addr_t bindAddr)
 }
 #endif /* USE_IPV6 */
 
+/* IsMe() is called once per console per process per reread.
+ * getifaddrs()/freeifaddrs() every call, which thrashes the global
+ * netlink_table_lock Therefore we cache, WARNING: caches results
+ * for process lifetime though
+ */
+#define ISME_CACHE_SIZE 256
+static struct {
+    char *name;
+    int result;
+} isme_result_cache[ISME_CACHE_SIZE];
+static int isme_result_cache_count = 0;
+#if USE_IPV6
+static struct ifaddrs *isme_cached_addrs = (struct ifaddrs *)0;
+static int isme_addrs_initialized = 0;
+#endif
+
 int
 IsMe(char *id)
 {
 #if USE_IPV6
     int ret = 0;
     int error;
+    int i;
     struct addrinfo hints;
     struct addrinfo *res, *rp;
-    struct ifaddrs *myAddrs, *ifa;
+    struct ifaddrs *ifa;
     void *a, *b;
     size_t len;
+
+    /* hostname memo: most consoles share a handful of master names */
+    for (i = 0; i < isme_result_cache_count; i++) {
+	if (strcmp(isme_result_cache[i].name, id) == 0)
+	    return isme_result_cache[i].result;
+    }
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = PF_UNSPEC;
@@ -2079,15 +2102,19 @@ IsMe(char *id)
 	return 0;
     }
 
-    /* get list of all addresses on system */
-    error = getifaddrs(&myAddrs);
-    if (error) {
-	perror("getifaddrs failed");
-	return 0;
+    /* get list of all addresses on system (cached for process lifetime) */
+    if (!isme_addrs_initialized) {
+	error = getifaddrs(&isme_cached_addrs);
+	if (error) {
+	    perror("getifaddrs failed");
+	    freeaddrinfo(res);
+	    return 0;
+	}
+	isme_addrs_initialized = 1;
     }
 
     /* try to find a match */
-    for (ifa = myAddrs; ifa != NULL; ifa = ifa->ifa_next) {
+    for (ifa = isme_cached_addrs; ifa != NULL; ifa = ifa->ifa_next) {
 	/* skip interfaces without address or in down state */
 	if (ifa->ifa_addr == NULL || !(ifa->ifa_flags & IFF_UP))
 	    continue;
@@ -2122,8 +2149,18 @@ IsMe(char *id)
 
   done:
     freeaddrinfo(res);
-    freeifaddrs(myAddrs);
+    /* NB: isme_cached_addrs is process-lifetime; do NOT freeifaddrs */
     CONDDEBUG((1, "IsMe: ret %d id %s", ret, id));
+
+    /* memoize so next call skips both getaddrinfo and the inner loop */
+    if (isme_result_cache_count < ISME_CACHE_SIZE) {
+	char *dup = StrDup(id);
+	if (dup != (char *)0) {
+	    isme_result_cache[isme_result_cache_count].name = dup;
+	    isme_result_cache[isme_result_cache_count].result = ret;
+	    isme_result_cache_count++;
+	}
+    }
     return ret;
 #else
     int j, i;
