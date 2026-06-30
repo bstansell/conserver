@@ -1511,12 +1511,146 @@ AddrsMatch(char *addr1, char *addr2)
 #endif /* USE_IPV6 */
 }
 
+#if USE_IPV6
+/* AddrsMatch but takes pre-resolved addrinfo lists so the inner
+ * loop of FindUniq does not pay a getaddrinfo() per pair
+ */
+static int
+AddrsMatchAi(const char *name1, const char *name2,
+	     struct addrinfo *ai1, struct addrinfo *ai2)
+{
+    struct addrinfo *rp1, *rp2;
+
+    if (strcasecmp(name1, name2) == 0)
+	return 1;
+    if (ai1 == (struct addrinfo *)0 || ai2 == (struct addrinfo *)0)
+	return 0;
+
+    for (rp1 = ai1; rp1 != (struct addrinfo *)0; rp1 = rp1->ai_next) {
+	for (rp2 = ai2; rp2 != (struct addrinfo *)0; rp2 = rp2->ai_next) {
+	    void *a, *b;
+	    size_t len;
+	    if (rp1->ai_family != rp2->ai_family)
+		continue;
+	    if (rp1->ai_family == AF_INET) {
+		a = &(((struct sockaddr_in *)rp1->ai_addr)->sin_addr);
+		b = &(((struct sockaddr_in *)rp2->ai_addr)->sin_addr);
+		len = sizeof(struct in_addr);
+	    } else if (rp1->ai_family == AF_INET6) {
+		a = &(((struct sockaddr_in6 *)rp1->ai_addr)->sin6_addr);
+		b = &(((struct sockaddr_in6 *)rp2->ai_addr)->sin6_addr);
+		len = sizeof(struct in6_addr);
+	    } else {
+		continue;
+	    }
+	    if (memcmp(a, b, len) == 0)
+		return 1;
+	}
+    }
+    return 0;
+}
+#endif
+
 /* thread ther list of uniq console server machines, aliases for	(ksb)
  * machines will screw us up
  */
 REMOTE *
 FindUniq(REMOTE *pRCAll)
 {
+#if USE_IPV6
+    /* Dedup the remote-master list by hostname and resolved IP.
+     * Resolve each unique hostname exactly once and alias the
+     * resulting addrinfo across cache entries
+     */
+    struct cacheent {
+	REMOTE *r;
+	struct addrinfo *ai;
+    };
+    struct nameent {
+	char *name;
+	struct addrinfo *ai;
+    };
+    struct cacheent *cache;
+    struct nameent *names;
+    int *uniqIdx;
+    int n, i, k, u, uniqCount, nameCount;
+    REMOTE *entry, *uniqHead;
+    struct addrinfo *entryAi;
+    struct addrinfo hints;
+
+    if (pRCAll == (REMOTE *)0)
+	return (REMOTE *)0;
+
+    n = 0;
+    for (entry = pRCAll; entry != (REMOTE *)0; entry = entry->pRCnext)
+	n++;
+
+    cache = (struct cacheent *)calloc(n, sizeof(struct cacheent));
+    names = (struct nameent *)calloc(n, sizeof(struct nameent));
+    uniqIdx = (int *)calloc(n, sizeof(int));
+    if (cache == (struct cacheent *)0 || names == (struct nameent *)0 ||
+	uniqIdx == (int *)0)
+	OutOfMem();
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_flags = AI_ADDRCONFIG;
+    hints.ai_socktype = SOCK_STREAM;
+
+    nameCount = 0;
+    for (entry = pRCAll, i = 0; entry != (REMOTE *)0;
+	 entry = entry->pRCnext, i++) {
+	cache[i].r = entry;
+	cache[i].ai = (struct addrinfo *)0;
+	for (k = 0; k < nameCount; k++) {
+	    if (strcasecmp(names[k].name, entry->rhost) == 0) {
+		cache[i].ai = names[k].ai;
+		break;
+	    }
+	}
+	if (k == nameCount) {
+	    names[nameCount].name = entry->rhost;
+	    if (getaddrinfo
+		(entry->rhost, NULL, &hints, &names[nameCount].ai) != 0)
+		names[nameCount].ai = (struct addrinfo *)0;
+	    cache[i].ai = names[nameCount].ai;
+	    nameCount++;
+	}
+    }
+
+    /* Walk the input list tail-to-head and build the uniq chain */
+    uniqCount = 0;
+    uniqHead = (REMOTE *)0;
+    for (i = n - 1; i >= 0; i--) {
+	int matched = 0;
+	entry = cache[i].r;
+	entryAi = cache[i].ai;
+
+	for (u = 0; u < uniqCount; u++) {
+	    int ui = uniqIdx[u];
+	    if (AddrsMatchAi(cache[ui].r->rhost, entry->rhost,
+			     cache[ui].ai, entryAi)) {
+		matched = 1;
+		break;
+	    }
+	}
+
+	entry->pRCuniq = uniqHead;
+	if (!matched) {
+	    uniqIdx[uniqCount++] = i;
+	    uniqHead = entry;
+	}
+    }
+
+    for (k = 0; k < nameCount; k++) {
+	if (names[k].ai != (struct addrinfo *)0)
+	    freeaddrinfo(names[k].ai);
+    }
+    free(names);
+    free(cache);
+    free(uniqIdx);
+
+    return uniqHead;
+#else
     REMOTE *pRC;
 
     /* INV: tail of the list we are building always contains only
@@ -1535,6 +1669,7 @@ FindUniq(REMOTE *pRCAll)
 	    return pRCAll->pRCuniq;
     }
     return pRCAll;
+#endif
 }
 
 void

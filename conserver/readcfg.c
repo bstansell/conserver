@@ -2462,6 +2462,90 @@ CONSENT *parserConsoles = (CONSENT *)0;
 CONSENT **parserConsolesTail = &parserConsoles;
 CONSENT *parserConsoleTemp = (CONSENT *)0;
 
+/* Hash index for parserConsoles, keyed by ->server.
+ * Aims to make duplicate-name lookup O(1)
+ */
+#define PARSER_CONSOLES_HASH_SIZE 32768U
+#define PARSER_CONSOLES_HASH_MASK (PARSER_CONSOLES_HASH_SIZE - 1U)
+
+typedef struct parserConsolesHashEntry {
+    CONSENT *c;
+    struct parserConsolesHashEntry *next;
+} PCHashEntry;
+
+static PCHashEntry *parserConsolesHash[PARSER_CONSOLES_HASH_SIZE];
+
+static unsigned int
+ParserConsolesHashName(const char *s)
+{
+    unsigned int h = 5381U;
+    int ch;
+    while ((ch = (unsigned char)*s++) != 0)
+	h = ((h << 5) + h) + (unsigned int)ch;
+    return h & PARSER_CONSOLES_HASH_MASK;
+}
+
+static CONSENT *
+ParserConsolesHashLookup(const char *id)
+{
+    PCHashEntry *e;
+    unsigned int h = ParserConsolesHashName(id);
+    for (e = parserConsolesHash[h]; e != (PCHashEntry *)0; e = e->next) {
+	if (strcmp(e->c->server, id) == 0)
+	    return e->c;
+    }
+    return (CONSENT *)0;
+}
+
+static void
+ParserConsolesHashInsert(CONSENT *c)
+{
+    PCHashEntry *e;
+    unsigned int h;
+    if (c == (CONSENT *)0 || c->server == (char *)0)
+	return;
+    if ((e = (PCHashEntry *)calloc(1, sizeof(*e))) == (PCHashEntry *)0)
+	OutOfMem();
+    e->c = c;
+    h = ParserConsolesHashName(c->server);
+    e->next = parserConsolesHash[h];
+    parserConsolesHash[h] = e;
+}
+
+static void
+ParserConsolesHashRemove(CONSENT *c)
+{
+    PCHashEntry **pp;
+    PCHashEntry *dead;
+    unsigned int h;
+    if (c == (CONSENT *)0 || c->server == (char *)0)
+	return;
+    h = ParserConsolesHashName(c->server);
+    for (pp = &parserConsolesHash[h]; *pp != (PCHashEntry *)0;
+	 pp = &(*pp)->next) {
+	if ((*pp)->c == c) {
+	    dead = *pp;
+	    *pp = dead->next;
+	    free(dead);
+	    return;
+	}
+    }
+}
+
+static void
+ParserConsolesHashClear(void)
+{
+    PCHashEntry *e, *next;
+    unsigned int i;
+    for (i = 0; i < PARSER_CONSOLES_HASH_SIZE; i++) {
+	for (e = parserConsolesHash[i]; e != (PCHashEntry *)0; e = next) {
+	    next = e->next;
+	    free(e);
+	}
+	parserConsolesHash[i] = (PCHashEntry *)0;
+    }
+}
+
 void
 ConsoleBegin(char *id)
 {
@@ -2643,12 +2727,12 @@ ConsoleEnd(void)
 
     /* if we're overriding an existing console, nuke it */
     if ((c =
-	 FindParserDefaultOrConsole(parserConsoles,
-				    parserConsoleTemp->server)) !=
+	 ParserConsolesHashLookup(parserConsoleTemp->server)) !=
 	(CONSENT *)0) {
 	if (isMaster)
 	    Error("console definition for `%s' overridden [%s:%d]",
 		  parserConsoleTemp->server, file, line);
+	ParserConsolesHashRemove(c);
 	DestroyParserDefaultOrConsole(c, &parserConsoles,
 				      &parserConsolesTail);
     }
@@ -2656,6 +2740,7 @@ ConsoleEnd(void)
     /* add the temp to the tail of the list */
     *parserConsolesTail = parserConsoleTemp;
     parserConsolesTail = &(parserConsoleTemp->pCEnext);
+    ParserConsolesHashInsert(parserConsoleTemp);
     parserConsoleTemp = (CONSENT *)0;
 }
 
@@ -3554,6 +3639,7 @@ ConsoleDestroy(void)
     DestroyParserDefaultOrConsole(parserConsoleTemp, (CONSENT **)0,
 				  (CONSENT ***)0);
     parserConsoles = parserConsoleTemp = (CONSENT *)0;
+    ParserConsolesHashClear();
 
     /* here we check on the client permissions and adjust accordingly */
     if (!isMaster && pGroups != (GRPENT *)0) {
